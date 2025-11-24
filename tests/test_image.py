@@ -160,3 +160,26 @@ class TestFileStructure:
         init_script = host.file("/root/assets/init-workspace.sh")
         assert init_script.exists, "init-workspace script not found"
         assert init_script.mode == 0o755, "init-workspace script is not executable"
+
+    def test_workspace_template_pre_commit_config_exists(self, host):
+        """Test that .pre-commit-config.yaml exists in workspace template."""
+        precommit_config = host.file("/root/assets/workspace/.pre-commit-config.yaml")
+        assert precommit_config.exists, (
+            ".pre-commit-config.yaml not found in workspace template"
+        )
+        assert precommit_config.is_file, ".pre-commit-config.yaml is not a file"
+
+    def test_workspace_template_pre_commit_hooks_initialized(self, host):
+        """Test that pre-commit hooks are pre-initialized in workspace template."""
+        cache_dir = host.file("/root/assets/workspace/.pre-commit-cache")
+        assert cache_dir.exists, (
+            "Pre-commit cache directory not found in workspace template"
+        )
+        assert cache_dir.is_directory, "Pre-commit cache is not a directory"
+        # Verify the cache directory is not empty (contains installed hooks)
+        result = host.run(
+            'test -n "$(ls -A /root/assets/workspace/.pre-commit-cache 2>/dev/null)"'
+        )
+        assert result.rc == 0, (
+            "Pre-commit cache directory is empty - hooks were not initialized"
+        )

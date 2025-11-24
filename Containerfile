@@ -95,6 +95,13 @@ COPY assets /root/assets
 # Set execute permissions on all shell scripts in the assets
 RUN find /root/assets -type f -name "*.sh" -exec chmod +x {} \;
 
+# Pre-initialize pre-commit hooks in workspace assets
+WORKDIR /root/assets/workspace
+RUN git init && \
+    PRE_COMMIT_HOME=/root/assets/workspace/.pre-commit-cache \
+    pre-commit install-hooks && \
+    rm -rf .git
+
 # Set environment variables
 ENV PYTHONUNBUFFERED="1"
 ENV IN_CONTAINER="true"
