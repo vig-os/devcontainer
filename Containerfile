@@ -5,19 +5,19 @@ FROM python:3.12-slim-trixie
 # By default, we build the dev version unless specified as an argument
 ARG IMAGE_TAG="dev"
 LABEL maintainer="Carlos Vigo <carlos.vigo@exoma.ch>"
-LABEL description="vig-OS development environment"
+LABEL description="vigOS development environment"
 LABEL version="${IMAGE_TAG}"
 
 # OCI standard labels
-LABEL org.opencontainers.image.title="vig-OS development environment"
+LABEL org.opencontainers.image.title="vigOS development environment"
 LABEL org.opencontainers.image.description="Development environment with common tools and utilities"
 LABEL org.opencontainers.image.version="${IMAGE_TAG}"
 LABEL org.opencontainers.image.authors="Carlos Vigo <carlos.vigo@exoma.ch>, Lars Gerchow <lars.gerchow@exoma.ch>"
-LABEL org.opencontainers.image.vendor="vig-OS"
-LABEL org.opencontainers.image.source="https://github.com/vig-OS/devcontainer"
+LABEL org.opencontainers.image.vendor="vigOS"
+LABEL org.opencontainers.image.source="https://github.com/vig-os/devcontainer"
 LABEL org.opencontainers.image.licenses="MIT"
-LABEL org.opencontainers.image.documentation="https://github.com/vig-OS/devcontainer/blob/main/README.md"
-LABEL org.opencontainers.image.url="https://github.com/vig-OS/devcontainer"
+LABEL org.opencontainers.image.documentation="https://github.com/vig-os/devcontainer/blob/main/README.md"
+LABEL org.opencontainers.image.url="https://github.com/vig-os/devcontainer"
 
 # Build and runtime information (injected at build time)
 ARG BUILD_DATE=""
