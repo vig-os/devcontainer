@@ -15,7 +15,7 @@ else
     NATIVE_PLATFORM := linux/amd64
 endif
 
-# Template backup/restore functions are now in scripts/backup_template.sh and scripts/restore_template.sh
+# Build process uses build/ folder - templates are copied and modified there, source files remain unchanged
 
 # Helper functions for help text
 define print_help_header
@@ -78,15 +78,8 @@ build:
 
 # Test target: dev
 .PHONY: test
-test-image:
-	@if [ -z "$(VERSION)" ]; then \
-		VERSION="dev"; \
-		echo "Testing local development image:$$VERSION..."; \
-		$(MAKE) build; \
-	else \
-		echo "Testing versioned image:$$VERSION..."; \
-	fi; \
-	./scripts/run_tests.sh $$VERSION;
+test:
+	@./scripts/run_tests.sh "$(VERSION)"
 
 # Push target: build, (optionally) test, commit, push & tag a versioned release
 # Use NO_TEST=1 to skip tests

@@ -31,19 +31,31 @@ print_status() {
     esac
 }
 
-# Argument: optional tag (default: dev)
-TAG=${1:-dev}
+# Argument: optional version/tag (default: dev)
+VERSION="${1:-dev}"
+TAG="$VERSION"
 
 # Get project root directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
+# Determine REPO (same logic as Makefile)
+REPO="${TEST_REGISTRY:-ghcr.io/vig-os/devcontainer}"
+REPO="${REPO%/}"
+
 # Configuration - single image repository
-IMAGE_NAME="ghcr.io/vig-os/devcontainer:$TAG"
+IMAGE_NAME="$REPO:$TAG"
 CONTAINER_NAME="test-devcontainer"
 
-echo -e "${BLUE}Starting Tests Suite for Container image:devcontainer:$TAG${NC}"
+# Print appropriate message based on version
+if [ "$VERSION" = "dev" ]; then
+	print_status "info" "Testing local development image:$VERSION..."
+else
+	print_status "info" "Testing versioned image:$VERSION..."
+fi
+
+echo -e "${BLUE}Starting Tests Suite for Container image:$IMAGE_NAME${NC}"
 echo "================================================================"
 
 # Function to cleanup containers
@@ -65,10 +77,22 @@ if ! command -v podman &> /dev/null; then
     exit 1
 fi
 
-# Check if image exists
+# Check if image exists, build if it's dev version and missing
 if ! podman image exists "$IMAGE_NAME"; then
-    print_status "error" "Image $IMAGE_NAME not found. Please build it first with 'make build'"
-    exit 1
+	if [ "$VERSION" = "dev" ]; then
+		print_status "info" "Image $IMAGE_NAME not found. Building..."
+		# Detect native platform for build
+		NATIVE_ARCH=$(uname -m)
+		if [ "$NATIVE_ARCH" = "arm64" ] || [ "$NATIVE_ARCH" = "aarch64" ]; then
+			NATIVE_PLATFORM="linux/arm64"
+		else
+			NATIVE_PLATFORM="linux/amd64"
+		fi
+		"$SCRIPT_DIR/build.sh" "$VERSION" "$REPO" "$NATIVE_PLATFORM"
+	else
+		print_status "error" "Image $IMAGE_NAME not found. Please build it first"
+		exit 1
+	fi
 fi
 
 # Check if tests directory exists

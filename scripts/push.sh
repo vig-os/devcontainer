@@ -6,6 +6,8 @@ set -e
 
 VERSION="$1"
 REPO="${2:-${TEST_REGISTRY:-ghcr.io/vig-os/devcontainer}}"
+# Remove trailing slash from REPO to avoid invalid tag format (e.g., localhost:5000/test/:tag)
+REPO="${REPO%/}"
 
 # Detect native platform
 NATIVE_ARCH=$(uname -m)
@@ -137,10 +139,6 @@ if ! git diff --cached --quiet; then
 fi
 echo "✓ Repository is clean"
 
-# Backup and replace template
-echo "Backing up and replacing template with version $VERSION..."
-"$SCRIPT_DIR/backup_template.sh" "$VERSION"
-
 # Capture build metadata
 echo "Capturing build metadata (before any commits)..."
 BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -149,6 +147,18 @@ echo "  BUILD_DATE: $BUILD_DATE"
 echo "  VCS_REF: $VCS_REF"
 echo "  IMAGE_TAG: $VERSION"
 
+# Prepare build folder
+BUILD_DIR="build"
+echo "Preparing build folder..."
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
+cp Containerfile "$BUILD_DIR/"
+cp -r assets "$BUILD_DIR/"
+if [ -d "$BUILD_DIR/assets/workspace" ]; then
+	echo "Replacing {{IMAGE_TAG}} with $VERSION in build folder template files..."
+	find "$BUILD_DIR/assets/workspace" -type f -exec sed -i "s|{{IMAGE_TAG}}|$VERSION|g" {} \; 2>/dev/null || true
+fi
+
 # Build and test if needed
 if [ -z "$NO_TEST" ]; then
 	echo "Building versioned image:$VERSION (single arch for testing)..."
@@ -156,16 +166,16 @@ if [ -z "$NO_TEST" ]; then
 		--build-arg BUILD_DATE="$BUILD_DATE" \
 		--build-arg VCS_REF="$VCS_REF" \
 		--build-arg IMAGE_TAG="$VERSION" \
-		-t "$REPO:$VERSION" -f Containerfile .; then
+		-t "$REPO:$VERSION" \
+		-f "$BUILD_DIR/Containerfile" \
+		"$BUILD_DIR"; then
 		echo "❌ Build failed"
-		"$SCRIPT_DIR/restore_template.sh"
 		exit 1
 	fi
 
 	echo "Testing versioned image:$VERSION..."
 	if ! "$SCRIPT_DIR/run_tests.sh" "$VERSION"; then
 		echo "❌ Tests failed"
-		"$SCRIPT_DIR/restore_template.sh"
 		exit 1
 	fi
 else
@@ -193,16 +203,15 @@ for platform in $(echo "$PLATFORM_LIST" | tr ',' ' '); do
 		--build-arg VCS_REF="$VCS_REF" \
 		--build-arg IMAGE_TAG="$VERSION" \
 		--tag "$REPO:$VERSION-$arch" \
-		-f Containerfile .; then
+		-f "$BUILD_DIR/Containerfile" \
+		"$BUILD_DIR"; then
 		echo "❌ Error: $platform build failed"
-		"$SCRIPT_DIR/restore_template.sh"
 		exit 1
 	fi
 	if echo "$REPO" | grep -q "^localhost:"; then
 		echo "Pushing $platform image to local registry..."
 		if ! podman push --tls-verify=false "$REPO:$VERSION-$arch"; then
 			echo "❌ Error: Pushing $platform image failed"
-			"$SCRIPT_DIR/restore_template.sh"
 			exit 1
 		fi
 	fi
@@ -223,14 +232,12 @@ fi
 
 if ! podman manifest create "$REPO:latest"; then
 	echo "❌ Error: Manifest creation failed"
-	"$SCRIPT_DIR/restore_template.sh"
 	exit 1
 fi
 
 for img_tag in $BUILT_PLATFORMS; do
 	if ! podman manifest add "$REPO:latest" "$img_tag"; then
 		echo "❌ Error: Adding $img_tag to manifest failed"
-		"$SCRIPT_DIR/restore_template.sh"
 		exit 1
 	fi
 done
@@ -242,14 +249,12 @@ podman rmi -f "$REPO:$VERSION" 2>/dev/null || true
 
 if ! podman manifest create "$REPO:$VERSION"; then
 	echo "❌ Error: Version manifest creation failed"
-	"$SCRIPT_DIR/restore_template.sh"
 	exit 1
 fi
 
 for img_tag in $BUILT_PLATFORMS; do
 	if ! podman manifest add "$REPO:$VERSION" "$img_tag"; then
 		echo "❌ Error: Adding $img_tag to version manifest failed"
-		"$SCRIPT_DIR/restore_template.sh"
 		exit 1
 	fi
 done
@@ -258,13 +263,11 @@ done
 echo "Pushing manifests to registry..."
 if ! podman manifest push $PODMAN_TLS_VERIFY "$REPO:latest"; then
 	echo "❌ Error: :latest manifest push failed"
-	"$SCRIPT_DIR/restore_template.sh"
 	exit 1
 fi
 
 if ! podman manifest push $PODMAN_TLS_VERIFY "$REPO:$VERSION"; then
 	echo "❌ Error: :$VERSION manifest push failed"
-	"$SCRIPT_DIR/restore_template.sh"
 	exit 1
 fi
 
@@ -279,7 +282,6 @@ echo "Updating README.md with latest version..."
 if [ -f README.md ]; then
 	if ! sed -i.tmp "s/- \*\*Latest version\*\*: .*/- **Latest version**: $VERSION/" README.md; then
 		echo "❌ Failed to update README.md"
-		"$SCRIPT_DIR/restore_template.sh"
 		exit 1
 	fi
 	rm -f README.md.tmp 2>/dev/null || true
@@ -288,18 +290,15 @@ else
 	echo "⚠️  README.md not found, skipping version update"
 fi
 
-# Commit changes
+# Commit changes (only if there are changes)
 echo "Committing changes..."
-git add Containerfile template README.md 2>/dev/null || true
+git add README.md 2>/dev/null || true
 if git diff --cached --quiet; then
-	echo "❌ Error! No changes to commit in Containerfile, template, or README.md"
-	"$SCRIPT_DIR/restore_template.sh"
-	exit 1
+	echo "⚠️  No changes to commit (README.md may already have this version)"
 else
 	if ! git commit -m "Release $VERSION"; then
 		echo "❌ Failed to commit changes"
-		git reset HEAD Containerfile template README.md 2>/dev/null || true
-		"$SCRIPT_DIR/restore_template.sh"
+		git reset HEAD README.md 2>/dev/null || true
 		exit 1
 	fi
 	echo "✓ Committed changes"
@@ -309,14 +308,9 @@ fi
 echo "Creating git tag $VERSION (for image:$VERSION)..."
 if ! git tag "$VERSION"; then
 	echo "❌ Failed to create git tag"
-	"$SCRIPT_DIR/restore_template.sh"
 	exit 1
 fi
 echo "✓ Created git tag $VERSION"
-
-# Restore template
-echo "Restoring template folder..."
-"$SCRIPT_DIR/restore_template.sh"
 
 echo ""
 echo "✓ Successfully tagged and pushed:$VERSION"
