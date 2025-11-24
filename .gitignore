@@ -1,0 +1,26 @@
+# Caches
+.pre-commit-cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+__pycache__
+
+# Python
+.venv/
+
+# User environment variables
+.env
+
+# Test temporary files
+tests/tmp/
+
+# Build temporary files
+**/.template.backup/
+*.tmp
+**/template/*.tmp
+**/README.md.tmp
+
+# DevContainer test artifacts in template directories
+**/template/.git/
+**/template/.venv/
+**/template/.pre-commit-cache/

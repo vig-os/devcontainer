@@ -1,0 +1,14 @@
+#!/bin/bash
+# Set error handling, fail on any error during script execution
+set -euo pipefail
+
+# Check if we're running inside the dev container
+if [ "${IN_CONTAINER:-}" = "true" ]; then
+	# Inside dev container
+	echo "Running pre-commit..."
+	pre-commit run
+else
+	# Outside dev container - run via uv
+	echo "Running pre-commit via uv..."
+	uv run pre-commit run
+fi
