@@ -6,6 +6,11 @@ This test verifies that the push mechanism works correctly by:
 2. Running the push target with the test registry
 3. Verifying that images and tags are created correctly
 4. Ensuring cleanup happens automatically (no artifacts remain)
+
+Note on push behavior:
+- For localhost registries: Images are pushed during the build step (before manifest creation)
+- For remote registries (e.g., GHCR): Individual images are pushed before creating manifests,
+  then manifests are created using registry references, preventing "manifest unknown" errors.
 """
 
 import os
@@ -210,11 +215,13 @@ def pushed_image(local_registry, test_version, git_clean_state):
         pytest.skip(f"Push failed: {push_result.stderr}")
 
     # Return push info for use by tests
+    # Note: REPO is set from TEST_REGISTRY, so images are at test_registry_path directly
+    # (e.g., localhost:32915/test:99.4401, not localhost:32915/test/devcontainer:99.4401)
     push_info = {
         "registry_path": test_registry_path,
-        "image_name": "devcontainer",
+        "image_name": "",  # Empty because REPO already includes the full path
         "version": test_version,
-        "git_tag": test_version,  # Git tag is just the version in single-image repo
+        "git_tag": f"v{test_version}",  # Git tag format: v0.1, v1.0, etc.
         "project_root": project_root,
         "original_head": git_clean_state["original_head"],
         "env": env,
@@ -251,7 +258,7 @@ def test_make_push_mechanism(pushed_image):
     test_version = pushed_image["version"]
     test_git_tag = pushed_image["git_tag"]
 
-    # Verify git tag was created (using version format: 99.8795)
+    # Verify git tag was created (using version format: v99.8795)
     print(f"\n🔍 Verifying git tag {test_git_tag}...")
     tag_result = subprocess.run(
         ["git", "rev-parse", test_git_tag],
@@ -261,26 +268,34 @@ def test_make_push_mechanism(pushed_image):
     assert tag_result.returncode == 0, f"Git tag {test_git_tag} was not created"
 
     # Verify image exists in local registry
+    # Note: REPO is set from TEST_REGISTRY, so images are at test_registry_path directly
     print("\n🔍 Verifying image in registry...")
-    full_image_name = f"{test_registry_path}devcontainer:{test_version}"
+    # Remove trailing slash if present, then add version tag
+    registry_base = test_registry_path.rstrip("/")
+    full_image_name = f"{registry_base}:{test_version}"
+    # podman manifest inspect relies on CONTAINERS_REGISTRIES_CONF for insecure registry config
     inspect_result = subprocess.run(
         ["podman", "manifest", "inspect", full_image_name],
         capture_output=True,
         text=True,
+        env=os.environ.copy(),  # Ensure environment variables are inherited
     )
     assert inspect_result.returncode == 0, (
-        f"Image {full_image_name} not found in registry"
+        f"Image {full_image_name} not found in registry. "
+        f"STDERR: {inspect_result.stderr}"
     )
 
     # Verify :latest tag also exists
-    latest_image_name = f"{test_registry_path}devcontainer:latest"
+    latest_image_name = f"{registry_base}:latest"
     latest_result = subprocess.run(
         ["podman", "manifest", "inspect", latest_image_name],
         capture_output=True,
         text=True,
+        env=os.environ.copy(),  # Ensure environment variables are inherited
     )
     assert latest_result.returncode == 0, (
-        f"Image {latest_image_name} not found in registry"
+        f"Image {latest_image_name} not found in registry. "
+        f"STDERR: {latest_result.stderr}"
     )
 
     print("\n✅ Push test passed! Image successfully pushed to registry.")
@@ -299,10 +314,15 @@ def pulled_image(pushed_image):
     test_version = pushed_image["version"]
     project_root = pushed_image["project_root"]
     original_head = pushed_image["original_head"]
-    env = pushed_image["env"]
+    env = pushed_image["env"].copy()
+
+    # Explicitly set TEST_REGISTRY in the environment before calling make
+    env["TEST_REGISTRY"] = test_registry_path
 
     # Pull the image from the registry
-    print(f"\n📥 Pulling devcontainer:{test_version} from {test_registry_path}...")
+    # Note: REPO is set from TEST_REGISTRY, so images are at test_registry_path directly
+    # Makefile uses TEST_REGISTRY directly (with trailing slash), so pulled image name matches what make pull uses
+    print(f"\n📥 Pulling {test_registry_path}:{test_version} from registry...")
     pull_result = subprocess.run(
         [
             "make",
@@ -315,7 +335,17 @@ def pulled_image(pushed_image):
         text=True,
     )
 
-    if pull_result.returncode != 0:
+    # Check if pull actually succeeded (Makefile suppresses errors, so check output)
+    # Print pull output for debugging
+    print(
+        f"Pull command output:\nSTDOUT: {pull_result.stdout}\nSTDERR: {pull_result.stderr}"
+    )
+
+    if (
+        pull_result.returncode != 0
+        or "⚠️" in pull_result.stdout
+        or "Failed" in pull_result.stdout
+    ):
         print(
             f"Pull failed:\nSTDOUT:\n{pull_result.stdout}\nSTDERR:\n{pull_result.stderr}"
         )
@@ -325,16 +355,32 @@ def pulled_image(pushed_image):
             project_root,
             original_head,
         )
-        pytest.skip(f"Pull failed: {pull_result.stderr}")
+        pytest.skip(f"Pull failed: {pull_result.stdout}")
 
     # Verify the image was pulled
-    pulled_image_name = f"{test_registry_path}devcontainer:{test_version}"
+    # Podman normalizes trailing slashes, so use registry_base (without trailing slash)
+    registry_base = test_registry_path.rstrip("/")
+    pulled_image_name = f"{registry_base}:{test_version}"
+
+    # Check if image exists
     inspect_result = subprocess.run(
         ["podman", "image", "exists", pulled_image_name],
         capture_output=True,
         text=True,
     )
+
     if inspect_result.returncode != 0:
+        # Debug: list all images to see what was actually pulled
+        debug_result = subprocess.run(
+            ["podman", "images", "--format", "{{.Repository}}:{{.Tag}}"],
+            capture_output=True,
+            text=True,
+        )
+        print(f"Debug - Looking for: {pulled_image_name}")
+        print(
+            f"Debug - Pull output:\nSTDOUT: {pull_result.stdout}\nSTDERR: {pull_result.stderr}"
+        )
+        print(f"Debug - Available images:\n{debug_result.stdout}")
         _cleanup_test_artifacts(
             test_version,
             test_registry_path,
@@ -384,8 +430,12 @@ def test_make_clean_mechanism(pulled_image):
     """
     # Extract info from fixture
     test_version = pulled_image["version"]
-    env = pulled_image["env"]
+    test_registry_path = pulled_image["registry_path"]
+    env = pulled_image["env"].copy()
     pulled_image_name = pulled_image["pulled_image_name"]
+
+    # Explicitly set TEST_REGISTRY in the environment before calling make
+    env["TEST_REGISTRY"] = test_registry_path
 
     # Clean the image using make clean
     print(f"\n🧹 Cleaning devcontainer:{test_version}...")
@@ -429,20 +479,24 @@ def _cleanup_test_artifacts(version, registry_path, project_root, original_head)
     Helper function to clean up test artifacts.
 
     This function:
-    1. Deletes the git tag (using version format: 99.8795)
+    1. Deletes the git tag (using version format: v99.8795)
     2. Resets to the original HEAD (removing any commit made by push)
     3. Restores README.md to its original state (reverts version update)
     4. Removes local images/manifests
     """
-    # Git tag is just the version in single-image repo
-    test_git_tag = version
+    # Git tag format: v0.1, v1.0, etc. (new format)
+    # Also handle old format without 'v' prefix for cleanup
+    test_git_tag = f"v{version}"
+    old_git_tag = version  # Old format without 'v' prefix
 
     # Delete git tag (local only, we don't push tags in tests)
-    subprocess.run(
-        ["git", "tag", "-d", test_git_tag],
-        capture_output=True,
-        cwd=project_root,
-    )
+    # Try both new and old formats in case of leftover tags
+    for tag in [test_git_tag, old_git_tag]:
+        subprocess.run(
+            ["git", "tag", "-d", tag],
+            capture_output=True,
+            cwd=project_root,
+        )
 
     # Get current HEAD to see if a commit was made
     result = subprocess.run(
@@ -483,8 +537,10 @@ def _cleanup_test_artifacts(version, registry_path, project_root, original_head)
         )
 
     # Try to remove local images/manifests (may not exist if using registry)
-    full_image_name = f"{registry_path}devcontainer:{version}"
-    latest_image_name = f"{registry_path}devcontainer:latest"
+    # Note: REPO is set from TEST_REGISTRY, so images are at registry_path directly
+    registry_base = registry_path.rstrip("/")
+    full_image_name = f"{registry_base}:{version}"
+    latest_image_name = f"{registry_base}:latest"
 
     # Detect native architecture for architecture-specific image cleanup
     import platform
@@ -492,8 +548,8 @@ def _cleanup_test_artifacts(version, registry_path, project_root, original_head)
     machine = platform.machine().lower()
     arch_suffix = "arm64" if machine in ("arm64", "aarch64") else "amd64"
 
-    # Architecture-specific image tag (e.g., localhost:32811/test/devc/base:99.305-amd64)
-    arch_image_name = f"{registry_path}devcontainer:{version}-{arch_suffix}"
+    # Architecture-specific image tag (e.g., localhost:32811/test:99.305-amd64)
+    arch_image_name = f"{registry_base}:{version}-{arch_suffix}"
 
     # Remove manifests first (ignore errors if they don't exist)
     for img in [full_image_name, latest_image_name]:

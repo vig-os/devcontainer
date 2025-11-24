@@ -1,6 +1,7 @@
 # Variables
 # Allow TEST_REGISTRY to override REPO for testing (e.g., localhost:5000/test/)
-REPO = $(if $(TEST_REGISTRY),$(TEST_REGISTRY),ghcr.io/vig-os/devcontainer)
+# Strip trailing slashes from REPO to avoid invalid image references
+REPO = $(if $(TEST_REGISTRY),$(patsubst %/,%,$(TEST_REGISTRY)),ghcr.io/vig-os/devcontainer)
 
 # Multi-arch support: build for both AMD64 and ARM64
 PLATFORMS = linux/amd64,linux/arm64
@@ -88,13 +89,14 @@ push:
 	@./scripts/push.sh "$(VERSION)" "$(REPO)" "$(NATIVE_PLATFORM)" "$(PLATFORMS)" "$(NO_TEST)" "$(NATIVE_ARCH_ONLY)"
 
 # Pull target: VERSION=latest (default) or VERSION=X.Y
+# Uses TEST_REGISTRY if set (via REPO variable)
 .PHONY: pull
 pull:
 	@if [ -z "$(VERSION)" ]; then \
 		VERSION="latest"; \
 	fi; \
-	echo "Pulling image:$$VERSION..."; \
-	if ! podman pull $(REPO):$$VERSION 2>/dev/null; then echo "⚠️  Failed to pull $(REPO):$$VERSION"; fi;
+	echo "Pulling image $(REPO):$$VERSION..."; \
+	if ! podman pull "$(REPO):$$VERSION" 2>/dev/null; then echo "⚠️  Failed to pull $(REPO):$$VERSION"; fi
 
 # Clean target: VERSION=dev (default) or VERSION=[X.Y, latest]
 .PHONY: clean

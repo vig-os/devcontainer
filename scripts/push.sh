@@ -50,7 +50,7 @@ fi
 echo "Preparing image:$VERSION..."
 
 # Check git tag
-GIT_TAG="$VERSION"
+GIT_TAG="v$VERSION"
 echo "Checking if git tag $GIT_TAG already exists..."
 if git rev-parse "$GIT_TAG" >/dev/null 2>&1; then
 	echo ""
@@ -83,24 +83,24 @@ echo "✓ Version $VERSION does not exist on GHCR"
 
 # Check latest version tag
 echo "Checking latest version tag..."
-LATEST_TAG=$(git tag -l | grep -E '^[0-9]+\.[0-9]+$' | sort -t. -k1,1n -k2,2n | tail -1)
+LATEST_TAG=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+$' | sed 's/^v//' | sort -t. -k1,1n -k2,2n | tail -1)
 if [ -n "$LATEST_TAG" ]; then
-	echo "  Latest tag: $LATEST_TAG"
+	echo "  Latest tag: v$LATEST_TAG"
 	MAJOR_NEW=$(echo "$VERSION" | cut -d. -f1)
 	MINOR_NEW=$(echo "$VERSION" | cut -d. -f2)
 	MAJOR_LATEST=$(echo "$LATEST_TAG" | cut -d. -f1)
 	MINOR_LATEST=$(echo "$LATEST_TAG" | cut -d. -f2)
 	if [ "$MAJOR_NEW" -lt "$MAJOR_LATEST" ] || { [ "$MAJOR_NEW" -eq "$MAJOR_LATEST" ] && [ "$MINOR_NEW" -le "$MINOR_LATEST" ]; }; then
 		echo ""
-		echo "❌ ERROR: New version $VERSION is not higher than latest version $LATEST_TAG!"
+		echo "❌ ERROR: New version $VERSION is not higher than latest version v$LATEST_TAG!"
 		echo ""
 		echo "   The new version must be greater than the latest tagged version."
-		echo "   Latest version: $LATEST_TAG"
+		echo "   Latest version: v$LATEST_TAG"
 		echo "   New version: $VERSION"
 		echo ""
 		exit 1
 	fi
-	echo "✓ New version $VERSION is higher than latest $LATEST_TAG"
+	echo "✓ New version $VERSION is higher than latest v$LATEST_TAG"
 else
 	echo "  No previous tags found"
 	echo "✓ This will be the first version tag"
@@ -218,6 +218,19 @@ for platform in $(echo "$PLATFORM_LIST" | tr ',' ' '); do
 	BUILT_PLATFORMS="$BUILT_PLATFORMS $REPO:$VERSION-$arch"
 done
 
+# Push individual images to registry (needed for manifest creation)
+# For localhost registries, images are already pushed above
+if ! echo "$REPO" | grep -q "^localhost:"; then
+	echo "Pushing individual images to registry..."
+	for img_tag in $BUILT_PLATFORMS; do
+		echo "Pushing $img_tag..."
+		if ! podman push "$img_tag"; then
+			echo "❌ Error: Pushing $img_tag failed"
+			exit 1
+		fi
+	done
+fi
+
 # Create manifests
 echo "Creating :latest manifest list..."
 echo "Removing any existing local tags/manifests for :latest..."
@@ -236,6 +249,7 @@ if ! podman manifest create "$REPO:latest"; then
 fi
 
 for img_tag in $BUILT_PLATFORMS; do
+	# Images are now in registry, so we can use regular registry references
 	if ! podman manifest add "$REPO:latest" "$img_tag"; then
 		echo "❌ Error: Adding $img_tag to manifest failed"
 		exit 1
@@ -253,6 +267,7 @@ if ! podman manifest create "$REPO:$VERSION"; then
 fi
 
 for img_tag in $BUILT_PLATFORMS; do
+	# Images are now in registry, so we can use regular registry references
 	if ! podman manifest add "$REPO:$VERSION" "$img_tag"; then
 		echo "❌ Error: Adding $img_tag to version manifest failed"
 		exit 1
@@ -261,14 +276,29 @@ done
 
 # Push manifests
 echo "Pushing manifests to registry..."
-if ! podman manifest push $PODMAN_TLS_VERIFY "$REPO:latest"; then
-	echo "❌ Error: :latest manifest push failed"
-	exit 1
-fi
-
-if ! podman manifest push $PODMAN_TLS_VERIFY "$REPO:$VERSION"; then
-	echo "❌ Error: :$VERSION manifest push failed"
-	exit 1
+# For localhost registries, use --all to ensure manifest is properly pushed
+# The old Makefile works without --all, but that may be due to different podman behavior
+# Using --all ensures the manifest list is pushed to the registry
+if echo "$REPO" | grep -q "^localhost:"; then
+	# For localhost, images are already pushed, but --all ensures manifest is pushed
+	if ! podman manifest push $PODMAN_TLS_VERIFY --all "$REPO:latest"; then
+		echo "❌ Error: :latest manifest push failed"
+		exit 1
+	fi
+	if ! podman manifest push $PODMAN_TLS_VERIFY --all "$REPO:$VERSION"; then
+		echo "❌ Error: :$VERSION manifest push failed"
+		exit 1
+	fi
+else
+	# For remote registries, --all pushes manifest and all referenced images
+	if ! podman manifest push $PODMAN_TLS_VERIFY --all "$REPO:latest"; then
+		echo "❌ Error: :latest manifest push failed"
+		exit 1
+	fi
+	if ! podman manifest push $PODMAN_TLS_VERIFY --all "$REPO:$VERSION"; then
+		echo "❌ Error: :$VERSION manifest push failed"
+		exit 1
+	fi
 fi
 
 if [ -n "$NATIVE_ARCH_ONLY" ]; then
@@ -305,12 +335,12 @@ else
 fi
 
 # Create git tag
-echo "Creating git tag $VERSION (for image:$VERSION)..."
-if ! git tag "$VERSION"; then
+echo "Creating git tag $GIT_TAG (for image:$VERSION)..."
+if ! git tag "$GIT_TAG"; then
 	echo "❌ Failed to create git tag"
 	exit 1
 fi
-echo "✓ Created git tag $VERSION"
+echo "✓ Created git tag $GIT_TAG"
 
 echo ""
 echo "✓ Successfully tagged and pushed:$VERSION"
@@ -321,4 +351,4 @@ else
 	echo "  Image: $REPO:$VERSION (multi-arch)"
 	echo "  Image: $REPO:latest (multi-arch)"
 fi
-echo "  Git tag: $VERSION"
+echo "  Git tag: $GIT_TAG"
