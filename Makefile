@@ -28,7 +28,10 @@ define print_help_targets
 	@echo "  setup       - Setup configuration"
 	@echo "  login       - Login to GitHub Container Registry"
 	@echo "  build       - Build local development image"
-	@echo "  test        - Build and test local development image"
+	@echo "  test        - Run all tests (image, integration, registry)"
+	@echo "  test-image  - Run image tests only"
+	@echo "  test-integration - Run integration tests only"
+	@echo "  test-registry - Run registry tests only"
 	@echo "  push VERSION=X.Y     - Build, test, commit, push & tag image:X.Y"
 	@echo "  push VERSION=X.Y NO_TEST=1 - Build, commit, push & tag image:X.Y (skip tests)"
 	@echo "  push VERSION=X.Y NATIVE_ARCH_ONLY=1 - Build only for native architecture"
@@ -77,10 +80,41 @@ login:
 build:
 	@./scripts/build.sh dev "$(REPO)" "$(NATIVE_PLATFORM)"
 
-# Test target: dev
+# Test targets
+# Default VERSION is "dev" if not specified
+TEST_VERSION := $(if $(VERSION),$(VERSION),dev)
+
+# Helper to ensure dev image exists before running image/integration tests
+.PHONY: _ensure-dev-image
+_ensure-dev-image:
+	@if ! podman image exists "$(REPO):$(TEST_VERSION)"; then \
+		if [ "$(TEST_VERSION)" = "dev" ]; then \
+			echo "Building dev image..."; \
+			$(MAKE) build; \
+		else \
+			echo "❌ Image $(REPO):$(TEST_VERSION) not found. Please build it first."; \
+			exit 1; \
+		fi; \
+	fi
+
+# Test image target: runs image tests
+.PHONY: test-image
+test-image: _ensure-dev-image
+	@TEST_CONTAINER_TAG=$(TEST_VERSION) pytest tests/test_image.py -v --tb=short
+
+# Test integration target: runs integration tests
+.PHONY: test-integration
+test-integration: _ensure-dev-image
+	@TEST_CONTAINER_TAG=$(TEST_VERSION) pytest tests/test_integration.py -v --tb=short
+
+# Test registry target: runs registry tests (doesn't need image)
+.PHONY: test-registry
+test-registry:
+	@pytest tests/test_registry.py -v --tb=short
+
+# Test target: runs image and integration tests
 .PHONY: test
-test:
-	@./scripts/run_tests.sh "$(VERSION)"
+test: test-image test-integration
 
 # Push target: build, (optionally) test, commit, push & tag a versioned release
 # Use NO_TEST=1 to skip tests

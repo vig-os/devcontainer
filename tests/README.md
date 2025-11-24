@@ -80,11 +80,39 @@ The fixtures automatically cleans up after all tests complete.
 
 ## Running Tests
 
+Tests are run using Makefile targets. The `test` target runs the image and integration test suites:
+
 ```bash
-# Build and test the current development version
+# Run image and integration tests
 make test
 
-# Or run tests directly for a specific image version
-./scripts/run_tests.sh dev
-./scripts/run_tests.sh 1.0
+# Run tests for a specific image version (must be locally available)
+make test VERSION=1.0
 ```
+
+### Individual Test Suites
+
+You can also run individual test suites:
+
+```bash
+# Run only image tests (builds dev image if needed)
+make test-image
+
+# Run only integration tests (builds dev image if needed)
+make test-integration
+
+# Run only registry tests (doesn't require pre-built image)
+make test-registry
+
+# Run specific test suite for a locally available version
+make test-image VERSION=1.0
+make test-integration VERSION=1.0
+```
+
+### Notes
+
+- `test-image` and `test-integration` automatically build the dev image if it doesn't exist (when `VERSION=dev` or none),
+  but they don't automatically update it
+- `test-registry` uses its own local registry and doesn't require a pre-built image
+- The `TEST_CONTAINER_TAG` environment variable is automatically set based on the `VERSION` parameter (defaults to "dev")
+- All tests use pytest with verbose output (`-v`) and short traceback format (`--tb=short`)

@@ -174,7 +174,11 @@ if [ -z "$NO_TEST" ]; then
 	fi
 
 	echo "Testing versioned image:$VERSION..."
-	if ! "$SCRIPT_DIR/run_tests.sh" "$VERSION"; then
+	# Export TEST_REGISTRY if REPO differs from default to ensure tests use correct registry
+	if [ "$REPO" != "ghcr.io/vig-os/devcontainer" ]; then
+		export TEST_REGISTRY="$REPO"
+	fi
+	if ! make test VERSION="$VERSION"; then
 		echo "❌ Tests failed"
 		exit 1
 	fi
