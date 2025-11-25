@@ -28,7 +28,7 @@ define print_help_targets
 	@echo "  setup       - Setup configuration"
 	@echo "  login       - Login to GitHub Container Registry"
 	@echo "  build       - Build local development image"
-	@echo "  test        - Run all tests (image, integration, registry)"
+	@echo "  test        - Run image and integration tests"
 	@echo "  test-image  - Run image tests only"
 	@echo "  test-integration - Run integration tests only"
 	@echo "  test-registry - Run registry tests only"
