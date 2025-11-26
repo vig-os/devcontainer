@@ -1413,3 +1413,158 @@ class TestDevContainerCLI:
             f"stderr: {result.stderr}\n"
             f"Expected 'Logged in to github.com' or similar in output"
         )
+
+
+class TestDockerComposeOverride:
+    """Test docker-compose.override.yml functionality for additional mounts."""
+
+    def test_override_mount_directory_exists(self, devcontainer_up):
+        """Test that the directory mounted via override file exists in container."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        # The conftest.py fixture creates an override mounting tests/ to /workspace/tests-mounted
+        check_dir_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "test",
+            "-d",
+            "/workspace/tests-mounted",
+        ]
+
+        result = subprocess.run(
+            check_dir_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+        )
+
+        assert result.returncode == 0, (
+            f"Override mount directory /workspace/tests-mounted not found\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(check_dir_cmd)}"
+        )
+
+    def test_override_mount_file_accessible(self, devcontainer_up):
+        """Test that files in the override mount are accessible."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        # Check that conftest.py exists in the mounted tests directory
+        check_file_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "test",
+            "-f",
+            "/workspace/tests-mounted/conftest.py",
+        ]
+
+        result = subprocess.run(
+            check_file_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+        )
+
+        assert result.returncode == 0, (
+            f"conftest.py not found in override mount at /workspace/tests-mounted/conftest.py\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(check_file_cmd)}"
+        )
+
+    def test_override_mount_file_readable(self, devcontainer_up):
+        """Test that files in the override mount are readable."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        # Read first line of conftest.py to verify content is accessible
+        read_file_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "head",
+            "-n",
+            "1",
+            "/workspace/tests-mounted/conftest.py",
+        ]
+
+        result = subprocess.run(
+            read_file_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+        )
+
+        assert result.returncode == 0, (
+            f"Failed to read conftest.py from override mount\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(read_file_cmd)}"
+        )
+
+        # Verify we got some content (should be a comment or import)
+        assert result.stdout.strip(), (
+            f"conftest.py appears to be empty or unreadable\nstdout: {result.stdout}\n"
+        )
+
+    def test_override_mount_list_directory(self, devcontainer_up):
+        """Test that we can list the contents of the override mount."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        # List contents of the mounted tests directory
+        ls_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "ls",
+            "-la",
+            "/workspace/tests-mounted",
+        ]
+
+        result = subprocess.run(
+            ls_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+        )
+
+        assert result.returncode == 0, (
+            f"Failed to list contents of override mount\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(ls_cmd)}"
+        )
+
+        # Verify expected test files are listed
+        assert "conftest.py" in result.stdout, (
+            f"conftest.py not found in directory listing\nstdout: {result.stdout}"
+        )
+        assert "test_integration.py" in result.stdout, (
+            f"test_integration.py not found in directory listing\n"
+            f"stdout: {result.stdout}"
+        )

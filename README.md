@@ -67,6 +67,40 @@ The template includes:
 - Git hooks for commit signing and verification
 - Project template files: README and CHANGELOG
 
+### Mounting Additional Folders
+
+The devcontainer supports mounting additional folders/projects using Docker Compose override files. This is useful for:
+
+- Multi-project development (monorepos, microservices)
+- Shared libraries or resources
+- Reference documentation
+
+To mount additional folders:
+
+1. Copy the example file:
+
+   ```bash
+   cp .devcontainer/docker-compose.override.yml.example \
+      .devcontainer/docker-compose.override.yml
+   ```
+
+2. Add your mounts to `docker-compose.override.yml`:
+
+```yaml
+   version: '3.8'
+
+   services:
+     devcontainer:
+       volumes:
+         - ../other-project:/workspace/other-project:cached
+         - ~/shared-libs:/workspace/shared:cached
+   ```
+
+1. Rebuild the devcontainer
+
+The override file is gitignored, so each developer can have their own local mounts.
+See `.devcontainer/MOUNTS.md` for detailed documentation and examples.
+
 ### Authentication
 
 GitHub authentication is handled automatically when the devcontainer starts:
