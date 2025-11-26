@@ -171,6 +171,7 @@ class TestFileStructure:
             "/root/assets/workspace/.devcontainer/.gitignore",
             "/root/assets/workspace/.devcontainer/devcontainer.json",
             "/root/assets/workspace/.devcontainer/docker-compose.yml",
+            "/root/assets/workspace/.devcontainer/docker-compose.override.yml.example",
             "/root/assets/workspace/.devcontainer/initialize.sh",
             "/root/assets/workspace/.devcontainer/post-attach.sh",
             # .devcontainer/scripts files
