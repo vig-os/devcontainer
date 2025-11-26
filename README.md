@@ -52,7 +52,7 @@ To deploy the devcontainer into your project, run the `init-workspace` script
 from your host terminal:
 
 ```bash
-podman run -it --rm -v "./:/workspace" ghcr.io/vig-os/devcontainer:latest init-workspace
+podman run -it --rm -v "./:/workspace" ghcr.io/vig-os/devcontainer:latest /root/assets/init-workspace.sh
 ```
 
 This script:
@@ -167,7 +167,7 @@ The container includes an `init-workspace` script that helps set up new projects
 Run it with:
 
 ```bash
-podman run -it --rm -v "./:/workspace" ghcr.io/vig-os/devcontainer:latest init-workspace
+podman run -it --rm -v "./:/workspace" ghcr.io/vig-os/devcontainer:latest /root/assets/init-workspace.sh
 ```
 
 ## Contributing
