@@ -153,7 +153,7 @@ import organization.
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: MIT
 - **Version**: Currently in development (unreleased)
-- **Size**: ~400-450 MB (based on python:3.12-slim-trixie ~150MB plus installed tools and dependencies)
+- **Size**: Currently in development (unreleased)
 
 ## Quick Start
 
