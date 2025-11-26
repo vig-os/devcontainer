@@ -183,6 +183,13 @@ class TestFileStructure:
             "/root/assets/workspace/.githooks/pre-commit",
         ]
 
+        # Define files and folders that should be gitignored
+        gitignored_content = [
+            "/root/assets/workspace/.devcontainer/docker-compose.override.yml",
+            "/root/assets/workspace/.devcontainer/docker-compose.local.yml",
+            "/root/assets/workspace/.devcontainer/.conf",
+        ]
+
         # Check all directories exist
         for dir_path in expected_dirs:
             assert host.file(dir_path).is_directory, (
@@ -200,6 +207,12 @@ class TestFileStructure:
                 assert host.file(file_path).mode & 0o111, (
                     f"Expected shell script is not executable: {file_path}"
                 )
+
+        # Check that gitignored files and folders are gitignored
+        for file_path in gitignored_content:
+            assert not host.file(file_path).exists, (
+                f"Expected file not found: {file_path}"
+            )
 
     def test_workspace_template_pre_commit_hooks_initialized(self, host):
         """Test that pre-commit hooks are pre-initialized in workspace template."""
