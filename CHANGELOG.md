@@ -8,12 +8,6 @@ and this project uses a simplified versioning scheme (X.Y format, e.g., 1.0, 1.1
 ## [Unreleased]
 
 ### Added
-- Initial development container image with Python 3.12
-- VS Code devcontainer template with init-workspace script
-- Pre-configured development tools (pre-commit, ruff, uv)
-- GitHub CLI integration
-- Git commit signing support
-- Comprehensive test suite (image, integration, registry tests)
 
 ### Changed
 
@@ -24,3 +18,45 @@ and this project uses a simplified versioning scheme (X.Y format, e.g., 1.0, 1.1
 ### Fixed
 
 ### Security
+
+## [0.1] - 2025-11-26
+
+### Added
+
+#### Core Image
+- Development container image based on Python 3.12 (Debian Trixie)
+- Multi-architecture support (AMD64, ARM64)
+- System tools: git, gh (GitHub CLI), curl, openssh-client, ca-certificates
+- Python tools: uv (fast package manager), pre-commit, ruff
+- Pre-configured development environment with minimal overhead
+
+#### Devcontainer Integration
+- VS Code devcontainer template with init-workspace script
+- Docker Compose orchestration for flexible container management
+- Support for mounting additional folders via docker-compose.override.yml
+- Post-attach automation for seamless development setup
+- Automatic Git configuration synchronization from host machine
+- SSH commit signing support with signature verification
+
+#### Testing Infrastructure
+- Three-tiered test suite: image tests, integration tests, and registry tests
+- Automated testing with pytest and testinfra
+- Registry tests with optimized minimal Containerfile (10-20s builds)
+- Session-scoped fixtures for efficient test execution
+- Comprehensive validation of push/pull/clean workflows
+
+#### Automation & Tooling
+- Makefile with build, test, push, pull, and clean targets
+- Automated version management and git tagging
+- Automatic README.md updates with version and image size during releases
+- Push script with multi-architecture builds and registry validation
+- Setup script for development environment initialization
+
+#### Documentation & Templates
+- GitHub issue templates (bug report, feature request, task)
+- Pull request template with comprehensive checklist
+- Complete project documentation (README.md, CONTRIBUTE.md, TESTING.md)
+- Detailed testing strategy and workflow documentation
+
+[Unreleased]: https://github.com/vig-os/devcontainer/compare/v0.1...HEAD
+[0.1]: https://github.com/vig-os/devcontainer/releases/tag/v0.1
