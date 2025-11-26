@@ -273,6 +273,42 @@ def devcontainer_up(initialized_workspace):
                 json.dump(config, f, indent=4)
             print("[DEBUG] Added SSH agent forwarding to devcontainer.json")
 
+    # Create docker-compose.override.yml for testing additional mounts
+    override_path = workspace_path / ".devcontainer" / "docker-compose.override.yml"
+    tests_dir = Path(__file__).parent.resolve()  # Path to tests/ directory
+    override_content = f"""version: '3.8'
+
+services:
+  devcontainer:
+    volumes:
+      # Mount tests directory for testing override functionality
+      - {tests_dir}:/workspace/tests-mounted:cached
+"""
+    with override_path.open("w") as f:
+        f.write(override_content)
+    print(f"[DEBUG] Created docker-compose.override.yml mounting {tests_dir}")
+
+    # Modify devcontainer.json to include the override file
+    # The devcontainer CLI doesn't auto-discover override files like docker-compose does
+    with devcontainer_json_path.open() as f:
+        config = json.load(f)
+
+    if not original_config:
+        original_config = json.dumps(config, indent=4)
+
+    # Change dockerComposeFile to an array including the override
+    if isinstance(config.get("dockerComposeFile"), str):
+        config["dockerComposeFile"] = [
+            config["dockerComposeFile"],
+            "docker-compose.override.yml",
+        ]
+    elif isinstance(config.get("dockerComposeFile"), list):
+        config["dockerComposeFile"].append("docker-compose.override.yml")
+
+    with devcontainer_json_path.open("w") as f:
+        json.dump(config, f, indent=4)
+    print("[DEBUG] Updated devcontainer.json to include docker-compose.override.yml")
+
     # Build and start the devcontainer
     up_cmd = [
         "devcontainer",
@@ -338,6 +374,12 @@ def devcontainer_up(initialized_workspace):
             f"stdout: {down_result.stdout}\n"
             f"stderr: {down_result.stderr}\n"
         )
+
+    # Clean up docker-compose.override.yml if it exists
+    override_path = workspace_path / ".devcontainer" / "docker-compose.override.yml"
+    if override_path.exists():
+        override_path.unlink()
+        print("[DEBUG] Removed docker-compose.override.yml")
 
     # Restore original devcontainer.json if we modified it
     if original_config:

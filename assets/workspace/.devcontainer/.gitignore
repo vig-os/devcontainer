@@ -1,1 +1,11 @@
+# Docker Compose override files (user-specific mounts and configuration)
+docker-compose.override.yml
+docker-compose.local.yml
+
+# User-specific configuration
 .conf/
+.env.local
+
+# Temporary files
+*.tmp
+*.log

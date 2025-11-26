@@ -6,9 +6,12 @@ set -e
 # between the host and the dev container.
 # The script is called from the post-attach.sh script.
 
+# .devcontainer is mounted at workspace root for VS Code compatibility
+DEVCONTAINER_DIR="/workspace/{{SHORT_NAME}}/.devcontainer"
+
 # Setup git configuration
 echo "Setting up git configuration..."
-HOST_GITCONFIG_FILE="/workspace/.devcontainer/.conf/.gitconfig"
+HOST_GITCONFIG_FILE="$DEVCONTAINER_DIR/.conf/.gitconfig"
 CONTAINER_GITCONFIG_FILE=$HOME"/.gitconfig"
 if [ -f "$HOST_GITCONFIG_FILE" ]; then
 	echo "Applying git configuration from $HOST_GITCONFIG_FILE..."
@@ -19,7 +22,7 @@ else
 fi
 
 # Setup SSH public key for signing
-HOST_SSH_PUBKEY="/workspace/.devcontainer/.conf/id_ed25519_github.pub"
+HOST_SSH_PUBKEY="$DEVCONTAINER_DIR/.conf/id_ed25519_github.pub"
 CONTAINER_SSH_DIR="$HOME/.ssh"
 if [ -f "$HOST_SSH_PUBKEY" ]; then
 	echo "Applying SSH public key from $HOST_SSH_PUBKEY..."
@@ -33,7 +36,7 @@ else
 fi
 
 # Setup allowed-signers file
-HOST_ALLOWED_SIGNERS_FILE="/workspace/.devcontainer/.conf/allowed-signers"
+HOST_ALLOWED_SIGNERS_FILE="$DEVCONTAINER_DIR/.conf/allowed-signers"
 CONTAINER_ALLOWED_SIGNERS_DIR="$HOME/.config/git"
 if [ -f "$HOST_ALLOWED_SIGNERS_FILE" ]; then
 	echo "Applying allowed-signers file from $HOST_ALLOWED_SIGNERS_FILE..."
@@ -162,7 +165,7 @@ else
 fi
 
 # Setup GitHub CLI config (settings, aliases, etc.)
-HOST_GH_CONFIG_DIR="/workspace/.devcontainer/.conf/gh"
+HOST_GH_CONFIG_DIR="$DEVCONTAINER_DIR/.conf/gh"
 CONTAINER_GH_CONFIG_DIR="$HOME/.config/gh"
 if [ -d "$HOST_GH_CONFIG_DIR" ]; then
 	echo "Applying GitHub CLI config from $HOST_GH_CONFIG_DIR..."
@@ -175,7 +178,7 @@ fi
 
 # Authenticate GitHub CLI using token file (if available)
 # This must run AFTER copying GitHub CLI config so the fresh token overwrites any old authentication.
-GH_TOKEN_FILE="/workspace/.devcontainer/.conf/.gh_token"
+GH_TOKEN_FILE="$DEVCONTAINER_DIR/.conf/.gh_token"
 if [ -f "$GH_TOKEN_FILE" ] && [ -s "$GH_TOKEN_FILE" ]; then
 	echo "Authenticating GitHub CLI..."
 	# Trim whitespace from token file (gh is sensitive to newlines/whitespace)

@@ -15,6 +15,7 @@ import warnings
 from pathlib import Path
 
 import pytest
+import yaml
 
 
 class TestHostGitSignatureSetup:
@@ -258,12 +259,8 @@ class TestDevContainerJson:
             f"Expected name to contain 'test_project', got: {config['name']}"
         )
 
-    def test_devcontainer_json_image(self, initialized_workspace, container_image):
-        """Test that devcontainer.json has correct image reference.
-
-        This test verifies that the devcontainer.json image matches the
-        container_image fixture (ghcr.io/vig-os/devcontainer:{tag}).
-        """
+    def test_devcontainer_json_docker_compose_file(self, initialized_workspace):
+        """Test that devcontainer.json references docker-compose.yml."""
         devcontainer_json = (
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
@@ -271,21 +268,29 @@ class TestDevContainerJson:
         with devcontainer_json.open() as f:
             config = json.load(f)
 
-        assert "image" in config, "devcontainer.json missing 'image' field"
-
-        # Verify the devcontainer.json image matches the container_image fixture
-        # container_image format: ghcr.io/vig-os/devcontainer:{tag}
-        assert config["image"] == container_image, (
-            f"Expected image to be {container_image}, got: {config['image']}"
+        assert "dockerComposeFile" in config, (
+            "devcontainer.json missing 'dockerComposeFile' field"
+        )
+        assert config["dockerComposeFile"] == "docker-compose.yml", (
+            f"Expected dockerComposeFile='docker-compose.yml', got: {config['dockerComposeFile']}"
         )
 
-        # {{IMAGE_TAG}} should be replaced (or at least not present)
-        assert "{{IMAGE_TAG}}" not in config["image"], (
-            f"Image tag placeholder not replaced: {config['image']}"
+    def test_devcontainer_json_service(self, initialized_workspace):
+        """Test that devcontainer.json specifies the service name."""
+        devcontainer_json = (
+            initialized_workspace / ".devcontainer" / "devcontainer.json"
+        )
+
+        with devcontainer_json.open() as f:
+            config = json.load(f)
+
+        assert "service" in config, "devcontainer.json missing 'service' field"
+        assert config["service"] == "devcontainer", (
+            f"Expected service='devcontainer', got: {config['service']}"
         )
 
     def test_devcontainer_json_workspace_folder(self, initialized_workspace):
-        """Test that workspaceFolder is set correctly."""
+        """Test that workspaceFolder is set correctly to project subdirectory."""
         devcontainer_json = (
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
@@ -296,8 +301,16 @@ class TestDevContainerJson:
         assert "workspaceFolder" in config, (
             "devcontainer.json missing 'workspaceFolder' field"
         )
-        assert config["workspaceFolder"] == "/workspace", (
-            f"Expected workspaceFolder='/workspace', got: {config['workspaceFolder']}"
+        # workspaceFolder should be /workspace/<project_name>, not /workspace
+        assert "/workspace/" in config["workspaceFolder"], (
+            f"Expected workspaceFolder to be in /workspace/ subdirectory, got: {config['workspaceFolder']}"
+        )
+        assert config["workspaceFolder"] != "/workspace", (
+            "workspaceFolder should be a subdirectory, not '/workspace' directly"
+        )
+        # Should contain the project name (test_project)
+        assert "test_project" in config["workspaceFolder"].lower(), (
+            f"workspaceFolder should contain project name, got: {config['workspaceFolder']}"
         )
 
     def test_devcontainer_json_vscode_extensions(self, initialized_workspace):
@@ -361,7 +374,7 @@ class TestDevContainerJson:
         )
 
     def test_devcontainer_json_post_attach_command(self, initialized_workspace):
-        """Test that postAttachCommand is configured."""
+        """Test that postAttachCommand is configured correctly."""
         devcontainer_json = (
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
@@ -372,11 +385,216 @@ class TestDevContainerJson:
         assert "postAttachCommand" in config, (
             "devcontainer.json missing 'postAttachCommand' field"
         )
+        # postAttachCommand should reference .devcontainer inside project subdirectory
         assert (
-            config["postAttachCommand"] == "/workspace/.devcontainer/post-attach.sh"
+            config["postAttachCommand"]
+            == "/workspace/test_project/.devcontainer/post-attach.sh"
         ), (
-            f"Expected postAttachCommand='/workspace/.devcontainer/post-attach.sh', "
+            f"Expected postAttachCommand='/workspace/test_project/.devcontainer/post-attach.sh', "
             f"got: {config['postAttachCommand']}"
+        )
+
+    def test_devcontainer_json_no_redundant_container_env(self, initialized_workspace):
+        """Test that containerEnv is not redundantly defined (should be in docker-compose.yml)."""
+        devcontainer_json = (
+            initialized_workspace / ".devcontainer" / "devcontainer.json"
+        )
+
+        with devcontainer_json.open() as f:
+            config = json.load(f)
+
+        # containerEnv should not be in devcontainer.json since environment
+        # variables are already defined in docker-compose.yml
+        assert "containerEnv" not in config, (
+            "containerEnv should not be in devcontainer.json (use docker-compose.yml instead)"
+        )
+
+
+class TestDevContainerDockerCompose:
+    """Test docker-compose.yml configuration."""
+
+    def test_docker_compose_yml_exists(self, initialized_workspace):
+        """Test that docker-compose.yml exists."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+        assert docker_compose_yml.exists(), "docker-compose.yml not found"
+        assert docker_compose_yml.is_file(), "docker-compose.yml is not a file"
+
+    def test_docker_compose_yml_valid(self, initialized_workspace):
+        """Test that docker-compose.yml is valid YAML."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        assert isinstance(config, dict), "docker-compose.yml is not a valid YAML object"
+        assert "version" in config, "docker-compose.yml missing 'version' field"
+        assert "services" in config, "docker-compose.yml missing 'services' field"
+
+    def test_docker_compose_yml_service_exists(self, initialized_workspace):
+        """Test that devcontainer service exists in docker-compose.yml."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        assert "devcontainer" in config["services"], (
+            "docker-compose.yml missing 'devcontainer' service"
+        )
+
+    def test_docker_compose_yml_image(self, initialized_workspace, container_image):
+        """Test that docker-compose.yml has correct image reference."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        service = config["services"]["devcontainer"]
+        assert "image" in service, "devcontainer service missing 'image' field"
+
+        # Verify the docker-compose.yml image matches the container_image fixture
+        # container_image format: ghcr.io/vig-os/devcontainer:{tag}
+        assert service["image"] == container_image, (
+            f"Expected image to be {container_image}, got: {service['image']}"
+        )
+
+        # {{IMAGE_TAG}} should be replaced (or at least not present)
+        assert "{{IMAGE_TAG}}" not in service["image"], (
+            f"Image tag placeholder not replaced: {service['image']}"
+        )
+
+    def test_docker_compose_yml_volumes(self, initialized_workspace):
+        """Test that docker-compose.yml has volume mount configured to subdirectory."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        service = config["services"]["devcontainer"]
+        assert "volumes" in service, "devcontainer service missing 'volumes' field"
+        assert isinstance(service["volumes"], list), "volumes should be a list"
+        assert len(service["volumes"]) > 0, "No volumes configured"
+
+        # Check that workspace folder is mounted to subdirectory
+        volumes_str = " ".join(service["volumes"])
+        # Should use relative path (..) for mounting
+        assert ".." in volumes_str, (
+            f"Expected relative path (..) or localWorkspaceFolder in volumes, got: {service['volumes']}"
+        )
+        # Should mount to /workspace/test_project (or /workspace/{{SHORT_NAME}} before replacement)
+        assert "/workspace/" in volumes_str, (
+            f"Expected mount to /workspace/ subdirectory, got: {service['volumes']}"
+        )
+        # Check that it's not mounting directly to /workspace
+        assert (
+            ":/workspace:" not in volumes_str and ':/workspace"' not in volumes_str
+        ), (
+            f"Should mount to subdirectory, not directly to /workspace, got: {service['volumes']}"
+        )
+
+    def test_docker_compose_yml_environment(self, initialized_workspace):
+        """Test that docker-compose.yml has environment variables configured."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        service = config["services"]["devcontainer"]
+        assert "environment" in service, (
+            "devcontainer service missing 'environment' field"
+        )
+        assert isinstance(service["environment"], list), "environment should be a list"
+
+        # Check for environment variable overrides
+        # (PYTHONUNBUFFERED and IN_CONTAINER are in Containerfile, not here)
+        env_vars = {
+            item.split("=")[0]: item.split("=")[1] if "=" in item else None
+            for item in service["environment"]
+        }
+
+        assert "PRE_COMMIT_HOME" in env_vars, (
+            "PRE_COMMIT_HOME environment variable not found"
+        )
+        # PRE_COMMIT_HOME should also be in project subdirectory
+        assert (
+            env_vars["PRE_COMMIT_HOME"].lower()
+            == "/workspace/test_project/.pre-commit-cache"
+        ), (
+            f"PRE_COMMIT_HOME should be in project directory, got: {env_vars['PRE_COMMIT_HOME']}"
+        )
+
+    def test_docker_compose_yml_command(self, initialized_workspace):
+        """Test that docker-compose.yml has command configured."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        service = config["services"]["devcontainer"]
+        assert "command" in service, "devcontainer service missing 'command' field"
+        assert service["command"] == "sleep infinity", (
+            f"Expected command='sleep infinity', got: {service['command']}"
+        )
+
+    def test_docker_compose_yml_user(self, initialized_workspace):
+        """Test that docker-compose.yml has user configured."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        service = config["services"]["devcontainer"]
+        assert "user" in service, "devcontainer service missing 'user' field"
+        assert service["user"] == "root", (
+            f"Expected user='root', got: {service['user']}"
+        )
+
+    def test_docker_compose_yml_interactive_settings(self, initialized_workspace):
+        """Test that docker-compose.yml has interactive settings configured."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        service = config["services"]["devcontainer"]
+        assert "stdin_open" in service, (
+            "devcontainer service missing 'stdin_open' field"
+        )
+        assert service["stdin_open"] is True, (
+            f"Expected stdin_open=True, got: {service['stdin_open']}"
+        )
+        assert "tty" in service, "devcontainer service missing 'tty' field"
+        assert service["tty"] is True, f"Expected tty=True, got: {service['tty']}"
+
+    def test_docker_compose_yml_placeholders_replaced(self, initialized_workspace):
+        """Test that {{IMAGE_TAG}} placeholder is replaced in docker-compose.yml."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            content = f.read()
+
+        # {{IMAGE_TAG}} should be replaced (or at least not present)
+        assert "{{IMAGE_TAG}}" not in content, (
+            "{{IMAGE_TAG}} placeholder not replaced in docker-compose.yml"
         )
 
 
@@ -437,16 +655,18 @@ class TestDevContainerPlaceholders:
         )
 
     def test_image_tag_replaced(self, initialized_workspace):
-        """Test that {{IMAGE_TAG}} placeholders are replaced."""
-        devcontainer_json = (
-            initialized_workspace / ".devcontainer" / "devcontainer.json"
+        """Test that {{IMAGE_TAG}} placeholders are replaced in docker-compose.yml."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
         )
 
-        with devcontainer_json.open() as f:
+        with docker_compose_yml.open() as f:
             content = f.read()
 
         # {{IMAGE_TAG}} should be replaced (or at least not present)
-        assert "{{IMAGE_TAG}}" not in content, "{{IMAGE_TAG}} placeholder not replaced"
+        assert "{{IMAGE_TAG}}" not in content, (
+            "{{IMAGE_TAG}} placeholder not replaced in docker-compose.yml"
+        )
 
 
 class TestDevContainerGit:
@@ -480,7 +700,8 @@ class TestDevContainerUserConf:
     def test_conf_directory_files(self, devcontainer_up):
         """Test that .devcontainer/.conf contains all expected files."""
         workspace_path = str(devcontainer_up.resolve())
-        conf_dir = "/workspace/.devcontainer/.conf"
+        # .devcontainer is inside the project subdirectory
+        conf_dir = "/workspace/test_project/.devcontainer/.conf"
 
         # Check that .gitconfig exists (should always be generated)
         check_gitconfig_cmd = [
@@ -644,7 +865,8 @@ class TestDevContainerUserConf:
     def test_files_copied_to_home(self, devcontainer_up):
         """Test that files from .devcontainer/.conf have been copied to their destinations."""
         workspace_path = str(devcontainer_up.resolve())
-        conf_dir = "/workspace/.devcontainer/.conf"
+        # .devcontainer is inside the project subdirectory
+        conf_dir = "/workspace/test_project/.devcontainer/.conf"
 
         # Check that .gitconfig was copied to ~/.gitconfig
         check_gitconfig_cmd = [
@@ -957,7 +1179,7 @@ class TestDevContainerCLI:
             "podman",
             "bash",
             "-c",
-            "cd /workspace && pre-commit run --files test_file.py",
+            "cd /workspace/test_project && pre-commit run --files test_file.py",
         ]
 
         result = subprocess.run(
@@ -1017,7 +1239,7 @@ class TestDevContainerCLI:
             "bash",
             "-c",
             (
-                "cd /workspace && "
+                "cd /workspace/test_project && "
                 "git config --get gpg.format 2>/dev/null | grep -q ssh && echo 'ssh_signing_configured' || echo 'not_configured'"
             ),
         ]
@@ -1056,7 +1278,7 @@ class TestDevContainerCLI:
             "bash",
             "-c",
             (
-                "cd /workspace && "
+                "cd /workspace/test_project && "
                 "git config user.name 'Test User' && "
                 "git config user.email 'test@example.com' && "
                 "git add test_commit.txt && "
@@ -1190,4 +1412,159 @@ class TestDevContainerCLI:
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}\n"
             f"Expected 'Logged in to github.com' or similar in output"
+        )
+
+
+class TestDockerComposeOverride:
+    """Test docker-compose.override.yml functionality for additional mounts."""
+
+    def test_override_mount_directory_exists(self, devcontainer_up):
+        """Test that the directory mounted via override file exists in container."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        # The conftest.py fixture creates an override mounting tests/ to /workspace/tests-mounted
+        check_dir_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "test",
+            "-d",
+            "/workspace/tests-mounted",
+        ]
+
+        result = subprocess.run(
+            check_dir_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+        )
+
+        assert result.returncode == 0, (
+            f"Override mount directory /workspace/tests-mounted not found\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(check_dir_cmd)}"
+        )
+
+    def test_override_mount_file_accessible(self, devcontainer_up):
+        """Test that files in the override mount are accessible."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        # Check that conftest.py exists in the mounted tests directory
+        check_file_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "test",
+            "-f",
+            "/workspace/tests-mounted/conftest.py",
+        ]
+
+        result = subprocess.run(
+            check_file_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+        )
+
+        assert result.returncode == 0, (
+            f"conftest.py not found in override mount at /workspace/tests-mounted/conftest.py\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(check_file_cmd)}"
+        )
+
+    def test_override_mount_file_readable(self, devcontainer_up):
+        """Test that files in the override mount are readable."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        # Read first line of conftest.py to verify content is accessible
+        read_file_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "head",
+            "-n",
+            "1",
+            "/workspace/tests-mounted/conftest.py",
+        ]
+
+        result = subprocess.run(
+            read_file_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+        )
+
+        assert result.returncode == 0, (
+            f"Failed to read conftest.py from override mount\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(read_file_cmd)}"
+        )
+
+        # Verify we got some content (should be a comment or import)
+        assert result.stdout.strip(), (
+            f"conftest.py appears to be empty or unreadable\nstdout: {result.stdout}\n"
+        )
+
+    def test_override_mount_list_directory(self, devcontainer_up):
+        """Test that we can list the contents of the override mount."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        # List contents of the mounted tests directory
+        ls_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "ls",
+            "-la",
+            "/workspace/tests-mounted",
+        ]
+
+        result = subprocess.run(
+            ls_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+        )
+
+        assert result.returncode == 0, (
+            f"Failed to list contents of override mount\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(ls_cmd)}"
+        )
+
+        # Verify expected test files are listed
+        assert "conftest.py" in result.stdout, (
+            f"conftest.py not found in directory listing\nstdout: {result.stdout}"
+        )
+        assert "test_integration.py" in result.stdout, (
+            f"test_integration.py not found in directory listing\n"
+            f"stdout: {result.stdout}"
         )
