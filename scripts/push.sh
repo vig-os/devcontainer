@@ -312,23 +312,61 @@ else
 fi
 
 # Update README.md
-echo "Updating README.md with latest version..."
+echo "Updating README.md with latest version and size..."
 if [ -f README.md ]; then
-	if ! sed -i.tmp "s/- \*\*Latest version\*\*: .*/- **Latest version**: $VERSION/" README.md; then
-		echo "❌ Failed to update README.md"
+	# Update version
+	if ! sed -i.tmp 's/- \*\*Version\*\*: .*/- **Version**: '"$VERSION"'/' README.md; then
+		echo "❌ Failed to update README.md version"
 		exit 1
 	fi
 	rm -f README.md.tmp 2>/dev/null || true
-	echo "✓ Updated README.md with version $VERSION"
+
+	# Get image size and round to nearest 10MB
+	# Note: Inspect architecture-specific image, not the manifest
+	echo "Calculating image size..."
+	NATIVE_ARCH=$(uname -m)
+	if [ "$NATIVE_ARCH" = "arm64" ] || [ "$NATIVE_ARCH" = "aarch64" ]; then
+		INSPECT_ARCH="arm64"
+	else
+		INSPECT_ARCH="amd64"
+	fi
+	IMAGE_SIZE_BYTES=$(podman image inspect --format='{{.Size}}' "$REPO:$VERSION-$INSPECT_ARCH" 2>/dev/null || echo "0")
+	if [ "$IMAGE_SIZE_BYTES" -gt 0 ]; then
+		# Convert to MB and round to nearest 10MB
+		IMAGE_SIZE_MB=$(( (IMAGE_SIZE_BYTES / 1024 / 1024 + 5) / 10 * 10 ))
+		if ! sed -i.tmp 's/- \*\*Size\*\*: .*/- **Size**: ~'"${IMAGE_SIZE_MB}"' MB/' README.md; then
+			echo "⚠️  Failed to update README.md size, continuing..."
+		else
+			echo "✓ Updated README.md with size ~${IMAGE_SIZE_MB} MB"
+		fi
+		rm -f README.md.tmp 2>/dev/null || true
+	else
+		echo "⚠️  Could not determine image size, skipping size update"
+		IMAGE_SIZE_MB=""
+	fi
+
+	if [ -n "$IMAGE_SIZE_MB" ]; then
+		echo "✓ Updated README.md with version $VERSION and size ~${IMAGE_SIZE_MB} MB"
+	else
+		echo "✓ Updated README.md with version $VERSION (size update skipped)"
+	fi
+
 else
-	echo "⚠️  README.md not found, skipping version update"
+	echo "⚠️  README.md not found, skipping updates"
 fi
 
 # Commit changes (only if there are changes)
 echo "Committing changes..."
 git add README.md 2>/dev/null || true
 if git diff --cached --quiet; then
-	echo "⚠️  No changes to commit (README.md may already have this version)"
+	echo "❌ ERROR: No changes to commit - README.md was not updated!"
+	echo ""
+	echo "   This means the version update failed silently."
+	echo "   Current README.md version line:"
+	grep "\*\*Version\*\*" README.md || echo "   (Version line not found)"
+	echo ""
+	git reset HEAD README.md 2>/dev/null || true
+	exit 1
 else
 	if ! git commit -m "Release $VERSION"; then
 		echo "❌ Failed to commit changes"

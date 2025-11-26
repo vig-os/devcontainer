@@ -248,8 +248,9 @@ def test_make_push_mechanism(pushed_image):
     1. Uses the pushed_image fixture to push an image
     2. Verifies the image exists in the local registry
     3. Verifies the git tag was created
-    4. Cleans up the git tag
-    5. Verifies no artifacts remain
+    4. Verifies README.md was updated with version and size
+    5. Cleans up the git tag
+    6. Verifies no artifacts remain
     """
     # The pushed_image fixture already verifies the image exists in the local registry
 
@@ -257,6 +258,7 @@ def test_make_push_mechanism(pushed_image):
     test_registry_path = pushed_image["registry_path"]
     test_version = pushed_image["version"]
     test_git_tag = pushed_image["git_tag"]
+    project_root = pushed_image["project_root"]
 
     # Verify git tag was created (using version format: v99.8795)
     print(f"\n🔍 Verifying git tag {test_git_tag}...")
@@ -297,6 +299,32 @@ def test_make_push_mechanism(pushed_image):
         f"Image {latest_image_name} not found in registry. "
         f"STDERR: {latest_result.stderr}"
     )
+
+    # Verify README.md was updated with version and size
+    print("\n🔍 Verifying README.md updates...")
+    readme_path = project_root / "README.md"
+    assert readme_path.exists(), "README.md not found"
+
+    readme_content = readme_path.read_text()
+
+    # Check version was updated
+    import re
+
+    version_match = re.search(r"- \*\*Version\*\*:\s*(.+)", readme_content)
+    assert version_match, "Version line not found in README.md"
+    readme_version = version_match.group(1).strip()
+    assert test_version in readme_version, (
+        f"README.md version '{readme_version}' does not contain '{test_version}'"
+    )
+
+    # Check size was updated with a value between 100 and 2000 MB
+    size_match = re.search(r"- \*\*Size\*\*:\s*~?(\d+)\s*MB", readme_content)
+    assert size_match, "Size line not found or invalid format in README.md"
+    readme_size = int(size_match.group(1))
+    assert 100 <= readme_size <= 2000, (
+        f"README.md size {readme_size} MB is outside valid range (100-2000 MB)"
+    )
+    print(f"✓ README.md updated with version {test_version} and size ~{readme_size} MB")
 
     print("\n✅ Push test passed! Image successfully pushed to registry.")
 
