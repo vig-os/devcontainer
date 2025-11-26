@@ -15,6 +15,7 @@ import warnings
 from pathlib import Path
 
 import pytest
+import yaml
 
 
 class TestHostGitSignatureSetup:
@@ -258,12 +259,8 @@ class TestDevContainerJson:
             f"Expected name to contain 'test_project', got: {config['name']}"
         )
 
-    def test_devcontainer_json_image(self, initialized_workspace, container_image):
-        """Test that devcontainer.json has correct image reference.
-
-        This test verifies that the devcontainer.json image matches the
-        container_image fixture (ghcr.io/vig-os/devcontainer:{tag}).
-        """
+    def test_devcontainer_json_docker_compose_file(self, initialized_workspace):
+        """Test that devcontainer.json references docker-compose.yml."""
         devcontainer_json = (
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
@@ -271,17 +268,25 @@ class TestDevContainerJson:
         with devcontainer_json.open() as f:
             config = json.load(f)
 
-        assert "image" in config, "devcontainer.json missing 'image' field"
-
-        # Verify the devcontainer.json image matches the container_image fixture
-        # container_image format: ghcr.io/vig-os/devcontainer:{tag}
-        assert config["image"] == container_image, (
-            f"Expected image to be {container_image}, got: {config['image']}"
+        assert "dockerComposeFile" in config, (
+            "devcontainer.json missing 'dockerComposeFile' field"
+        )
+        assert config["dockerComposeFile"] == "docker-compose.yml", (
+            f"Expected dockerComposeFile='docker-compose.yml', got: {config['dockerComposeFile']}"
         )
 
-        # {{IMAGE_TAG}} should be replaced (or at least not present)
-        assert "{{IMAGE_TAG}}" not in config["image"], (
-            f"Image tag placeholder not replaced: {config['image']}"
+    def test_devcontainer_json_service(self, initialized_workspace):
+        """Test that devcontainer.json specifies the service name."""
+        devcontainer_json = (
+            initialized_workspace / ".devcontainer" / "devcontainer.json"
+        )
+
+        with devcontainer_json.open() as f:
+            config = json.load(f)
+
+        assert "service" in config, "devcontainer.json missing 'service' field"
+        assert config["service"] == "devcontainer", (
+            f"Expected service='devcontainer', got: {config['service']}"
         )
 
     def test_devcontainer_json_workspace_folder(self, initialized_workspace):
@@ -380,6 +385,182 @@ class TestDevContainerJson:
         )
 
 
+class TestDevContainerDockerCompose:
+    """Test docker-compose.yml configuration."""
+
+    def test_docker_compose_yml_exists(self, initialized_workspace):
+        """Test that docker-compose.yml exists."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+        assert docker_compose_yml.exists(), "docker-compose.yml not found"
+        assert docker_compose_yml.is_file(), "docker-compose.yml is not a file"
+
+    def test_docker_compose_yml_valid(self, initialized_workspace):
+        """Test that docker-compose.yml is valid YAML."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        assert isinstance(config, dict), "docker-compose.yml is not a valid YAML object"
+        assert "version" in config, "docker-compose.yml missing 'version' field"
+        assert "services" in config, "docker-compose.yml missing 'services' field"
+
+    def test_docker_compose_yml_service_exists(self, initialized_workspace):
+        """Test that devcontainer service exists in docker-compose.yml."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        assert "devcontainer" in config["services"], (
+            "docker-compose.yml missing 'devcontainer' service"
+        )
+
+    def test_docker_compose_yml_image(self, initialized_workspace, container_image):
+        """Test that docker-compose.yml has correct image reference."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        service = config["services"]["devcontainer"]
+        assert "image" in service, "devcontainer service missing 'image' field"
+
+        # Verify the docker-compose.yml image matches the container_image fixture
+        # container_image format: ghcr.io/vig-os/devcontainer:{tag}
+        assert service["image"] == container_image, (
+            f"Expected image to be {container_image}, got: {service['image']}"
+        )
+
+        # {{IMAGE_TAG}} should be replaced (or at least not present)
+        assert "{{IMAGE_TAG}}" not in service["image"], (
+            f"Image tag placeholder not replaced: {service['image']}"
+        )
+
+    def test_docker_compose_yml_volumes(self, initialized_workspace):
+        """Test that docker-compose.yml has volume mount configured."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        service = config["services"]["devcontainer"]
+        assert "volumes" in service, "devcontainer service missing 'volumes' field"
+        assert isinstance(service["volumes"], list), "volumes should be a list"
+        assert len(service["volumes"]) > 0, "No volumes configured"
+
+        # Check that workspace folder is mounted
+        volumes_str = " ".join(service["volumes"])
+        assert "localWorkspaceFolder" in volumes_str or "/workspace" in volumes_str, (
+            f"Expected workspace folder mount, got: {service['volumes']}"
+        )
+
+    def test_docker_compose_yml_environment(self, initialized_workspace):
+        """Test that docker-compose.yml has environment variables configured."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        service = config["services"]["devcontainer"]
+        assert "environment" in service, (
+            "devcontainer service missing 'environment' field"
+        )
+        assert isinstance(service["environment"], list), "environment should be a list"
+
+        # Check for required environment variables
+        env_vars = {
+            item.split("=")[0]: item.split("=")[1] if "=" in item else None
+            for item in service["environment"]
+        }
+
+        assert "PYTHONUNBUFFERED" in env_vars, (
+            "PYTHONUNBUFFERED environment variable not found"
+        )
+        assert "IN_CONTAINER" in env_vars, "IN_CONTAINER environment variable not found"
+        assert env_vars["IN_CONTAINER"] == "true", (
+            f"Expected IN_CONTAINER='true', got: {env_vars['IN_CONTAINER']}"
+        )
+        assert "PRE_COMMIT_HOME" in env_vars, (
+            "PRE_COMMIT_HOME environment variable not found"
+        )
+
+    def test_docker_compose_yml_command(self, initialized_workspace):
+        """Test that docker-compose.yml has command configured."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        service = config["services"]["devcontainer"]
+        assert "command" in service, "devcontainer service missing 'command' field"
+        assert service["command"] == "sleep infinity", (
+            f"Expected command='sleep infinity', got: {service['command']}"
+        )
+
+    def test_docker_compose_yml_user(self, initialized_workspace):
+        """Test that docker-compose.yml has user configured."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        service = config["services"]["devcontainer"]
+        assert "user" in service, "devcontainer service missing 'user' field"
+        assert service["user"] == "root", (
+            f"Expected user='root', got: {service['user']}"
+        )
+
+    def test_docker_compose_yml_interactive_settings(self, initialized_workspace):
+        """Test that docker-compose.yml has interactive settings configured."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            config = yaml.safe_load(f)
+
+        service = config["services"]["devcontainer"]
+        assert "stdin_open" in service, (
+            "devcontainer service missing 'stdin_open' field"
+        )
+        assert service["stdin_open"] is True, (
+            f"Expected stdin_open=True, got: {service['stdin_open']}"
+        )
+        assert "tty" in service, "devcontainer service missing 'tty' field"
+        assert service["tty"] is True, f"Expected tty=True, got: {service['tty']}"
+
+    def test_docker_compose_yml_placeholders_replaced(self, initialized_workspace):
+        """Test that {{IMAGE_TAG}} placeholder is replaced in docker-compose.yml."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+        )
+
+        with docker_compose_yml.open() as f:
+            content = f.read()
+
+        # {{IMAGE_TAG}} should be replaced (or at least not present)
+        assert "{{IMAGE_TAG}}" not in content, (
+            "{{IMAGE_TAG}} placeholder not replaced in docker-compose.yml"
+        )
+
+
 class TestDevContainerScripts:
     """Test that devcontainer scripts exist and are executable."""
 
@@ -437,16 +618,18 @@ class TestDevContainerPlaceholders:
         )
 
     def test_image_tag_replaced(self, initialized_workspace):
-        """Test that {{IMAGE_TAG}} placeholders are replaced."""
-        devcontainer_json = (
-            initialized_workspace / ".devcontainer" / "devcontainer.json"
+        """Test that {{IMAGE_TAG}} placeholders are replaced in docker-compose.yml."""
+        docker_compose_yml = (
+            initialized_workspace / ".devcontainer" / "docker-compose.yml"
         )
 
-        with devcontainer_json.open() as f:
+        with docker_compose_yml.open() as f:
             content = f.read()
 
         # {{IMAGE_TAG}} should be replaced (or at least not present)
-        assert "{{IMAGE_TAG}}" not in content, "{{IMAGE_TAG}} placeholder not replaced"
+        assert "{{IMAGE_TAG}}" not in content, (
+            "{{IMAGE_TAG}} placeholder not replaced in docker-compose.yml"
+        )
 
 
 class TestDevContainerGit:

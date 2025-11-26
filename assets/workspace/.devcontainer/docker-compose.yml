@@ -1,0 +1,21 @@
+---
+version: '3.8'
+
+services:
+  devcontainer:
+    image: ghcr.io/vig-os/devcontainer:{{IMAGE_TAG}}
+    volumes:
+      # Mount the workspace folder (same as current devcontainer.json mount)
+      - ${localWorkspaceFolder}:/workspace:cached
+    environment:
+      # Preserve environment variables from Containerfile
+      - PYTHONUNBUFFERED=1
+      - IN_CONTAINER=true
+      - PRE_COMMIT_HOME=/workspace/.pre-commit-cache
+    # Keep container running for VS Code to attach
+    command: sleep infinity
+    # Use root user (default from image)
+    user: root
+    # Keep stdin open and allocate a pseudo-TTY for interactive use
+    stdin_open: true
+    tty: true
