@@ -1,6 +1,17 @@
 #!/bin/bash
 set -euo pipefail
 
+# Change to project root directory ({{SHORT_NAME}} is replaced during template initialization)
+PROJECT_ROOT="/workspace/{{SHORT_NAME}}"
+
+# Ensure project directory exists
+if [ ! -d "$PROJECT_ROOT" ]; then
+    echo "Error: Project directory $PROJECT_ROOT does not exist"
+    exit 1
+fi
+
+cd "$PROJECT_ROOT"
+
 echo "Checking git repository status..."
 
 # Check if we're already in a git repository

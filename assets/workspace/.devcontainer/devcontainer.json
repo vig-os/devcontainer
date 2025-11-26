@@ -1,7 +1,8 @@
 {
     "name": "{{SHORT_NAME}}-devc",
-    "image": "ghcr.io/vig-os/devcontainer:{{IMAGE_TAG}}",
-    "workspaceFolder": "/workspace",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "devcontainer",
+    "workspaceFolder": "/workspace/{{SHORT_NAME}}",
     "customizations": {
         "vscode": {
             "extensions": [
@@ -32,9 +33,6 @@
             }
         }
     },
-    "mounts": [
-        "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached"
-    ],
     "initializeCommand": ".devcontainer/initialize.sh",
-    "postAttachCommand": "/workspace/.devcontainer/post-attach.sh"
+    "postAttachCommand": "/workspace/{{SHORT_NAME}}/.devcontainer/post-attach.sh"
 }

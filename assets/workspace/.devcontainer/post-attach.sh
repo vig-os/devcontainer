@@ -8,7 +8,14 @@ set -euo pipefail
 
 echo "Running post-attach setup..."
 
-SCRIPTS_DIR="/workspace/.devcontainer/scripts"
+# .devcontainer is mounted at workspace root for VS Code compatibility
+SCRIPTS_DIR="/workspace/{{SHORT_NAME}}/.devcontainer/scripts"
+
+# Verify scripts directory exists
+if [ ! -d "$SCRIPTS_DIR" ]; then
+    echo "Error: Scripts directory $SCRIPTS_DIR does not exist"
+    exit 1
+fi
 
 # Initialize git repository if needed
 "$SCRIPTS_DIR/init-git.sh"

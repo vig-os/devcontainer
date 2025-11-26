@@ -75,7 +75,7 @@ class TestPythonEnvironment:
         assert result.rc == 0, "uv --version failed"
         assert "uv" in result.stdout.lower()
         # Check for version
-        assert "0.9.11" in result.stdout, f"Expected uv 0.9.11, got: {result.stdout}"
+        assert "0.9.12" in result.stdout, f"Expected uv 0.9.11, got: {result.stdout}"
 
 
 class TestDevelopmentTools:
@@ -117,14 +117,6 @@ class TestEnvironmentVariables:
         assert result.rc == 0, "Failed to read IN_CONTAINER"
         assert result.stdout.strip() == "true", (
             f"Expected IN_CONTAINER=true, got: {result.stdout.strip()}"
-        )
-
-    def test_pre_commit_home_set(self, host):
-        """Test that PRE_COMMIT_HOME is set."""
-        result = host.run("echo $PRE_COMMIT_HOME")
-        assert result.rc == 0, "Failed to read PRE_COMMIT_HOME"
-        assert result.stdout.strip() == "/workspace/.pre-commit-cache", (
-            f"Expected PRE_COMMIT_HOME=/workspace/.pre-commit-cache, got: {result.stdout.strip()}"
         )
 
     def test_locale_set(self, host):

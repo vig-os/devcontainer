@@ -102,14 +102,13 @@ RUN git init && \
     pre-commit install-hooks && \
     rm -rf .git
 
-# Set environment variables
-ENV PYTHONUNBUFFERED="1"
-ENV IN_CONTAINER="true"
-ENV PRE_COMMIT_HOME="/workspace/.pre-commit-cache"
-
 # Create workspace directory
 RUN mkdir -p /workspace
 WORKDIR /workspace
+
+# Set environment variables
+ENV PYTHONUNBUFFERED="1"
+ENV IN_CONTAINER="true"
 
 # Create aliases for pre-commit
 RUN echo 'alias precommit="pre-commit run"' >> /root/.bashrc
