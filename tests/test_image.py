@@ -155,19 +155,58 @@ class TestFileStructure:
         """Test that assets directory exists."""
         assert host.file("/root/assets").is_directory, "Assets directory not found"
 
-    def test_init_workspace_script_exists(self, host):
-        """Test that init-workspace script exists and is executable."""
-        init_script = host.file("/root/assets/init-workspace.sh")
-        assert init_script.exists, "init-workspace script not found"
-        assert init_script.mode == 0o755, "init-workspace script is not executable"
+    def test_assets_workspace_structure(self, host):
+        """Test that assets/workspace directory structure is complete."""
+        # Define expected directories
+        expected_dirs = [
+            "/root/assets/workspace",
+            "/root/assets/workspace/.devcontainer",
+            "/root/assets/workspace/.devcontainer/scripts",
+            "/root/assets/workspace/.githooks",
+        ]
 
-    def test_workspace_template_pre_commit_config_exists(self, host):
-        """Test that .pre-commit-config.yaml exists in workspace template."""
-        precommit_config = host.file("/root/assets/workspace/.pre-commit-config.yaml")
-        assert precommit_config.exists, (
-            ".pre-commit-config.yaml not found in workspace template"
-        )
-        assert precommit_config.is_file, ".pre-commit-config.yaml is not a file"
+        # Define expected files
+        expected_files = [
+            # Workspace root files
+            "/root/assets/workspace/.gitignore",
+            "/root/assets/workspace/.pre-commit-config.yaml",
+            "/root/assets/workspace/.pymarkdown",
+            "/root/assets/workspace/.pymarkdown.config.md",
+            "/root/assets/workspace/.yamllint",
+            "/root/assets/workspace/CHANGELOG.md",
+            "/root/assets/workspace/README.md",
+            # .devcontainer files
+            "/root/assets/workspace/.devcontainer/.gitignore",
+            "/root/assets/workspace/.devcontainer/devcontainer.json",
+            "/root/assets/workspace/.devcontainer/docker-compose.yml",
+            "/root/assets/workspace/.devcontainer/initialize.sh",
+            "/root/assets/workspace/.devcontainer/post-attach.sh",
+            # .devcontainer/scripts files
+            "/root/assets/workspace/.devcontainer/scripts/copy-host-user-conf.sh",
+            "/root/assets/workspace/.devcontainer/scripts/init-git.sh",
+            "/root/assets/workspace/.devcontainer/scripts/init-precommit.sh",
+            "/root/assets/workspace/.devcontainer/scripts/setup-git-conf.sh",
+            # Git hooks
+            "/root/assets/workspace/.githooks/pre-commit",
+        ]
+
+        # Check all directories exist
+        for dir_path in expected_dirs:
+            assert host.file(dir_path).is_directory, (
+                f"Expected directory not found: {dir_path}"
+            )
+
+        # Check all files exist
+        for file_path in expected_files:
+            assert host.file(file_path).exists, f"Expected file not found: {file_path}"
+            assert host.file(file_path).is_file, (
+                f"Expected file is not a regular file: {file_path}"
+            )
+            # Check shell scripts are executable
+            if file_path.endswith(".sh"):
+                assert host.file(file_path).mode & 0o111, (
+                    f"Expected shell script is not executable: {file_path}"
+                )
 
     def test_workspace_template_pre_commit_hooks_initialized(self, host):
         """Test that pre-commit hooks are pre-initialized in workspace template."""
