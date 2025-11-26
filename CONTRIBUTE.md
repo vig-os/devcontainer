@@ -90,10 +90,12 @@ When contributing to this project, follow this workflow:
 5. **Verify tests pass**
 
    ```bash
-   # Run image and integration tests
+   # Run all test suites (image, integration, registry)
    make test
 
-   # Optionally run registry tests
+   # Or run individual test suites
+   make test-image
+   make test-integration
    make test-registry
    ```
 
@@ -140,9 +142,8 @@ When releasing a new version of the devcontainer image, follow these steps:
 2. **Run tests**
 
    ```bash
-   # Run all tests to ensure everything works
+   # Run all test suites to ensure everything works
    make test
-   make test-registry
    ```
 
 3. **Ensure clean git state**

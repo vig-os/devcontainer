@@ -32,10 +32,10 @@ Closes #
 
 <!-- Describe the tests you ran and how to verify your changes -->
 
-- [ ] Tests pass locally (`make test`)
+- [ ] All tests pass locally (`make test` - runs image, integration, and registry tests)
 - [ ] Image tests pass (`make test-image`)
 - [ ] Integration tests pass (`make test-integration`)
-- [ ] Registry tests pass (`make test-registry`) (if applicable)
+- [ ] Registry tests pass (`make test-registry`)
 - [ ] Manual testing performed (describe below)
 
 ### Manual Testing Details

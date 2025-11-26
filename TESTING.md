@@ -80,13 +80,14 @@ The fixtures automatically cleans up after all tests complete.
 
 ## Running Tests
 
-Tests are run using Makefile targets. The `test` target runs the image and integration test suites:
+Tests are run using Makefile targets. The `test` target runs all three test suites (image, integration, and registry):
 
 ```bash
-# Run image and integration tests
+# Run all test suites (image, integration, registry)
 make test
 
 # Run tests for a specific image version (must be locally available)
+# Note: test-registry always uses a temporary local registry
 make test VERSION=1.0
 ```
 

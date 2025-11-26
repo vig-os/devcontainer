@@ -28,10 +28,10 @@ define print_help_targets
 	@echo "  setup       - Setup configuration"
 	@echo "  login       - Login to GitHub Container Registry"
 	@echo "  build       - Build local development image"
-	@echo "  test        - Run image and integration tests"
-	@echo "  test-image  - Run image tests only"
-	@echo "  test-integration - Run integration tests only"
-	@echo "  test-registry - Run registry tests only"
+	@echo "  test        - Run all test suites (image, integration, registry)"
+	@echo "  test-image  - Run image tests"
+	@echo "  test-integration - Run integration tests"
+	@echo "  test-registry - Run registry tests"
 	@echo "  push VERSION=X.Y     - Build, test, commit, push & tag image:X.Y"
 	@echo "  push VERSION=X.Y NO_TEST=1 - Build, commit, push & tag image:X.Y (skip tests)"
 	@echo "  push VERSION=X.Y NATIVE_ARCH_ONLY=1 - Build only for native architecture"
@@ -110,11 +110,11 @@ test-integration: _ensure-dev-image
 # Test registry target: runs registry tests (doesn't need image)
 .PHONY: test-registry
 test-registry:
-	@pytest tests/test_registry.py -v --tb=short
+	@pytest tests/test_registry.py -v -s --tb=short
 
-# Test target: runs image and integration tests
+# Test target: runs all test suites (image, integration, registry)
 .PHONY: test
-test: test-image test-integration
+test: test-image test-integration test-registry
 
 # Push target: build, (optionally) test, commit, push & tag a versioned release
 # Use NO_TEST=1 to skip tests
