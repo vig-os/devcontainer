@@ -75,7 +75,7 @@ class TestPythonEnvironment:
         assert result.rc == 0, "uv --version failed"
         assert "uv" in result.stdout.lower()
         # Check for version
-        assert "0.9.12" in result.stdout, f"Expected uv 0.9.12, got: {result.stdout}"
+        assert "0.9.13" in result.stdout, f"Expected uv 0.9.13, got: {result.stdout}"
 
 
 class TestDevelopmentTools:
