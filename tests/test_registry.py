@@ -182,7 +182,6 @@ def pushed_image(local_registry, test_version, git_clean_state):
     project_root = git_clean_state["project_root"]
 
     # Run push with TEST_REGISTRY set
-    print(f"\n🚀 Pushing devcontainer:{test_version} to {test_registry_path}...")
     env = os.environ.copy()
     env["TEST_REGISTRY"] = test_registry_path
 
@@ -231,7 +230,6 @@ def pushed_image(local_registry, test_version, git_clean_state):
         yield push_info
     finally:
         # Clean up at session end
-        print("\n🧹 Cleaning up session artifacts...")
         _cleanup_test_artifacts(
             test_version,
             test_registry_path,
@@ -261,7 +259,6 @@ def test_make_push_mechanism(pushed_image):
     project_root = pushed_image["project_root"]
 
     # Verify git tag was created (using version format: v99.8795)
-    print(f"\n🔍 Verifying git tag {test_git_tag}...")
     tag_result = subprocess.run(
         ["git", "rev-parse", test_git_tag],
         capture_output=True,
@@ -271,7 +268,6 @@ def test_make_push_mechanism(pushed_image):
 
     # Verify image exists in local registry
     # Note: REPO is set from TEST_REGISTRY, so images are at test_registry_path directly
-    print("\n🔍 Verifying image in registry...")
     # Remove trailing slash if present, then add version tag
     registry_base = test_registry_path.rstrip("/")
     full_image_name = f"{registry_base}:{test_version}"
@@ -301,7 +297,6 @@ def test_make_push_mechanism(pushed_image):
     )
 
     # Verify README.md was updated with version and size
-    print("\n🔍 Verifying README.md updates...")
     readme_path = project_root / "README.md"
     assert readme_path.exists(), "README.md not found"
 
@@ -324,9 +319,6 @@ def test_make_push_mechanism(pushed_image):
     assert 100 <= readme_size <= 2000, (
         f"README.md size {readme_size} MB is outside valid range (100-2000 MB)"
     )
-    print(f"✓ README.md updated with version {test_version} and size ~{readme_size} MB")
-
-    print("\n✅ Push test passed! Image successfully pushed to registry.")
 
 
 @pytest.fixture(scope="session")
@@ -350,7 +342,6 @@ def pulled_image(pushed_image):
     # Pull the image from the registry
     # Note: REPO is set from TEST_REGISTRY, so images are at test_registry_path directly
     # Makefile uses TEST_REGISTRY directly (with trailing slash), so pulled image name matches what make pull uses
-    print(f"\n📥 Pulling {test_registry_path}:{test_version} from registry...")
     pull_result = subprocess.run(
         [
             "make",
@@ -415,11 +406,9 @@ def test_make_pull_mechanism(pulled_image):
     This test depends on pulled_image fixture - if push or pull fails, this test will be skipped.
     """
     # Extract info from fixture
-    test_version = pulled_image["version"]
     pulled_image_name = pulled_image["pulled_image_name"]
 
     # Verify the image was pulled
-    print(f"\n🔍 Verifying pulled image {pulled_image_name}...")
     inspect_result = subprocess.run(
         ["podman", "image", "exists", pulled_image_name],
         capture_output=True,
@@ -427,10 +416,6 @@ def test_make_pull_mechanism(pulled_image):
     )
     assert inspect_result.returncode == 0, (
         f"Pulled image {pulled_image_name} not found locally"
-    )
-
-    print(
-        f"\n✅ Pull test passed! Image devcontainer:{test_version} successfully pulled."
     )
 
 
@@ -450,7 +435,6 @@ def test_make_clean_mechanism(pulled_image):
     env["TEST_REGISTRY"] = test_registry_path
 
     # Clean the image using make clean
-    print(f"\n🧹 Cleaning devcontainer:{test_version}...")
     clean_result = subprocess.run(
         [
             "make",
@@ -478,11 +462,6 @@ def test_make_clean_mechanism(pulled_image):
     # Note: clean might warn if image doesn't exist, but that's okay
     assert verify_result.returncode != 0, (
         f"Image {pulled_image_name} still exists after clean"
-    )
-
-    print(
-        "\n✅ Clean test passed! Image successfully cleaned. "
-        "(Git artifacts will be cleaned up at session end)"
     )
 
 
