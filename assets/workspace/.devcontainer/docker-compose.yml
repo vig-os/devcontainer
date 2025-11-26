@@ -5,13 +5,11 @@ services:
   devcontainer:
     image: ghcr.io/vig-os/devcontainer:{{IMAGE_TAG}}
     volumes:
-      # Mount the workspace folder (same as current devcontainer.json mount)
-      - ${localWorkspaceFolder}:/workspace:cached
+      # Mount the project folder to a subdirectory of workspace
+      - ..:/workspace/{{SHORT_NAME}}:cached
     environment:
-      # Preserve environment variables from Containerfile
-      - PYTHONUNBUFFERED=1
-      - IN_CONTAINER=true
-      - PRE_COMMIT_HOME=/workspace/.pre-commit-cache
+      # Override default paths to match project subdirectory structure
+      - PRE_COMMIT_HOME=/workspace/{{SHORT_NAME}}/.pre-commit-cache
     # Keep container running for VS Code to attach
     command: sleep infinity
     # Use root user (default from image)

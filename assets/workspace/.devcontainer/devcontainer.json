@@ -2,7 +2,7 @@
     "name": "{{SHORT_NAME}}-devc",
     "dockerComposeFile": "docker-compose.yml",
     "service": "devcontainer",
-    "workspaceFolder": "/workspace",
+    "workspaceFolder": "/workspace/{{SHORT_NAME}}",
     "customizations": {
         "vscode": {
             "extensions": [
@@ -34,5 +34,5 @@
         }
     },
     "initializeCommand": ".devcontainer/initialize.sh",
-    "postAttachCommand": "/workspace/.devcontainer/post-attach.sh"
+    "postAttachCommand": "/workspace/{{SHORT_NAME}}/.devcontainer/post-attach.sh"
 }

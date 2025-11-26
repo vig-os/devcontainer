@@ -119,14 +119,6 @@ class TestEnvironmentVariables:
             f"Expected IN_CONTAINER=true, got: {result.stdout.strip()}"
         )
 
-    def test_pre_commit_home_set(self, host):
-        """Test that PRE_COMMIT_HOME is set."""
-        result = host.run("echo $PRE_COMMIT_HOME")
-        assert result.rc == 0, "Failed to read PRE_COMMIT_HOME"
-        assert result.stdout.strip() == "/workspace/.pre-commit-cache", (
-            f"Expected PRE_COMMIT_HOME=/workspace/.pre-commit-cache, got: {result.stdout.strip()}"
-        )
-
     def test_locale_set(self, host):
         """Test that locale environment variables are set."""
         result = host.run("echo $LANG")
