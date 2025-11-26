@@ -62,8 +62,8 @@ echo "Creating virtual environment with Python $PYTHON_VERSION in: $PROJECT_ROOT
 uv venv --python "$PYTHON_VERSION" .venv
 
 # === 3. Sync project dependencies from lockfile ===
-echo "Installing project dependencies..."
-uv sync --frozen
+echo "Installing project dependencies (including dev dependencies)..."
+uv sync --frozen --all-extras
 
 # === 4. Setup Git hooks automatically ===
 echo "Setting up Git hooks..."
