@@ -152,7 +152,29 @@ BUILD_DIR="build"
 echo "Preparing build folder..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
-cp Containerfile "$BUILD_DIR/"
+
+# Use minimal Containerfile for registry tests (faster builds)
+if [ -n "$TEST_REGISTRY" ]; then
+	echo "Using minimal Containerfile for registry testing (TEST_REGISTRY is set)"
+	cat > "$BUILD_DIR/Containerfile" << 'EOF'
+# Minimal Containerfile for registry testing
+FROM python:3.12-slim-trixie
+
+# Keep basic structure to test asset copying
+COPY assets/ /opt/devcontainer/
+
+# Minimal metadata
+ARG BUILD_DATE
+ARG VCS_REF
+ARG IMAGE_TAG=dev
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.revision="${VCS_REF}"
+LABEL org.opencontainers.image.version="${IMAGE_TAG}"
+EOF
+else
+	cp Containerfile "$BUILD_DIR/"
+fi
+
 cp -r assets "$BUILD_DIR/"
 if [ -d "$BUILD_DIR/assets/workspace" ]; then
 	echo "Replacing {{IMAGE_TAG}} with $VERSION in build folder template files..."

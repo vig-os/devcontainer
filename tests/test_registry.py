@@ -364,11 +364,6 @@ def pulled_image(pushed_image):
     )
 
     # Check if pull actually succeeded (Makefile suppresses errors, so check output)
-    # Print pull output for debugging
-    print(
-        f"Pull command output:\nSTDOUT: {pull_result.stdout}\nSTDERR: {pull_result.stderr}"
-    )
-
     if (
         pull_result.returncode != 0
         or "⚠️" in pull_result.stdout
@@ -398,17 +393,6 @@ def pulled_image(pushed_image):
     )
 
     if inspect_result.returncode != 0:
-        # Debug: list all images to see what was actually pulled
-        debug_result = subprocess.run(
-            ["podman", "images", "--format", "{{.Repository}}:{{.Tag}}"],
-            capture_output=True,
-            text=True,
-        )
-        print(f"Debug - Looking for: {pulled_image_name}")
-        print(
-            f"Debug - Pull output:\nSTDOUT: {pull_result.stdout}\nSTDERR: {pull_result.stderr}"
-        )
-        print(f"Debug - Available images:\n{debug_result.stdout}")
         _cleanup_test_artifacts(
             test_version,
             test_registry_path,
