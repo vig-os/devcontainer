@@ -336,12 +336,12 @@ fi
 # Update README.md
 echo "Updating README.md with latest version and size..."
 if [ -f README.md ]; then
-	# Update version
-	if ! sed -i.tmp 's/- \*\*Version\*\*: .*/- **Version**: '"$VERSION"'/' README.md; then
+	RELEASE_DATE="${BUILD_DATE%%T*}"
+	RELEASE_URL="https://github.com/vig-os/devcontainer/releases/tag/v$VERSION"
+	if ! python3 scripts/update_readme.py version README.md "$VERSION" "$RELEASE_URL" "$RELEASE_DATE"; then
 		echo "❌ Failed to update README.md version"
 		exit 1
 	fi
-	rm -f README.md.tmp 2>/dev/null || true
 
 	# Get image size and round to nearest 10MB
 	# Note: Inspect architecture-specific image, not the manifest
@@ -356,12 +356,11 @@ if [ -f README.md ]; then
 	if [ "$IMAGE_SIZE_BYTES" -gt 0 ]; then
 		# Convert to MB and round to nearest 10MB
 		IMAGE_SIZE_MB=$(( (IMAGE_SIZE_BYTES / 1024 / 1024 + 5) / 10 * 10 ))
-		if ! sed -i.tmp 's/- \*\*Size\*\*: .*/- **Size**: ~'"${IMAGE_SIZE_MB}"' MB/' README.md; then
+		if ! python3 scripts/update_readme.py size README.md "$IMAGE_SIZE_MB"; then
 			echo "⚠️  Failed to update README.md size, continuing..."
 		else
 			echo "✓ Updated README.md with size ~${IMAGE_SIZE_MB} MB"
 		fi
-		rm -f README.md.tmp 2>/dev/null || true
 	else
 		echo "⚠️  Could not determine image size, skipping size update"
 		IMAGE_SIZE_MB=""

@@ -202,8 +202,8 @@ import organization.
 - **Registry**: `ghcr.io/vig-os/devcontainer`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: MIT
-- **Version**: Currently in development (unreleased)
-- **Size**: Currently in development (unreleased)
+- **Version**: This is an unreleased development version
+- **Size**: This is an unreleased development version
 
 ## Contributing
 

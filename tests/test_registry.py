@@ -15,10 +15,36 @@ Note on push behavior:
 
 import os
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from testcontainers.registry import DockerRegistryContainer
+
+from scripts import update_readme
+
+
+def test_update_readme_version_helper(tmp_path):
+    readme = tmp_path / "README.md"
+    readme.write_text("- **Version**: placeholder\n")
+
+    update_readme.update_version_line(
+        readme, "1.2", "https://example.com/v1.2", "2025-01-01"
+    )
+
+    assert (
+        readme.read_text().strip()
+        == "- **Version**: [1.2](https://example.com/v1.2), 2025-01-01"
+    )
+
+
+def test_update_readme_size_helper(tmp_path):
+    readme = tmp_path / "README.md"
+    readme.write_text("- **Size**: placeholder\n")
+
+    update_readme.update_size_line(readme, 420)
+
+    assert readme.read_text().strip() == "- **Size**: ~420 MB"
 
 
 @pytest.fixture(scope="session")
@@ -302,14 +328,33 @@ def test_make_push_mechanism(pushed_image):
 
     readme_content = readme_path.read_text()
 
-    # Check version was updated
+    # Check version line contains link and date
     import re
 
-    version_match = re.search(r"- \*\*Version\*\*:\s*(.+)", readme_content)
-    assert version_match, "Version line not found in README.md"
+    version_match = re.search(
+        r"- \*\*Version\*\*:\s*\[(.+)\]\((.+)\),\s*([0-9]{4}-[0-9]{2}-[0-9]{2})",
+        readme_content,
+    )
+    assert version_match, (
+        "Version line not found or missing required format "
+        "`- **Version**: [X.Y](link), YYYY-MM-DD`"
+    )
     readme_version = version_match.group(1).strip()
-    assert test_version in readme_version, (
-        f"README.md version '{readme_version}' does not contain '{test_version}'"
+    readme_link = version_match.group(2).strip()
+    readme_date = version_match.group(3).strip()
+
+    assert readme_version == test_version, (
+        f"README.md version '{readme_version}' does not equal '{test_version}'"
+    )
+    expected_link = (
+        f"https://github.com/vig-os/devcontainer/releases/tag/v{test_version}"
+    )
+    assert readme_link == expected_link, (
+        f"README.md version link '{readme_link}' does not equal '{expected_link}'"
+    )
+    today_utc = datetime.now(UTC).strftime("%Y-%m-%d")
+    assert readme_date == today_utc, (
+        f"README.md version date '{readme_date}' is not today's UTC date '{today_utc}'"
     )
 
     # Check size was updated with a value between 100 and 2000 MB
