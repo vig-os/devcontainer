@@ -33,6 +33,6 @@
             }
         }
     },
-    "initializeCommand": ".devcontainer/initialize.sh",
-    "postAttachCommand": "/workspace/{{SHORT_NAME}}/.devcontainer/post-attach.sh"
+    "initializeCommand": ".devcontainer/scripts/initialize.sh",
+    "postAttachCommand": "/workspace/{{SHORT_NAME}}/.devcontainer/scripts/post-attach.sh"
 }

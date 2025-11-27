@@ -207,6 +207,24 @@ class TestDevContainerStructure:
         assert scripts_dir.exists(), ".devcontainer/scripts directory not found"
         assert scripts_dir.is_dir(), ".devcontainer/scripts is not a directory"
 
+    def test_setup_scripts_exist(self, initialized_workspace):
+        """Test that all setup scripts exist and are executable."""
+        scripts_dir = initialized_workspace / ".devcontainer" / "scripts"
+        expected_scripts = [
+            "copy-host-user-conf.sh",
+            "init-git.sh",
+            "setup-git-conf.sh",
+            "init-precommit.sh",
+            "post-attach.sh",
+            "initialize.sh",
+        ]
+
+        for script_name in expected_scripts:
+            script = scripts_dir / script_name
+            assert script.exists(), f"{script_name} not found"
+            assert script.is_file(), f"{script_name} is not a file"
+            assert script.stat().st_mode & 0o111, f"{script_name} is not executable"
+
     def test_template_files_copied(self, initialized_workspace):
         """Test that minimal template files are copied to workspace."""
         # Check for README.md
@@ -369,8 +387,9 @@ class TestDevContainerJson:
         assert "initializeCommand" in config, (
             "devcontainer.json missing 'initializeCommand' field"
         )
-        assert config["initializeCommand"] == ".devcontainer/initialize.sh", (
-            f"Expected initializeCommand='.devcontainer/initialize.sh', got: {config['initializeCommand']}"
+        assert config["initializeCommand"] == ".devcontainer/scripts/initialize.sh", (
+            "Expected initializeCommand='.devcontainer/scripts/initialize.sh', "
+            f"got: {config['initializeCommand']}"
         )
 
     def test_devcontainer_json_post_attach_command(self, initialized_workspace):
@@ -386,11 +405,11 @@ class TestDevContainerJson:
             "devcontainer.json missing 'postAttachCommand' field"
         )
         # postAttachCommand should reference .devcontainer inside project subdirectory
-        assert (
-            config["postAttachCommand"]
-            == "/workspace/test_project/.devcontainer/post-attach.sh"
-        ), (
-            f"Expected postAttachCommand='/workspace/test_project/.devcontainer/post-attach.sh', "
+        expected_command = (
+            "/workspace/test_project/.devcontainer/scripts/post-attach.sh"
+        )
+        assert config["postAttachCommand"] == expected_command, (
+            f"Expected postAttachCommand='{expected_command}', "
             f"got: {config['postAttachCommand']}"
         )
 
@@ -596,42 +615,6 @@ class TestDevContainerDockerCompose:
         assert "{{IMAGE_TAG}}" not in content, (
             "{{IMAGE_TAG}} placeholder not replaced in docker-compose.yml"
         )
-
-
-class TestDevContainerScripts:
-    """Test that devcontainer scripts exist and are executable."""
-
-    def test_initialize_script_exists(self, initialized_workspace):
-        """Test that initialize.sh exists and is executable."""
-        init_script = initialized_workspace / ".devcontainer" / "initialize.sh"
-        assert init_script.exists(), "initialize.sh not found"
-        assert init_script.is_file(), "initialize.sh is not a file"
-        assert init_script.stat().st_mode & 0o111, "initialize.sh is not executable"
-
-    def test_post_attach_script_exists(self, initialized_workspace):
-        """Test that post-attach.sh exists and is executable."""
-        post_attach_script = initialized_workspace / ".devcontainer" / "post-attach.sh"
-        assert post_attach_script.exists(), "post-attach.sh not found"
-        assert post_attach_script.is_file(), "post-attach.sh is not a file"
-        assert post_attach_script.stat().st_mode & 0o111, (
-            "post-attach.sh is not executable"
-        )
-
-    def test_setup_scripts_exist(self, initialized_workspace):
-        """Test that all setup scripts exist and are executable."""
-        scripts_dir = initialized_workspace / ".devcontainer" / "scripts"
-        expected_scripts = [
-            "copy-host-user-conf.sh",
-            "init-git.sh",
-            "setup-git-conf.sh",
-            "init-precommit.sh",
-        ]
-
-        for script_name in expected_scripts:
-            script = scripts_dir / script_name
-            assert script.exists(), f"{script_name} not found"
-            assert script.is_file(), f"{script_name} is not a file"
-            assert script.stat().st_mode & 0o111, f"{script_name} is not executable"
 
 
 class TestDevContainerPlaceholders:
