@@ -172,9 +172,10 @@ class TestFileStructure:
             "/root/assets/workspace/.devcontainer/devcontainer.json",
             "/root/assets/workspace/.devcontainer/docker-compose.yml",
             "/root/assets/workspace/.devcontainer/docker-compose.override.yml.example",
+            "/root/assets/workspace/.devcontainer/workspace.code-workspace.example",
+            # .devcontainer/scripts files
             "/root/assets/workspace/.devcontainer/initialize.sh",
             "/root/assets/workspace/.devcontainer/post-attach.sh",
-            # .devcontainer/scripts files
             "/root/assets/workspace/.devcontainer/scripts/copy-host-user-conf.sh",
             "/root/assets/workspace/.devcontainer/scripts/init-git.sh",
             "/root/assets/workspace/.devcontainer/scripts/init-precommit.sh",
@@ -188,6 +189,7 @@ class TestFileStructure:
             "/root/assets/workspace/.devcontainer/docker-compose.override.yml",
             "/root/assets/workspace/.devcontainer/docker-compose.local.yml",
             "/root/assets/workspace/.devcontainer/.conf",
+            "/root/assets/workspace/.devcontainer/workspace.code-workspace",
         ]
 
         # Check all directories exist
