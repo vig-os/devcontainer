@@ -169,6 +169,7 @@ class TestFileStructure:
             "/root/assets/workspace/README.md",
             # .devcontainer files
             "/root/assets/workspace/.devcontainer/.gitignore",
+            "/root/assets/workspace/.devcontainer/README.md",
             "/root/assets/workspace/.devcontainer/devcontainer.json",
             "/root/assets/workspace/.devcontainer/docker-compose.yml",
             "/root/assets/workspace/.devcontainer/docker-compose.override.yml.example",

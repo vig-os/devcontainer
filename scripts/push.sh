@@ -161,7 +161,7 @@ if [ -n "$TEST_REGISTRY" ]; then
 FROM python:3.12-slim-trixie
 
 # Keep basic structure to test asset copying
-COPY assets/ /opt/devcontainer/
+COPY assets /root/assets
 
 # Minimal metadata
 ARG BUILD_DATE
@@ -179,6 +179,19 @@ cp -r assets "$BUILD_DIR/"
 if [ -d "$BUILD_DIR/assets/workspace" ]; then
 	echo "Replacing {{IMAGE_TAG}} with $VERSION in build folder template files..."
 	find "$BUILD_DIR/assets/workspace" -type f -exec sed -i "s|{{IMAGE_TAG}}|$VERSION|g" {} \; 2>/dev/null || true
+
+	# Update devcontainer README in build folder with version and date
+	BUILD_DEVCONTAINER_README="$BUILD_DIR/assets/workspace/.devcontainer/README.md"
+	if [ -f "$BUILD_DEVCONTAINER_README" ]; then
+		RELEASE_DATE="${BUILD_DATE%%T*}"
+		RELEASE_URL="https://github.com/vig-os/devcontainer/releases/tag/v$VERSION"
+		echo "Updating devcontainer README in build folder with version $VERSION..."
+		if ! python3 scripts/update_readme.py version "$BUILD_DEVCONTAINER_README" "$VERSION" "$RELEASE_URL" "$RELEASE_DATE"; then
+			echo "❌ Failed to update devcontainer README version metadata in build folder"
+			exit 1
+		fi
+		echo "✓ Updated devcontainer README in build folder with version $VERSION"
+	fi
 fi
 
 # Build and test if needed
@@ -335,9 +348,9 @@ fi
 
 # Update README.md
 echo "Updating README.md with latest version and size..."
+RELEASE_DATE="${BUILD_DATE%%T*}"
+RELEASE_URL="https://github.com/vig-os/devcontainer/releases/tag/v$VERSION"
 if [ -f README.md ]; then
-	RELEASE_DATE="${BUILD_DATE%%T*}"
-	RELEASE_URL="https://github.com/vig-os/devcontainer/releases/tag/v$VERSION"
 	if ! python3 scripts/update_readme.py version README.md "$VERSION" "$RELEASE_URL" "$RELEASE_DATE"; then
 		echo "❌ Failed to update README.md version"
 		exit 1
@@ -376,19 +389,19 @@ else
 	echo "⚠️  README.md not found, skipping updates"
 fi
 
-# Commit changes (only if there are changes)
+# Commit changes to README.md
 echo "Committing changes..."
-git add README.md 2>/dev/null || true
-if git diff --cached --quiet; then
-	echo "❌ ERROR: No changes to commit - README.md was not updated!"
+# Check if README.md has any changes (staged or unstaged)
+if git diff --quiet README.md && git diff --cached --quiet README.md; then
+	echo "⚠️  WARNING: README.md has no changes to commit"
 	echo ""
-	echo "   This means the version update failed silently."
+	echo "   This may happen if README.md was already at version $VERSION."
 	echo "   Current README.md version line:"
 	grep "\*\*Version\*\*" README.md || echo "   (Version line not found)"
 	echo ""
-	git reset HEAD README.md 2>/dev/null || true
-	exit 1
+	echo "   Continuing without committing README.md changes..."
 else
+	git add README.md 2>/dev/null || true
 	if ! git commit -m "Release $VERSION"; then
 		echo "❌ Failed to commit changes"
 		git reset HEAD README.md 2>/dev/null || true

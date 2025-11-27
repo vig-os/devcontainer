@@ -14,7 +14,9 @@ Note on push behavior:
 """
 
 import os
+import re
 import subprocess
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -45,6 +47,18 @@ def test_update_readme_size_helper(tmp_path):
     update_readme.update_size_line(readme, 420)
 
     assert readme.read_text().strip() == "- **Size**: ~420 MB"
+
+
+def test_reset_version_to_development_helper(tmp_path):
+    readme = tmp_path / "README.md"
+    readme.write_text("- **Version**: [1.2](https://example.com/v1.2), 2025-01-01\n")
+
+    update_readme.reset_version_to_development(readme)
+
+    assert (
+        readme.read_text().strip()
+        == "- **Version**: This is an unreleased development version"
+    )
 
 
 @pytest.fixture(scope="session")
@@ -100,7 +114,6 @@ insecure = true
 @pytest.fixture(scope="session")
 def test_version():
     """Return a test version that's guaranteed to be unique."""
-    import time
 
     # Use timestamp-based version to ensure uniqueness
     timestamp = int(time.time())
@@ -264,106 +277,176 @@ def pushed_image(local_registry, test_version, git_clean_state):
         )
 
 
-def test_make_push_mechanism(pushed_image):
+class TestMakePushImage:
     """
-    Test the complete push mechanism using a local registry.
-
-    This test:
-    1. Uses the pushed_image fixture to push an image
-    2. Verifies the image exists in the local registry
-    3. Verifies the git tag was created
-    4. Verifies README.md was updated with version and size
-    5. Cleans up the git tag
-    6. Verifies no artifacts remain
+    Tests for the push mechanism.
     """
-    # The pushed_image fixture already verifies the image exists in the local registry
 
-    # Extract info from fixture
-    test_registry_path = pushed_image["registry_path"]
-    test_version = pushed_image["version"]
-    test_git_tag = pushed_image["git_tag"]
-    project_root = pushed_image["project_root"]
+    def test_make_push_image(self, pushed_image):
+        """
+        Test that the push mechanism creates an image with version an latest tag.
+        """
+        # The pushed_image fixture already verifies the image exists in the local registry
 
-    # Verify git tag was created (using version format: v99.8795)
-    tag_result = subprocess.run(
-        ["git", "rev-parse", test_git_tag],
-        capture_output=True,
-        text=True,
-    )
-    assert tag_result.returncode == 0, f"Git tag {test_git_tag} was not created"
+        # Extract info from fixture
+        test_registry_path = pushed_image["registry_path"]
+        test_version = pushed_image["version"]
 
-    # Verify image exists in local registry
-    # Note: REPO is set from TEST_REGISTRY, so images are at test_registry_path directly
-    # Remove trailing slash if present, then add version tag
-    registry_base = test_registry_path.rstrip("/")
-    full_image_name = f"{registry_base}:{test_version}"
-    # podman manifest inspect relies on CONTAINERS_REGISTRIES_CONF for insecure registry config
-    inspect_result = subprocess.run(
-        ["podman", "manifest", "inspect", full_image_name],
-        capture_output=True,
-        text=True,
-        env=os.environ.copy(),  # Ensure environment variables are inherited
-    )
-    assert inspect_result.returncode == 0, (
-        f"Image {full_image_name} not found in registry. "
-        f"STDERR: {inspect_result.stderr}"
-    )
+        # Verify image exists in local registry
+        # Note: REPO is set from TEST_REGISTRY, so images are at test_registry_path directly
+        # Remove trailing slash if present, then add version tag
+        registry_base = test_registry_path.rstrip("/")
+        full_image_name = f"{registry_base}:{test_version}"
+        # podman manifest inspect relies on CONTAINERS_REGISTRIES_CONF for insecure registry config
+        inspect_result = subprocess.run(
+            ["podman", "manifest", "inspect", full_image_name],
+            capture_output=True,
+            text=True,
+            env=os.environ.copy(),  # Ensure environment variables are inherited
+        )
+        assert inspect_result.returncode == 0, (
+            f"Image {full_image_name} not found in registry. "
+            f"STDERR: {inspect_result.stderr}"
+        )
 
-    # Verify :latest tag also exists
-    latest_image_name = f"{registry_base}:latest"
-    latest_result = subprocess.run(
-        ["podman", "manifest", "inspect", latest_image_name],
-        capture_output=True,
-        text=True,
-        env=os.environ.copy(),  # Ensure environment variables are inherited
-    )
-    assert latest_result.returncode == 0, (
-        f"Image {latest_image_name} not found in registry. "
-        f"STDERR: {latest_result.stderr}"
-    )
+        # Verify :latest tag also exists
+        latest_image_name = f"{registry_base}:latest"
+        latest_result = subprocess.run(
+            ["podman", "manifest", "inspect", latest_image_name],
+            capture_output=True,
+            text=True,
+            env=os.environ.copy(),  # Ensure environment variables are inherited
+        )
+        assert latest_result.returncode == 0, (
+            f"Image {latest_image_name} not found in registry. "
+            f"STDERR: {latest_result.stderr}"
+        )
 
-    # Verify README.md was updated with version and size
-    readme_path = project_root / "README.md"
-    assert readme_path.exists(), "README.md not found"
+    def test_make_push_creates_git_tag(self, pushed_image):
+        """
+        Test that the push mechanism creates a git tag.
+        """
+        # The pushed_image fixture already verifies the image exists in the local registry
 
-    readme_content = readme_path.read_text()
+        # Extract info from fixture
+        test_git_tag = pushed_image["git_tag"]
 
-    # Check version line contains link and date
-    import re
+        # Verify git tag was created (using version format: v99.8795)
+        tag_result = subprocess.run(
+            ["git", "rev-parse", test_git_tag],
+            capture_output=True,
+            text=True,
+        )
+        assert tag_result.returncode == 0, f"Git tag {test_git_tag} was not created"
 
-    version_match = re.search(
-        r"- \*\*Version\*\*:\s*\[(.+)\]\((.+)\),\s*([0-9]{4}-[0-9]{2}-[0-9]{2})",
-        readme_content,
-    )
-    assert version_match, (
-        "Version line not found or missing required format "
-        "`- **Version**: [X.Y](link), YYYY-MM-DD`"
-    )
-    readme_version = version_match.group(1).strip()
-    readme_link = version_match.group(2).strip()
-    readme_date = version_match.group(3).strip()
+    def test_make_push_updates_project_readme(self, pushed_image):
+        """
+        Test that the project README.md was updated with version and date during push.
+        """
+        # The pushed_image fixture already verifies the image exists in the local registry
 
-    assert readme_version == test_version, (
-        f"README.md version '{readme_version}' does not equal '{test_version}'"
-    )
-    expected_link = (
-        f"https://github.com/vig-os/devcontainer/releases/tag/v{test_version}"
-    )
-    assert readme_link == expected_link, (
-        f"README.md version link '{readme_link}' does not equal '{expected_link}'"
-    )
-    today_utc = datetime.now(UTC).strftime("%Y-%m-%d")
-    assert readme_date == today_utc, (
-        f"README.md version date '{readme_date}' is not today's UTC date '{today_utc}'"
-    )
+        # Extract info from fixture
+        test_version = pushed_image["version"]
+        project_root = pushed_image["project_root"]
 
-    # Check size was updated with a value between 100 and 2000 MB
-    size_match = re.search(r"- \*\*Size\*\*:\s*~?(\d+)\s*MB", readme_content)
-    assert size_match, "Size line not found or invalid format in README.md"
-    readme_size = int(size_match.group(1))
-    assert 100 <= readme_size <= 2000, (
-        f"README.md size {readme_size} MB is outside valid range (100-2000 MB)"
-    )
+        # Verify project README.md was updated with version and size
+        readme_path = project_root / "README.md"
+        assert readme_path.exists(), "README.md not found"
+
+        readme_content = readme_path.read_text()
+
+        # Check version line contains link and date
+        version_match = re.search(
+            r"- \*\*Version\*\*:\s*\[(.+)\]\((.+)\),\s*([0-9]{4}-[0-9]{2}-[0-9]{2})",
+            readme_content,
+        )
+        assert version_match, (
+            "Version line not found or missing required format "
+            "`- **Version**: [X.Y](link), YYYY-MM-DD`"
+        )
+        readme_version = version_match.group(1).strip()
+        readme_link = version_match.group(2).strip()
+        readme_date = version_match.group(3).strip()
+
+        assert readme_version == test_version, (
+            f"README.md version '{readme_version}' does not equal '{test_version}'"
+        )
+        expected_link = (
+            f"https://github.com/vig-os/devcontainer/releases/tag/v{test_version}"
+        )
+        assert readme_link == expected_link, (
+            f"README.md version link '{readme_link}' does not equal '{expected_link}'"
+        )
+        today_utc = datetime.now(UTC).strftime("%Y-%m-%d")
+        assert readme_date == today_utc, (
+            f"README.md version date '{readme_date}' is not today's UTC date '{today_utc}'"
+        )
+
+        # Check size was updated with a value between 100 and 2000 MB
+        size_match = re.search(r"- \*\*Size\*\*:\s*~?(\d+)\s*MB", readme_content)
+        assert size_match, "Size line not found or invalid format in README.md"
+        readme_size = int(size_match.group(1))
+        assert 100 <= readme_size <= 2000, (
+            f"README.md size {readme_size} MB is outside valid range (100-2000 MB)"
+        )
+
+    def test_make_push_image_has_correct_devcontainer_readme(self, pushed_image):
+        """
+        Test that the devcontainer README.md in the pushed image has the correct version.
+        """
+        # Extract info from fixture
+        test_registry_path = pushed_image["registry_path"]
+        test_version = pushed_image["version"]
+
+        # Get the full image name - use architecture-specific tag for direct access
+        registry_base = test_registry_path.rstrip("/")
+        # Detect native architecture
+        native_arch = os.uname().machine
+        arch = "arm64" if native_arch in ("arm64", "aarch64") else "amd64"
+        full_image_name = f"{registry_base}:{test_version}-{arch}"
+
+        # Fetch the devcontainer README.md from the image
+        readme_path = "/root/assets/workspace/.devcontainer/README.md"
+        image_readme_content = None
+        cat_result = subprocess.run(
+            ["podman", "run", "--rm", full_image_name, "cat", readme_path],
+            capture_output=True,
+            text=True,
+            env=os.environ.copy(),
+        )
+        assert cat_result.returncode == 0, (
+            f"Could not find devcontainer README.md in image at {readme_path}"
+        )
+        image_readme_content = cat_result.stdout
+
+        # Check version line contains link and date
+        version_match = re.search(
+            r"- \*\*Version\*\*:\s*\[(.+)\]\((.+)\),\s*([0-9]{4}-[0-9]{2}-[0-9]{2})",
+            image_readme_content,
+        )
+        assert version_match, (
+            "Version line not found or missing required format in image devcontainer README.md"
+        )
+        image_readme_version = version_match.group(1).strip()
+        image_readme_link = version_match.group(2).strip()
+        image_readme_date = version_match.group(3).strip()
+
+        assert image_readme_version == test_version, (
+            f"Image devcontainer README.md version '{image_readme_version}' "
+            f"does not equal '{test_version}'"
+        )
+        expected_link = (
+            f"https://github.com/vig-os/devcontainer/releases/tag/v{test_version}"
+        )
+        assert image_readme_link == expected_link, (
+            f"Image devcontainer README.md version link '{image_readme_link}' "
+            f"does not equal '{expected_link}'"
+        )
+        today_utc = datetime.now(UTC).strftime("%Y-%m-%d")
+        assert image_readme_date == today_utc, (
+            f"Image devcontainer README.md version date '{image_readme_date}' "
+            f"is not today's UTC date '{today_utc}'"
+        )
 
 
 @pytest.fixture(scope="session")
