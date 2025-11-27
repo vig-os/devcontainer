@@ -14,6 +14,42 @@ To use this devcontainer image, you need:
 
 That's it! All development tools (Python, git, pre-commit, etc.) are included in the container image itself.
 
+## Quick Start
+
+1. **Pull the latest image**
+
+   ```bash
+   podman pull ghcr.io/vig-os/devcontainer:latest
+   # or
+   docker pull ghcr.io/vig-os/devcontainer:latest
+   ```
+
+2. **Initialize a workspace inside `PATH_TO_PROJECT`**
+
+   ```bash
+   podman run -it --rm -v "PATH_TO_PROJECT:/workspace" \
+     ghcr.io/vig-os/devcontainer:latest /root/assets/init-workspace.sh
+   # or with Docker:
+   docker run -it --rm -v "PATH_TO_PROJECT:/workspace" \
+     ghcr.io/vig-os/devcontainer:latest /root/assets/init-workspace.sh
+   ```
+
+   The script copies the devcontainer template (`.devcontainer/`), git hooks, README/CHANGELOG, and auth helpers into your project.
+
+3. **Run with `--force` when overwriting or updating an existing project**
+
+   ```bash
+   podman run -it --rm -v "PATH_TO_PROJECT:/workspace" \
+     ghcr.io/vig-os/devcontainer:latest /root/assets/init-workspace.sh --force
+   ```
+
+   You will be prompted to confirm before files are replaced.
+   It is advised to commit all your changes before so that it can be easily reverted.
+
+4. **Open the project in VS Code**
+
+   VS Code will detect `.devcontainer/devcontainer.json` and offer to reopen inside the container automatically.
+
 ## Features
 
 ### **Base Image**
@@ -101,6 +137,20 @@ To mount additional folders:
 The override file is gitignored, so each developer can have their own local mounts.
 See `.devcontainer/MOUNTS.md` for detailed documentation and examples.
 
+### Multi-root VS Code workspace
+
+Multi-root workspaces allow to **browse/edit the mounted folders from VS Code** —for
+runtime-only usage, mounting through `docker-compose.override.yml` is enough.
+
+1. Copy the template once per machine:
+   `cp .devcontainer/workspace.code-workspace.example .devcontainer/workspace.code-workspace`
+2. Customize the `folders` array with additional projects mounted via `docker-compose.override.yml`.
+3. VS Code will automatically offer the `Open Workspace` option.
+
+Your personal `workspace.code-workspace` stays gitignored and therefore only local.
+If you want to share new defaults, update `.devcontainer/workspace.code-workspace.example`
+and teammates can recopy or merge the changes locally.
+
 ### Authentication
 
 GitHub authentication is handled automatically when the devcontainer starts:
@@ -114,7 +164,7 @@ GitHub authentication is handled automatically when the devcontainer starts:
    and commit signing
 
 The authentication setup runs via the `postAttachCommand` hook, which executes
-`post-attach.sh` when VS Code attaches to the container.
+`.devcontainer/scripts/post-attach.sh` when VS Code attaches to the container.
 
 ### Git configuration
 
@@ -154,21 +204,6 @@ import organization.
 - **License**: MIT
 - **Version**: Currently in development (unreleased)
 - **Size**: Currently in development (unreleased)
-
-## Quick Start
-
-The container includes an `init-workspace` script that helps set up new projects with:
-
-- VS Code Dev Container configuration (`.devcontainer/`)
-- Git repository initialization with pre-commit hooks
-- GitHub authentication setup
-- Project template files
-
-Run it with:
-
-```bash
-podman run -it --rm -v "./:/workspace" ghcr.io/vig-os/devcontainer:latest /root/assets/init-workspace.sh
-```
 
 ## Contributing
 
