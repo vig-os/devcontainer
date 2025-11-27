@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Push container image to registry
-# Usage: push.sh <version> [REPO] [NATIVE_PLATFORM] [PLATFORMS] [NO_TEST] [NATIVE_ARCH_ONLY]
+# Usage: push.sh <version> [REPO] [NATIVE_PLATFORM] [PLATFORMS] [REGISTRY_TEST]
 
 set -e
 
@@ -18,8 +18,7 @@ else
 fi
 
 PLATFORMS="${4:-linux/amd64,linux/arm64}"
-NO_TEST="${5:-}"
-NATIVE_ARCH_ONLY="${6:-}"
+REGISTRY_TEST=${5:-0}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -30,7 +29,7 @@ if [ -z "$VERSION" ]; then
 	echo ""
 	echo "❌ ERROR: VERSION is required to push"
 	echo ""
-	echo "   Usage: push.sh VERSION [REPO] [NATIVE_PLATFORM] [PLATFORMS] [NO_TEST] [NATIVE_ARCH_ONLY]"
+	echo "   Usage: push.sh VERSION [REPO] [NATIVE_PLATFORM] [PLATFORMS] [REGISTRY_TEST]"
 	echo "   Example: push.sh 1.0"
 	echo ""
 	exit 1
@@ -195,7 +194,20 @@ if [ -d "$BUILD_DIR/assets/workspace" ]; then
 fi
 
 # Build and test if needed
-if [ -z "$NO_TEST" ]; then
+if [ "$REGISTRY_TEST" -eq 1 ]; then
+	echo "Building versioned image:$VERSION (single arch for registry testing)..."
+	if ! podman build --platform "$NATIVE_PLATFORM" \
+		--build-arg BUILD_DATE="$BUILD_DATE" \
+		--build-arg VCS_REF="$VCS_REF" \
+		--build-arg IMAGE_TAG="$VERSION" \
+		-t "$REPO:$VERSION" \
+		-f "$BUILD_DIR/Containerfile" \
+		"$BUILD_DIR"; then
+		echo "❌ Build failed"
+		exit 1
+	fi
+	echo "✓ Built minimal test image (skipping full test suite for registry testing)"
+else
 	echo "Building versioned image:$VERSION (single arch for testing)..."
 	if ! podman build --platform "$NATIVE_PLATFORM" \
 		--build-arg BUILD_DATE="$BUILD_DATE" \
@@ -209,22 +221,16 @@ if [ -z "$NO_TEST" ]; then
 	fi
 
 	echo "Testing versioned image:$VERSION..."
-	# Export TEST_REGISTRY if REPO differs from default to ensure tests use correct registry
-	if [ "$REPO" != "ghcr.io/vig-os/devcontainer" ]; then
-		export TEST_REGISTRY="$REPO"
-	fi
 	if ! make test VERSION="$VERSION"; then
 		echo "❌ Tests failed"
 		exit 1
 	fi
-else
-	echo "⚠️  Skipping tests (NO_TEST=1)"
 fi
 
 # Build for target platforms
-if [ -n "$NATIVE_ARCH_ONLY" ]; then
+if [ "$REGISTRY_TEST" -eq 1 ]; then
 	PLATFORM_LIST="$NATIVE_PLATFORM"
-	echo "Building single-arch image for native platform: $NATIVE_PLATFORM"
+	echo "Building dummy image for registry testing"
 else
 	PLATFORM_LIST="$PLATFORMS"
 	echo "Building multi-arch images for: $PLATFORMS"
@@ -247,10 +253,10 @@ for platform in $(echo "$PLATFORM_LIST" | tr ',' ' '); do
 		echo "❌ Error: $platform build failed"
 		exit 1
 	fi
-	if echo "$REPO" | grep -q "^localhost:"; then
-		echo "Pushing $platform image to local registry..."
+	if [ "$REGISTRY_TEST" -eq 1 ]; then
+		echo "Pushing dummy image to local registry..."
 		if ! podman push --tls-verify=false "$REPO:$VERSION-$arch"; then
-			echo "❌ Error: Pushing $platform image failed"
+			echo "❌ Error: Pushing dummy image failed"
 			exit 1
 		fi
 	fi
@@ -259,7 +265,7 @@ done
 
 # Push individual images to registry (needed for manifest creation)
 # For localhost registries, images are already pushed above
-if ! echo "$REPO" | grep -q "^localhost:"; then
+if [ "$REGISTRY_TEST" -eq 0 ]; then
 	echo "Pushing individual images to registry..."
 	for img_tag in $BUILT_PLATFORMS; do
 		echo "Pushing $img_tag..."
@@ -276,7 +282,7 @@ echo "Removing any existing local tags/manifests for :latest..."
 podman manifest rm "$REPO:latest" 2>/dev/null || true
 podman rmi -f "$REPO:latest" 2>/dev/null || true
 
-if echo "$REPO" | grep -q "^localhost:"; then
+if [ "$REGISTRY_TEST" -eq 1 ]; then
 	PODMAN_TLS_VERIFY="--tls-verify=false"
 else
 	PODMAN_TLS_VERIFY=""
@@ -318,7 +324,7 @@ echo "Pushing manifests to registry..."
 # For localhost registries, use --all to ensure manifest is properly pushed
 # The old Makefile works without --all, but that may be due to different podman behavior
 # Using --all ensures the manifest list is pushed to the registry
-if echo "$REPO" | grep -q "^localhost:"; then
+if [ "$REGISTRY_TEST" -eq 1 ]; then
 	# For localhost, images are already pushed, but --all ensures manifest is pushed
 	if ! podman manifest push $PODMAN_TLS_VERIFY --all "$REPO:latest"; then
 		echo "❌ Error: :latest manifest push failed"
@@ -340,8 +346,8 @@ else
 	fi
 fi
 
-if [ -n "$NATIVE_ARCH_ONLY" ]; then
-	echo "✓ Successfully pushed $REPO:latest and $REPO:$VERSION ($NATIVE_PLATFORM)"
+if [ "$REGISTRY_TEST" -eq 1 ]; then
+	echo "✓ Successfully pushed dummy image to local registry"
 else
 	echo "✓ Successfully pushed $REPO:latest and $REPO:$VERSION (multi-arch)"
 fi
@@ -420,9 +426,9 @@ echo "✓ Created git tag $GIT_TAG"
 
 echo ""
 echo "✓ Successfully tagged and pushed:$VERSION"
-if [ -n "$NATIVE_ARCH_ONLY" ]; then
-	echo "  Image: $REPO:$VERSION ($NATIVE_PLATFORM)"
-	echo "  Image: $REPO:latest ($NATIVE_PLATFORM)"
+if [ "$REGISTRY_TEST" -eq 1 ]; then
+	echo "  Image: $REPO:$VERSION (dummy image)"
+	echo "  Image: $REPO:latest (dummy image)"
 else
 	echo "  Image: $REPO:$VERSION (multi-arch)"
 	echo "  Image: $REPO:latest (multi-arch)"

@@ -37,18 +37,6 @@ def update_size_line(readme_path: Path | str, size_mb: int) -> str:
     return replacement
 
 
-def reset_version_to_development(readme_path: Path | str) -> str:
-    """Reset the version line to development version string."""
-    path = Path(readme_path)
-    text = path.read_text()
-    replacement = "- **Version**: This is an unreleased development version"
-    updated_text, count = VERSION_PATTERN.subn(replacement, text, count=1)
-    if count != 1:
-        raise ValueError(f"Version line not found in {path}")
-    path.write_text(updated_text)
-    return replacement
-
-
 def parse_args() -> tuple[str, argparse.Namespace]:
     parser = argparse.ArgumentParser(description="Patch README metadata lines.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -84,8 +72,8 @@ def main() -> None:
         )
     elif command == "size":
         update_size_line(args.readme, args.size_mb)
-    elif command == "reset-dev":
-        reset_version_to_development(args.readme)
+    else:
+        raise ValueError(f"Unknown command: {command}")
 
 
 if __name__ == "__main__":

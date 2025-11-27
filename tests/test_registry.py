@@ -49,18 +49,6 @@ def test_update_readme_size_helper(tmp_path):
     assert readme.read_text().strip() == "- **Size**: ~420 MB"
 
 
-def test_reset_version_to_development_helper(tmp_path):
-    readme = tmp_path / "README.md"
-    readme.write_text("- **Version**: [1.2](https://example.com/v1.2), 2025-01-01\n")
-
-    update_readme.reset_version_to_development(readme)
-
-    assert (
-        readme.read_text().strip()
-        == "- **Version**: This is an unreleased development version"
-    )
-
-
 @pytest.fixture(scope="session")
 def local_registry(tmp_path_factory):
     """
@@ -229,8 +217,7 @@ def pushed_image(local_registry, test_version, git_clean_state):
             "make",
             "push",
             f"VERSION={test_version}",
-            "NO_TEST=1",
-            "NATIVE_ARCH_ONLY=1",
+            "REGISTRY_TEST=1",
         ],
         env=env,
         cwd=project_root,

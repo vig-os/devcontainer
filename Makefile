@@ -24,27 +24,24 @@ define print_help_header
 endef
 
 define print_help_targets
-	@echo "  info        - Show information about the image"
-	@echo "  setup       - Setup configuration"
-	@echo "  login       - Login to GitHub Container Registry"
-	@echo "  build       - Build local development image"
-	@echo "  test        - Run all test suites (image, integration, registry)"
-	@echo "  test-image  - Run image tests"
-	@echo "  test-integration - Run integration tests"
-	@echo "  test-registry - Run registry tests"
-	@echo "  push VERSION=X.Y     - Build, test, commit, push & tag image:X.Y"
-	@echo "  push VERSION=X.Y NO_TEST=1 - Build, commit, push & tag image:X.Y (skip tests)"
-	@echo "  push VERSION=X.Y NATIVE_ARCH_ONLY=1 - Build only for native architecture"
-	@echo "  pull VERSION={VER}   - Pull image:{VER} (default: latest)"
-	@echo "  clean VERSION={VER}  - Remove image:{VER} (default: dev)"
+	@echo "  info                             - Show information about the image"
+	@echo "  setup                            - Setup configuration"
+	@echo "  login                            - Login to GitHub Container Registry"
+	@echo "  build                            - Build local development image"
+	@echo "  test                             - Run all test suites (image, integration, registry)"
+	@echo "  test-image                       - Run image tests"
+	@echo "  test-integration                 - Run integration tests"
+	@echo "  test-registry                    - Run registry tests"
+	@echo "  push VERSION=X.Y                 - Build, test, commit, push & tag image:X.Y"
+	@echo "  push VERSION=X.Y REGISTRY_TEST=1 - Test the make push mechanism with a dummy image to a dummy registry"
+	@echo "  pull VERSION={VER}               - Pull image:{VER} (default: latest)"
+	@echo "  clean VERSION={VER}              - Remove image:{VER} (default: dev)"
 	@echo "  "
 	@echo "Examples:"
-	@echo "  make build                    # Build local development version"
-	@echo "  make push VERSION=1.0        # Build, test, commit, push & tag image:1.0"
-	@echo "  make push VERSION=1.0 NO_TEST=1  # Skip tests during push"
-	@echo "  make push VERSION=1.0 NATIVE_ARCH_ONLY=1  # Build only native arch"
-	@echo "  make pull VERSION=1.0         # Pull image:1.0"
-	@echo "  make clean                   # Remove image:dev"
+	@echo "  make build               # Build local development version"
+	@echo "  make push VERSION=1.0    # Build, test, commit, push & tag image:1.0"
+	@echo "  make pull VERSION=1.0    # Pull image:1.0"
+	@echo "  make clean               # Remove image:dev"
 endef
 
 # Default target
@@ -117,10 +114,10 @@ test-registry:
 test: test-image test-integration test-registry
 
 # Push target: build, (optionally) test, commit, push & tag a versioned release
-# Use NO_TEST=1 to skip tests
+# Use REGISTRY_TEST=1 to enable registry testing mode (single arch, minimal image, no commits)
 .PHONY: push
 push:
-	@./scripts/push.sh "$(VERSION)" "$(REPO)" "$(NATIVE_PLATFORM)" "$(PLATFORMS)" "$(NO_TEST)" "$(NATIVE_ARCH_ONLY)"
+	@./scripts/push.sh "$(VERSION)" "$(REPO)" "$(NATIVE_PLATFORM)" "$(PLATFORMS)" "$(REGISTRY_TEST)"
 
 # Pull target: VERSION=latest (default) or VERSION=X.Y
 # Uses TEST_REGISTRY if set (via REPO variable)
