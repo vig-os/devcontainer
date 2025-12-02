@@ -97,17 +97,17 @@ _ensure-dev-image:
 # Test image target: runs image tests
 .PHONY: test-image
 test-image: _ensure-dev-image
-	@TEST_CONTAINER_TAG=$(TEST_VERSION) pytest tests/test_image.py -v --tb=short
+	@TEST_CONTAINER_TAG=$(TEST_VERSION) uv run pytest tests/test_image.py -v --tb=short
 
 # Test integration target: runs integration tests
 .PHONY: test-integration
 test-integration: _ensure-dev-image
-	@TEST_CONTAINER_TAG=$(TEST_VERSION) pytest tests/test_integration.py -v --tb=short
+	@TEST_CONTAINER_TAG=$(TEST_VERSION) uv run pytest tests/test_integration.py -v --tb=short
 
 # Test registry target: runs registry tests (doesn't need image)
 .PHONY: test-registry
 test-registry:
-	@pytest tests/test_registry.py -v -s --tb=short
+	@uv run pytest tests/test_registry.py -v -s --tb=short
 
 # Test target: runs all test suites (image, integration, registry)
 .PHONY: test
