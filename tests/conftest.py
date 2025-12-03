@@ -254,6 +254,9 @@ def devcontainer_up(initialized_workspace):
         if "remoteEnv" not in config:
             config["remoteEnv"] = {}
 
+        # Track if we made changes
+        ssh_agent_added = False
+
         # Check if SSH agent mount already exists
         ssh_mount = (
             f"source={env['SSH_AUTH_SOCK']},target=/tmp/ssh-agent.sock,type=bind"
