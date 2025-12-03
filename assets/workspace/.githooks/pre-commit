@@ -10,5 +10,5 @@ if [ "${IN_CONTAINER:-}" = "true" ]; then
 else
 	# Outside dev container - try to run via podman compose
 	echo "Running pre-commit via dev container..."
-	podman compose run --rm dev pre-commit run
+	podman compose run --rm devcontainer pre-commit run
 fi
