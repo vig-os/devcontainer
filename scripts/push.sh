@@ -268,7 +268,11 @@ for platform in $(echo "$PLATFORM_LIST" | tr ',' ' '); do
 			exit 1
 		fi
 	fi
-	BUILT_PLATFORMS="$BUILT_PLATFORMS $REPO:$VERSION-$arch"
+	if [ -z "$BUILT_PLATFORMS" ]; then
+		BUILT_PLATFORMS="$REPO:$VERSION-$arch"
+	else
+		BUILT_PLATFORMS="$BUILT_PLATFORMS $REPO:$VERSION-$arch"
+	fi
 done
 
 # Push individual images to registry (needed for manifest creation)
