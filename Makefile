@@ -123,11 +123,9 @@ push:
 # Uses TEST_REGISTRY if set (via REPO variable)
 .PHONY: pull
 pull:
-	@if [ -z "$(VERSION)" ]; then \
-		VERSION="latest"; \
-	fi; \
-	echo "Pulling image $(REPO):$$VERSION..."; \
-	if ! podman pull "$(REPO):$$VERSION" 2>/dev/null; then echo "⚠️  Failed to pull $(REPO):$$VERSION"; fi
+	@VERSION=$${VERSION:-latest}; echo "Pulling image $(REPO):$$VERSION..."; \
+	TLS_FLAG=""; [ "$(REGISTRY_TEST)" = "1" ] && TLS_FLAG="--tls-verify=false"; \
+	podman pull $$TLS_FLAG "$(REPO):$$VERSION" || echo "⚠️  Failed to pull $(REPO):$$VERSION"
 
 # Clean target: VERSION=dev (default) or VERSION=[X.Y, latest]
 .PHONY: clean
