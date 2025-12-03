@@ -201,9 +201,9 @@ import organization.
 - **Base Image**: `python:3.12-slim-trixie`
 - **Registry**: `ghcr.io/vig-os/devcontainer`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
-- **License**: MIT
-- **Version**: [99.4251](https://github.com/vig-os/devcontainer/releases/tag/v99.4251), 2025-12-03
-- **Size**: ~140 MB
+- **License**: Apache
+- **Version**: This is a development version
+- **Size**: This is a development version
 
 ## Contributing
 
