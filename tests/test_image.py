@@ -9,6 +9,18 @@ Derived containers can inherit from these test classes to verify that
 base functionality is preserved in their containers.
 """
 
+# Expected versions for installed tools
+# These should be updated when the Containerfile is updated
+EXPECTED_VERSIONS = {
+    "git": "2.",  # Major version check (from apt package)
+    "curl": "8.",  # Major version check (from apt package)
+    "gh": "2.83.1",  # GitHub CLI (manually installed from latest release)
+    "uv": "0.9.13",  # UV (manually installed from latest release)
+    "python": "3.12",  # Python (from base image)
+    "pre_commit": "4.5.0",  # pre-commit (installed via uv pip)
+    "ruff": "0.14.6",  # ruff (installed via uv pip)
+}
+
 
 class TestSystemTools:
     """Test that system tools are installed with correct versions."""
@@ -22,8 +34,10 @@ class TestSystemTools:
         result = host.run("git --version")
         assert result.rc == 0, "git --version failed"
         assert "git version" in result.stdout.lower()
-        # Check for version 2.x (from Containerfile: git=1:2.47.3-0+deb13u1)
-        assert "2." in result.stdout, f"Expected git 2.x, got: {result.stdout}"
+        expected = EXPECTED_VERSIONS["git"]
+        assert expected in result.stdout, (
+            f"Expected git {expected}x, got: {result.stdout}"
+        )
 
     def test_curl_installed(self, host):
         """Test that curl is installed."""
@@ -34,8 +48,10 @@ class TestSystemTools:
         result = host.run("curl --version")
         assert result.rc == 0, "curl --version failed"
         assert "curl" in result.stdout.lower()
-        # Check for version 8.x (from Containerfile: curl=8.14.1-2)
-        assert "8." in result.stdout, f"Expected curl 8.x, got: {result.stdout}"
+        expected = EXPECTED_VERSIONS["curl"]
+        assert expected in result.stdout, (
+            f"Expected curl {expected}x, got: {result.stdout}"
+        )
 
     def test_openssh_client_installed(self, host):
         """Test that openssh-client is installed."""
@@ -54,8 +70,10 @@ class TestSystemTools:
         result = host.run("gh --version")
         assert result.rc == 0, "gh --version failed"
         assert "gh version" in result.stdout.lower()
-        # Check for version 2.83.1
-        assert "2.83.1" in result.stdout, f"Expected gh 2.83.0, got: {result.stdout}"
+        expected = EXPECTED_VERSIONS["gh"]
+        assert expected in result.stdout, (
+            f"Expected gh {expected}, got: {result.stdout}"
+        )
 
 
 class TestPythonEnvironment:
@@ -65,8 +83,9 @@ class TestPythonEnvironment:
         """Test that python3 is available."""
         result = host.run("python3 --version")
         assert result.rc == 0, "python3 --version failed"
-        assert "Python 3.12" in result.stdout, (
-            f"Expected Python 3.12, got: {result.stdout}"
+        expected = EXPECTED_VERSIONS["python"]
+        assert f"Python {expected}" in result.stdout, (
+            f"Expected Python {expected}, got: {result.stdout}"
         )
 
     def test_uv_installed(self, host):
@@ -74,8 +93,10 @@ class TestPythonEnvironment:
         result = host.run("uv --version")
         assert result.rc == 0, "uv --version failed"
         assert "uv" in result.stdout.lower()
-        # Check for version
-        assert "0.9.13" in result.stdout, f"Expected uv 0.9.13, got: {result.stdout}"
+        expected = EXPECTED_VERSIONS["uv"]
+        assert expected in result.stdout, (
+            f"Expected uv {expected}, got: {result.stdout}"
+        )
 
 
 class TestDevelopmentTools:
@@ -86,9 +107,9 @@ class TestDevelopmentTools:
         result = host.run("pre-commit --version")
         assert result.rc == 0, "pre-commit --version failed"
         assert "pre-commit" in result.stdout.lower()
-        # Check for version 4.3.0 (from Containerfile: pre-commit==4.3.0)
-        assert "4.5.0" in result.stdout, (
-            f"Expected pre-commit 4.3.0, got: {result.stdout}"
+        expected = EXPECTED_VERSIONS["pre_commit"]
+        assert expected in result.stdout, (
+            f"Expected pre-commit {expected}, got: {result.stdout}"
         )
 
     def test_ruff_installed(self, host):
@@ -96,8 +117,10 @@ class TestDevelopmentTools:
         result = host.run("ruff --version")
         assert result.rc == 0, "ruff --version failed"
         assert "ruff" in result.stdout.lower()
-        # Check for version
-        assert "0.14.6" in result.stdout, f"Expected ruff 0.14.6, got: {result.stdout}"
+        expected = EXPECTED_VERSIONS["ruff"]
+        assert expected in result.stdout, (
+            f"Expected ruff {expected}, got: {result.stdout}"
+        )
 
 
 class TestEnvironmentVariables:
