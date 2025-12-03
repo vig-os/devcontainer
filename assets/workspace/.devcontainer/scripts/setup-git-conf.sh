@@ -214,8 +214,12 @@ if [ -f "$GH_TOKEN_FILE" ] && [ -s "$GH_TOKEN_FILE" ]; then
 fi
 
 # Setup git hooks
+# {{SHORT_NAME}} is replaced during template initialization
+PROJECT_ROOT="/workspace/{{SHORT_NAME}}"
+
 echo "Setting up git hooks..."
-if [ -d .githooks ]; then
+if [ -d "$PROJECT_ROOT/.githooks" ]; then
+	cd "$PROJECT_ROOT"
 	git config core.hooksPath .githooks
 	echo "Git hooks configured to use .githooks directory"
 else
