@@ -42,7 +42,13 @@ if [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
 fi
 
 # Get the project root directory (parent of scripts/)
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Source utilities
+# shellcheck source=scripts/utils.sh
+source "$SCRIPT_DIR/utils.sh"
+
 cd "$PROJECT_ROOT"
 
 # === 1. Install uv if missing ===
@@ -110,7 +116,7 @@ if [ -n "$CONTAINER_CMD" ]; then
     else
         echo "Container registry config exists at $DOCKER_CONFIG. Verifying authentication..."
         if $CONTAINER_CMD login ghcr.io --get-login >/dev/null 2>&1 || \
-           { timeout 2 $CONTAINER_CMD login ghcr.io >/dev/null 2>&1; }; then
+           run_with_timeout 2 $CONTAINER_CMD login ghcr.io >/dev/null 2>&1; then
             echo "✓ GitHub Container Registry authentication verified."
         else
             echo "⚠ Warning: Could not verify authentication."

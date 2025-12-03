@@ -22,6 +22,11 @@ REGISTRY_TEST=${5:-0}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Source utilities
+# shellcheck source=scripts/utils.sh
+source "$SCRIPT_DIR/utils.sh"
+
 cd "$PROJECT_ROOT"
 
 # Validate version
@@ -140,7 +145,7 @@ echo "✓ Repository is clean"
 
 # Capture build metadata
 echo "Capturing build metadata (before any commits)..."
-BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+BUILD_DATE=$(get_iso_date)
 VCS_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
 echo "  BUILD_DATE: $BUILD_DATE"
 echo "  VCS_REF: $VCS_REF"
@@ -177,7 +182,10 @@ fi
 cp -r assets "$BUILD_DIR/"
 if [ -d "$BUILD_DIR/assets/workspace" ]; then
 	echo "Replacing {{IMAGE_TAG}} with $VERSION in build folder template files..."
-	find "$BUILD_DIR/assets/workspace" -type f -exec sed -i "s|{{IMAGE_TAG}}|$VERSION|g" {} \; 2>/dev/null || true
+
+	find "$BUILD_DIR/assets/workspace" -type f -print0 | while IFS= read -r -d '' file; do
+		sed_inplace "s|{{IMAGE_TAG}}|$VERSION|g" "$file"
+	done
 
 	# Update devcontainer README in build folder with version and date
 	BUILD_DEVCONTAINER_README="$BUILD_DIR/assets/workspace/.devcontainer/README.md"
