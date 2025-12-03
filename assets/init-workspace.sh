@@ -72,6 +72,14 @@ fi
 SHORT_NAME=$(echo "$SHORT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[ -]/_/g' | sed 's/[^a-z0-9_]/_/g')
 echo "Project short name set to: $SHORT_NAME"
 
+# Ask user for organization name
+read -rp "Enter the name of your organization, e.g. 'vigOS': " ORG_NAME
+if [[ -z "$ORG_NAME" ]]; then
+    echo "Error: Organization name is required" >&2
+    exit 1
+fi
+echo "Organization name set to: $ORG_NAME"
+
 # Warn if forcing (prompt user)
 if [[ "$FORCE" == "true" ]]; then
     echo "Warning: --force flag detected. Existing files may be overwritten."
@@ -96,8 +104,9 @@ else
     cp -r "$TEMPLATE_DIR"/.[!.]* "$WORKSPACE_DIR/" 2>/dev/null || true
 fi
 
-# Replace {{SHORT_NAME}} in all files (recursively, excluding .git)
+# Replace placeholders in all files (recursively, excluding .git)
 find "$WORKSPACE_DIR" -type f ! -path "*/.git/*" -exec sed -i "s/{{SHORT_NAME}}/${SHORT_NAME}/g" {} +
+find "$WORKSPACE_DIR" -type f ! -path "*/.git/*" -exec sed -i "s/{{ORG_NAME}}/${ORG_NAME}/g" {} +
 
 # Restore executable permissions on shell scripts and hooks (must be after sed -i)
 echo "Setting executable permissions on shell scripts and hooks..."

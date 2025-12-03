@@ -190,6 +190,7 @@ class TestFileStructure:
             "/root/assets/workspace/.yamllint",
             "/root/assets/workspace/CHANGELOG.md",
             "/root/assets/workspace/README.md",
+            "/root/assets/workspace/LICENSE",
             # .devcontainer files
             "/root/assets/workspace/.devcontainer/.gitignore",
             "/root/assets/workspace/.devcontainer/README.md",
@@ -254,3 +255,43 @@ class TestFileStructure:
         assert result.rc == 0, (
             "Pre-commit cache directory is empty - hooks were not initialized"
         )
+
+
+class TestPlaceholders:
+    """Test that placeholders are replaced correctly."""
+
+    def test_image_tag_replaced(self, host):
+        """Test that {{IMAGE_TAG}} placeholder is replaced in all asset files."""
+        workspace_root = "/root/assets/workspace"
+
+        # Hard-coded list of paths to exclude
+        excluded_paths = [
+            ".pre-commit-cache",
+            ".ruff_cache",
+        ]
+
+        # Build find command with exclusions
+        exclude_patterns = " -o ".join(
+            [f"-path '*/{path}/*'" for path in excluded_paths]
+        )
+        find_cmd = (
+            f"find {workspace_root} "
+            f"\\( {exclude_patterns} \\) -prune "
+            r"-o -type f -print"
+        )
+
+        result = host.run(find_cmd)
+        assert result.rc == 0, f"Failed to find files in {workspace_root}"
+        files = result.stdout.strip().split("\n") if result.stdout.strip() else []
+
+        for file_path in files:
+            file = host.file(file_path)
+            if file.exists and file.is_file:
+                try:
+                    content = file.content_string
+                    assert "{{IMAGE_TAG}}" not in content, (
+                        f"{{IMAGE_TAG}} placeholder not replaced in {file_path}"
+                    )
+                except UnicodeDecodeError:
+                    # Skip binary files
+                    continue

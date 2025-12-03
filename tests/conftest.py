@@ -136,6 +136,7 @@ def initialized_workspace(container_image):
     # Run init-workspace in the container
     # The script requires an interactive terminal (-it) and expects input
     project_name = "test_project"
+    organization_name = "Test Org"
 
     # Use pexpect to handle interactive terminal input
     cmd = [
@@ -156,6 +157,9 @@ def initialized_workspace(container_image):
         # Wait for the prompt and send the project name
         child.expect("Enter a short name", timeout=30)
         child.sendline(project_name)
+
+        child.expect("Enter the name of your organization, e.g. 'vigOS': ", timeout=30)
+        child.sendline(organization_name)
 
         # Wait for the process to complete
         child.expect(pexpect.EOF, timeout=60)

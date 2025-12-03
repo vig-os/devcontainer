@@ -261,14 +261,6 @@ class TestDevContainerJson:
 
         assert "name" in config, "devcontainer.json missing 'name' field"
 
-        # Check that placeholders were replaced (init-workspace should replace them)
-        assert "{{SHORT_NAME}}" not in config["name"], (
-            f"Name contains unreplaced placeholder: {config['name']}"
-        )
-        assert "{{IMAGE_TAG}}" not in config["name"], (
-            f"Name contains unreplaced placeholder: {config['name']}"
-        )
-
         # Verify name is not empty
         assert len(config["name"]) > 0, "Name should not be empty"
 
@@ -602,54 +594,69 @@ class TestDevContainerDockerCompose:
         assert "tty" in service, "devcontainer service missing 'tty' field"
         assert service["tty"] is True, f"Expected tty=True, got: {service['tty']}"
 
-    def test_docker_compose_yml_placeholders_replaced(self, initialized_workspace):
-        """Test that {{IMAGE_TAG}} placeholder is replaced in docker-compose.yml."""
-        docker_compose_yml = (
-            initialized_workspace / ".devcontainer" / "docker-compose.yml"
+
+class TestPlaceholders:
+    """Test that placeholders are replaced correctly."""
+
+    def test_placeholders_replaced(self, initialized_workspace):
+        """Test that placeholders are replaced in all asset files."""
+        # Hard-coded list of paths to exclude
+        excluded_paths = [
+            ".pre-commit-cache",
+            ".ruff_cache",
+        ]
+
+        # Find all files recursively, excluding specified paths at iteration level
+        files = (
+            file_path
+            for file_path in initialized_workspace.rglob("*")
+            if file_path.is_file()
+            and not any(
+                excluded_path in file_path.parts for excluded_path in excluded_paths
+            )
         )
 
-        with docker_compose_yml.open() as f:
-            content = f.read()
+        # Check each file for placeholders
+        for file_path in files:
+            try:
+                content = file_path.read_text(encoding="utf-8")
+                for placeholder in ["{{IMAGE_TAG}}", "{{SHORT_NAME}}"]:
+                    assert placeholder not in content, (
+                        f"{placeholder} placeholder not replaced in {file_path}"
+                    )
+            except UnicodeDecodeError:
+                # Skip binary files
+                continue
 
-        # {{IMAGE_TAG}} should be replaced (or at least not present)
-        assert "{{IMAGE_TAG}}" not in content, (
-            "{{IMAGE_TAG}} placeholder not replaced in docker-compose.yml"
-        )
+    def test_org_name_replaced(self, initialized_workspace):
+        """Test that organization name is replaced in specific asset files."""
+        # Files with organization name in specific paths
+        files = [
+            initialized_workspace / "LICENSE",
+        ]
 
-
-class TestDevContainerPlaceholders:
-    """Test that template placeholders are replaced correctly."""
+        # Check each file for organization name
+        for file in files:
+            content = file.read_text(encoding="utf-8")
+            assert "{{ORG_NAME}}" not in content, (
+                f"{{ORG_NAME}} placeholder not replaced in {file}"
+            )
+            assert "Test Org" in content, f"Organization name not replaced in {file}"
 
     def test_short_name_replaced(self, initialized_workspace):
-        """Test that {{SHORT_NAME}} placeholders are replaced."""
-        devcontainer_json = (
-            initialized_workspace / ".devcontainer" / "devcontainer.json"
-        )
+        """Test that short name is replaced in specific asset files."""
+        # Files with short name in specific paths
+        files = [
+            initialized_workspace / ".devcontainer" / "devcontainer.json",
+        ]
 
-        with devcontainer_json.open() as f:
-            content = f.read()
-
-        # {{SHORT_NAME}} should be replaced with test_project
-        assert "{{SHORT_NAME}}" not in content, (
-            "{{SHORT_NAME}} placeholder not replaced"
-        )
-        assert "test_project" in content.lower(), (
-            "SHORT_NAME not replaced with test_project"
-        )
-
-    def test_image_tag_replaced(self, initialized_workspace):
-        """Test that {{IMAGE_TAG}} placeholders are replaced in docker-compose.yml."""
-        docker_compose_yml = (
-            initialized_workspace / ".devcontainer" / "docker-compose.yml"
-        )
-
-        with docker_compose_yml.open() as f:
-            content = f.read()
-
-        # {{IMAGE_TAG}} should be replaced (or at least not present)
-        assert "{{IMAGE_TAG}}" not in content, (
-            "{{IMAGE_TAG}} placeholder not replaced in docker-compose.yml"
-        )
+        # Check each file for short name
+        for file in files:
+            content = file.read_text(encoding="utf-8")
+            assert "{{SHORT_NAME}}" not in content, (
+                f"{{SHORT_NAME}} placeholder not replaced in {file}"
+            )
+            assert "test_project" in content, f"Short name not replaced in {file}"
 
 
 class TestDevContainerGit:
