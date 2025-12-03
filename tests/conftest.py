@@ -243,7 +243,7 @@ def devcontainer_up(initialized_workspace):
         print("[DEBUG] Disabling SSH agent forwarding on macOS+podman")
         print("[DEBUG] (VM isolation prevents socket mounting)")
         del env["SSH_AUTH_SOCK"]
-    elif env.get("SSH_AUTH_SOCK", "false") and Path(env["SSH_AUTH_SOCK"]).exists():
+    elif "SSH_AUTH_SOCK" in env and Path(env["SSH_AUTH_SOCK"]).exists():
         print("[DEBUG] Setting up SSH agent forwarding in devcontainer.json")
         # Read the devcontainer.json
         with devcontainer_json_path.open() as f:
