@@ -5,7 +5,7 @@ set -euo pipefail
 PROJECT_ROOT="/workspace/{{SHORT_NAME}}"
 
 # Run only if pre-commit hooks are not already installed
-if [ -f "$PROJECT_ROOT/.pre-commit-cache" ]; then
+if [ -d "$PROJECT_ROOT/.pre-commit-cache" ]; then
 	echo "Pre-commit hooks already installed, skipping"
 	exit 0
 fi
