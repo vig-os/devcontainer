@@ -202,8 +202,8 @@ import organization.
 - **Registry**: `ghcr.io/vig-os/devcontainer`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: MIT
-- **Version**: This is an unreleased development version
-- **Size**: This is an unreleased development version
+- **Version**: [99.9204](https://github.com/vig-os/devcontainer/releases/tag/v99.9204), 2025-12-03
+- **Size**: ~140 MB
 
 ## Contributing
 
