@@ -426,7 +426,8 @@ fi
 
 # Create git tag
 echo "Creating git tag $GIT_TAG (for image:$VERSION)..."
-if ! git tag "$GIT_TAG"; then
+# Disable GPG signing for tags to avoid interactive prompts in automated environments
+if ! git -c tag.gpgsign=false tag -a "$GIT_TAG" -m "Release $VERSION"; then
 	echo "❌ Failed to create git tag"
 	exit 1
 fi
