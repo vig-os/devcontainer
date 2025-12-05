@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Post-attach script - runs when container is attached
-# This script is called from postAttachCommand
+# This script is called from postAttachCommand in devcontainer.json
 
 set -euo pipefail
 

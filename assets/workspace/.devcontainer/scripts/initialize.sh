@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Initialize script - runs on host before container starts
-# This script is called from initializeCommand
+# This script is called from initializeCommand in devcontainer.json
 
 set -euo pipefail
 

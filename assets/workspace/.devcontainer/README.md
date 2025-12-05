@@ -7,14 +7,18 @@ This folder contains everything VS Code needs to launch the
 
 ## Lifecycle scripts
 
-- `.devcontainer/scripts/copy-host-user-conf.sh` – copies host git/SSH/GitHub CLI config into `.devcontainer/.conf/`.
-- `.devcontainer/scripts/initialize.sh` – host-side hook that runs the copy script before VS Code builds the container.
-- `.devcontainer/scripts/post-attach.sh` – container-side hook that calls:
-  - `scripts/init-git.sh` to initialize or reuse the project repo
-  - `scripts/setup-git-conf.sh` to wire up GitHub authentication, commit signing, and allowed signers
-  - `scripts/init-precommit.sh` to install the pre-commit hooks that live under `.githooks/`
+1. `.devcontainer/scripts/initialize.sh` – host-side hook that runs before VS Code builds the container.
+   - `.devcontainer/scripts/copy-host-user-conf.sh` – copies host git/SSH/GitHub CLI config into `.devcontainer/.conf/`.
+2. `.devcontainer/scripts/post-create.sh` – container-side hook that runs when the container is created for the first time.
+Add your custom setup commands here to install any dependencies or tools needed for your project.
+3. `.devcontainer/scripts/post-attach.sh` – container-side hook that is run every time you launch your project:
+   - `scripts/init-git.sh` to initialize or reuse the project repo
+   - `scripts/setup-git-conf.sh` to wire up GitHub authentication, commit signing, and allowed signers
+   - `scripts/init-precommit.sh` to install the pre-commit hooks that live under `.githooks/`
 
-You rarely need to run these manually; VS Code executes them automatically via `initializeCommand` and `postAttachCommand`. If you do re-run them, make sure to use the same working directory that VS Code would (`project/.devcontainer` on the host or `/workspace/<project>/.devcontainer` inside the container).
+You rarely need to run these manually; VS Code executes them automatically via `initializeCommand`, `postCreateCommand`, and `postAttachCommand`.
+If you do re-run them, make sure to use the same working directory that VS Code would (`project/.devcontainer` on the host
+or `/workspace/<project>/.devcontainer` inside the container).
 
 ## Mounts and multi-root workspaces
 

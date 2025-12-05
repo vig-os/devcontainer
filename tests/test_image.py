@@ -199,6 +199,7 @@ class TestFileStructure:
             "/root/assets/workspace/.devcontainer/docker-compose.override.yml.example",
             "/root/assets/workspace/.devcontainer/workspace.code-workspace.example",
             # .devcontainer/scripts files
+            "/root/assets/workspace/.devcontainer/scripts/post-create.sh",
             "/root/assets/workspace/.devcontainer/scripts/initialize.sh",
             "/root/assets/workspace/.devcontainer/scripts/post-attach.sh",
             "/root/assets/workspace/.devcontainer/scripts/copy-host-user-conf.sh",

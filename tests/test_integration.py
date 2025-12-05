@@ -216,6 +216,7 @@ class TestDevContainerStructure:
             "setup-git-conf.sh",
             "init-precommit.sh",
             "post-attach.sh",
+            "post-create.sh",
             "initialize.sh",
         ]
 
@@ -403,6 +404,27 @@ class TestDevContainerJson:
         assert config["postAttachCommand"] == expected_command, (
             f"Expected postAttachCommand='{expected_command}', "
             f"got: {config['postAttachCommand']}"
+        )
+
+    def test_devcontainer_json_post_create_command(self, initialized_workspace):
+        """Test that postCreateCommand is configured correctly."""
+        devcontainer_json = (
+            initialized_workspace / ".devcontainer" / "devcontainer.json"
+        )
+
+        with devcontainer_json.open() as f:
+            config = json.load(f)
+
+        assert "postCreateCommand" in config, (
+            "devcontainer.json missing 'postCreateCommand' field"
+        )
+        # postCreateCommand should reference .devcontainer inside project subdirectory
+        expected_command = (
+            "/workspace/test_project/.devcontainer/scripts/post-create.sh"
+        )
+        assert config["postCreateCommand"] == expected_command, (
+            f"Expected postCreateCommand='{expected_command}', "
+            f"got: {config['postCreateCommand']}"
         )
 
     def test_devcontainer_json_no_redundant_container_env(self, initialized_workspace):

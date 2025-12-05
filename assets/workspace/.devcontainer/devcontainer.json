@@ -34,5 +34,6 @@
         }
     },
     "initializeCommand": ".devcontainer/scripts/initialize.sh",
-    "postAttachCommand": "/workspace/{{SHORT_NAME}}/.devcontainer/scripts/post-attach.sh"
+    "postAttachCommand": "/workspace/{{SHORT_NAME}}/.devcontainer/scripts/post-attach.sh",
+    "postCreateCommand": "/workspace/{{SHORT_NAME}}/.devcontainer/scripts/post-create.sh"
 }
