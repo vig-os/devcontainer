@@ -105,8 +105,14 @@ else
 fi
 
 # Replace placeholders in all files (recursively, excluding .git)
-find "$WORKSPACE_DIR" -type f ! -path "*/.git/*" -exec sed -i "s/{{SHORT_NAME}}/${SHORT_NAME}/g" {} +
-find "$WORKSPACE_DIR" -type f ! -path "*/.git/*" -exec sed -i "s/{{ORG_NAME}}/${ORG_NAME}/g" {} +
+echo "Replacing placeholders in files..."
+# Use a more efficient approach: only process files that contain placeholders
+# and combine both replacements in a single sed pass
+find "$WORKSPACE_DIR" -type f ! -path "*/.git/*" -print0 | while IFS= read -r -d '' file; do
+    if grep -q '{{SHORT_NAME}}\|{{ORG_NAME}}' "$file" 2>/dev/null; then
+        sed -i "s/{{SHORT_NAME}}/${SHORT_NAME}/g; s/{{ORG_NAME}}/${ORG_NAME}/g" "$file"
+    fi
+done
 
 # Restore executable permissions on shell scripts and hooks (must be after sed -i)
 echo "Setting executable permissions on shell scripts and hooks..."
