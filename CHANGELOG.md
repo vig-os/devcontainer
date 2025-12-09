@@ -9,18 +9,32 @@ and this project uses a simplified versioning scheme (X.Y format, e.g., 1.0, 1.1
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.1] - 2025-12-09
+
+### Added
+
 #### Core Image
 - Development container image based on Python 3.12 (Debian Trixie)
 - Multi-architecture support (AMD64, ARM64)
 - System tools: git, gh (GitHub CLI), curl, openssh-client, ca-certificates
-- Python tools: uv (fast package manager), pre-commit, ruff
+- Python tools: uv, pre-commit, ruff
 - Pre-configured development environment with minimal overhead
 
 #### Devcontainer Integration
-- VS Code devcontainer template with init-workspace script
+- VS Code devcontainer template with init-workspace script setting organization and project name
 - Docker Compose orchestration for flexible container management
 - Support for mounting additional folders via docker-compose.override.yml
-- Post-attach automation for seamless development setup
+- Container lifecycle scripts `post-create.sh`, `initialize.sh` and `post-attach.sh` for seamless development setup
 - Automatic Git configuration synchronization from host machine
 - SSH commit signing support with signature verification
 - Focused `.devcontainer/README.md` with version tracking, lifecycle documentation, and workspace configuration guide
@@ -49,18 +63,6 @@ and this project uses a simplified versioning scheme (X.Y format, e.g., 1.0, 1.1
 - Pull request template with comprehensive checklist
 - Complete project documentation (README.md, CONTRIBUTE.md, TESTING.md)
 - Detailed testing strategy and workflow documentation
-- Push script now updates README files in build folder instead of source files (keeps source clean)
-- Simplified push parameters: single `REGISTRY_TEST=1` flag replaces `NO_TEST` and `NATIVE_ARCH_ONLY` flags
-- Workspace configuration (`workspace.code-workspace`) is now user-specific (gitignored, users copy from example)
-- Registry test mode now skips full test suite (minimal test image doesn't need comprehensive tests)
-- Push script commit logic handles cases where README.md already has the target version
+- Push script updates README files in both project and assets
 
-### Changed
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
+[0.1]: https://github.com/vig-os/devcontainer/releases/tag/v0.1
