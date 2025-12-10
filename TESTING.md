@@ -77,7 +77,6 @@ Registry fixtures:
 This is important for fixtures that take time to set up (e.g., `devcontainer_up` takes about a minute).
 The fixtures automatically cleans up after all tests complete.
 
-
 ## Running Tests
 
 Tests are run using Makefile targets. The `test` target runs all three test suites (image, integration, and registry):

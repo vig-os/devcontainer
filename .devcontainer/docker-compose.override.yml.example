@@ -11,8 +11,6 @@
 # Find your UID: id -u
 # Find podman socket: podman machine inspect podman-machine-default --format '{{.ConnectionInfo.PodmanSocket.Path}}'
 
-version: '3.8'
-
 services:
   devcontainer:
     volumes:

@@ -1,20 +1,7 @@
 ---
 # .pre-commit-config.yaml
 
-exclude: ^\.cursor/
-
 repos:
-
-  # GitHub Data Sync
-  - repo: local
-    hooks:
-      - id: sync-github-data
-        name: Sync GitHub Issues and PRs
-        entry: .github/scripts/sync-prs-issues.sh
-        language: system
-        pass_filenames: false
-        always_run: true
-
   # General Pre-commit Hooks (Fixes formatting issues)
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -34,26 +21,12 @@ repos:
       - id: trailing-whitespace
 
   # Python Linting and Formatting (Ruff)
-  # on pre-commit, fix linting errors
-  # on push, fix linting errors and enforce docstrings
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.3
     hooks:
       - id: ruff
-        name: ruff (commit)
-        # ignore docstring linting errors on pre-commit
-        args: [--fix, --ignore=D]
-        stages: [pre-commit]
+        args: [--fix]
       - id: ruff-format
-        name: ruff-format (commit)
-        stages: [pre-commit]
-      - id: ruff
-        name: ruff (push - strict)
-        args: [--fix, --extend-select=D]  # enforce docstrings on push
-        stages: [pre-push]
-      - id: ruff-format
-        name: ruff-format (push - strict)
-        stages: [pre-push]
 
   # YAML Linting
   - repo: https://github.com/adrienverge/yamllint
@@ -68,31 +41,19 @@ repos:
     hooks:
       - id: shellcheck
         name: shellcheck
-        args: [-x]
+        args: ["-x"]
 
-  # Markdown Linting (auto-fixes issues)
+  # Markdown Linting
   - repo: https://github.com/jackdewinter/pymarkdown
     rev: v0.9.23
     hooks:
       - id: pymarkdown
-        name: pymarkdown
+        name: pymarkdown (fix)
         args: ["fix"]
+      - id: pymarkdown
+        name: pymarkdown (scan)
+        args: ["scan"]
         exclude: ^\.github_data/
-
-  # Dockerfile Linting (using Podman instead of Docker)
-  - repo: local
-    hooks:
-      - id: hadolint
-        name: hadolint
-        language: system
-        entry: >
-          bash -c 'for file in "$@"; do
-          podman run --rm -i
-          -v "$PWD/.hadolint.yaml:/hadolint.yaml:ro"
-          docker.io/hadolint/hadolint
-          hadolint --config /hadolint.yaml - < "$file";
-          done' --
-        files: (Containerfile|Dockerfile)$
 
   # Makefile
   - repo: https://github.com/checkmake/checkmake

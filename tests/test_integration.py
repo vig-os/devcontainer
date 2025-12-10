@@ -77,18 +77,41 @@ class TestHostGitSignatureSetup:
             pytest.skip(
                 "Git signing key not configured. "
                 "This is optional but recommended. "
-                "Configure with: git config user.signingkey ~/.ssh/id_ed25519_github.pub"
+                "Configure with the full SSH public key string or file path"
             )
 
         signing_key = result.stdout.strip()
         assert signing_key, "Signing key is configured but empty"
 
-        # Verify the key file exists if it's a path
+        # Check if it's a file path, email, or full public key string
         if signing_key.startswith("~") or signing_key.startswith("/"):
+            # Old behavior: file path
             from pathlib import Path
 
             key_path = Path(signing_key.replace("~", str(Path.home())))
             assert key_path.exists(), f"Signing key file not found: {signing_key}"
+        elif signing_key.startswith("ssh-"):
+            # Full SSH public key string (for SSH agent signing)
+            # Verify it looks like a valid SSH public key format
+            parts = signing_key.split()
+            assert len(parts) >= 2, (
+                f"Invalid SSH public key format. "
+                f"Expected 'ssh-<type> <key-data> [comment]', got: {signing_key[:50]}..."
+            )
+            assert parts[0] in [
+                "ssh-rsa",
+                "ssh-ed25519",
+                "ecdsa-sha2-nistp256",
+                "ecdsa-sha2-nistp384",
+                "ecdsa-sha2-nistp521",
+            ], f"Unsupported SSH key type: {parts[0]}"
+        elif "@" in signing_key:
+            # Email address (standard for SSH agent signing)
+            # This is the preferred method - git looks up the email in allowed-signers
+            pass
+        else:
+            # Could be other identifier (namespace, etc.)
+            pass
 
     def test_git_commit_gpgsign_configured(self):
         """Test that git is configured to sign commits by default."""
@@ -523,7 +546,7 @@ class TestDevContainerDockerCompose:
         assert ".." in volumes_str, (
             f"Expected relative path (..) or localWorkspaceFolder in volumes, got: {service['volumes']}"
         )
-        # Should mount to /workspace/test_project (or /workspace/{{SHORT_NAME}} before replacement)
+        # Should mount to /workspace/test_project (or /workspace/devcontainer before replacement)
         assert "/workspace/" in volumes_str, (
             f"Expected mount to /workspace/ subdirectory, got: {service['volumes']}"
         )
@@ -642,7 +665,7 @@ class TestPlaceholders:
         for file_path in files:
             try:
                 content = file_path.read_text(encoding="utf-8")
-                for placeholder in ["{{IMAGE_TAG}}", "{{SHORT_NAME}}"]:
+                for placeholder in ["{{IMAGE_TAG}}", "devcontainer"]:
                     assert placeholder not in content, (
                         f"{placeholder} placeholder not replaced in {file_path}"
                     )
@@ -660,9 +683,7 @@ class TestPlaceholders:
         # Check each file for organization name
         for file in files:
             content = file.read_text(encoding="utf-8")
-            assert "{{ORG_NAME}}" not in content, (
-                f"{{ORG_NAME}} placeholder not replaced in {file}"
-            )
+            assert "vigOS" not in content, f"vigOS placeholder not replaced in {file}"
             assert "Test Org" in content, f"Organization name not replaced in {file}"
 
     def test_short_name_replaced(self, initialized_workspace):
@@ -675,8 +696,8 @@ class TestPlaceholders:
         # Check each file for short name
         for file in files:
             content = file.read_text(encoding="utf-8")
-            assert "{{SHORT_NAME}}" not in content, (
-                f"{{SHORT_NAME}} placeholder not replaced in {file}"
+            assert "devcontainer" not in content, (
+                f"devcontainer placeholder not replaced in {file}"
             )
             assert "test_project" in content, f"Short name not replaced in {file}"
 

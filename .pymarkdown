@@ -1,4 +1,9 @@
 {
+  "extensions": {
+    "front-matter": {
+      "enabled": true
+    }
+  },
   "plugins": {
     "md013": {
       "enabled": true,
@@ -6,6 +11,18 @@
     },
     "md036": {
       "enabled": false
+    },
+    "md003": {
+      "enabled": true,
+      "style": "atx"
+    },
+    "md041": {
+      "enabled": true,
+      "front_matter_title": "title"
+    },
+    "md025": {
+      "enabled": true,
+      "front_matter_title": "title"
     }
   }
 }

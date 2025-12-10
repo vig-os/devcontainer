@@ -1,9 +1,7 @@
 ---
-version: '3.8'
-
 services:
   devcontainer:
-    image: ghcr.io/vig-os/devcontainer:{{IMAGE_TAG}}
+    image: ghcr.io/vig-os/devcontainer:dev
     volumes:
       # Mount the project folder to a subdirectory of workspace
       - ..:/workspace/devcontainer:cached

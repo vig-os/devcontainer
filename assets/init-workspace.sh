@@ -84,19 +84,19 @@ echo "Organization name set to: $ORG_NAME"
 if [[ "$FORCE" == "true" ]]; then
     echo ""
     echo "Checking for files that would be overwritten..."
-    
+
     # Find files that exist in both template and workspace
     CONFLICTS=()
     while IFS= read -r -d '' template_file; do
         # Get relative path from template directory
-        rel_path="${template_file#$TEMPLATE_DIR/}"
+        rel_path="${template_file#"$TEMPLATE_DIR"/}"
         workspace_file="$WORKSPACE_DIR/$rel_path"
-        
+
         if [[ -e "$workspace_file" ]]; then
             CONFLICTS+=("$rel_path")
         fi
     done < <(find "$TEMPLATE_DIR" -type f ! -path "*/.git/*" -print0)
-    
+
     if [[ ${#CONFLICTS[@]} -eq 0 ]]; then
         echo "No existing files would be overwritten."
     else
@@ -109,7 +109,7 @@ if [[ "$FORCE" == "true" ]]; then
         echo "─────────────────────────────────────────────────────────────"
         echo ""
     fi
-    
+
     read -rp "Continue with --force? (y/N): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
