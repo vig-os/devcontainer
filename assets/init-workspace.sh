@@ -8,6 +8,18 @@ TEMPLATE_DIR="/root/assets/workspace"
 WORKSPACE_DIR="/workspace"
 FORCE=false
 
+# Source utility functions for cross-platform compatibility
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/utils.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$SCRIPT_DIR/utils.sh"
+else
+    # Fallback: define sed_inplace for Linux (container environment)
+    sed_inplace() {
+        sed -i "$1" "$2"
+    }
+fi
+
 # Check if running in interactive mode
 if [[ ! -t 0 ]]; then
     echo "Error: This script requires an interactive terminal." >&2
@@ -136,8 +148,8 @@ echo "Replacing placeholders in files..."
 # Use a more efficient approach: only process files that contain placeholders
 # and combine both replacements in a single sed pass
 find "$WORKSPACE_DIR" -type f ! -path "*/.git/*" -print0 | while IFS= read -r -d '' file; do
-    if grep -q 'devcontainer\|vigOS' "$file" 2>/dev/null; then
-        sed -i "s/devcontainer/${SHORT_NAME}/g; s/vigOS/${ORG_NAME}/g" "$file"
+    if grep -q '{{SHORT_NAME}}\|{{ORG_NAME}}' "$file" 2>/dev/null; then
+        sed_inplace "s/{{SHORT_NAME}}/${SHORT_NAME}/g; s/{{ORG_NAME}}/${ORG_NAME}/g" "$file"
     fi
 done
 

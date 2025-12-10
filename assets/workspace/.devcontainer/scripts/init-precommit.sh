@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# devcontainer is replaced during template initialization
-PROJECT_ROOT="/workspace/devcontainer"
+# {{SHORT_NAME}} is replaced during template initialization
+PROJECT_ROOT="/workspace/{{SHORT_NAME}}"
 
 # Run only if pre-commit hooks are not already installed
 if [ -d "$PROJECT_ROOT/.pre-commit-cache" ]; then

@@ -1,11 +1,11 @@
 {
-    "name": "devcontainer-devc",
+    "name": "{{SHORT_NAME}}-devc",
     "dockerComposeFile": [
         "docker-compose.yml",
         "docker-compose.override.yml"
     ],
     "service": "devcontainer",
-    "workspaceFolder": "/workspace/devcontainer",
+    "workspaceFolder": "/workspace/{{SHORT_NAME}}",
     "customizations": {
         "vscode": {
             "extensions": [
@@ -49,6 +49,6 @@
     ],
     "postStartCommand": "sudo chmod 666 /var/run/docker.sock 2>/dev/null || true",
     "initializeCommand": ".devcontainer/scripts/initialize.sh",
-    "postAttachCommand": "/workspace/devcontainer/.devcontainer/scripts/post-attach.sh",
-    "postCreateCommand": "/workspace/devcontainer/.devcontainer/scripts/post-create.sh"
+    "postAttachCommand": "/workspace/{{SHORT_NAME}}/.devcontainer/scripts/post-attach.sh",
+    "postCreateCommand": "/workspace/{{SHORT_NAME}}/.devcontainer/scripts/post-create.sh"
 }

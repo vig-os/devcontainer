@@ -46,6 +46,15 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
+# Install Podman client for Docker-out-of-Docker (DooD) pattern
+# This allows the container to communicate with the host's Podman daemon via mounted socket
+RUN set -eux; \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        podman \
+    && rm -rf /var/lib/apt/lists/*; \
+    podman --version
+
 # Install latest GitHub CLI manually from releases
 ARG TARGETARCH=amd64
 RUN set -eux; \
@@ -94,6 +103,42 @@ COPY assets /root/assets
 
 # Set execute permissions on all shell scripts in the assets
 RUN find /root/assets -type f -name "*.sh" -exec chmod +x {} \;
+
+# Generate architecture-specific docker-compose.override.yml for podman socket
+# arm64 → macOS (Apple Silicon) with UID 501
+# amd64 → Linux with UID 1000
+ARG TARGETARCH
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+        arm64) \
+            SOCKET_PATH="/run/user/501/podman/podman.sock"; \
+            ARCH_NAME="macOS/arm64"; \
+            ;; \
+        amd64) \
+            SOCKET_PATH="/run/user/1000/podman/podman.sock"; \
+            ARCH_NAME="Linux/amd64"; \
+            ;; \
+        *) \
+            echo "Unsupported architecture: ${TARGETARCH}"; \
+            exit 1; \
+            ;; \
+    esac; \
+    OVERRIDE_FILE="/root/assets/workspace/.devcontainer/docker-compose.override.yml"; \
+    printf '%s\n' \
+        "# Auto-generated docker-compose.override.yml for ${ARCH_NAME}" \
+        "# Generated at image build time based on target architecture" \
+        "#" \
+        "# This file mounts the Podman socket for container-in-container operations." \
+        "# Modify as needed for your system (e.g., different UID or Docker Desktop)." \
+        "" \
+        "version: '3.8'" \
+        "" \
+        "services:" \
+        "  devcontainer:" \
+        "    volumes:" \
+        "      # Podman socket mount (default for ${ARCH_NAME})" \
+        "      - ${SOCKET_PATH}:/var/run/docker.sock:Z" \
+        > "$OVERRIDE_FILE"
 
 # Pre-initialize pre-commit hooks in workspace assets
 WORKDIR /root/assets/workspace

@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# Change to project root directory (devcontainer is replaced during template initialization)
-PROJECT_ROOT="/workspace/devcontainer"
+# Change to project root directory ({{SHORT_NAME}} is replaced during template initialization)
+PROJECT_ROOT="/workspace/{{SHORT_NAME}}"
 
 # Ensure project directory exists
 if [ ! -d "$PROJECT_ROOT" ]; then

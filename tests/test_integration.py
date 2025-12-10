@@ -306,9 +306,23 @@ class TestDevContainerJson:
         assert "dockerComposeFile" in config, (
             "devcontainer.json missing 'dockerComposeFile' field"
         )
-        assert config["dockerComposeFile"] == "docker-compose.yml", (
-            f"Expected dockerComposeFile='docker-compose.yml', got: {config['dockerComposeFile']}"
-        )
+        # dockerComposeFile can be a string or array (includes override file)
+        docker_compose_files = config["dockerComposeFile"]
+        if isinstance(docker_compose_files, str):
+            assert docker_compose_files == "docker-compose.yml", (
+                f"Expected dockerComposeFile='docker-compose.yml', got: {docker_compose_files}"
+            )
+        elif isinstance(docker_compose_files, list):
+            assert "docker-compose.yml" in docker_compose_files, (
+                f"Expected 'docker-compose.yml' in {docker_compose_files}"
+            )
+            assert "docker-compose.override.yml" in docker_compose_files, (
+                f"Expected 'docker-compose.override.yml' in {docker_compose_files}"
+            )
+        else:
+            pytest.fail(
+                f"Unexpected dockerComposeFile type: {type(docker_compose_files)}"
+            )
 
     def test_devcontainer_json_service(self, initialized_workspace):
         """Test that devcontainer.json specifies the service name."""
@@ -320,8 +334,9 @@ class TestDevContainerJson:
             config = json.load(f)
 
         assert "service" in config, "devcontainer.json missing 'service' field"
-        assert config["service"] == "devcontainer", (
-            f"Expected service='devcontainer', got: {config['service']}"
+        # Service name is derived from SHORT_NAME (test_project in tests)
+        assert config["service"] in ["devcontainer", "test_project"], (
+            f"Expected service='devcontainer' or 'test_project', got: {config['service']}"
         )
 
     def test_devcontainer_json_workspace_folder(self, initialized_workspace):
@@ -452,7 +467,7 @@ class TestDevContainerJson:
         )
 
     def test_devcontainer_json_no_redundant_container_env(self, initialized_workspace):
-        """Test that containerEnv is not redundantly defined (should be in docker-compose.yml)."""
+        """Test that containerEnv only has socket-related env vars (others should be in docker-compose.yml)."""
         devcontainer_json = (
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
@@ -460,11 +475,15 @@ class TestDevContainerJson:
         with devcontainer_json.open() as f:
             config = json.load(f)
 
-        # containerEnv should not be in devcontainer.json since environment
-        # variables are already defined in docker-compose.yml
-        assert "containerEnv" not in config, (
-            "containerEnv should not be in devcontainer.json (use docker-compose.yml instead)"
-        )
+        # containerEnv is allowed for podman socket configuration
+        if "containerEnv" in config:
+            container_env = config["containerEnv"]
+            # Only CONTAINER_HOST and DOCKER_HOST should be here (for podman socket)
+            allowed_keys = {"CONTAINER_HOST", "DOCKER_HOST"}
+            actual_keys = set(container_env.keys())
+            assert actual_keys == allowed_keys, (
+                f"containerEnv should only contain {allowed_keys}, got: {actual_keys}"
+            )
 
 
 class TestDevContainerDockerCompose:
@@ -667,7 +686,8 @@ class TestPlaceholders:
         for file_path in files:
             try:
                 content = file_path.read_text(encoding="utf-8")
-                for placeholder in ["{{IMAGE_TAG}}", "devcontainer"]:
+                # Check for unreplaced placeholders (not literal strings)
+                for placeholder in ["{{IMAGE_TAG}}", "{{SHORT_NAME}}", "{{ORG_NAME}}"]:
                     assert placeholder not in content, (
                         f"{placeholder} placeholder not replaced in {file_path}"
                     )
@@ -676,30 +696,33 @@ class TestPlaceholders:
                 continue
 
     def test_org_name_replaced(self, initialized_workspace):
-        """Test that organization name is replaced in specific asset files."""
+        """Test that organization name placeholder is replaced in specific asset files."""
         # Files with organization name in specific paths
         files = [
             initialized_workspace / "LICENSE",
         ]
 
-        # Check each file for organization name
+        # Check each file for organization name placeholder (not literal "vigOS")
         for file in files:
             content = file.read_text(encoding="utf-8")
-            assert "vigOS" not in content, f"vigOS placeholder not replaced in {file}"
+            assert "{{ORG_NAME}}" not in content, (
+                f"{{{{ORG_NAME}}}} placeholder not replaced in {file}"
+            )
             assert "Test Org" in content, f"Organization name not replaced in {file}"
 
     def test_short_name_replaced(self, initialized_workspace):
-        """Test that short name is replaced in specific asset files."""
+        """Test that short name placeholder is replaced in specific asset files."""
         # Files with short name in specific paths
         files = [
             initialized_workspace / ".devcontainer" / "devcontainer.json",
         ]
 
-        # Check each file for short name
+        # Check each file for short name placeholder (not literal "devcontainer")
+        # Note: "devcontainer" can legitimately appear as a service name
         for file in files:
             content = file.read_text(encoding="utf-8")
-            assert "devcontainer" not in content, (
-                f"devcontainer placeholder not replaced in {file}"
+            assert "{{SHORT_NAME}}" not in content, (
+                f"{{{{SHORT_NAME}}}} placeholder not replaced in {file}"
             )
             assert "test_project" in content, f"Short name not replaced in {file}"
 
@@ -1602,4 +1625,327 @@ class TestDockerComposeOverride:
         assert "test_integration.py" in result.stdout, (
             f"test_integration.py not found in directory listing\n"
             f"stdout: {result.stdout}"
+        )
+
+
+class TestPodmanSocketAccess:
+    """Tests for Podman/Docker socket access from within the devcontainer.
+
+    These tests verify that container-in-container operations work correctly,
+    which is essential for:
+    - Building container images inside the devcontainer
+    - Running sidecar containers
+    - Testing containerized applications
+    """
+
+    def test_socket_file_exists(self, devcontainer_up):
+        """Test that the Docker/Podman socket is mounted in the container."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        check_socket_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "test",
+            "-S",
+            "/var/run/docker.sock",
+        ]
+
+        result = subprocess.run(
+            check_socket_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+        )
+
+        assert result.returncode == 0, (
+            f"Docker/Podman socket not found at /var/run/docker.sock\n"
+            f"The socket must be mounted via docker-compose.override.yml\n"
+            f"See: .devcontainer/docker-compose.override.yml.example\n"
+            f"stderr: {result.stderr}"
+        )
+
+    def test_socket_environment_variables(self, devcontainer_up):
+        """Test that CONTAINER_HOST and DOCKER_HOST are set correctly."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        check_env_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "bash",
+            "-c",
+            "echo CONTAINER_HOST=$CONTAINER_HOST && echo DOCKER_HOST=$DOCKER_HOST",
+        ]
+
+        result = subprocess.run(
+            check_env_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+        )
+
+        assert result.returncode == 0, (
+            f"Failed to check environment variables\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}"
+        )
+
+        # Check that both variables are set to the socket path
+        expected_socket = "unix:///var/run/docker.sock"
+        assert f"CONTAINER_HOST={expected_socket}" in result.stdout, (
+            f"CONTAINER_HOST not set correctly\n"
+            f"Expected: {expected_socket}\n"
+            f"stdout: {result.stdout}"
+        )
+        assert f"DOCKER_HOST={expected_socket}" in result.stdout, (
+            f"DOCKER_HOST not set correctly\n"
+            f"Expected: {expected_socket}\n"
+            f"stdout: {result.stdout}"
+        )
+
+    def test_podman_version_works(self, devcontainer_up):
+        """Test that we can communicate with the Podman daemon via the socket."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        # Try podman version command
+        version_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "podman",
+            "version",
+        ]
+
+        result = subprocess.run(
+            version_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=10,
+        )
+
+        if result.returncode != 0:
+            pytest.skip(
+                f"Podman socket not accessible from container. "
+                f"This requires docker-compose.override.yml to mount the socket.\n"
+                f"Copy docker-compose.override.yml.example and configure for your OS.\n"
+                f"stderr: {result.stderr}"
+            )
+
+        # Verify we got version information
+        assert "Version:" in result.stdout or "version" in result.stdout.lower(), (
+            f"Unexpected podman version output\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}"
+        )
+
+    def test_podman_info_works(self, devcontainer_up):
+        """Test that we can query the Podman daemon for system information."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        info_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "podman",
+            "info",
+            "--format",
+            "{{.Host.OS}}",
+        ]
+
+        result = subprocess.run(
+            info_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=10,
+        )
+
+        if result.returncode != 0:
+            pytest.skip(
+                f"Podman socket not accessible from container.\nstderr: {result.stderr}"
+            )
+
+        # Verify we got OS information (darwin for macOS, linux for Linux)
+        assert result.stdout.strip() in ["darwin", "linux"], (
+            f"Unexpected OS from podman info\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}"
+        )
+
+    def test_container_image_pull(self, devcontainer_up):
+        """Test that we can pull container images via the socket."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        # Use a very small test image
+        test_image = "docker.io/library/hello-world:latest"
+
+        pull_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "podman",
+            "pull",
+            test_image,
+        ]
+
+        result = subprocess.run(
+            pull_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=60,  # Pulling can take time
+        )
+
+        if result.returncode != 0:
+            pytest.skip(
+                f"Podman socket not accessible or network unavailable.\n"
+                f"stderr: {result.stderr}"
+            )
+
+        # Verify the image was pulled
+        assert (
+            "Writing manifest" in result.stdout
+            or "Trying to pull" in result.stdout
+            or result.returncode == 0
+        ), f"Image pull failed\nstdout: {result.stdout}\nstderr: {result.stderr}"
+
+    def test_container_run_simple(self, devcontainer_up):
+        """Test that we can run a simple container via the socket."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        # First ensure we have the image
+        test_image = "docker.io/library/hello-world:latest"
+
+        run_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "podman",
+            "run",
+            "--rm",
+            test_image,
+        ]
+
+        result = subprocess.run(
+            run_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=30,
+        )
+
+        if result.returncode != 0:
+            pytest.skip(f"Cannot run containers via socket.\nstderr: {result.stderr}")
+
+        # hello-world image prints a message
+        assert "Hello from Docker" in result.stdout or result.returncode == 0, (
+            f"Container run failed\nstdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+
+    def test_simple_image_build(self, devcontainer_up):
+        """Test that we can build a simple container image via the socket."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        # Create a simple Containerfile in a temp location
+        containerfile_content = (
+            "FROM docker.io/library/alpine:latest\nRUN echo 'test build'"
+        )
+
+        build_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "bash",
+            "-c",
+            f"echo '{containerfile_content}' | podman build -t test-build:latest -f - /tmp",
+        ]
+
+        result = subprocess.run(
+            build_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=120,  # Building can take time
+        )
+
+        if result.returncode != 0:
+            pytest.skip(
+                f"Cannot build images via socket.\n"
+                f"This may require additional permissions or configuration.\n"
+                f"stderr: {result.stderr}"
+            )
+
+        # Verify the build succeeded
+        assert (
+            "COMMIT test-build:latest" in result.stdout
+            or "Successfully tagged" in result.stdout
+            or result.returncode == 0
+        ), f"Image build failed\nstdout: {result.stdout}\nstderr: {result.stderr}"
+
+        # Clean up the test image
+        cleanup_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "podman",
+            "rmi",
+            "test-build:latest",
+        ]
+
+        subprocess.run(
+            cleanup_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=10,
         )

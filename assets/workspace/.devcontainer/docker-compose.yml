@@ -6,10 +6,10 @@ services:
     image: ghcr.io/vig-os/devcontainer:{{IMAGE_TAG}}
     volumes:
       # Mount the project folder to a subdirectory of workspace
-      - ..:/workspace/devcontainer:cached
+      - ..:/workspace/{{SHORT_NAME}}:cached
     environment:
       # Override default paths to match project subdirectory structure
-      - PRE_COMMIT_HOME=/workspace/devcontainer/.pre-commit-cache
+      - PRE_COMMIT_HOME=/workspace/{{SHORT_NAME}}/.pre-commit-cache
       # Tell Podman/Docker to use the mounted socket (for sidecars and container builds)
       - CONTAINER_HOST=unix:///var/run/docker.sock
       - DOCKER_HOST=unix:///var/run/docker.sock

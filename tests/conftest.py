@@ -280,20 +280,45 @@ def devcontainer_up(initialized_workspace):
                 json.dump(config, f, indent=4)
             print("[DEBUG] Added SSH agent forwarding to devcontainer.json")
 
-    # Create docker-compose.override.yml for testing additional mounts
+    # Extend docker-compose.override.yml for testing
+    # The initialized workspace already has an override file with socket mounts
+    # We just need to add our test-specific mount
+    import yaml
+
     override_path = workspace_path / ".devcontainer" / "docker-compose.override.yml"
     tests_dir = Path(__file__).parent.resolve()  # Path to tests/ directory
-    override_content = f"""version: '3.8'
 
-services:
-  devcontainer:
-    volumes:
-      # Mount tests directory for testing override functionality
-      - {tests_dir}:/workspace/tests-mounted:cached
-"""
+    # Read the existing override file (created by init-workspace.sh from image assets)
+    if override_path.exists():
+        with override_path.open() as f:
+            override_config = yaml.safe_load(f)
+        print("[DEBUG] Loaded existing docker-compose.override.yml from workspace")
+    else:
+        # Fallback: create basic structure
+        override_config = {
+            "version": "3.8",
+            "services": {"devcontainer": {"volumes": []}},
+        }
+        print("[DEBUG] No existing override found, creating new one")
+
+    # Ensure the structure exists
+    if "services" not in override_config:
+        override_config["services"] = {}
+    if "devcontainer" not in override_config["services"]:
+        override_config["services"]["devcontainer"] = {}
+    if "volumes" not in override_config["services"]["devcontainer"]:
+        override_config["services"]["devcontainer"]["volumes"] = []
+
+    # Add test mount (if not already present)
+    test_mount = f"{tests_dir}:/workspace/tests-mounted:cached"
+    if test_mount not in override_config["services"]["devcontainer"]["volumes"]:
+        override_config["services"]["devcontainer"]["volumes"].append(test_mount)
+        print(f"[DEBUG] Added test mount: {tests_dir}")
+
+    # Write back the merged override
     with override_path.open("w") as f:
-        f.write(override_content)
-    print(f"[DEBUG] Created docker-compose.override.yml mounting {tests_dir}")
+        yaml.dump(override_config, f, default_flow_style=False, sort_keys=False)
+    print("[DEBUG] Updated docker-compose.override.yml (preserving socket mounts)")
 
     # Modify devcontainer.json to include the override file
     # The devcontainer CLI doesn't auto-discover override files like docker-compose does

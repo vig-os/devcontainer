@@ -7,7 +7,7 @@ set -e
 # The script is called from the post-attach.sh script.
 
 # .devcontainer is mounted at workspace root for VS Code compatibility
-DEVCONTAINER_DIR="/workspace/devcontainer/.devcontainer"
+DEVCONTAINER_DIR="/workspace/{{SHORT_NAME}}/.devcontainer"
 
 # Setup git configuration
 echo "Setting up git configuration..."
@@ -16,11 +16,6 @@ CONTAINER_GITCONFIG_FILE=$HOME"/.gitconfig"
 if [ -f "$HOST_GITCONFIG_FILE" ]; then
 	echo "Applying git configuration from $HOST_GITCONFIG_FILE..."
 	cp "$HOST_GITCONFIG_FILE" "$CONTAINER_GITCONFIG_FILE"
-
-	# Fix gpg.ssh.allowedSignersFile path to point to container path instead of host path
-	CONTAINER_ALLOWED_SIGNERS="$HOME/.config/git/allowed-signers"
-	git config --global gpg.ssh.allowedSignersFile "$CONTAINER_ALLOWED_SIGNERS"
-	echo "Updated gpg.ssh.allowedSignersFile to container path: $CONTAINER_ALLOWED_SIGNERS"
 else
 	echo "No git config file found, skipping git setup"
 	echo "Run this from host's project root: .devcontainer/scripts/copy-host-user-conf.sh"
@@ -34,17 +29,6 @@ if [ -f "$HOST_SSH_PUBKEY" ]; then
 	mkdir -p "$CONTAINER_SSH_DIR"
 	cp "$HOST_SSH_PUBKEY" "$CONTAINER_SSH_DIR/id_ed25519_github.pub"
 	echo "SSH public key installed at $CONTAINER_SSH_DIR/id_ed25519_github.pub"
-
-	# Configure git to use the user email as signing key identifier for SSH agent signing
-	# Git will look up this email in allowed-signers to get the public key,
-	# then match it with the private key in the SSH agent
-	GIT_USER_EMAIL=$(git config --global user.email 2>/dev/null || echo "")
-	if [ -n "$GIT_USER_EMAIL" ]; then
-		git config --global user.signingkey "$GIT_USER_EMAIL"
-		echo "Configured user.signingkey with email ($GIT_USER_EMAIL) for SSH agent signing"
-	else
-		echo "Warning: Git user.email not set, cannot configure user.signingkey"
-	fi
 else
 	echo "Warning: No SSH public key found at $HOST_SSH_PUBKEY"
 	echo "Git commit signing may not work without this file"
@@ -54,26 +38,11 @@ fi
 # Setup allowed-signers file
 HOST_ALLOWED_SIGNERS_FILE="$DEVCONTAINER_DIR/.conf/allowed-signers"
 CONTAINER_ALLOWED_SIGNERS_DIR="$HOME/.config/git"
-CONTAINER_ALLOWED_SIGNERS_FILE="$CONTAINER_ALLOWED_SIGNERS_DIR/allowed-signers"
 if [ -f "$HOST_ALLOWED_SIGNERS_FILE" ]; then
 	echo "Applying allowed-signers file from $HOST_ALLOWED_SIGNERS_FILE..."
 	mkdir -p "$CONTAINER_ALLOWED_SIGNERS_DIR"
-	cp "$HOST_ALLOWED_SIGNERS_FILE" "$CONTAINER_ALLOWED_SIGNERS_FILE"
-	echo "Allowed-signers file installed at $CONTAINER_ALLOWED_SIGNERS_FILE"
-
-	# Ensure the allowed-signers file contains an entry for the current git user email
-	GIT_USER_EMAIL=$(git config --global user.email 2>/dev/null || echo "")
-	if [ -n "$GIT_USER_EMAIL" ] && [ -f "$HOST_SSH_PUBKEY" ]; then
-		# Check if user email is already in allowed-signers
-		if ! grep -q "^$GIT_USER_EMAIL " "$CONTAINER_ALLOWED_SIGNERS_FILE" 2>/dev/null; then
-			# Add entry for git user email with the SSH public key
-			PUBKEY_CONTENT=$(cat "$HOST_SSH_PUBKEY")
-			echo "$GIT_USER_EMAIL $PUBKEY_CONTENT" >> "$CONTAINER_ALLOWED_SIGNERS_FILE"
-			echo "Added entry for git user email ($GIT_USER_EMAIL) to allowed-signers file"
-		else
-			echo "Git user email ($GIT_USER_EMAIL) already in allowed-signers file"
-		fi
-	fi
+	cp "$HOST_ALLOWED_SIGNERS_FILE" "$CONTAINER_ALLOWED_SIGNERS_DIR/allowed-signers"
+	echo "Allowed-signers file installed at $CONTAINER_ALLOWED_SIGNERS_DIR/allowed-signers"
 else
 	echo "Warning: No allowed-signers file found at $HOST_ALLOWED_SIGNERS_FILE"
 	echo "Git signature verification may not work without this file"
@@ -245,8 +214,8 @@ if [ -f "$GH_TOKEN_FILE" ] && [ -s "$GH_TOKEN_FILE" ]; then
 fi
 
 # Setup git hooks
-# devcontainer is replaced during template initialization
-PROJECT_ROOT="/workspace/devcontainer"
+# {{SHORT_NAME}} is replaced during template initialization
+PROJECT_ROOT="/workspace/{{SHORT_NAME}}"
 
 echo "Setting up git hooks..."
 if [ -d "$PROJECT_ROOT/.githooks" ]; then

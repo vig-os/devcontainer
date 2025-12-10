@@ -8,7 +8,7 @@ set -euo pipefail
 echo "Running post-attach setup..."
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="/workspace/devcontainer"
+PROJECT_ROOT="/workspace/{{SHORT_NAME}}"
 
 if [ ! -d "$PROJECT_ROOT" ]; then
     echo "Error: Project directory $PROJECT_ROOT does not exist"
