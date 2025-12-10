@@ -2015,10 +2015,11 @@ class TestSidecarConnectivity:
         )
 
     def test_exec_simple_command_in_sidecar(self, devcontainer_with_sidecar):
-        """Test executing a simple command in sidecar via podman exec (Approach 1)."""
+        """Test executing a script in sidecar via podman exec (Approach 1)."""
         workspace_path = str(devcontainer_with_sidecar.resolve())
 
-        # Execute a test command IN the sidecar
+        # Execute the test build script IN the sidecar
+        # This demonstrates the real workflow: running scripts/builds in sidecars
         exec_cmd = [
             "devcontainer",
             "exec",
@@ -2031,8 +2032,7 @@ class TestSidecarConnectivity:
             "podman",
             "exec",
             "test-sidecar",
-            "echo",
-            "Hello from sidecar via podman exec",
+            "/usr/local/bin/test-build.sh",
         ]
 
         result = subprocess.run(
@@ -2045,14 +2045,17 @@ class TestSidecarConnectivity:
         )
 
         assert result.returncode == 0, (
-            f"Failed to execute command in sidecar\n"
+            f"Failed to execute script in sidecar\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}"
         )
 
-        # Verify we got the expected output
-        assert "Hello from sidecar via podman exec" in result.stdout, (
-            f"Unexpected output from sidecar\nstdout: {result.stdout}"
+        # Verify we got the expected output from the script
+        assert "Hello from sidecar test script" in result.stdout, (
+            f"Script did not execute correctly\nstdout: {result.stdout}"
+        )
+        assert "Communication verified!" in result.stdout, (
+            f"Script output incomplete\nstdout: {result.stdout}"
         )
 
     def test_exec_build_workflow_in_sidecar(self, devcontainer_with_sidecar):

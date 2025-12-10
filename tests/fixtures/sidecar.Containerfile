@@ -10,5 +10,9 @@ RUN apk add --no-cache \
 # Create a test build directory
 RUN mkdir -p /workspace/build-output
 
+# Copy test script to demonstrate executing scripts in sidecar
+COPY test-build.sh /usr/local/bin/test-build.sh
+RUN chmod +x /usr/local/bin/test-build.sh
+
 # Just keep the container alive - commands will be executed via podman exec
 CMD ["sleep", "infinity"]
