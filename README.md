@@ -202,8 +202,8 @@ import organization.
 - **Registry**: `ghcr.io/vig-os/devcontainer`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
-- **Version**: [0.1](https://github.com/vig-os/devcontainer/releases/tag/v0.1), 2025-12-09
-- **Size**: ~120 MB
+- **Version**: [0.1](https://github.com/vig-os/devcontainer/releases/tag/v0.1), 2025-12-10
+- **Size**: ~920 MB
 
 ## Contributing
 
