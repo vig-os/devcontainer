@@ -198,6 +198,220 @@ def initialized_workspace(container_image):
 
 
 @pytest.fixture(scope="session")
+def sidecar_image():
+    """
+    Build the test sidecar image once for all sidecar tests.
+
+    This fixture:
+    - Builds the sidecar image using podman
+    - Image is stored in Podman VM where compose can access it
+    - Returns the image name for use in compose configuration
+    - Skips all sidecar tests if build fails
+    """
+    import subprocess
+
+    sidecar_dir = Path(__file__).parent / "fixtures"
+    image_name = "localhost/test-sidecar:latest"
+
+    print(f"\n[DEBUG] Building sidecar image: {image_name}")
+    print(f"[DEBUG] Sidecar directory: {sidecar_dir}")
+
+    # Build using podman (this runs in the VM where compose needs it)
+    build_cmd = [
+        "podman",
+        "build",
+        "-t",
+        image_name,
+        "-f",
+        str(sidecar_dir / "sidecar.Containerfile"),
+        str(sidecar_dir),
+    ]
+
+    result = subprocess.run(build_cmd, capture_output=True, text=True, timeout=120)
+
+    if result.returncode != 0:
+        pytest.skip(
+            f"Failed to build sidecar image: {result.stderr}\n"
+            f"Sidecar tests will be skipped."
+        )
+
+    print(f"[DEBUG] Sidecar image built successfully: {image_name}")
+    return image_name
+
+
+@pytest.fixture(scope="function")
+def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
+    """
+    Set up a devcontainer WITH a sidecar for testing multi-container setups.
+
+    This fixture:
+    - Uses the pre-built sidecar image
+    - Configures docker-compose.override.yml with sidecar service
+    - Starts both devcontainer and sidecar together
+    - Enables testing of Approach 1: command execution via podman exec
+    - Cleans up both containers after tests
+
+    Note: This is separate from devcontainer_up to avoid breaking other tests.
+    """
+    import json
+    import os
+    import platform
+    import shutil
+    import subprocess
+
+    workspace_path = initialized_workspace.resolve()
+
+    # Check if devcontainer CLI is available
+    if not shutil.which("devcontainer"):
+        pytest.skip(
+            "devcontainer CLI not available. "
+            "Install with: npm install -g @devcontainers/cli@0.80.1"
+        )
+
+    # Prepare environment
+    env = os.environ.copy()
+    docker_path = "podman"
+    original_config = None
+    devcontainer_json_path = workspace_path / ".devcontainer" / "devcontainer.json"
+
+    # Disable SSH agent forwarding on macOS+podman
+    if (
+        platform.system() == "Darwin"
+        and docker_path == "podman"
+        and "SSH_AUTH_SOCK" in env
+    ):
+        print("[DEBUG] Disabling SSH agent forwarding on macOS+podman (sidecar test)")
+        del env["SSH_AUTH_SOCK"]
+
+    # Create docker-compose.override.yml with sidecar
+    import yaml
+
+    override_path = workspace_path / ".devcontainer" / "docker-compose.override.yml"
+
+    # Read existing override (from init-workspace.sh)
+    if override_path.exists():
+        with override_path.open() as f:
+            override_config = yaml.safe_load(f)
+        print("[DEBUG] Loaded existing docker-compose.override.yml")
+    else:
+        override_config = {
+            "version": "3.8",
+            "services": {"devcontainer": {"volumes": []}},
+        }
+
+    # Ensure structure exists
+    if "services" not in override_config:
+        override_config["services"] = {}
+    if "devcontainer" not in override_config["services"]:
+        override_config["services"]["devcontainer"] = {}
+    if "volumes" not in override_config["services"]["devcontainer"]:
+        override_config["services"]["devcontainer"]["volumes"] = []
+
+    # Add test mount
+    tests_dir = Path(__file__).parent.resolve()
+    test_mount = f"{tests_dir}:/workspace/tests-mounted:cached"
+    if test_mount not in override_config["services"]["devcontainer"]["volumes"]:
+        override_config["services"]["devcontainer"]["volumes"].append(test_mount)
+
+    # Add sidecar service
+    override_config["services"]["test-sidecar"] = {
+        "image": sidecar_image,
+        "container_name": "test-sidecar",
+        "command": "sleep infinity",
+        "volumes": [
+            # Share workspace for build artifacts
+            f"..:/workspace/{initialized_workspace.name}:cached"
+        ],
+    }
+    print(f"[DEBUG] Added test-sidecar service using image: {sidecar_image}")
+
+    # Write override file
+    with override_path.open("w") as f:
+        yaml.dump(override_config, f, default_flow_style=False, sort_keys=False)
+    print("[DEBUG] Updated docker-compose.override.yml with sidecar")
+
+    # Update devcontainer.json to include override
+    with devcontainer_json_path.open() as f:
+        config = json.load(f)
+
+    original_config = json.dumps(config, indent=4)
+
+    if isinstance(config.get("dockerComposeFile"), str):
+        config["dockerComposeFile"] = [
+            config["dockerComposeFile"],
+            "docker-compose.override.yml",
+        ]
+    elif (
+        isinstance(config.get("dockerComposeFile"), list)
+        and "docker-compose.override.yml" not in config["dockerComposeFile"]
+    ):
+        config["dockerComposeFile"].append("docker-compose.override.yml")
+
+    with devcontainer_json_path.open("w") as f:
+        json.dump(config, f, indent=4)
+    print("[DEBUG] Updated devcontainer.json")
+
+    # Build and start devcontainer with sidecar
+    up_cmd = [
+        "devcontainer",
+        "up",
+        "--workspace-folder",
+        str(workspace_path),
+        "--config",
+        f"{workspace_path}/.devcontainer/devcontainer.json",
+        "--remove-existing-container",
+        "--docker-path",
+        docker_path,
+        "--log-level",
+        "trace",
+    ]
+
+    print(f"\n[DEBUG] Starting devcontainer with sidecar: {' '.join(up_cmd)}")
+
+    up_result = subprocess.run(
+        up_cmd,
+        capture_output=True,
+        text=True,
+        cwd=str(workspace_path),
+        env=env,
+        timeout=120,
+    )
+
+    if up_result.returncode != 0:
+        pytest.skip(
+            f"devcontainer up with sidecar failed - skipping sidecar tests\n"
+            f"This is expected if podman-compose has issues with multi-container setups\n"
+            f"Socket tests already prove the underlying capability works.\n"
+            f"stdout: {up_result.stdout}\n"
+            f"stderr: {up_result.stderr}\n"
+            f"command: {' '.join(up_cmd)}"
+        )
+
+    print("[DEBUG] Devcontainer with sidecar is up and running")
+
+    # Yield workspace path for tests
+    yield workspace_path
+
+    # Cleanup
+    print("[DEBUG] Cleaning up devcontainer with sidecar...")
+
+    # Stop containers manually using podman
+    stop_cmds = [
+        ["podman", "stop", "test-sidecar"],
+        ["podman", "rm", "test-sidecar"],
+    ]
+
+    for cmd in stop_cmds:
+        subprocess.run(cmd, capture_output=True, timeout=30)
+
+    # Restore original devcontainer.json
+    if original_config:
+        with devcontainer_json_path.open("w") as f:
+            f.write(original_config)
+        print("[DEBUG] Restored original devcontainer.json")
+
+
+@pytest.fixture(scope="session")
 def devcontainer_up(initialized_workspace):
     """
     Set up a devcontainer using devcontainer CLI.

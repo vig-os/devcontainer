@@ -1949,3 +1949,197 @@ class TestPodmanSocketAccess:
             env=os.environ.copy(),
             timeout=10,
         )
+
+
+class TestSidecarConnectivity:
+    """Standalone tests for sidecar functionality using Approach 1 (podman exec).
+
+    These tests verify the real-world sidecar workflow:
+    - Sidecar containers can be started alongside the devcontainer
+    - Commands can be executed in sidecars via podman exec (Approach 1)
+    - Build workflows can be triggered in sidecar builders
+    - This is the ACTUAL workflow users will use for builder sidecars
+
+    Test Setup:
+    - Uses a custom test-sidecar image (alpine-based)
+    - Sidecar stays alive with 'sleep infinity'
+    - Commands are executed via: podman exec sidecar <command>
+
+    Communication Method:
+    - Uses Podman socket for container management (podman exec)
+    - NOT HTTP networking (that's tested separately)
+    - This is Approach 1: Direct command execution
+    """
+
+    def test_sidecar_starts_with_devcontainer(self, devcontainer_with_sidecar):
+        """Test that sidecar container starts alongside devcontainer."""
+        workspace_path = str(devcontainer_with_sidecar.resolve())
+
+        # Check sidecar is running via podman ps
+        check_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "podman",
+            "ps",
+            "--filter",
+            "name=test-sidecar",
+            "--format",
+            "{{.Names}}",
+        ]
+
+        result = subprocess.run(
+            check_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=10,
+        )
+
+        assert result.returncode == 0, (
+            f"Failed to check running containers\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}"
+        )
+
+        # Verify sidecar is running
+        assert "test-sidecar" in result.stdout, (
+            f"Test sidecar container not found in running containers\n"
+            f"stdout: {result.stdout}"
+        )
+
+    def test_exec_simple_command_in_sidecar(self, devcontainer_with_sidecar):
+        """Test executing a simple command in sidecar via podman exec (Approach 1)."""
+        workspace_path = str(devcontainer_with_sidecar.resolve())
+
+        # Execute a test command IN the sidecar
+        exec_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "podman",
+            "exec",
+            "test-sidecar",
+            "echo",
+            "Hello from sidecar via podman exec",
+        ]
+
+        result = subprocess.run(
+            exec_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=10,
+        )
+
+        assert result.returncode == 0, (
+            f"Failed to execute command in sidecar\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}"
+        )
+
+        # Verify we got the expected output
+        assert "Hello from sidecar via podman exec" in result.stdout, (
+            f"Unexpected output from sidecar\nstdout: {result.stdout}"
+        )
+
+    def test_exec_build_workflow_in_sidecar(self, devcontainer_with_sidecar):
+        """Test a realistic build workflow: exec into sidecar to create build artifacts."""
+        workspace_path = str(devcontainer_with_sidecar.resolve())
+
+        # Simulate a build process in the sidecar
+        # This is how users would actually trigger builds
+        build_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "podman",
+            "exec",
+            "test-sidecar",
+            "sh",
+            "-c",
+            "echo 'Building project...' && "
+            "mkdir -p /workspace/build-output && "
+            "echo 'build artifacts' > /workspace/build-output/result.txt && "
+            "cat /workspace/build-output/result.txt",
+        ]
+
+        result = subprocess.run(
+            build_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=10,
+        )
+
+        assert result.returncode == 0, (
+            f"Failed to execute build workflow in sidecar\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}"
+        )
+
+        # Verify the build executed
+        assert "Building project" in result.stdout, (
+            f"Build workflow did not execute\nstdout: {result.stdout}"
+        )
+        assert "build artifacts" in result.stdout, (
+            f"Build artifacts not created\nstdout: {result.stdout}"
+        )
+
+    def test_sidecar_has_bash(self, devcontainer_with_sidecar):
+        """Test that sidecar has bash installed for complex build scripts."""
+        workspace_path = str(devcontainer_with_sidecar.resolve())
+
+        # Check bash is available
+        bash_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "podman",
+            "exec",
+            "test-sidecar",
+            "bash",
+            "--version",
+        ]
+
+        result = subprocess.run(
+            bash_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=10,
+        )
+
+        assert result.returncode == 0, (
+            f"Bash not available in sidecar\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}"
+        )
+
+        assert "bash" in result.stdout.lower(), (
+            f"Unexpected bash version output\nstdout: {result.stdout}"
+        )
