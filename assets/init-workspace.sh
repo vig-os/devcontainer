@@ -80,10 +80,37 @@ if [[ -z "$ORG_NAME" ]]; then
 fi
 echo "Organization name set to: $ORG_NAME"
 
-# Warn if forcing (prompt user)
+# Warn if forcing (prompt user) - show which files would be overwritten
 if [[ "$FORCE" == "true" ]]; then
-    echo "Warning: --force flag detected. Existing files may be overwritten."
-    read -rp "Continue? (y/N): " -n 1 -r
+    echo ""
+    echo "Checking for files that would be overwritten..."
+    
+    # Find files that exist in both template and workspace
+    CONFLICTS=()
+    while IFS= read -r -d '' template_file; do
+        # Get relative path from template directory
+        rel_path="${template_file#$TEMPLATE_DIR/}"
+        workspace_file="$WORKSPACE_DIR/$rel_path"
+        
+        if [[ -e "$workspace_file" ]]; then
+            CONFLICTS+=("$rel_path")
+        fi
+    done < <(find "$TEMPLATE_DIR" -type f ! -path "*/.git/*" -print0)
+    
+    if [[ ${#CONFLICTS[@]} -eq 0 ]]; then
+        echo "No existing files would be overwritten."
+    else
+        echo ""
+        echo "The following ${#CONFLICTS[@]} file(s) will be OVERWRITTEN:"
+        echo "─────────────────────────────────────────────────────────────"
+        for conflict in "${CONFLICTS[@]}"; do
+            echo "  ⚠  $conflict"
+        done
+        echo "─────────────────────────────────────────────────────────────"
+        echo ""
+    fi
+    
+    read -rp "Continue with --force? (y/N): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         echo "Aborted."
@@ -109,8 +136,8 @@ echo "Replacing placeholders in files..."
 # Use a more efficient approach: only process files that contain placeholders
 # and combine both replacements in a single sed pass
 find "$WORKSPACE_DIR" -type f ! -path "*/.git/*" -print0 | while IFS= read -r -d '' file; do
-    if grep -q '{{SHORT_NAME}}\|{{ORG_NAME}}' "$file" 2>/dev/null; then
-        sed -i "s/{{SHORT_NAME}}/${SHORT_NAME}/g; s/{{ORG_NAME}}/${ORG_NAME}/g" "$file"
+    if grep -q 'devcontainer\|vigOS' "$file" 2>/dev/null; then
+        sed -i "s/devcontainer/${SHORT_NAME}/g; s/vigOS/${ORG_NAME}/g" "$file"
     fi
 done
 
