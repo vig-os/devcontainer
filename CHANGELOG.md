@@ -19,7 +19,7 @@ and this project uses a simplified versioning scheme (X.Y format, e.g., 1.0, 1.1
 
 ### Security
 
-## [0.1] - 2025-12-09
+## [0.1] - 2025-12-10
 
 ### Added
 
