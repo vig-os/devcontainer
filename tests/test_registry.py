@@ -49,6 +49,29 @@ def test_update_readme_size_helper(tmp_path):
     assert readme.read_text().strip() == "- **Size**: ~420 MB"
 
 
+def _get_arch_suffixes():
+    """Return list of arch suffixes derived from PLATFORMS plus native arch."""
+    platforms_env = os.environ.get("PLATFORMS", "")
+    arch_suffixes = []
+    for platform_entry in platforms_env.split(","):
+        platform_entry = platform_entry.strip()
+        if not platform_entry:
+            continue
+        # Expect linux/arch; fall back to the whole entry if format differs
+        if "/" in platform_entry:
+            arch_suffixes.append(platform_entry.split("/", 1)[1])
+        else:
+            arch_suffixes.append(platform_entry)
+
+    # Always include native arch as a fallback
+    machine = os.uname().machine
+    native_arch = "arm64" if machine in ("arm64", "aarch64") else "amd64"
+    if native_arch not in arch_suffixes:
+        arch_suffixes.append(native_arch)
+
+    return arch_suffixes
+
+
 @pytest.fixture(scope="session")
 def local_registry(tmp_path_factory):
     """
@@ -643,14 +666,11 @@ def _cleanup_test_artifacts(version, registry_path, project_root, original_head)
     full_image_name = f"{registry_base}:{version}"
     latest_image_name = f"{registry_base}:latest"
 
-    # Detect native architecture for architecture-specific image cleanup
-    import platform
+    # Determine architectures to clean
+    arch_suffixes = _get_arch_suffixes()
 
-    machine = platform.machine().lower()
-    arch_suffix = "arm64" if machine in ("arm64", "aarch64") else "amd64"
-
-    # Architecture-specific image tag (e.g., localhost:32811/test:99.305-amd64)
-    arch_image_name = f"{registry_base}:{version}-{arch_suffix}"
+    # Architecture-specific image tags (e.g., localhost:32811/test:99.305-amd64)
+    arch_image_names = [f"{registry_base}:{version}-{arch}" for arch in arch_suffixes]
 
     # Remove manifests first (ignore errors if they don't exist)
     for img in [full_image_name, latest_image_name]:
@@ -662,7 +682,7 @@ def _cleanup_test_artifacts(version, registry_path, project_root, original_head)
 
     # Remove all image tags (manifests, versioned, latest, and architecture-specific)
     # Use -f to force removal even if tagged in multiple ways
-    for img in [full_image_name, latest_image_name, arch_image_name]:
+    for img in [full_image_name, latest_image_name, *arch_image_names]:
         # Try removing by tag first
         subprocess.run(
             ["podman", "rmi", "-f", img],
@@ -692,3 +712,30 @@ def _cleanup_test_artifacts(version, registry_path, project_root, original_head)
         capture_output=True,
         check=False,
     )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def verify_no_stray_images_after_tests(local_registry, test_version):
+    """
+    Ensure no registry test images remain after all tests (even on failures).
+    """
+
+    registry_base = f"{local_registry}/test".rstrip("/")
+    arch_suffixes = _get_arch_suffixes()
+
+    def _assert_no_images():
+        tags = [
+            f"{registry_base}:{test_version}",
+            f"{registry_base}:latest",
+            *[f"{registry_base}:{test_version}-{arch}" for arch in arch_suffixes],
+        ]
+        for tag in tags:
+            result = subprocess.run(
+                ["podman", "image", "exists", tag],
+                capture_output=True,
+                text=True,
+            )
+            assert result.returncode != 0, f"Stray image left behind: {tag}"
+
+    yield
+    _assert_no_images()

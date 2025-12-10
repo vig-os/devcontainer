@@ -10,6 +10,7 @@ devcontainer functionality works correctly in their containers too.
 
 import json
 import os
+import re
 import subprocess
 import warnings
 from pathlib import Path
@@ -493,9 +494,10 @@ class TestDevContainerDockerCompose:
         assert "image" in service, "devcontainer service missing 'image' field"
 
         # Verify the docker-compose.yml image matches the container_image fixture
-        # container_image format: ghcr.io/vig-os/devcontainer:{tag}
-        assert service["image"] == container_image, (
-            f"Expected image to be {container_image}, got: {service['image']}"
+        # Normalize arch suffix if present (e.g., :X.Y or :X.Y-amd64 -> :X.Y)
+        expected_image = re.sub(r"-[^:]+$", "", container_image)
+        assert service["image"] == expected_image, (
+            f"Expected image to be {expected_image}, got: {service['image']}"
         )
 
         # {{IMAGE_TAG}} should be replaced (or at least not present)
