@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = "==3.12.10"
 
 [[package]]
@@ -107,7 +107,11 @@ version = "0.1.1"
 source = { virtual = "." }
 dependencies = [
     { name = "github-backup" },
+    { name = "pexpect" },
     { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pyyaml" },
+    { name = "testinfra" },
 ]
 
 [package.dev-dependencies]
@@ -137,7 +141,11 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "github-backup", specifier = ">=0.50.3" },
+    { name = "pexpect", specifier = ">=4.9.0" },
     { name = "pre-commit", specifier = ">=4.3.0" },
+    { name = "pytest", specifier = ">=9.0.1" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "testinfra", specifier = ">=6.0.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -447,6 +455,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/fc/b3/c272537f3ea2f312555efeb86398cc382cd07b740d5f3c730918c36e64e1/testcontainers-4.13.3.tar.gz", hash = "sha256:9d82a7052c9a53c58b69e1dc31da8e7a715e8b3ec1c4df5027561b47e2efe646", size = 79064, upload-time = "2025-11-14T05:08:47.584Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/73/27/c2f24b19dafa197c514abe70eda69bc031c5152c6b1f1e5b20099e2ceedd/testcontainers-4.13.3-py3-none-any.whl", hash = "sha256:063278c4805ffa6dd85e56648a9da3036939e6c0ac1001e851c9276b19b05970", size = 124784, upload-time = "2025-11-14T05:08:46.053Z" },
+]
+
+[[package]]
+name = "testinfra"
+version = "6.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest-testinfra" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e8/aa/35319fcf8935036bb2f8049ffb515d4490b8bfc27cf2d9551d3b4686702e/testinfra-6.0.0.tar.gz", hash = "sha256:4225d36e4bb02eb1618429325280c4b62a18cea8a90c91564ee0cc1d31ca331a", size = 1705, upload-time = "2020-11-12T21:39:44.264Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b2/6b/021295ce3a3c9cdf8ebd643647c2eeb8329b960b07b4f983a488af291354/testinfra-6.0.0-py3-none-any.whl", hash = "sha256:1a75b5025dbe82ffedec50afeaf9a7f96a8cd1e294f0d40de3a089a369ceae0e", size = 2135, upload-time = "2020-11-12T21:39:43.232Z" },
 ]
 
 [[package]]
