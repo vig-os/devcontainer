@@ -1,5 +1,16 @@
 """
 Shared fixtures for all devc container tests.
+
+This module supports running tests from both:
+1. Host machine (direct podman access)
+2. Inside a devcontainer (Docker-out-of-Docker via socket)
+
+When running from within a container, set HOST_WORKSPACE_PATH environment
+variable to the host path that maps to /workspace/devcontainer in the container.
+This enables path translation for volume mounts.
+
+Example:
+    HOST_WORKSPACE_PATH=/Users/you/Projects/devcontainer make test-integration
 """
 
 import atexit
@@ -7,11 +18,63 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 import pexpect
 import pytest
 import testinfra
+
+
+def is_running_in_container() -> bool:
+    """Detect if we're running inside a container."""
+    # Check for container environment indicators
+    if os.environ.get("IN_CONTAINER") == "true":
+        return True
+    if Path("/.dockerenv").exists():
+        return True
+    if Path("/run/.containerenv").exists():
+        return True
+    # Check cgroup for container runtime
+    try:
+        with Path("/proc/1/cgroup").open() as f:
+            return "docker" in f.read() or "podman" in f.read()
+    except (FileNotFoundError, PermissionError):
+        pass
+    return False
+
+
+def get_host_path(container_path: Path) -> Path:
+    """
+    Translate a container path to a host path.
+
+    When running inside a container with Docker-out-of-Docker (DooD),
+    volume mounts must use HOST paths because podman runs on the host.
+
+    Args:
+        container_path: Path inside the container
+
+    Returns:
+        Host path if HOST_WORKSPACE_PATH is set and path is under /workspace,
+        otherwise returns the original path.
+    """
+    host_workspace = os.environ.get("HOST_WORKSPACE_PATH")
+    if not host_workspace:
+        return container_path
+
+    container_path_str = str(container_path.resolve())
+    container_workspace = "/workspace/devcontainer"
+
+    if container_path_str.startswith(container_workspace):
+        relative = container_path_str[len(container_workspace) :]
+        return Path(host_workspace + relative)
+
+    return container_path
+
+
+def get_compose_project_name() -> str:
+    """Generate a unique compose project name for test isolation."""
+    return f"test-{int(time.time())}"
 
 
 @pytest.fixture(scope="session")
@@ -110,26 +173,51 @@ def initialized_workspace(container_image):
     """
     Create a temporary workspace directory and initialize it with init-workspace.
 
-    The workspace is created within the project directory for gitconfig reasons.
-    It will be cleaned up when the test session ends.
+    This fixture supports running from both:
+    1. Host machine - uses direct bind mounts
+    2. Inside a devcontainer - uses podman compose with named volumes
+
+    When running inside a container (Docker-out-of-Docker), we use compose
+    to handle volume management, avoiding the host path translation issue.
+
+    The workspace will be cleaned up when the test session ends.
     """
     # Get the project root (assuming conftest.py is in tests/)
     project_root = Path(__file__).resolve().parents[1]
+    tests_dir = project_root / "tests"
 
-    # Create a temporary directory within the project for gitconfig reasons
-    tests_tmp_dir = project_root / "tests" / "tmp"
+    # Check if we're running inside a container
+    in_container = is_running_in_container()
+
+    # Always use tests/tmp - it's in the shared workspace which is mounted
+    # both on host and in container, so both can access it
+    tests_tmp_dir = tests_dir / "tmp"
     tests_tmp_dir.mkdir(parents=True, exist_ok=True)
-
-    # Create a unique temporary directory for this test session
     workspace_dir = tempfile.mkdtemp(
         dir=str(tests_tmp_dir), prefix="workspace-devcontainer-"
     )
+
     workspace_path = Path(workspace_dir)
+
+    # Generate unique names for compose project and volume
+    unique_id = workspace_path.name.replace("workspace-devcontainer-", "")
+    compose_project = f"test-{unique_id}"
+    volume_name = f"test-workspace-{unique_id}"
+
+    # Track whether we're using compose (for cleanup)
+    using_compose = False
 
     # Register cleanup function
     def cleanup():
         if workspace_path.exists():
             shutil.rmtree(workspace_path, ignore_errors=True)
+        if using_compose:
+            # Clean up the named volume
+            subprocess.run(
+                ["podman", "volume", "rm", "-f", volume_name],
+                capture_output=True,
+                text=True,
+            )
 
     atexit.register(cleanup)
 
@@ -138,57 +226,184 @@ def initialized_workspace(container_image):
     project_name = "test_project"
     organization_name = "Test Org"
 
-    # Use pexpect to handle interactive terminal input
-    cmd = [
-        "podman",
-        "run",
-        "-it",
-        "--rm",
-        "-v",
-        f"{workspace_path}:/workspace",
-        container_image,
-        "/root/assets/init-workspace.sh",
-    ]
+    if in_container:
+        # Use podman with named volumes to avoid path translation issues
+        # Named volumes work everywhere without needing compose
+        using_compose = True  # We still track this for volume cleanup
 
-    try:
-        # Spawn the process with pexpect
-        child = pexpect.spawn(" ".join(cmd), encoding="utf-8", timeout=60)
+        # Create the named volume
+        create_volume_cmd = ["podman", "volume", "create", volume_name]
+        create_result = subprocess.run(
+            create_volume_cmd, capture_output=True, text=True, timeout=30
+        )
 
-        # Wait for the prompt and send the project name
-        child.expect("Enter a short name", timeout=30)
-        child.sendline(project_name)
-
-        child.expect("Enter the name of your organization, e.g. 'vigOS': ", timeout=30)
-        child.sendline(organization_name)
-
-        # Wait for the process to complete
-        child.expect(pexpect.EOF, timeout=60)
-        child.close()
-
-        # Check return code
-        if child.exitstatus != 0:
+        if create_result.returncode != 0:
             cleanup()
             pytest.fail(
-                f"Failed to initialize workspace with init-workspace.sh\n"
-                f"Return code: {child.exitstatus}\n"
-                f"Output: {child.before}"
+                f"Failed to create volume {volume_name}\n"
+                f"stdout: {create_result.stdout}\n"
+                f"stderr: {create_result.stderr}"
             )
-    except pexpect.TIMEOUT:
-        cleanup()
-        pytest.fail(
-            f"Timeout while initializing workspace with init-workspace.sh\n"
-            f"Output: {child.before if 'child' in locals() else 'N/A'}"
+
+        print(f"[DEBUG] Created volume: {volume_name}")
+
+        # Run init-workspace with the named volume
+        cmd = [
+            "podman",
+            "run",
+            "-it",
+            "--rm",
+            "-v",
+            f"{volume_name}:/workspace",
+            container_image,
+            "/root/assets/init-workspace.sh",
+        ]
+
+        try:
+            # Spawn the process with pexpect
+            print(f"[DEBUG] Running podman command: {' '.join(cmd)}")
+            print(f"[DEBUG] Volume: {volume_name}, Image: {container_image}")
+
+            child = pexpect.spawn(" ".join(cmd), encoding="utf-8", timeout=60)
+
+            # Wait for the prompt and send the project name
+            child.expect("Enter a short name", timeout=30)
+            child.sendline(project_name)
+
+            child.expect(
+                "Enter the name of your organization, e.g. 'vigOS': ", timeout=30
+            )
+            child.sendline(organization_name)
+
+            # Wait for the process to complete
+            child.expect(pexpect.EOF, timeout=60)
+            child.close()
+
+            # Check return code
+            if child.exitstatus != 0:
+                cleanup()
+                pytest.fail(
+                    f"Failed to initialize workspace with init-workspace.sh\n"
+                    f"Return code: {child.exitstatus}\n"
+                    f"Output: {child.before}"
+                )
+        except pexpect.TIMEOUT:
+            cleanup()
+            output = child.before if "child" in locals() else "N/A"
+            pytest.fail(
+                f"Timeout while initializing workspace with init-workspace.sh\n"
+                f"Command: {' '.join(cmd)}\n"
+                f"Output: {output}"
+            )
+        except pexpect.EOF:
+            cleanup()
+            output = child.before if "child" in locals() else "N/A"
+            pytest.fail(
+                f"Error while initializing workspace with init-workspace.sh: EOF\n"
+                f"Command: {' '.join(cmd)}\n"
+                f"Output so far: {output}\n"
+                f"This usually means the container exited before responding.\n"
+                f"Check that the image exists and the compose file is correct."
+            )
+        except pexpect.ExceptionPexpect as e:
+            cleanup()
+            output = child.before if "child" in locals() else "N/A"
+            pytest.fail(
+                f"Error while initializing workspace with init-workspace.sh: {e}\n"
+                f"Command: {' '.join(cmd)}\n"
+                f"Output: {output}"
+            )
+
+        # Copy files from the named volume to the local temp directory
+        # The temp directory is in /workspace/devcontainer/tests/tmp which is
+        # shared between host and container, so we use host path for the mount
+        workspace_path_host = get_host_path(workspace_path)
+
+        copy_cmd = [
+            "podman",
+            "run",
+            "--rm",
+            "-v",
+            f"{volume_name}:/source:ro",
+            "-v",
+            f"{workspace_path_host}:/dest",  # Use host path!
+            "alpine",
+            "sh",
+            "-c",
+            "cp -a /source/. /dest/",
+        ]
+
+        print(
+            f"[DEBUG] Copying files from volume {volume_name} to {workspace_path_host}"
         )
-    except pexpect.ExceptionPexpect as e:
-        cleanup()
-        pytest.fail(f"Error while initializing workspace with init-workspace.sh: {e}")
+        copy_result = subprocess.run(
+            copy_cmd, capture_output=True, text=True, timeout=30
+        )
+
+        if copy_result.returncode != 0:
+            cleanup()
+            pytest.fail(
+                f"Failed to copy files from volume to workspace\n"
+                f"Command: {' '.join(copy_cmd)}\n"
+                f"stdout: {copy_result.stdout}\n"
+                f"stderr: {copy_result.stderr}"
+            )
+    else:
+        # Running on host - use direct bind mount (original behavior)
+        cmd = [
+            "podman",
+            "run",
+            "-it",
+            "--rm",
+            "-v",
+            f"{workspace_path}:/workspace",
+            container_image,
+            "/root/assets/init-workspace.sh",
+        ]
+
+        try:
+            # Spawn the process with pexpect
+            child = pexpect.spawn(" ".join(cmd), encoding="utf-8", timeout=60)
+
+            # Wait for the prompt and send the project name
+            child.expect("Enter a short name", timeout=30)
+            child.sendline(project_name)
+
+            child.expect(
+                "Enter the name of your organization, e.g. 'vigOS': ", timeout=30
+            )
+            child.sendline(organization_name)
+
+            # Wait for the process to complete
+            child.expect(pexpect.EOF, timeout=60)
+            child.close()
+
+            # Check return code
+            if child.exitstatus != 0:
+                cleanup()
+                pytest.fail(
+                    f"Failed to initialize workspace with init-workspace.sh\n"
+                    f"Return code: {child.exitstatus}\n"
+                    f"Output: {child.before}"
+                )
+        except pexpect.TIMEOUT:
+            cleanup()
+            pytest.fail(
+                f"Timeout while initializing workspace with init-workspace.sh\n"
+                f"Output: {child.before if 'child' in locals() else 'N/A'}"
+            )
+        except pexpect.ExceptionPexpect as e:
+            cleanup()
+            pytest.fail(
+                f"Error while initializing workspace with init-workspace.sh: {e}"
+            )
 
     # Verify the workspace was initialized
     if not (workspace_path / "README.md").exists():
         cleanup()
         pytest.fail(
             f"Workspace initialization failed - README.md not found in {workspace_path}\n"
-            f"Workspace contents: {list[Path](workspace_path.iterdir())}"
+            f"Workspace contents: {list(workspace_path.iterdir()) if workspace_path.exists() else 'N/A'}"
         )
 
     yield workspace_path
@@ -251,6 +466,9 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
     - Enables testing of Approach 1: command execution via podman exec
     - Cleans up both containers after tests
 
+    When running from inside a container (DooD), set HOST_WORKSPACE_PATH
+    environment variable to enable path translation for devcontainer CLI.
+
     Note: This is separate from devcontainer_up to avoid breaking other tests.
     """
     import json
@@ -260,6 +478,26 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
     import subprocess
 
     workspace_path = initialized_workspace.resolve()
+
+    # Check if we need path translation for DooD
+    in_container = is_running_in_container()
+    host_workspace = os.environ.get("HOST_WORKSPACE_PATH")
+
+    if in_container and not host_workspace:
+        pytest.skip(
+            "Running inside a container without HOST_WORKSPACE_PATH set. "
+            "Devcontainer CLI tests require host path translation. "
+            "Set HOST_WORKSPACE_PATH to the host path that maps to /workspace/devcontainer"
+        )
+
+    # Translate workspace path to host path if needed
+    if in_container and host_workspace:
+        workspace_path_for_cli = get_host_path(workspace_path)
+        print(
+            f"[DEBUG] Translated workspace path: {workspace_path} -> {workspace_path_for_cli}"
+        )
+    else:
+        workspace_path_for_cli = workspace_path
 
     # Check if devcontainer CLI is available
     if not shutil.which("devcontainer"):
@@ -307,9 +545,10 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
     if "volumes" not in override_config["services"]["devcontainer"]:
         override_config["services"]["devcontainer"]["volumes"] = []
 
-    # Add test mount
+    # Add test mount - use host path for mount
     tests_dir = Path(__file__).parent.resolve()
-    test_mount = f"{tests_dir}:/workspace/tests-mounted:cached"
+    tests_dir_for_mount = get_host_path(tests_dir) if in_container else tests_dir
+    test_mount = f"{tests_dir_for_mount}:/workspace/tests-mounted:cached"
     if test_mount not in override_config["services"]["devcontainer"]["volumes"]:
         override_config["services"]["devcontainer"]["volumes"].append(test_mount)
 
@@ -352,13 +591,14 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
     print("[DEBUG] Updated devcontainer.json")
 
     # Build and start devcontainer with sidecar
+    # Use workspace_path_for_cli for CLI operations (host path when running in container)
     up_cmd = [
         "devcontainer",
         "up",
         "--workspace-folder",
-        str(workspace_path),
+        str(workspace_path_for_cli),
         "--config",
-        f"{workspace_path}/.devcontainer/devcontainer.json",
+        f"{workspace_path_for_cli}/.devcontainer/devcontainer.json",
         "--remove-existing-container",
         "--docker-path",
         docker_path,
@@ -422,6 +662,9 @@ def devcontainer_up(initialized_workspace):
     - Yields the workspace path for tests to use
     - Cleans up by running `devcontainer down` after all tests
 
+    When running from inside a container (DooD), set HOST_WORKSPACE_PATH
+    environment variable to enable path translation for devcontainer CLI.
+
     Note: This fixture takes some time to set up.
     """
     import json
@@ -431,6 +674,26 @@ def devcontainer_up(initialized_workspace):
     import subprocess
 
     workspace_path = initialized_workspace.resolve()
+
+    # Check if we need path translation for DooD
+    in_container = is_running_in_container()
+    host_workspace = os.environ.get("HOST_WORKSPACE_PATH")
+
+    if in_container and not host_workspace:
+        pytest.skip(
+            "Running inside a container without HOST_WORKSPACE_PATH set. "
+            "Devcontainer CLI tests require host path translation. "
+            "Set HOST_WORKSPACE_PATH to the host path that maps to /workspace/devcontainer"
+        )
+
+    # Translate workspace path to host path if needed
+    if in_container and host_workspace:
+        workspace_path_for_cli = get_host_path(workspace_path)
+        print(
+            f"[DEBUG] Translated workspace path: {workspace_path} -> {workspace_path_for_cli}"
+        )
+    else:
+        workspace_path_for_cli = workspace_path
 
     # Check if devcontainer CLI is available
     if not shutil.which("devcontainer"):
@@ -502,6 +765,9 @@ def devcontainer_up(initialized_workspace):
     override_path = workspace_path / ".devcontainer" / "docker-compose.override.yml"
     tests_dir = Path(__file__).parent.resolve()  # Path to tests/ directory
 
+    # For test mounts, we need to use host path if running in container
+    tests_dir_for_mount = get_host_path(tests_dir) if in_container else tests_dir
+
     # Read the existing override file (created by init-workspace.sh from image assets)
     if override_path.exists():
         with override_path.open() as f:
@@ -523,11 +789,11 @@ def devcontainer_up(initialized_workspace):
     if "volumes" not in override_config["services"]["devcontainer"]:
         override_config["services"]["devcontainer"]["volumes"] = []
 
-    # Add test mount (if not already present)
-    test_mount = f"{tests_dir}:/workspace/tests-mounted:cached"
+    # Add test mount (if not already present) - use host path for mount
+    test_mount = f"{tests_dir_for_mount}:/workspace/tests-mounted:cached"
     if test_mount not in override_config["services"]["devcontainer"]["volumes"]:
         override_config["services"]["devcontainer"]["volumes"].append(test_mount)
-        print(f"[DEBUG] Added test mount: {tests_dir}")
+        print(f"[DEBUG] Added test mount: {tests_dir_for_mount}")
 
     # Write back the merged override
     with override_path.open("w") as f:
@@ -556,13 +822,14 @@ def devcontainer_up(initialized_workspace):
     print("[DEBUG] Updated devcontainer.json to include docker-compose.override.yml")
 
     # Build and start the devcontainer
+    # Use workspace_path_for_cli for CLI operations (host path when running in container)
     up_cmd = [
         "devcontainer",
         "up",
         "--workspace-folder",
-        str(workspace_path),
+        str(workspace_path_for_cli),
         "--config",
-        f"{workspace_path}/.devcontainer/devcontainer.json",
+        f"{workspace_path_for_cli}/.devcontainer/devcontainer.json",
         "--remove-existing-container",
         "--docker-path",
         docker_path,
@@ -577,7 +844,7 @@ def devcontainer_up(initialized_workspace):
         up_cmd,
         capture_output=True,
         text=True,
-        cwd=str(workspace_path),
+        cwd=str(workspace_path),  # Local operations use container path
         env=env,  # Use environment without SSH_AUTH_SOCK on macOS
         timeout=120,
     )
@@ -600,9 +867,9 @@ def devcontainer_up(initialized_workspace):
         "devcontainer",
         "down",
         "--workspace-folder",
-        str(workspace_path),
+        str(workspace_path_for_cli),
         "--config",
-        f"{workspace_path}/.devcontainer/devcontainer.json",
+        f"{workspace_path_for_cli}/.devcontainer/devcontainer.json",
         "--docker-path",
         docker_path,
     ]

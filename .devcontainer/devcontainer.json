@@ -40,6 +40,9 @@
         "CONTAINER_HOST": "unix:///var/run/docker.sock",
         "DOCKER_HOST": "unix:///var/run/docker.sock"
     },
+    "remoteEnv": {
+        "HOST_WORKSPACE_PATH": "${localWorkspaceFolder}"
+    },
     "runArgs": [
         "--cap-add=SYS_ADMIN",
         "--cap-add=MKNOD",
