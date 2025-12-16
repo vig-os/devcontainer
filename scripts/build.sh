@@ -5,7 +5,15 @@
 set -e
 
 echo "🔍 DEBUG: Script started"
-echo "🔍 DEBUG: Arguments: \$1='$1' \$2='$2' \$3='$3'"
+echo "🔍 DEBUG: Raw arguments: $*"
+
+# Optional flag: --no-cache (must be first arg to keep positional semantics)
+NO_CACHE=0
+if [ "${1:-}" = "--no-cache" ]; then
+	NO_CACHE=1
+	shift
+	echo "🔍 DEBUG: --no-cache flag detected"
+fi
 
 VERSION="${1:-dev}"
 REPO="${2:-${TEST_REGISTRY:-ghcr.io/vig-os/devcontainer}}"
@@ -97,8 +105,17 @@ echo "🔍 DEBUG:   IMAGE_TAG: $BUILD_VERSION"
 echo "🔍 DEBUG:   Tag: $REPO:$BUILD_VERSION"
 echo "🔍 DEBUG:   Containerfile: $BUILD_DIR/Containerfile"
 echo "🔍 DEBUG:   Build context: $BUILD_DIR"
+if [ "$NO_CACHE" -eq 1 ]; then
+	echo "🔍 DEBUG:   No cache: enabled"
+fi
+
+BUILD_CACHE_ARGS=()
+if [ "$NO_CACHE" -eq 1 ]; then
+	BUILD_CACHE_ARGS+=(--no-cache)
+fi
 
 if ! podman build --platform "$NATIVE_PLATFORM" \
+	"${BUILD_CACHE_ARGS[@]}" \
 	--build-arg BUILD_DATE="$BUILD_DATE" \
 	--build-arg VCS_REF="$VCS_REF" \
 	--build-arg IMAGE_TAG="$BUILD_VERSION" \

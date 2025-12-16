@@ -77,7 +77,11 @@ login:
 # Build target: dev
 .PHONY: build
 build:
-	@./scripts/build.sh dev "$(REPO)" "$(NATIVE_PLATFORM)"
+	@if [ "$(NO_CACHE)" = "1" ]; then \
+		./scripts/build.sh --no-cache dev "$(REPO)" "$(NATIVE_PLATFORM)"; \
+	else \
+		./scripts/build.sh dev "$(REPO)" "$(NATIVE_PLATFORM)"; \
+	fi
 
 # Test targets
 # Default VERSION is "dev" if not specified
