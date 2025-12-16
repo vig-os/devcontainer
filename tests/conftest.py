@@ -31,7 +31,13 @@ def pytest_sessionstart(session):
     Pre-flight check: Detect lingering test containers from previous runs.
 
     Runs before any tests to ensure a clean environment.
+    Skip this check when running as part of 'make test' (PYTEST_SKIP_CONTAINER_CHECK=1)
+    since the check is done once at the start of the full test run.
     """
+    # Skip check when running under 'make test' - check already done at start
+    if os.environ.get("PYTEST_SKIP_CONTAINER_CHECK") == "1":
+        return
+
     # Check for lingering containers from previous test runs
     check_cmd = [
         "podman",
@@ -372,6 +378,21 @@ def initialized_workspace(container_image):
             "/root/assets/init-workspace.sh",
         ]
 
+        # Track progress through stages for better timeout diagnostics
+        import time
+
+        stages = {
+            "started": None,
+            "short_name_prompt": None,
+            "org_name_prompt": None,
+            "copying_files": None,
+            "replacing_placeholders": None,
+            "setting_permissions": None,
+            "completed": None,
+        }
+        current_stage = "started"
+        stages["started"] = time.time()
+
         try:
             # Spawn the process with pexpect
             print(f"[DEBUG] Running podman command: {' '.join(cmd)}")
@@ -379,17 +400,65 @@ def initialized_workspace(container_image):
 
             child = pexpect.spawn(" ".join(cmd), encoding="utf-8", timeout=60)
 
-            # Wait for the prompt and send the project name
+            # Stage 1: Wait for short name prompt
             child.expect("Enter a short name", timeout=30)
+            stages["short_name_prompt"] = time.time()
+            current_stage = "short_name_prompt"
             child.sendline(project_name)
 
+            # Stage 2: Wait for org name prompt
             child.expect(
                 "Enter the name of your organization, e.g. 'vigOS': ", timeout=30
             )
+            stages["org_name_prompt"] = time.time()
+            current_stage = "org_name_prompt"
             child.sendline(organization_name)
 
-            # Wait for the process to complete
-            child.expect(pexpect.EOF, timeout=60)
+            # Stage 3: Monitor progress through remaining stages
+            stage_patterns = [
+                ("Copying files from", "copying_files", 30),
+                ("Replacing placeholders", "replacing_placeholders", 60),
+                ("Setting executable permissions", "setting_permissions", 30),
+                ("Workspace initialized successfully", "completed", 30),
+            ]
+
+            for pattern, stage_name, timeout in stage_patterns:
+                try:
+                    child.expect(pattern, timeout=timeout)
+                    stages[stage_name] = time.time()
+                    current_stage = stage_name
+                except pexpect.TIMEOUT:
+                    stage_start = stages.get(current_stage) or stages["started"]
+                    time_in_stage = time.time() - stage_start
+
+                    cleanup()
+                    pytest.fail(
+                        f"⏱️  Timeout waiting for: '{pattern}'\n"
+                        f"\n"
+                        f"📊 Progress tracking:\n"
+                        f"   Current stage: {current_stage}\n"
+                        f"   Time in stage: {time_in_stage:.1f}s (timeout: {timeout}s)\n"
+                        f"\n"
+                        f"📈 Stage timings:\n"
+                        + "\n".join(
+                            f"   {'✓' if stages[s] else '✗'} {s}: "
+                            + (
+                                f"{stages[s] - stages['started']:.1f}s"
+                                if stages[s]
+                                else "not reached"
+                            )
+                            for s in stages
+                        )
+                        + f"\n\n"
+                        f"💡 If stuck on 'copying_files':\n"
+                        f"   - Check if .pre-commit-cache is being copied (should be excluded)\n"
+                        f"   - Volume mounts can be slow\n"
+                        f"\n"
+                        f"📤 Last output:\n{child.before}"
+                    )
+
+            # Wait for EOF
+            child.expect(pexpect.EOF, timeout=30)
             child.close()
 
             # Check return code
@@ -400,13 +469,40 @@ def initialized_workspace(container_image):
                     f"Return code: {child.exitstatus}\n"
                     f"Output: {child.before}"
                 )
+
+            # Log successful timing
+            total_time = time.time() - stages["started"]
+            print(f"[DEBUG] Workspace initialized in {total_time:.1f}s")
+
         except pexpect.TIMEOUT:
             cleanup()
             output = child.before if "child" in locals() else "N/A"
+            stage_start = (
+                stages.get(current_stage) or stages.get("started") or time.time()
+            )
+            time_in_stage = time.time() - stage_start
+
             pytest.fail(
-                f"Timeout while initializing workspace with init-workspace.sh\n"
+                f"⏱️  Timeout while initializing workspace\n"
+                f"\n"
+                f"📊 Progress tracking:\n"
+                f"   Current stage: {current_stage}\n"
+                f"   Time in stage: {time_in_stage:.1f}s\n"
+                f"\n"
+                f"📈 Stage timings:\n"
+                + "\n".join(
+                    f"   {'✓' if stages[s] else '✗'} {s}: "
+                    + (
+                        f"{stages[s] - stages['started']:.1f}s"
+                        if stages[s]
+                        else "not reached"
+                    )
+                    for s in stages
+                )
+                + f"\n\n"
                 f"Command: {' '.join(cmd)}\n"
-                f"Output: {output}"
+                f"\n"
+                f"📤 Last output:\n{output}"
             )
         except pexpect.EOF:
             cleanup()
@@ -474,21 +570,87 @@ def initialized_workspace(container_image):
             "/root/assets/init-workspace.sh",
         ]
 
+        # Track progress through stages for better timeout diagnostics
+        import time
+
+        stages = {
+            "started": None,
+            "short_name_prompt": None,
+            "org_name_prompt": None,
+            "copying_files": None,
+            "replacing_placeholders": None,
+            "setting_permissions": None,
+            "completed": None,
+        }
+        current_stage = "started"
+        stages["started"] = time.time()
+
         try:
             # Spawn the process with pexpect
             child = pexpect.spawn(" ".join(cmd), encoding="utf-8", timeout=60)
 
-            # Wait for the prompt and send the project name
+            # Stage 1: Wait for short name prompt
             child.expect("Enter a short name", timeout=30)
+            stages["short_name_prompt"] = time.time()
+            current_stage = "short_name_prompt"
             child.sendline(project_name)
 
+            # Stage 2: Wait for org name prompt
             child.expect(
                 "Enter the name of your organization, e.g. 'vigOS': ", timeout=30
             )
+            stages["org_name_prompt"] = time.time()
+            current_stage = "org_name_prompt"
             child.sendline(organization_name)
 
-            # Wait for the process to complete
-            child.expect(pexpect.EOF, timeout=60)
+            # Stage 3: Monitor progress through remaining stages
+            # Use shorter timeouts to detect slow operations
+            stage_patterns = [
+                ("Copying files from", "copying_files", 30),
+                ("Replacing placeholders", "replacing_placeholders", 60),
+                ("Setting executable permissions", "setting_permissions", 30),
+                ("Workspace initialized successfully", "completed", 30),
+            ]
+
+            for pattern, stage_name, timeout in stage_patterns:
+                try:
+                    child.expect(pattern, timeout=timeout)
+                    stages[stage_name] = time.time()
+                    current_stage = stage_name
+                except pexpect.TIMEOUT:
+                    # Calculate time spent in current stage
+                    stage_start = stages.get(current_stage) or stages["started"]
+                    time_in_stage = time.time() - stage_start
+
+                    cleanup()
+                    pytest.fail(
+                        f"⏱️  Timeout waiting for: '{pattern}'\n"
+                        f"\n"
+                        f"📊 Progress tracking:\n"
+                        f"   Current stage: {current_stage}\n"
+                        f"   Time in stage: {time_in_stage:.1f}s (timeout: {timeout}s)\n"
+                        f"\n"
+                        f"📈 Stage timings:\n"
+                        + "\n".join(
+                            f"   {'✓' if stages[s] else '✗'} {s}: "
+                            + (
+                                f"{stages[s] - stages['started']:.1f}s"
+                                if stages[s]
+                                else "not reached"
+                            )
+                            for s in stages
+                        )
+                        + f"\n\n"
+                        f"💡 If stuck on 'copying_files':\n"
+                        f"   - Check if .pre-commit-cache is being copied (should be excluded)\n"
+                        f"   - Volume mounts on macOS are slow (Podman VM overhead)\n"
+                        f"   - Check: podman run --rm {container_image} du -sh /root/assets/workspace/\n"
+                        f"\n"
+                        f"📤 Last output:\n{child.before}"
+                    )
+
+            # Wait for EOF
+            child.expect(pexpect.EOF, timeout=30)
             child.close()
 
             # Check return code
@@ -499,11 +661,43 @@ def initialized_workspace(container_image):
                     f"Return code: {child.exitstatus}\n"
                     f"Output: {child.before}"
                 )
+
+            # Log successful timing
+            total_time = time.time() - stages["started"]
+            print(f"[DEBUG] Workspace initialized in {total_time:.1f}s")
+
         except pexpect.TIMEOUT:
             cleanup()
+            output = child.before if "child" in locals() else "N/A"
+            stage_start = (
+                stages.get(current_stage) or stages.get("started") or time.time()
+            )
+            time_in_stage = time.time() - stage_start
+
             pytest.fail(
-                f"Timeout while initializing workspace with init-workspace.sh\n"
-                f"Output: {child.before if 'child' in locals() else 'N/A'}"
+                f"⏱️  Timeout while initializing workspace\n"
+                f"\n"
+                f"📊 Progress tracking:\n"
+                f"   Current stage: {current_stage}\n"
+                f"   Time in stage: {time_in_stage:.1f}s\n"
+                f"\n"
+                f"📈 Stage timings:\n"
+                + "\n".join(
+                    f"   {'✓' if stages[s] else '✗'} {s}: "
+                    + (
+                        f"{stages[s] - stages['started']:.1f}s"
+                        if stages[s]
+                        else "not reached"
+                    )
+                    for s in stages
+                )
+                + f"\n\n"
+                f"💡 Common causes:\n"
+                f"   - Large .pre-commit-cache being copied (should be excluded now)\n"
+                f"   - Slow volume mount (macOS Podman runs through VM)\n"
+                f"   - Script hanging on a prompt or I/O operation\n"
+                f"\n"
+                f"📤 Last output:\n{output}"
             )
         except pexpect.ExceptionPexpect as e:
             cleanup()
@@ -718,14 +912,142 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
     )
 
     if up_result.returncode != 0:
-        pytest.skip(
-            f"devcontainer up with sidecar failed - skipping sidecar tests\n"
-            f"This is expected if podman-compose has issues with multi-container setups\n"
-            f"Socket tests already prove the underlying capability works.\n"
-            f"stdout: {up_result.stdout}\n"
-            f"stderr: {up_result.stderr}\n"
-            f"command: {' '.join(up_cmd)}"
+        # Extract error details for better diagnostics
+        import json
+
+        # Try to parse JSON error from stdout
+        error_message = "Unknown error"
+        podman_command = None
+        try:
+            stdout_json = json.loads(up_result.stdout)
+            if "message" in stdout_json:
+                error_message = stdout_json["message"]
+                # Extract the actual podman compose command from the error
+                if "Command failed:" in error_message:
+                    parts = error_message.split("Command failed:")
+                    if len(parts) > 1:
+                        podman_command = parts[1].strip()
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+        # Extract actual podman error from stderr
+        # The devcontainer CLI swallows Podman errors, so we need to search carefully
+        podman_errors = []
+        stderr_lines = up_result.stderr.split("\n") if up_result.stderr else []
+
+        # Look for actual Podman compose errors (not just "Command failed")
+        # Podman errors often contain: "Error", "failed", "cannot", "unable", etc.
+        # But NOT from devcontainer CLI (which has timestamps like [2025-12-16T...])
+        podman_error_patterns = [
+            "Error creating",
+            "Error starting",
+            "Error:",
+            "failed to",
+            "cannot",
+            "unable to",
+            "invalid",
+            "not found",
+            "permission denied",
+            "connection refused",
+            "no such",
+        ]
+
+        # Search through all stderr lines for actual Podman errors
+        for i, line in enumerate(stderr_lines):
+            line_stripped = line.strip()
+            if not line_stripped:
+                continue
+
+            # Skip devcontainer CLI log lines (they have timestamps)
+            if line_stripped.startswith("[") and "Z]" in line_stripped:
+                continue
+            if line_stripped.startswith("Start:") or line_stripped.startswith("Stop:"):
+                continue
+            if "at " in line_stripped and (
+                "async" in line_stripped or "/node_modules/" in line_stripped
+            ):
+                continue  # Skip Node.js stack traces
+
+            # Check if this looks like a Podman error
+            line_lower = line_stripped.lower()
+            for pattern in podman_error_patterns:
+                if pattern.lower() in line_lower:
+                    # Get some context (2 lines before and after)
+                    context_start = max(0, i - 2)
+                    context_end = min(len(stderr_lines), i + 3)
+                    context = "\n".join(stderr_lines[context_start:context_end])
+                    podman_errors.append(context)
+                    break
+
+        # If we found Podman errors, use them; otherwise look at the end
+        podman_error = None
+        if podman_errors:
+            # Use the first substantial error found
+            podman_error = podman_errors[0]
+        else:
+            # Fallback: get last meaningful lines (not stack traces)
+            for line in reversed(stderr_lines[-30:]):
+                line_stripped = line.strip()
+                if not line_stripped:
+                    continue
+                # Skip stack traces and log prefixes
+                if (
+                    line_stripped.startswith("[")
+                    or line_stripped.startswith("Start:")
+                    or line_stripped.startswith("Stop:")
+                    or "at " in line_stripped
+                    or "/node_modules/" in line_stripped
+                ):
+                    continue
+                podman_error = line_stripped
+                break
+
+        # Build comprehensive error message
+        skip_msg = "❌ SKIPPED: devcontainer up with sidecar failed\n"
+        skip_msg += "\n"
+        skip_msg += "📋 Error Summary:\n"
+        skip_msg += f"   {error_message}\n"
+
+        if podman_errors:
+            skip_msg += "\n"
+            skip_msg += f"🔴 Podman Error(s) Found ({len(podman_errors)}):\n"
+            for i, err in enumerate(podman_errors[:3], 1):  # Show up to 3 errors
+                skip_msg += f"   [{i}] {err}\n"
+        elif podman_error:
+            skip_msg += "\n"
+            skip_msg += "🔴 Podman Error (extracted):\n"
+            skip_msg += f"   {podman_error}\n"
+        else:
+            skip_msg += "\n"
+            skip_msg += "⚠️  Could not extract Podman error from stderr\n"
+            skip_msg += "   (devcontainer CLI may be swallowing the actual error)\n"
+
+        if podman_command:
+            skip_msg += "\n"
+            skip_msg += "⚙️  Failed Command:\n"
+            skip_msg += f"   {podman_command[:200]}\n"
+        skip_msg += "\n"
+        skip_msg += "💡 Common causes:\n"
+        skip_msg += "   - Podman compose issues with multi-container setups\n"
+        skip_msg += "   - Socket mount configuration problems\n"
+        skip_msg += "   - SELinux labeling conflicts on macOS\n"
+        skip_msg += "   - Image pull/build failures\n"
+        skip_msg += "\n"
+        skip_msg += "🔍 Full Details:\n"
+        skip_msg += f"   Return code: {up_result.returncode}\n"
+        skip_msg += f"   Devcontainer command: {' '.join(up_cmd)}\n"
+        skip_msg += "\n"
+        skip_msg += "📤 stdout (last 1000 chars):\n"
+        skip_msg += f"{up_result.stdout[-1000:]}\n"
+        skip_msg += "\n"
+        skip_msg += "📤 stderr (last 1500 chars - where errors usually appear):\n"
+        skip_msg += f"{up_result.stderr[-1500:]}\n"
+        skip_msg += "\n"
+        skip_msg += (
+            "💭 Note: Socket tests already prove the underlying capability works."
         )
+
+        pytest.skip(skip_msg)
 
     print("[DEBUG] Devcontainer with sidecar is up and running")
 

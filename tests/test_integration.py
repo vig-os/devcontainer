@@ -403,8 +403,11 @@ class TestDevContainerJson:
         assert "python.defaultInterpreterPath" in settings, (
             "Python interpreter path not configured"
         )
-        assert settings["python.defaultInterpreterPath"] == "/usr/local/bin/python", (
-            f"Expected Python path '/usr/local/bin/python', got: {settings['python.defaultInterpreterPath']}"
+        assert (
+            settings["python.defaultInterpreterPath"]
+            == "/root/assets/workspace/.venv/bin/python"
+        ), (
+            f"Expected Python path '/root/assets/workspace/.venv/bin/python', got: {settings['python.defaultInterpreterPath']}"
         )
 
     def test_devcontainer_json_initialize_command(self, initialized_workspace):
@@ -603,12 +606,10 @@ class TestDevContainerDockerCompose:
         assert "PRE_COMMIT_HOME" in env_vars, (
             "PRE_COMMIT_HOME environment variable not found"
         )
-        # PRE_COMMIT_HOME should also be in project subdirectory
-        assert (
-            env_vars["PRE_COMMIT_HOME"].lower()
-            == "/workspace/test_project/.pre-commit-cache"
-        ), (
-            f"PRE_COMMIT_HOME should be in project directory, got: {env_vars['PRE_COMMIT_HOME']}"
+        # PRE_COMMIT_HOME points to pre-built cache in container image
+        # (not project-local, to enable instant pre-commit without downloads)
+        assert env_vars["PRE_COMMIT_HOME"] == "/opt/pre-commit-cache", (
+            f"PRE_COMMIT_HOME should point to pre-built cache, got: {env_vars['PRE_COMMIT_HOME']}"
         )
 
     def test_docker_compose_yml_command(self, initialized_workspace):

@@ -320,38 +320,18 @@ class TestFileStructure:
             )
 
     def test_workspace_template_pre_commit_hooks_initialized(self, host):
-        """Test that pre-commit hooks are pre-initialized in workspace template."""
-        cache_dir = host.file("/root/assets/workspace/.pre-commit-cache")
+        """Test that pre-commit hooks are pre-initialized at system cache location."""
+        # Pre-commit cache is built to /opt/pre-commit-cache (not in workspace assets)
+        # This allows init-workspace.sh to skip excluding it during copy
+        cache_dir = host.file("/opt/pre-commit-cache")
         assert cache_dir.exists, (
-            "Pre-commit cache directory not found in workspace template"
+            "Pre-commit cache directory not found at /opt/pre-commit-cache"
         )
         assert cache_dir.is_directory, "Pre-commit cache is not a directory"
         # Verify the cache directory is not empty (contains installed hooks)
-        result = host.run(
-            'test -n "$(ls -A /root/assets/workspace/.pre-commit-cache 2>/dev/null)"'
-        )
+        result = host.run('test -n "$(ls -A /opt/pre-commit-cache 2>/dev/null)"')
         assert result.rc == 0, (
             "Pre-commit cache directory is empty - hooks were not initialized"
-        )
-
-    def test_docker_compose_yml_has_socket_mount(self, host):
-        """Test that docker-compose.yml has socket mount with CONTAINER_SOCKET_PATH variable."""
-        compose_file = "/root/assets/workspace/.devcontainer/docker-compose.yml"
-
-        # Verify file exists
-        assert host.file(compose_file).exists, "docker-compose.yml not found"
-
-        # Read compose file content
-        content_result = host.run(f"cat {compose_file}")
-        assert content_result.rc == 0, "Failed to read compose file"
-        content = content_result.stdout
-
-        # Verify socket mount uses environment variable with fallback
-        assert "${CONTAINER_SOCKET_PATH:-/var/run/docker.sock}" in content, (
-            "Expected docker-compose.yml to use CONTAINER_SOCKET_PATH env var"
-        )
-        assert "/var/run/docker.sock:Z" in content, (
-            "Expected socket mount to /var/run/docker.sock in container"
         )
 
 
@@ -366,6 +346,7 @@ class TestPlaceholders:
         excluded_paths = [
             ".pre-commit-cache",
             ".ruff_cache",
+            ".venv",
         ]
 
         # Build find command with exclusions

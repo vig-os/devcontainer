@@ -116,8 +116,22 @@ test-registry:
 	@uv run pytest tests/test_registry.py -v -s --tb=short
 
 # Test target: runs all test suites (image, integration, registry)
+# Clean up lingering containers first, then skip check within individual test runs
 .PHONY: test
-test: test-image test-integration test-registry
+test: _test-cleanup-check _test-all
+
+.PHONY: _test-cleanup-check
+_test-cleanup-check:
+	@if podman ps -a --filter "name=workspace-devcontainer" -q 2>/dev/null | grep -q .; then \
+		echo "⚠️  Lingering test containers found, cleaning up..."; \
+		$(MAKE) clean-test-containers; \
+	fi
+
+.PHONY: _test-all
+_test-all: _ensure-dev-image
+	@PYTEST_SKIP_CONTAINER_CHECK=1 TEST_CONTAINER_TAG=$(TEST_VERSION) uv run pytest tests/test_image.py -v --tb=short
+	@PYTEST_SKIP_CONTAINER_CHECK=1 TEST_CONTAINER_TAG=$(TEST_VERSION) uv run pytest tests/test_integration.py -v --tb=short
+	@PYTEST_SKIP_CONTAINER_CHECK=1 uv run pytest tests/test_registry.py -v -s --tb=short
 
 # Push target: build, (optionally) test, commit, push & tag a versioned release
 # Use REGISTRY_TEST=1 to enable registry testing mode (single arch, minimal image, no commits)
