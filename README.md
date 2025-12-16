@@ -59,10 +59,8 @@ That's it! All development tools (Python, git, pre-commit, just, etc.) are inclu
 Available recipes:
     [build]
     build no_cache=""              # Build local development image
-    clean-artifacts                # Clean build artifacts
-
-    [clean]
     clean version="dev"            # Remove image (default: dev)
+    clean-artifacts                # Clean build artifacts
     clean-test-containers          # Clean up lingering test containers
 
     [deps]
@@ -70,6 +68,7 @@ Available recipes:
     update                         # Update all dependencies
 
     [info]
+    containers *args               # just containers --all   # Show all podman containers and images
     default                        # Show available commands (default)
     docs                           # Generate documentation from templates
     help                           # Show available commands
@@ -111,7 +110,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
 - **Version**: 0.1
-- **Built**: 2025-12-16T15:53:46
+- **Built**: 2025-12-16T16:00:25
 - **Size**: ~920 MB
 
 ## Features

@@ -126,10 +126,8 @@ When contributing to this project, follow this workflow:
 Available recipes:
     [build]
     build no_cache=""              # Build local development image
-    clean-artifacts                # Clean build artifacts
-
-    [clean]
     clean version="dev"            # Remove image (default: dev)
+    clean-artifacts                # Clean build artifacts
     clean-test-containers          # Clean up lingering test containers
 
     [deps]
@@ -137,6 +135,7 @@ Available recipes:
     update                         # Update all dependencies
 
     [info]
+    containers *args               # just containers --all   # Show all podman containers and images
     default                        # Show available commands (default)
     docs                           # Generate documentation from templates
     help                           # Show available commands
