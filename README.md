@@ -14,6 +14,49 @@ To use this devcontainer image, you need:
 
 That's it! All development tools (Python, git, pre-commit, etc.) are included in the container image itself.
 
+## Setup
+
+### Podman Socket Setup (Debian/Ubuntu)
+
+If you're using **Podman** on Debian/Ubuntu, you need to enable the Podman socket service to allow the devcontainer to access Podman from inside containers (required for sidecars and container builds).
+
+**Install Podman** (if not already installed):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y podman
+```
+
+**Enable and start the Podman socket service**:
+
+```bash
+# Enable the socket service to start automatically on login
+systemctl --user enable podman.socket
+
+# Start the socket service now
+systemctl --user start podman.socket
+
+# Verify it's running
+systemctl --user status podman.socket
+```
+
+The socket will be created at `/run/user/$(id -u)/podman/podman.sock` and will automatically start on future logins.
+
+**Note**: The devcontainer's `initialize.sh` script automatically detects and configures the socket path. If you need to manually configure it, create `.devcontainer/.env` with:
+
+```bash
+CONTAINER_SOCKET_PATH=/run/user/$(id -u)/podman/podman.sock
+```
+
+**Using Docker instead**: If you prefer Docker, the socket is typically at `/var/run/docker.sock`. Make sure your user is in the `docker` group:
+
+```bash
+sudo usermod -aG docker $USER
+# Log out and back in for group changes to take effect
+```
+
+The `initialize.sh` script will automatically detect Docker socket if Podman socket is not available.
+
 ## Quick Start
 
 1. **Pull the latest image**
