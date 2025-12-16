@@ -171,13 +171,23 @@ for preserved in "${PRESERVE_FILES[@]}"; do
 done
 
 # Use rsync if available, otherwise cp
+# Note: Excluding .venv - it is used directly from the container image
+# via UV_PROJECT_ENVIRONMENT environment variable (set in docker-compose.yml)
+# Pre-commit cache is now at /opt/pre-commit-cache (not in assets/workspace)
 if command -v rsync &> /dev/null; then
-    rsync -av --exclude='.git' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
+    rsync -av --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
 else
     # Fallback to cp with proper handling (less precise, may overwrite preserved files)
     echo "Warning: rsync not available, preserved files may be overwritten"
-    cp -r "$TEMPLATE_DIR"/* "$WORKSPACE_DIR/" 2>/dev/null || true
-    cp -r "$TEMPLATE_DIR"/.[!.]* "$WORKSPACE_DIR/" 2>/dev/null || true
+    for item in "$TEMPLATE_DIR"/*; do
+        [[ -e "$item" ]] || continue
+        cp -r "$item" "$WORKSPACE_DIR/" 2>/dev/null || true
+    done
+    for item in "$TEMPLATE_DIR"/.[!.]*; do
+        [[ -e "$item" ]] || continue
+        [[ "$(basename "$item")" == ".venv" ]] && continue
+        cp -r "$item" "$WORKSPACE_DIR/" 2>/dev/null || true
+    done
 fi
 
 # Replace placeholders in files (using pre-built manifest from image)
@@ -203,6 +213,17 @@ else
             sed -i "s/{{SHORT_NAME}}/${SHORT_NAME}/g; s/{{ORG_NAME}}/${ORG_NAME}/g" "$file"
         fi
     done
+fi
+
+# Rename template_project directory to match project short name
+if [[ -d "$WORKSPACE_DIR/src/template_project" ]]; then
+    echo "Renaming src/template_project to src/${SHORT_NAME}..."
+    mv "$WORKSPACE_DIR/src/template_project" "$WORKSPACE_DIR/src/${SHORT_NAME}"
+fi
+
+# Update test imports to use actual project name (template_project -> $SHORT_NAME)
+if [[ -f "$WORKSPACE_DIR/tests/test_example.py" ]]; then
+    sed -i "s/import template_project/import ${SHORT_NAME}/g; s/template_project\.__version__/${SHORT_NAME}.__version__/g" "$WORKSPACE_DIR/tests/test_example.py"
 fi
 
 # Restore executable permissions on shell scripts and hooks (must be after sed -i)

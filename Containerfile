@@ -95,8 +95,8 @@ RUN set -eux; \
 
 # Install Python development tools directly into system using uv
 RUN uv pip install --system \
-    pre-commit \
-    ruff
+    pre-commit==4.5.0 \
+    ruff==0.14.9
 
 # Copy assets into container image
 COPY assets /root/assets
@@ -112,14 +112,26 @@ RUN find /root/assets -type f -name "*.sh" -exec chmod +x {} \;
 # This avoids expensive runtime searching in init-workspace.sh
 RUN grep -rl '{{SHORT_NAME}}\|{{ORG_NAME}}\|{{IMAGE_TAG}}' /root/assets/workspace/ \
     --exclude-dir=.git \
+    --exclude-dir=.venv \
+    --exclude-dir=.pre-commit-cache \
     2>/dev/null > /root/assets/.placeholder-manifest.txt || true
 
-# Pre-initialize pre-commit hooks in workspace assets
+# Pre-initialize pre-commit hooks to system cache location
+# This cache is used by the container (not copied to workspace by init-workspace.sh)
+# Host users will use their own cache (~/.cache/pre-commit or project-local)
 WORKDIR /root/assets/workspace
 RUN git init && \
-    PRE_COMMIT_HOME=/root/assets/workspace/.pre-commit-cache \
+    PRE_COMMIT_HOME=/opt/pre-commit-cache \
     pre-commit install-hooks && \
     rm -rf .git
+
+# Pre-build Python virtual environment with template dependencies
+# This venv is used directly via UV_PROJECT_ENVIRONMENT (not copied to workspace)
+# Temporarily replace {{SHORT_NAME}} placeholder for uv sync, then restore for init-workspace.sh
+RUN sed -i 's/{{SHORT_NAME}}/template_project/g' pyproject.toml && \
+    uv sync --all-extras --no-install-project && \
+    uv pip list && \
+    sed -i 's/template_project/{{SHORT_NAME}}/g' pyproject.toml
 
 # Create workspace directory
 RUN mkdir -p /workspace
