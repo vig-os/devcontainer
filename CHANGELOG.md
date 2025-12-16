@@ -21,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING**: Docker Compose file hierarchy now uses `project.yaml` and `local.yaml` instead of `override.yml`
 - Socket detection prioritizes Podman over Docker Desktop on macOS and Linux
-- Placeholder replacement uses build-time manifest (significantly faster initialization)
+- `{{TAG}}` placeholder replacement moved to container with build-time manifest generation (significantly faster initialization)
+- Placeholder replacement logic now runs in container at build time instead of at runtime
 - Socket mount configuration uses environment variable with fallback: `${CONTAINER_SOCKET_PATH:-/var/run/docker.sock}`
 - `initialize.sh` writes socket path to `.env` file instead of modifying YAML directly
 - `init-workspace.sh` simplified: removed cross-platform `sed` handling (always runs in Linux)
