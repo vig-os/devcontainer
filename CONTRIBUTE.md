@@ -7,7 +7,7 @@ This guide explains how to develop, build, test, and release the vigOS developme
 | Component            | Version | Purpose |
 |----------------------|---------|---------|
 | **Podman**           | v4.0+   | Container runtime, compose, and linting |
-| **make**             | GNU     | Build automation and management         |
+| **just**             | v1.0+   | Build automation and command runner     |
 | **uv**               | v0.8+   | Python package and project manager      |
 | **git**              | >2.34.0 | Version control and pre-commit tools    |
 | **ssh**              | Latest  | GitHub sign in and commit signing       |
@@ -16,7 +16,7 @@ This guide explains how to develop, build, test, and release the vigOS developme
 | **devcontainer CLI** | v0.80.1 | DevContainer CLI for testing devcontainer functionality |
 
 > **Note:** You do **not** need to manually install `uv` or `devcontainer CLI`.
-They will be installed automatically when running `./scripts/setup.sh` or `make setup`.
+They will be installed automatically when running `./scripts/setup.sh` or `just setup`.
 
 **Ubuntu/Debian:**
 
@@ -51,7 +51,7 @@ Clone this repository and prepare it for container development:
 ```bash
 git clone git@github.com:vig-os/devcontainer.git
 cd devcontainer
-make setup
+just setup
 ```
 
 ## Development Workflow
@@ -76,7 +76,7 @@ When contributing to this project, follow this workflow:
    - Make your changes
    - Commit often and descriptively
    - Add tests
-   - Build and test locally: `make build && make test`
+   - Build and test locally: `just build && just test`
    - Ensure your code follows the project's style and conventions
 
 4. **Update documentation if necessary**
@@ -91,12 +91,12 @@ When contributing to this project, follow this workflow:
 
    ```bash
    # Run all test suites (image, integration, registry)
-   make test
+   just test
 
    # Or run individual test suites
-   make test-image
-   make test-integration
-   make test-registry
+   just test-image
+   just test-integration
+   just test-registry
    ```
 
 6. **Create a pull request**
@@ -109,9 +109,9 @@ When contributing to this project, follow this workflow:
    - Address any feedback or requested changes
    - Once approved, your changes will be merged into `dev`
 
-## Make Targets
+## Just Recipes
 
-- **help**: Show a list of all available make targets
+- **help**: Show a list of all available recipes
 - **info**: Show information about the image
 - **setup**: Setup this repository for container development
 - **login**: Test authentication to GitHub Container Registry
@@ -120,11 +120,11 @@ When contributing to this project, follow this workflow:
 - **test-image**: Run image tests only
 - **test-integration**: Run integration tests only
 - **test-registry**: Run registry tests only
-- **push VERSION=X.Y**: Build, test, commit, push & tag image:X.Y
-- **push VERSION=X.Y NO_TEST=1**: Build, commit, push & tag image:X.Y (skip tests)
-- **push VERSION=X.Y NATIVE_ARCH_ONLY=1**: Build only for native architecture
-- **pull VERSION={VER}**: Pull image:{VER} (default: latest)
-- **clean VERSION={VER}**: Remove image:{VER} (default: dev)
+- **push X.Y**: Build, test, commit, push & tag image:X.Y
+- **push X.Y no_test=true**: Build, commit, push & tag image:X.Y (skip tests)
+- **push X.Y native_only=true**: Build only for native architecture
+- **pull {VER}**: Pull image:{VER} (default: latest)
+- **clean {VER}**: Remove image:{VER} (default: dev)
 
 ## Release Workflow
 
@@ -143,7 +143,7 @@ When releasing a new version of the devcontainer image, follow these steps:
 
    ```bash
    # Run all test suites to ensure everything works
-   make test
+   just test
    ```
 
 3. **Ensure clean git state**
@@ -158,16 +158,16 @@ When releasing a new version of the devcontainer image, follow these steps:
    # All changes should be committed before releasing
    ```
 
-4. **Release with `make push` (creates tag)**
+4. **Release with `just push` (creates tag)**
 
    ```bash
    # Replace X.Y with the version number (e.g. 1.0, 1.1, 2.0)
-   make push VERSION=X.Y
+   just push X.Y
    ```
 
    - This will:
      - Build the image for the specified version
-     - Run tests (unless `NO_TEST=1` is specified)
+     - Run tests (unless `no_test=true` is specified)
      - Push the image to GHCR with both `:latest` and `:X.Y` tags
      - Update [README.md](README.md) with the new version
      - Create a git commit with the README.md update (commit message: "Release X.Y")
@@ -188,12 +188,12 @@ vigOS Development Environment uses **smart version detection** to manage both GH
 - **Development versions** (`dev`):
   - Only local, without time stamp or git reference
   - Meant for development and testing only
-  - Use `make build` and `make test` to build and test
+  - Use `just build` and `just test` to build and test
 
 - **Stable versions** (e.g., `1.2`, `2.0`):
   - Pushes to GHCR with both `:latest` and `:version` tags
   - Creates git tag `v{version}` (e.g., `v1.2`)
-  - Use `make push VERSION=X.Y`
+  - Use `just push X.Y`
 
 This ensures that `:latest` always points to the latest stable release, and git tags provide traceability for all stable container versions.
 
@@ -201,9 +201,9 @@ This ensures that `:latest` always points to the latest stable release, and git 
 
 vigOS Development Environment supports both **AMD64** (x86_64) and **ARM64** (Apple Silicon) architectures:
 
-- **Local builds** (`make build` and `make test`): Automatically builds and tests for your native platform (ARM64 on macOS, AMD64 on Linux)
-- **Push to registry** (`make push`): Builds and pushes multi-arch manifests supporting both platforms
-- **Pull from registry** (`make pull`): Automatically pulls the correct architecture for your platform
+- **Local builds** (`just build` and `just test`): Automatically builds and tests for your native platform (ARM64 on macOS, AMD64 on Linux)
+- **Push to registry** (`just push`): Builds and pushes multi-arch manifests supporting both platforms
+- **Pull from registry** (`just pull`): Automatically pulls the correct architecture for your platform
 
 This ensures seamless development across different platforms without manual platform specification.
 

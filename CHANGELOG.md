@@ -9,13 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `just` as build automation tool (replaces `make`)
+- Layered justfile architecture: `justfile.base` (managed), `justfile.project` (team-shared), `justfile.local` (personal)
+- Generic sidecar passthrough: `just sidecar <name> <recipe>` for executing commands in sidecar containers
+- Documentation generation system (`docs/generate.py`) with Jinja2 templates
 - Python project template with `pyproject.toml` and standard structure (`src/`, `tests/`, `docs/`)
 - Pre-built Python virtual environment with common dev/science dependencies (numpy, scipy, pandas, matplotlib, pytest, jupyter)
 - Auto-sync Python dependencies on container attach via `uv sync`
 - `UV_PROJECT_ENVIRONMENT` environment variable for instant venv access without rebuild
 - `pip-licenses` pre-commit hook for dependency license compliance checking (blocks GPL-3.0/AGPL-3.0)
 - Pre-flight container cleanup check in test suite with helpful error messages
-- `make clean-test-containers` target for removing lingering test containers
+- `just clean-test-containers` recipe for removing lingering test containers
 - `PYTEST_AUTO_CLEANUP` environment variable for automatic test container cleanup
 - `docker-compose.project.yaml` for team-shared configuration (git-tracked, preserved during upgrades)
 - `docker-compose.local.yaml` for personal configuration (git-ignored, preserved during upgrades)
@@ -24,8 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING**: Replaced `make` with `just` - all build commands now use `just` (e.g., `just test`, `just build`, `just push`)
 - VS Code Python interpreter now points to pre-built venv (`/root/assets/workspace/.venv`)
-- Test container cleanup check runs once at start of `make test` instead of each test phase
+- Test container cleanup check runs once at start of `just test` instead of each test phase
 - **BREAKING**: Docker Compose file hierarchy now uses `project.yaml` and `local.yaml` instead of `override.yml`
 - Socket detection prioritizes Podman over Docker Desktop on macOS and Linux
 - `{{TAG}}` placeholder replacement moved to container with build-time manifest generation (significantly faster initialization)
@@ -88,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Automation and Tooling
 
-- Makefile with build, test, push, pull, and clean targets
+- Justfile with build, test, push, pull, and clean recipes
 - Automated version management and git tagging
 - Automatic README.md updates with version and image size during releases
 - Push script with multi-architecture builds and registry validation
