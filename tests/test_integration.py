@@ -316,8 +316,8 @@ class TestDevContainerJson:
             assert "docker-compose.yml" in docker_compose_files, (
                 f"Expected 'docker-compose.yml' in {docker_compose_files}"
             )
-            assert "docker-compose.override.yml" in docker_compose_files, (
-                f"Expected 'docker-compose.override.yml' in {docker_compose_files}"
+            assert "docker-compose.project.yaml" in docker_compose_files, (
+                f"Expected 'docker-compose.project.yaml' in {docker_compose_files}"
             )
         else:
             pytest.fail(
@@ -507,7 +507,7 @@ class TestDevContainerDockerCompose:
             config = yaml.safe_load(f)
 
         assert isinstance(config, dict), "docker-compose.yml is not a valid YAML object"
-        assert "version" in config, "docker-compose.yml missing 'version' field"
+        # Note: 'version' field is deprecated in modern docker-compose (1.27.0+)
         assert "services" in config, "docker-compose.yml missing 'services' field"
 
     def test_docker_compose_yml_service_exists(self, initialized_workspace):
@@ -1473,11 +1473,11 @@ class TestDevContainerCLI:
         )
 
 
-class TestDockerComposeOverride:
-    """Test docker-compose.override.yml functionality for additional mounts."""
+class TestDockerComposeProjectOverrides:
+    """Test docker-compose.project.yaml functionality for additional mounts."""
 
-    def test_override_mount_directory_exists(self, devcontainer_up):
-        """Test that the directory mounted via override file exists in container."""
+    def test_project_mount_directory_exists(self, devcontainer_up):
+        """Test that the directory mounted via project.yaml exists in container."""
         workspace_path = str(devcontainer_up.resolve())
 
         # The conftest.py fixture creates an override mounting tests/ to /workspace/tests-mounted
@@ -1666,8 +1666,8 @@ class TestPodmanSocketAccess:
 
         assert result.returncode == 0, (
             f"Docker/Podman socket not found at /var/run/docker.sock\n"
-            f"The socket must be mounted via docker-compose.override.yml\n"
-            f"See: .devcontainer/docker-compose.override.yml.example\n"
+            f"The socket is configured via docker-compose.yml using CONTAINER_SOCKET_PATH from .env\n"
+            f"The .env file is created by initialize.sh based on your host OS\n"
             f"stderr: {result.stderr}"
         )
 
@@ -1746,8 +1746,8 @@ class TestPodmanSocketAccess:
         if result.returncode != 0:
             pytest.skip(
                 f"Podman socket not accessible from container. "
-                f"This requires docker-compose.override.yml to mount the socket.\n"
-                f"Copy docker-compose.override.yml.example and configure for your OS.\n"
+                f"The socket is configured via docker-compose.yml using CONTAINER_SOCKET_PATH.\n"
+                f"Ensure initialize.sh ran and created .env with the correct socket path.\n"
                 f"stderr: {result.stderr}"
             )
 

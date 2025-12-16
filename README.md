@@ -44,11 +44,39 @@ That's it! All development tools (Python, git, pre-commit, etc.) are included in
    ```
 
    You will be prompted to confirm before files are replaced.
+   **Preserved files**: `docker-compose.project.yaml` and `docker-compose.local.yaml`
+   are never overwritten, keeping your customizations intact.
+
    It is advised to commit all your changes before so that it can be easily reverted.
 
 4. **Open the project in VS Code**
 
    VS Code will detect `.devcontainer/devcontainer.json` and offer to reopen inside the container automatically.
+
+## Upgrading from v0.1
+
+If you're upgrading from version 0.1, note these important changes:
+
+### Docker Compose File Reorganization
+
+The compose override system has been reorganized:
+
+**Old structure (v0.1)**:
+- `docker-compose.override.yml` - For all customizations
+
+**New structure (v0.2+)**:
+- `docker-compose.project.yaml` - Team/project config (git-tracked)
+- `docker-compose.local.yaml` - Personal config (git-ignored)
+
+**Migration steps**:
+
+1. If you have customizations in `docker-compose.override.yml`:
+   - Move **team-shared** config → `docker-compose.project.yaml`
+   - Move **personal** config → `docker-compose.local.yaml`
+2. Run `init-workspace.sh --force` to update the devcontainer
+3. The old `docker-compose.override.yml` is no longer used
+
+Both `project.yaml` and `local.yaml` are preserved during upgrades.
 
 ## Features
 
@@ -113,38 +141,33 @@ The devcontainer supports mounting additional folders/projects using Docker Comp
 
 To mount additional folders:
 
-1. Copy the example file:
+**For team-shared mounts** (committed to git):
+- Edit `.devcontainer/docker-compose.project.yaml`
 
-   ```bash
-   cp .devcontainer/docker-compose.override.yml.example \
-      .devcontainer/docker-compose.override.yml
-   ```
+**For personal mounts** (local only):
+- Edit `.devcontainer/docker-compose.local.yaml`
 
-2. Add your mounts to `docker-compose.override.yml`:
+Example:
 
 ```yaml
-   version: '3.8'
+services:
+  devcontainer:
+    volumes:
+      - ../other-project:/workspace/other-project:cached
+      - ~/shared-libs:/workspace/shared:cached
+```
 
-   services:
-     devcontainer:
-       volumes:
-         - ../other-project:/workspace/other-project:cached
-         - ~/shared-libs:/workspace/shared:cached
-   ```
-
-1. Rebuild the devcontainer
-
-The override file is gitignored, so each developer can have their own local mounts.
-See `.devcontainer/MOUNTS.md` for detailed documentation and examples.
+Then rebuild the devcontainer. The `local.yaml` file is gitignored, so each developer can have their own mounts.
+See `.devcontainer/README.md` for detailed documentation and examples.
 
 ### Multi-root VS Code workspace
 
 Multi-root workspaces allow to **browse/edit the mounted folders from VS Code** —for
-runtime-only usage, mounting through `docker-compose.override.yml` is enough.
+runtime-only usage, mounting through `docker-compose.project.yaml` or `docker-compose.local.yaml` is enough.
 
 1. Copy the template once per machine:
    `cp .devcontainer/workspace.code-workspace.example .devcontainer/workspace.code-workspace`
-2. Customize the `folders` array with additional projects mounted via `docker-compose.override.yml`.
+2. Customize the `folders` array with additional projects mounted via compose files.
 3. VS Code will automatically offer the `Open Workspace` option.
 
 Your personal `workspace.code-workspace` stays gitignored and therefore only local.

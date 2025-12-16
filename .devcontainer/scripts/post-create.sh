@@ -39,7 +39,12 @@ else
     echo "   Run 'gh auth login' or add token manually to login to ghcr.io"
 fi
 
+
 # User specific setup
 # Add your custom setup commands here to install any dependencies or tools needed for your project
+
+echo "Installing make..."
+apt-get update && apt-get install -y make podman docker-compose
+
 
 echo "Post-create setup complete"

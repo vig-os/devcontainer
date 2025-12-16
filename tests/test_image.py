@@ -9,8 +9,6 @@ Derived containers can inherit from these test classes to verify that
 base functionality is preserved in their containers.
 """
 
-import pytest
-
 # Expected versions for installed tools
 # These should be updated when the Containerfile is updated
 EXPECTED_VERSIONS = {
@@ -198,8 +196,8 @@ class TestFileStructure:
             "/root/assets/workspace/.devcontainer/README.md",
             "/root/assets/workspace/.devcontainer/devcontainer.json",
             "/root/assets/workspace/.devcontainer/docker-compose.yml",
-            "/root/assets/workspace/.devcontainer/docker-compose.override.yml",  # Auto-generated in Containerfile
-            "/root/assets/workspace/.devcontainer/docker-compose.override.yml.example",
+            "/root/assets/workspace/.devcontainer/docker-compose.project.yaml",
+            "/root/assets/workspace/.devcontainer/docker-compose.local.yaml",
             "/root/assets/workspace/.devcontainer/workspace.code-workspace.example",
             # .devcontainer/scripts files
             "/root/assets/workspace/.devcontainer/scripts/post-create.sh",
@@ -259,38 +257,25 @@ class TestFileStructure:
             "Pre-commit cache directory is empty - hooks were not initialized"
         )
 
-    def test_docker_compose_override_arch_specific(self, host):
-        """Test that docker-compose.override.yml has correct socket for architecture."""
-        override_file = (
-            "/root/assets/workspace/.devcontainer/docker-compose.override.yml"
-        )
+    def test_docker_compose_yml_has_socket_mount(self, host):
+        """Test that docker-compose.yml has socket mount with CONTAINER_SOCKET_PATH variable."""
+        compose_file = "/root/assets/workspace/.devcontainer/docker-compose.yml"
 
         # Verify file exists
-        assert host.file(override_file).exists, "docker-compose.override.yml not found"
+        assert host.file(compose_file).exists, "docker-compose.yml not found"
 
-        # Get architecture
-        arch_result = host.run("uname -m")
-        assert arch_result.rc == 0, "Failed to determine architecture"
-        arch = arch_result.stdout.strip()
-
-        # Read override file content
-        content_result = host.run(f"cat {override_file}")
-        assert content_result.rc == 0, "Failed to read override file"
+        # Read compose file content
+        content_result = host.run(f"cat {compose_file}")
+        assert content_result.rc == 0, "Failed to read compose file"
         content = content_result.stdout
 
-        # Verify correct socket path based on architecture
-        if arch in ("aarch64", "arm64"):
-            # arm64 → macOS socket path (UID 501)
-            assert "/run/user/501/podman/podman.sock" in content, (
-                f"Expected macOS socket path for {arch} architecture"
-            )
-        elif arch in ("x86_64", "amd64"):
-            # amd64 → Linux socket path (UID 1000)
-            assert "/run/user/1000/podman/podman.sock" in content, (
-                f"Expected Linux socket path for {arch} architecture"
-            )
-        else:
-            pytest.fail(f"Unexpected architecture: {arch}")
+        # Verify socket mount uses environment variable with fallback
+        assert "${CONTAINER_SOCKET_PATH:-/var/run/docker.sock}" in content, (
+            "Expected docker-compose.yml to use CONTAINER_SOCKET_PATH env var"
+        )
+        assert "/var/run/docker.sock:Z" in content, (
+            "Expected socket mount to /var/run/docker.sock in container"
+        )
 
 
 class TestPlaceholders:

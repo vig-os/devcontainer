@@ -9,9 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Pre-flight container cleanup check in test suite with helpful error messages
+- `make clean-test-containers` target for removing lingering test containers
+- `PYTEST_AUTO_CLEANUP` environment variable for automatic test container cleanup
+- `docker-compose.project.yaml` for team-shared configuration (git-tracked, preserved during upgrades)
+- `docker-compose.local.yaml` for personal configuration (git-ignored, preserved during upgrades)
+- Build-time manifest generation for optimized placeholder replacement
+- `tests/CLEANUP.md` documentation for test container management
+
 ### Changed
 
+- **BREAKING**: Docker Compose file hierarchy now uses `project.yaml` and `local.yaml` instead of `override.yml`
+- Socket detection prioritizes Podman over Docker Desktop on macOS and Linux
+- Placeholder replacement uses build-time manifest (significantly faster initialization)
+- Socket mount configuration uses environment variable with fallback: `${CONTAINER_SOCKET_PATH:-/var/run/docker.sock}`
+- `initialize.sh` writes socket path to `.env` file instead of modifying YAML directly
+- `init-workspace.sh` simplified: removed cross-platform `sed` handling (always runs in Linux)
+
 ### Removed
+
+- Deprecated `version` field from all Docker Compose files
+- `:Z` SELinux flag from socket mounts (incompatible with macOS socket files)
+- `docker-compose.override.yml` (replaced by `project.yaml` and `local.yaml`)
+- `docker-compose.sidecar.yaml` (merged into main `docker-compose.yml`)
 
 ### Fixed
 
@@ -19,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Git now uses the SSH agent for signing by looking up the email in allowed-signers and matching with the agent key.
 - Fixed `gpg.ssh.allowedSignersFile` path to use container path instead of host path after copying git configuration.
 - Automatically add git user email to allowed-signers file during setup to ensure commits can be signed and verified.
+- macOS Podman socket mounting errors caused by SELinux `:Z` flag on socket files
+- Test failures from lingering containers now detected and reported before test run
+- Socket detection during tests now matches runtime behavior (Podman-first)
 
 ### Security
 

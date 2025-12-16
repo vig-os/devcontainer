@@ -26,6 +26,119 @@ import pytest
 import testinfra
 
 
+def pytest_sessionstart(session):
+    """
+    Pre-flight check: Detect lingering test containers from previous runs.
+
+    Runs before any tests to ensure a clean environment.
+    """
+    # Check for lingering containers from previous test runs
+    check_cmd = [
+        "podman",
+        "ps",
+        "-a",
+        "--filter",
+        "name=workspace-devcontainer",
+        "--format",
+        "{{.ID}}\t{{.Names}}\t{{.Status}}\t{{.CreatedAt}}",
+    ]
+
+    result = subprocess.run(check_cmd, capture_output=True, text=True)
+
+    if result.returncode == 0 and result.stdout.strip():
+        containers = result.stdout.strip().split("\n")
+
+        # Also check for test-sidecar containers
+        sidecar_check_cmd = [
+            "podman",
+            "ps",
+            "-a",
+            "--filter",
+            "name=test-sidecar",
+            "--format",
+            "{{.ID}}\t{{.Names}}\t{{.Status}}\t{{.CreatedAt}}",
+        ]
+        sidecar_result = subprocess.run(
+            sidecar_check_cmd, capture_output=True, text=True
+        )
+
+        if sidecar_result.returncode == 0 and sidecar_result.stdout.strip():
+            containers.extend(sidecar_result.stdout.strip().split("\n"))
+
+        # Format the error message
+        container_list = "\n".join(f"  - {c}" for c in containers)
+
+        cleanup_commands = """
+To clean up these containers, run:
+
+    # Clean up workspace devcontainers
+    podman ps -a --filter "name=workspace-devcontainer" --format "{{{{.ID}}}}" | xargs -r podman rm -f
+
+    # Clean up test sidecars
+    podman ps -a --filter "name=test-sidecar" --format "{{{{.ID}}}}" | xargs -r podman rm -f
+
+    # Or use the Makefile target:
+    make clean-test-containers
+
+Alternatively, set PYTEST_AUTO_CLEANUP=1 to automatically clean up before tests:
+
+    PYTEST_AUTO_CLEANUP=1 uv run pytest tests/
+"""
+
+        # Check if auto-cleanup is enabled
+        if os.environ.get("PYTEST_AUTO_CLEANUP") == "1":
+            print(f"\n⚠️  Found {len(containers)} lingering test container(s)")
+            print("🧹 Auto-cleanup enabled, removing containers...")
+
+            # Clean up workspace devcontainers
+            cleanup_devcontainer = [
+                "podman",
+                "ps",
+                "-a",
+                "--filter",
+                "name=workspace-devcontainer",
+                "--format",
+                "{{.ID}}",
+            ]
+            ids_result = subprocess.run(
+                cleanup_devcontainer, capture_output=True, text=True
+            )
+            if ids_result.stdout.strip():
+                for container_id in ids_result.stdout.strip().split("\n"):
+                    subprocess.run(
+                        ["podman", "rm", "-f", container_id], capture_output=True
+                    )
+
+            # Clean up test sidecars
+            cleanup_sidecar = [
+                "podman",
+                "ps",
+                "-a",
+                "--filter",
+                "name=test-sidecar",
+                "--format",
+                "{{.ID}}",
+            ]
+            sidecar_ids_result = subprocess.run(
+                cleanup_sidecar, capture_output=True, text=True
+            )
+            if sidecar_ids_result.stdout.strip():
+                for container_id in sidecar_ids_result.stdout.strip().split("\n"):
+                    subprocess.run(
+                        ["podman", "rm", "-f", container_id], capture_output=True
+                    )
+
+            print("✅ Cleanup complete\n")
+        else:
+            # Fail with helpful error message
+            pytest.exit(
+                f"\n\n❌ Found {len(containers)} lingering test container(s) from previous runs:\n\n"
+                f"{container_list}\n\n"
+                f"{cleanup_commands}",
+                returncode=1,
+            )
+
+
 def is_running_in_container() -> bool:
     """Detect if we're running inside a container."""
     # Check for container environment indicators
@@ -461,7 +574,7 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
 
     This fixture:
     - Uses the pre-built sidecar image
-    - Configures docker-compose.override.yml with sidecar service
+    - Configures docker-compose.project.yaml with sidecar service
     - Starts both devcontainer and sidecar together
     - Enables testing of Approach 1: command execution via podman exec
     - Cleans up both containers after tests
@@ -521,39 +634,41 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
         print("[DEBUG] Disabling SSH agent forwarding on macOS+podman (sidecar test)")
         del env["SSH_AUTH_SOCK"]
 
-    # Create docker-compose.override.yml with sidecar
+    # Configure docker-compose.project.yaml with sidecar
+    # This file is already in the devcontainer.json dockerComposeFile list
     import yaml
 
-    override_path = workspace_path / ".devcontainer" / "docker-compose.override.yml"
+    project_yaml_path = workspace_path / ".devcontainer" / "docker-compose.project.yaml"
 
-    # Read existing override (from init-workspace.sh)
-    if override_path.exists():
-        with override_path.open() as f:
-            override_config = yaml.safe_load(f)
-        print("[DEBUG] Loaded existing docker-compose.override.yml")
+    # Read existing project config (from init-workspace.sh template)
+    if project_yaml_path.exists():
+        with project_yaml_path.open() as f:
+            project_config = yaml.safe_load(f) or {}
+        print("[DEBUG] Loaded existing docker-compose.project.yaml")
     else:
-        override_config = {
-            "version": "3.8",
-            "services": {"devcontainer": {"volumes": []}},
-        }
+        project_config = {}
+
+    # Initialize if empty (template file has only comments)
+    if not project_config:
+        project_config = {"services": {"devcontainer": {"volumes": []}}}
 
     # Ensure structure exists
-    if "services" not in override_config:
-        override_config["services"] = {}
-    if "devcontainer" not in override_config["services"]:
-        override_config["services"]["devcontainer"] = {}
-    if "volumes" not in override_config["services"]["devcontainer"]:
-        override_config["services"]["devcontainer"]["volumes"] = []
+    if "services" not in project_config:
+        project_config["services"] = {}
+    if "devcontainer" not in project_config["services"]:
+        project_config["services"]["devcontainer"] = {}
+    if "volumes" not in project_config["services"]["devcontainer"]:
+        project_config["services"]["devcontainer"]["volumes"] = []
 
     # Add test mount - use host path for mount
     tests_dir = Path(__file__).parent.resolve()
     tests_dir_for_mount = get_host_path(tests_dir) if in_container else tests_dir
     test_mount = f"{tests_dir_for_mount}:/workspace/tests-mounted:cached"
-    if test_mount not in override_config["services"]["devcontainer"]["volumes"]:
-        override_config["services"]["devcontainer"]["volumes"].append(test_mount)
+    if test_mount not in project_config["services"]["devcontainer"]["volumes"]:
+        project_config["services"]["devcontainer"]["volumes"].append(test_mount)
 
     # Add sidecar service
-    override_config["services"]["test-sidecar"] = {
+    project_config["services"]["test-sidecar"] = {
         "image": sidecar_image,
         "container_name": "test-sidecar",
         "command": "sleep infinity",
@@ -564,31 +679,16 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
     }
     print(f"[DEBUG] Added test-sidecar service using image: {sidecar_image}")
 
-    # Write override file
-    with override_path.open("w") as f:
-        yaml.dump(override_config, f, default_flow_style=False, sort_keys=False)
-    print("[DEBUG] Updated docker-compose.override.yml with sidecar")
+    # Write project yaml file (already in devcontainer.json dockerComposeFile list)
+    with project_yaml_path.open("w") as f:
+        yaml.dump(project_config, f, default_flow_style=False, sort_keys=False)
+    print("[DEBUG] Updated docker-compose.project.yaml with sidecar")
 
-    # Update devcontainer.json to include override
+    # Read devcontainer.json for potential restoration later
     with devcontainer_json_path.open() as f:
         config = json.load(f)
-
     original_config = json.dumps(config, indent=4)
-
-    if isinstance(config.get("dockerComposeFile"), str):
-        config["dockerComposeFile"] = [
-            config["dockerComposeFile"],
-            "docker-compose.override.yml",
-        ]
-    elif (
-        isinstance(config.get("dockerComposeFile"), list)
-        and "docker-compose.override.yml" not in config["dockerComposeFile"]
-    ):
-        config["dockerComposeFile"].append("docker-compose.override.yml")
-
-    with devcontainer_json_path.open("w") as f:
-        json.dump(config, f, indent=4)
-    print("[DEBUG] Updated devcontainer.json")
+    # Note: No need to modify devcontainer.json - project.yaml is already in dockerComposeFile list
 
     # Build and start devcontainer with sidecar
     # Use workspace_path_for_cli for CLI operations (host path when running in container)
@@ -757,69 +857,56 @@ def devcontainer_up(initialized_workspace):
                 json.dump(config, f, indent=4)
             print("[DEBUG] Added SSH agent forwarding to devcontainer.json")
 
-    # Extend docker-compose.override.yml for testing
-    # The initialized workspace already has an override file with socket mounts
+    # Extend docker-compose.project.yaml for testing
+    # This file is already in the devcontainer.json dockerComposeFile list
     # We just need to add our test-specific mount
     import yaml
 
-    override_path = workspace_path / ".devcontainer" / "docker-compose.override.yml"
+    project_yaml_path = workspace_path / ".devcontainer" / "docker-compose.project.yaml"
     tests_dir = Path(__file__).parent.resolve()  # Path to tests/ directory
 
     # For test mounts, we need to use host path if running in container
     tests_dir_for_mount = get_host_path(tests_dir) if in_container else tests_dir
 
-    # Read the existing override file (created by init-workspace.sh from image assets)
-    if override_path.exists():
-        with override_path.open() as f:
-            override_config = yaml.safe_load(f)
-        print("[DEBUG] Loaded existing docker-compose.override.yml from workspace")
+    # Read the existing project yaml (created by init-workspace.sh from template)
+    if project_yaml_path.exists():
+        with project_yaml_path.open() as f:
+            project_config = yaml.safe_load(f) or {}
+        print("[DEBUG] Loaded existing docker-compose.project.yaml from workspace")
     else:
-        # Fallback: create basic structure
-        override_config = {
-            "version": "3.8",
-            "services": {"devcontainer": {"volumes": []}},
-        }
-        print("[DEBUG] No existing override found, creating new one")
+        project_config = {}
+        print("[DEBUG] No existing project.yaml found, creating new one")
+
+    # Initialize if empty (template file has only comments)
+    if not project_config:
+        project_config = {"services": {"devcontainer": {"volumes": []}}}
 
     # Ensure the structure exists
-    if "services" not in override_config:
-        override_config["services"] = {}
-    if "devcontainer" not in override_config["services"]:
-        override_config["services"]["devcontainer"] = {}
-    if "volumes" not in override_config["services"]["devcontainer"]:
-        override_config["services"]["devcontainer"]["volumes"] = []
+    if "services" not in project_config:
+        project_config["services"] = {}
+    if "devcontainer" not in project_config["services"]:
+        project_config["services"]["devcontainer"] = {}
+    if "volumes" not in project_config["services"]["devcontainer"]:
+        project_config["services"]["devcontainer"]["volumes"] = []
 
     # Add test mount (if not already present) - use host path for mount
     test_mount = f"{tests_dir_for_mount}:/workspace/tests-mounted:cached"
-    if test_mount not in override_config["services"]["devcontainer"]["volumes"]:
-        override_config["services"]["devcontainer"]["volumes"].append(test_mount)
+    if test_mount not in project_config["services"]["devcontainer"]["volumes"]:
+        project_config["services"]["devcontainer"]["volumes"].append(test_mount)
         print(f"[DEBUG] Added test mount: {tests_dir_for_mount}")
 
-    # Write back the merged override
-    with override_path.open("w") as f:
-        yaml.dump(override_config, f, default_flow_style=False, sort_keys=False)
-    print("[DEBUG] Updated docker-compose.override.yml (preserving socket mounts)")
+    # Write back the project yaml
+    with project_yaml_path.open("w") as f:
+        yaml.dump(project_config, f, default_flow_style=False, sort_keys=False)
+    print("[DEBUG] Updated docker-compose.project.yaml with test mount")
 
-    # Modify devcontainer.json to include the override file
-    # The devcontainer CLI doesn't auto-discover override files like docker-compose does
+    # Read devcontainer.json for potential restoration later
+    # Note: No need to modify it - project.yaml is already in dockerComposeFile list
     with devcontainer_json_path.open() as f:
         config = json.load(f)
 
     if not original_config:
         original_config = json.dumps(config, indent=4)
-
-    # Change dockerComposeFile to an array including the override
-    if isinstance(config.get("dockerComposeFile"), str):
-        config["dockerComposeFile"] = [
-            config["dockerComposeFile"],
-            "docker-compose.override.yml",
-        ]
-    elif isinstance(config.get("dockerComposeFile"), list):
-        config["dockerComposeFile"].append("docker-compose.override.yml")
-
-    with devcontainer_json_path.open("w") as f:
-        json.dump(config, f, indent=4)
-    print("[DEBUG] Updated devcontainer.json to include docker-compose.override.yml")
 
     # Build and start the devcontainer
     # Use workspace_path_for_cli for CLI operations (host path when running in container)
@@ -888,11 +975,8 @@ def devcontainer_up(initialized_workspace):
             f"stderr: {down_result.stderr}\n"
         )
 
-    # Clean up docker-compose.override.yml if it exists
-    override_path = workspace_path / ".devcontainer" / "docker-compose.override.yml"
-    if override_path.exists():
-        override_path.unlink()
-        print("[DEBUG] Removed docker-compose.override.yml")
+    # Note: docker-compose.project.yaml is part of the template, not test-created
+    # The temporary workspace will be cleaned up anyway, so no need to restore it
 
     # Restore original devcontainer.json if we modified it
     if original_config:

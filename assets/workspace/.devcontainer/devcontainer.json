@@ -2,7 +2,8 @@
     "name": "{{SHORT_NAME}}-devc",
     "dockerComposeFile": [
         "docker-compose.yml",
-        "docker-compose.override.yml"
+        "docker-compose.project.yaml",
+        "docker-compose.local.yaml"
     ],
     "service": "devcontainer",
     "workspaceFolder": "/workspace/{{SHORT_NAME}}",

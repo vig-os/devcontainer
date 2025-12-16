@@ -136,7 +136,7 @@ The test fixtures automatically detect if they're running inside a container by 
 When running from inside a container with `HOST_WORKSPACE_PATH` set, the `get_host_path()` function translates container paths to host paths for:
 
 - Devcontainer CLI `--workspace-folder` arguments
-- Volume mount paths in docker-compose.override.yml
+- Volume mount paths in docker-compose.project.yaml
 - Any operation that needs to communicate with the host's podman daemon
 
 ## Troubleshooting

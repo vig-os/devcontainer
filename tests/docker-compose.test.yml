@@ -3,7 +3,7 @@
 # This file defines services for running tests that need container operations
 # Using compose handles path translation automatically, enabling tests to run
 # from within a devcontainer (DooD - Docker-out-of-Docker)
-version: "3.8"
+# Note: 'version' field is deprecated in docker-compose 1.27.0+
 
 services:
   # Service to initialize a test workspace using init-workspace.sh

@@ -1,12 +1,13 @@
 ---
-version: '3.8'
-
 services:
   devcontainer:
     image: ghcr.io/vig-os/devcontainer:{{IMAGE_TAG}}
     volumes:
       # Mount the project folder to a subdirectory of workspace
       - ..:/workspace/{{SHORT_NAME}}:cached
+      # Container socket for Docker-out-of-Docker (DooD) - enables sidecars
+      # Path is set by initialize.sh in .env, falls back to Docker default
+      - "${CONTAINER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock"
     environment:
       # Override default paths to match project subdirectory structure
       - PRE_COMMIT_HOME=/workspace/{{SHORT_NAME}}/.pre-commit-cache

@@ -104,41 +104,15 @@ COPY assets /root/assets
 # Set execute permissions on all shell scripts in the assets
 RUN find /root/assets -type f -name "*.sh" -exec chmod +x {} \;
 
-# Generate architecture-specific docker-compose.override.yml for podman socket
-# arm64 → macOS (Apple Silicon) with UID 501
-# amd64 → Linux with UID 1000
-ARG TARGETARCH
-RUN set -eux; \
-    case "${TARGETARCH}" in \
-        arm64) \
-            SOCKET_PATH="/run/user/501/podman/podman.sock"; \
-            ARCH_NAME="macOS/arm64"; \
-            ;; \
-        amd64) \
-            SOCKET_PATH="/run/user/1000/podman/podman.sock"; \
-            ARCH_NAME="Linux/amd64"; \
-            ;; \
-        *) \
-            echo "Unsupported architecture: ${TARGETARCH}"; \
-            exit 1; \
-            ;; \
-    esac; \
-    OVERRIDE_FILE="/root/assets/workspace/.devcontainer/docker-compose.override.yml"; \
-    printf '%s\n' \
-        "# Auto-generated docker-compose.override.yml for ${ARCH_NAME}" \
-        "# Generated at image build time based on target architecture" \
-        "#" \
-        "# This file mounts the Podman socket for container-in-container operations." \
-        "# Modify as needed for your system (e.g., different UID or Docker Desktop)." \
-        "" \
-        "version: '3.8'" \
-        "" \
-        "services:" \
-        "  devcontainer:" \
-        "    volumes:" \
-        "      # Podman socket mount (default for ${ARCH_NAME})" \
-        "      - ${SOCKET_PATH}:/var/run/docker.sock:Z" \
-        > "$OVERRIDE_FILE"
+# Note: Container socket configuration is now handled at runtime
+# The initialize.sh script detects the host OS and writes CONTAINER_SOCKET_PATH to .env
+# docker-compose.yml uses this environment variable for the socket mount
+
+# Generate build-time manifest of files containing placeholders
+# This avoids expensive runtime searching in init-workspace.sh
+RUN grep -rl '{{SHORT_NAME}}\|{{ORG_NAME}}\|{{IMAGE_TAG}}' /root/assets/workspace/ \
+    --exclude-dir=.git \
+    2>/dev/null > /root/assets/.placeholder-manifest.txt || true
 
 # Pre-initialize pre-commit hooks in workspace assets
 WORKDIR /root/assets/workspace

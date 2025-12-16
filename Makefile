@@ -32,16 +32,18 @@ define print_help_targets
 	@echo "  test-image                       - Run image tests"
 	@echo "  test-integration                 - Run integration tests"
 	@echo "  test-registry                    - Run registry tests"
+	@echo "  clean-test-containers            - Remove lingering test containers"
 	@echo "  push VERSION=X.Y                 - Build, test, commit, push & tag image:X.Y"
 	@echo "  push VERSION=X.Y REGISTRY_TEST=1 - Test the make push mechanism with a dummy image to a dummy registry"
 	@echo "  pull VERSION={VER}               - Pull image:{VER} (default: latest)"
 	@echo "  clean VERSION={VER}              - Remove image:{VER} (default: dev)"
 	@echo "  "
 	@echo "Examples:"
-	@echo "  make build               # Build local development version"
-	@echo "  make push VERSION=1.0    # Build, test, commit, push & tag image:1.0"
-	@echo "  make pull VERSION=1.0    # Pull image:1.0"
-	@echo "  make clean               # Remove image:dev"
+	@echo "  make build                    # Build local development version"
+	@echo "  make push VERSION=1.0         # Build, test, commit, push & tag image:1.0"
+	@echo "  make pull VERSION=1.0         # Pull image:1.0"
+	@echo "  make clean                    # Remove image:dev"
+	@echo "  make clean-test-containers    # Clean up lingering test containers"
 endef
 
 # Default target
@@ -134,4 +136,24 @@ clean:
 		./scripts/clean.sh dev "$(REPO)"; \
 	else \
 		./scripts/clean.sh "$(VERSION)" "$(REPO)"; \
+	fi
+
+# Clean test containers: Remove lingering test containers from previous test runs
+.PHONY: clean-test-containers
+clean-test-containers:
+	@echo "🧹 Cleaning up lingering test containers..."
+	@DEVCONTAINERS=$$(podman ps -a --filter "name=workspace-devcontainer" --format "{{.ID}}" 2>/dev/null); \
+	SIDECARS=$$(podman ps -a --filter "name=test-sidecar" --format "{{.ID}}" 2>/dev/null); \
+	if [ -n "$$DEVCONTAINERS" ] || [ -n "$$SIDECARS" ]; then \
+		if [ -n "$$DEVCONTAINERS" ]; then \
+			echo "  Removing workspace devcontainers..."; \
+			echo "$$DEVCONTAINERS" | xargs -r podman rm -f; \
+		fi; \
+		if [ -n "$$SIDECARS" ]; then \
+			echo "  Removing test sidecars..."; \
+			echo "$$SIDECARS" | xargs -r podman rm -f; \
+		fi; \
+		echo "✅ Cleanup complete"; \
+	else \
+		echo "✨ No lingering test containers found"; \
 	fi
