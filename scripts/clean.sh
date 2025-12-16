@@ -6,6 +6,8 @@ set -e
 
 VERSION="${1:-dev}"
 REPO="${2:-${TEST_REGISTRY:-ghcr.io/vig-os/devcontainer}}"
+# Strip trailing slash if present
+REPO="${REPO%/}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
