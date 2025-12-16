@@ -43,17 +43,18 @@ repos:
         name: shellcheck
         args: ["-x"]
 
-  # Markdown Linting
+  # Markdown Linting (excludes auto-generated docs)
   - repo: https://github.com/jackdewinter/pymarkdown
     rev: v0.9.23
     hooks:
       - id: pymarkdown
         name: pymarkdown (fix)
         args: ["-c", ".pymarkdown", "fix"]
+        exclude: ^(README\.md|CONTRIBUTE\.md|TESTING\.md|\.github_data/)
       - id: pymarkdown
         name: pymarkdown (scan)
         args: ["-c", ".pymarkdown", "scan"]
-        exclude: ^\.github_data/
+        exclude: ^(README\.md|CONTRIBUTE\.md|TESTING\.md|\.github_data/)
 
   # Justfile formatting
   - repo: local

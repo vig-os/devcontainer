@@ -10,7 +10,8 @@
       "maximum": 2
     },
     "md013": {
-      "enabled": false
+      "enabled": true,
+      "line_length": 120
     },
     "md036": {
       "enabled": false
