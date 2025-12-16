@@ -1,0 +1,12 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAIN JUSTFILE - Orchestrates all recipe sources
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Import devcontainer-managed base recipes (replaced on upgrade)
+import '.devcontainer/justfile.base'
+
+# Import team-shared project recipes (git-tracked, preserved on upgrade)
+import? 'justfile.project'
+
+# Import personal recipes (gitignored, preserved on upgrade)
+import? 'justfile.local'
