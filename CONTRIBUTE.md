@@ -124,6 +124,8 @@ When contributing to this project, follow this workflow:
 
 ```text
 Available recipes:
+    podman ...                     # Import podman management recipes as namespace
+
     [build]
     build no_cache=""              # Build local development image
     clean version="dev"            # Remove image (default: dev)
@@ -142,18 +144,6 @@ Available recipes:
     init *args                     # Check/install system dependencies (OS-sensitive)
     login                          # Test login to GHCR
     setup                          # Setup Python environment and dev tools
-
-    [podman]
-    containers *args               # just containers --all   # Show all podman containers and images
-    kill name                      # Usage: just kill <name-or-id>
-    kill-all                       # Stop and remove all containers (with confirmation)
-    kill-project                   # Stop and remove project-related containers
-    prune                          # Prune unused containers, images, networks, and volumes
-    prune-all                      # Full cleanup: prune including volumes
-    rmi image                      # just rmi ghcr.io/vig-os/devcontainer:dev
-    rmi-all                        # Remove all images (with confirmation)
-    rmi-dangling                   # Remove dangling images (untagged)
-    rmi-project                    # Remove project-related images
 
     [quality]
     format                         # Format code

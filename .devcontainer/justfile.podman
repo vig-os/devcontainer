@@ -59,7 +59,7 @@ containers *args:
             echo "  No project-related images found"
         fi
         echo ""
-        echo "Tip: Use 'just containers --all' to see all podman containers and images"
+        echo "Tip: Use 'just podman containers --all' to see all podman containers and images"
     fi
 
 # ───────────────────────────────────────────────────────────────────────────────

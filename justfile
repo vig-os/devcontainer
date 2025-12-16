@@ -6,9 +6,8 @@
 
 import '.devcontainer/justfile.base'
 
-# Import podman management recipes
-
-import '.devcontainer/justfile.podman'
+# Import podman management recipes as namespace
+mod podman '.devcontainer/justfile.podman'
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # VARIABLES
