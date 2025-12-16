@@ -124,7 +124,7 @@ When contributing to this project, follow this workflow:
 
 ```text
 Available recipes:
-    podman ...                     # Import podman management recipes as namespace
+    podman ...                     # Podman container & image management (run 'just podman' for options)
 
     [build]
     build no_cache=""              # Build local development image

@@ -2,14 +2,17 @@
 # PODMAN RECIPES - Container and Image Management
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# Show available podman recipes (default when running 'just podman')
+[private]
+default:
+    @just --list --justfile {{ source_file() }}
+
 # ───────────────────────────────────────────────────────────────────────────────
 # LISTING
 # ───────────────────────────────────────────────────────────────────────────────
 
-# List containers/images related to this project
-# Usage: just containers         # Show project-related containers
-#        just containers --all   # Show all podman containers and images
-[group('podman')]
+# List containers/images related to this project (--all for all)
+[group('list')]
 containers *args:
     #!/usr/bin/env bash
     FMT_ID=$(printf '\x7b\x7b.ID\x7d\x7d')
@@ -68,7 +71,7 @@ containers *args:
 
 # Stop and remove a container by name or ID
 # Usage: just kill <name-or-id>
-[group('podman')]
+[group('containers')]
 kill name:
     #!/usr/bin/env bash
     if podman ps -a --format "%(printf '\x7b\x7b.Names\x7d\x7d')" | grep -q "^{{ name }}$" || \
@@ -81,7 +84,7 @@ kill name:
     fi
 
 # Stop and remove all containers (with confirmation)
-[group('podman')]
+[group('containers')]
 [confirm("⚠️  This will remove ALL containers. Continue?")]
 kill-all:
     #!/usr/bin/env bash
@@ -95,7 +98,7 @@ kill-all:
     fi
 
 # Stop and remove project-related containers
-[group('podman')]
+[group('containers')]
 kill-project:
     #!/usr/bin/env bash
     echo "🔪 Removing project-related containers..."
@@ -120,7 +123,7 @@ kill-project:
 # Remove an image by name, tag, or ID
 # Usage: just rmi <image>
 #        just rmi ghcr.io/vig-os/devcontainer:dev
-[group('podman')]
+[group('images')]
 rmi image:
     #!/usr/bin/env bash
     if podman image exists "{{ image }}" 2>/dev/null; then
@@ -132,7 +135,7 @@ rmi image:
     fi
 
 # Remove all images (with confirmation)
-[group('podman')]
+[group('images')]
 [confirm("⚠️  This will remove ALL images. Continue?")]
 rmi-all:
     #!/usr/bin/env bash
@@ -146,7 +149,7 @@ rmi-all:
     fi
 
 # Remove project-related images
-[group('podman')]
+[group('images')]
 rmi-project:
     #!/usr/bin/env bash
     echo "🗑️  Removing project-related images..."
@@ -160,7 +163,7 @@ rmi-project:
     fi
 
 # Remove dangling images (untagged)
-[group('podman')]
+[group('images')]
 rmi-dangling:
     #!/usr/bin/env bash
     echo "🗑️  Removing dangling images..."
@@ -177,7 +180,7 @@ rmi-dangling:
 # ───────────────────────────────────────────────────────────────────────────────
 
 # Prune unused containers, images, networks, and volumes
-[group('podman')]
+[group('cleanup')]
 [confirm("⚠️  This will prune all unused podman resources. Continue?")]
 prune:
     #!/usr/bin/env bash
@@ -186,7 +189,7 @@ prune:
     echo "✓ Prune complete"
 
 # Full cleanup: prune including volumes
-[group('podman')]
+[group('cleanup')]
 [confirm("⚠️  This will prune ALL unused resources including volumes. Continue?")]
 prune-all:
     #!/usr/bin/env bash

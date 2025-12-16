@@ -6,7 +6,7 @@
 
 import '.devcontainer/justfile.base'
 
-# Import podman management recipes as namespace
+# Podman container & image management (run 'just podman' for options)
 mod podman '.devcontainer/justfile.podman'
 
 # ═══════════════════════════════════════════════════════════════════════════════

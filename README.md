@@ -57,7 +57,7 @@ That's it! All development tools (Python, git, pre-commit, just, etc.) are inclu
 
 ```text
 Available recipes:
-    podman ...                     # Import podman management recipes as namespace
+    podman ...                     # Podman container & image management (run 'just podman' for options)
 
     [build]
     build no_cache=""              # Build local development image
@@ -111,7 +111,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
 - **Version**: 0.1
-- **Built**: 2025-12-16T16:09:21
+- **Built**: 2025-12-16T16:13:33
 - **Size**: ~920 MB
 
 ## Features
