@@ -4,7 +4,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # Import standard dev recipes
 
-import '.devcontainer/justfile.base'
+import 'justfile.base'
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # VARIABLES
@@ -224,4 +224,4 @@ test-sidecar *args:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Podman container & image management recipes
 
-import '.devcontainer/justfile.podman'
+import 'justfile.podman'
