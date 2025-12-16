@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `pip-licenses` pre-commit hook for dependency license compliance checking (blocks GPL-3.0/AGPL-3.0)
 - Pre-flight container cleanup check in test suite with helpful error messages
 - `make clean-test-containers` target for removing lingering test containers
 - `PYTEST_AUTO_CLEANUP` environment variable for automatic test container cleanup

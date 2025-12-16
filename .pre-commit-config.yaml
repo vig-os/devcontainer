@@ -68,3 +68,13 @@ repos:
     rev: v1.39.0
     hooks:
       - id: typos
+
+  # License Compliance Check (runs only when dependencies change)
+  - repo: local
+    hooks:
+      - id: pip-licenses
+        name: pip-licenses (check dependency licenses)
+        entry: uv run pip-licenses --fail-on="GPL-3.0-only;GPL-3.0-or-later;AGPL-3.0-only;AGPL-3.0-or-later"
+        language: system
+        files: ^(pyproject\.toml|uv\.lock|requirements.*\.txt)$
+        pass_filenames: false
