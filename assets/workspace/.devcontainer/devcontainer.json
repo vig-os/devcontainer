@@ -14,7 +14,8 @@
                 "charliermarsh.ruff",
                 "ms-vscode.vscode-json",
                 "redhat.vscode-yaml",
-                "GitHub.vscode-pull-request-github"
+                "GitHub.vscode-pull-request-github",
+                "promptexecution.justlang-lsp"
             ],
             "settings": {
                 "python.defaultInterpreterPath": "/root/assets/workspace/.venv/bin/python",
