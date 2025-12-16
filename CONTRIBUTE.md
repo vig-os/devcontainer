@@ -139,6 +139,7 @@ Available recipes:
     [info]
     default                        # Show available commands (default)
     docs                           # Generate documentation from templates
+    help                           # Show available commands
     info                           # Show image information
     init *args                     # Check/install system dependencies (OS-sensitive)
     login                          # Test login to GHCR

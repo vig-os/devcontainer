@@ -72,6 +72,7 @@ Available recipes:
     [info]
     default                        # Show available commands (default)
     docs                           # Generate documentation from templates
+    help                           # Show available commands
     info                           # Show image information
     init *args                     # Check/install system dependencies (OS-sensitive)
     login                          # Test login to GHCR
@@ -110,7 +111,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
 - **Version**: 0.1
-- **Built**: 2025-12-16T15:49:16
+- **Built**: 2025-12-16T15:53:46
 - **Size**: ~920 MB
 
 ## Features

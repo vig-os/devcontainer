@@ -26,6 +26,11 @@ platforms := "linux/amd64,linux/arm64"
 default:
     @just --list --unsorted
 
+# Show available commands
+[group('info')]
+help:
+    @just --list
+
 # Show image information
 [group('info')]
 info:

@@ -19,6 +19,11 @@ project := "{{SHORT_NAME}}"
 default:
     @just --list --unsorted
 
+# Show available commands
+[group('info')]
+help:
+    @just --list
+
 # Show project information
 [group('info')]
 info:
