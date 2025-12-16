@@ -1,0 +1,28 @@
+# docker-compose.local.yaml
+#
+# Personal/user-specific compose overrides.
+#
+# Use this file for configuration that is PERSONAL to you:
+#   - Mounting your personal directories
+#   - Local environment variables (API keys, tokens)
+#   - Machine-specific settings
+#
+# This file is:
+#   - Git IGNORED (your personal settings stay local)
+#   - Preserved during devcontainer upgrades (init-workspace.sh --force)
+#
+# For team/project overrides, use docker-compose.project.yaml instead.
+#
+# Example:
+#
+#   services:
+#     devcontainer:
+#       volumes:
+#         - ~/my-personal-scripts:/workspace/scripts:ro
+#       environment:
+#         - MY_API_KEY=secret123
+
+
+
+
+
