@@ -6,9 +6,6 @@
 
 import '.devcontainer/justfile.base'
 
-# Podman module (use 'just podman <recipe>' for subcommands)
-mod podman '.devcontainer/justfile.podman'
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # VARIABLES
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -221,3 +218,10 @@ clean-test-containers:
 [group('sidecar')]
 test-sidecar *args:
     @just sidecar test-sidecar {{ args }}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PODMAN
+# ═══════════════════════════════════════════════════════════════════════════════
+# Podman container & image management recipes
+
+import '.devcontainer/justfile.podman'
