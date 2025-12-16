@@ -6,6 +6,10 @@
 
 import '.devcontainer/justfile.base'
 
+# Import podman management recipes
+
+import '.devcontainer/justfile.podman'
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # VARIABLES
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -68,63 +72,6 @@ login:
     #!/usr/bin/env bash
     echo "Logging in to GitHub Container Registry..."
     podman login ghcr.io
-
-# List containers/images related to this project
-# Usage: just containers         # Show project-related containers
-
-# just containers --all   # Show all podman containers and images
-[group('info')]
-containers *args:
-    #!/usr/bin/env bash
-    FMT_ID=$(printf '\x7b\x7b.ID\x7d\x7d')
-    FMT_NAMES=$(printf '\x7b\x7b.Names\x7d\x7d')
-    FMT_IMAGE=$(printf '\x7b\x7b.Image\x7d\x7d')
-    FMT_STATUS=$(printf '\x7b\x7b.Status\x7d\x7d')
-    FMT_REPO=$(printf '\x7b\x7b.Repository\x7d\x7d')
-    FMT_TAG=$(printf '\x7b\x7b.Tag\x7d\x7d')
-    FMT_SIZE=$(printf '\x7b\x7b.Size\x7d\x7d')
-
-    if [[ "{{ args }}" == *"--all"* ]]; then
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "  All Podman Containers"
-        echo "═══════════════════════════════════════════════════════════════"
-        podman ps -a --format "table $FMT_NAMES\t$FMT_IMAGE\t$FMT_STATUS" 2>/dev/null || echo "  No containers found"
-        echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "  All Podman Images"
-        echo "═══════════════════════════════════════════════════════════════"
-        podman images --format "table $FMT_REPO\t$FMT_TAG\t$FMT_SIZE" 2>/dev/null || echo "  No images found"
-    else
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "  Project-Related Containers"
-        echo "═══════════════════════════════════════════════════════════════"
-        # Match containers from compose services and test patterns
-        PATTERNS="devcontainer|test-sidecar|init-workspace|workspace-inspector|vig-os"
-        CONTAINERS=$(podman ps -a --format "$FMT_NAMES|$FMT_IMAGE|$FMT_STATUS" 2>/dev/null | grep -iE "$PATTERNS" || true)
-        if [ -n "$CONTAINERS" ]; then
-            echo "  NAME                          IMAGE                           STATUS"
-            echo "$CONTAINERS" | while IFS='|' read -r name image status; do
-                printf "  %-30s %-30s %s\n" "$name" "$image" "$status"
-            done
-        else
-            echo "  No project-related containers found"
-        fi
-        echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "  Project-Related Images"
-        echo "═══════════════════════════════════════════════════════════════"
-        IMAGES=$(podman images --format "$FMT_REPO|$FMT_TAG|$FMT_SIZE" 2>/dev/null | grep -iE "devcontainer|test-sidecar|vig-os" || true)
-        if [ -n "$IMAGES" ]; then
-            echo "  REPOSITORY                    TAG        SIZE"
-            echo "$IMAGES" | while IFS='|' read -r repo tag size; do
-                printf "  %-30s %-10s %s\n" "$repo" "$tag" "$size"
-            done
-        else
-            echo "  No project-related images found"
-        fi
-        echo ""
-        echo "Tip: Use 'just containers --all' to see all podman containers and images"
-    fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # BUILD

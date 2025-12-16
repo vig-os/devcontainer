@@ -68,7 +68,6 @@ Available recipes:
     update                         # Update all dependencies
 
     [info]
-    containers *args               # just containers --all   # Show all podman containers and images
     default                        # Show available commands (default)
     docs                           # Generate documentation from templates
     help                           # Show available commands
@@ -76,6 +75,18 @@ Available recipes:
     init *args                     # Check/install system dependencies (OS-sensitive)
     login                          # Test login to GHCR
     setup                          # Setup Python environment and dev tools
+
+    [podman]
+    containers *args               # just containers --all   # Show all podman containers and images
+    kill name                      # Usage: just kill <name-or-id>
+    kill-all                       # Stop and remove all containers (with confirmation)
+    kill-project                   # Stop and remove project-related containers
+    prune                          # Prune unused containers, images, networks, and volumes
+    prune-all                      # Full cleanup: prune including volumes
+    rmi image                      # just rmi ghcr.io/vig-os/devcontainer:dev
+    rmi-all                        # Remove all images (with confirmation)
+    rmi-dangling                   # Remove dangling images (untagged)
+    rmi-project                    # Remove project-related images
 
     [quality]
     format                         # Format code
@@ -110,7 +121,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
 - **Version**: 0.1
-- **Built**: 2025-12-16T16:00:25
+- **Built**: 2025-12-16T16:06:33
 - **Size**: ~920 MB
 
 ## Features
