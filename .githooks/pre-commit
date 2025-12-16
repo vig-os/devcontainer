@@ -10,4 +10,4 @@ if [ "${IN_CONTAINER:-}" = "false" ]; then
 fi
 
 # Run pre-commit hooks
-pre-commit run
+uv run pre-commit run
