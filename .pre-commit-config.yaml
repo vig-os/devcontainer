@@ -49,19 +49,31 @@ repos:
     hooks:
       - id: pymarkdown
         name: pymarkdown (fix)
-        args: ["fix"]
+        args: ["-c", ".pymarkdown", "fix"]
       - id: pymarkdown
         name: pymarkdown (scan)
-        args: ["scan"]
+        args: ["-c", ".pymarkdown", "scan"]
         exclude: ^\.github_data/
 
-  # Makefile
-  - repo: https://github.com/checkmake/checkmake
-    rev: 0.2.2
+  # Justfile formatting
+  - repo: local
     hooks:
-      - id: checkmake
-        name: checkmake (lint Makefile)
-        files: ^Makefile$
+      - id: just-fmt
+        name: just (format justfiles)
+        entry: just --fmt --unstable
+        language: system
+        files: ^justfile(\..*)?$
+        pass_filenames: false
+
+  # Documentation Generation (auto-regenerate on template/requirements changes)
+  - repo: local
+    hooks:
+      - id: generate-docs
+        name: generate-docs (regenerate from templates)
+        entry: bash -c 'uv run python docs/generate.py && git add README.md CONTRIBUTE.md TESTING.md 2>/dev/null || true'
+        language: system
+        files: ^(docs/templates/.*\.j2|docs/narrative/.*\.md|scripts/requirements\.yaml|justfile)$
+        pass_filenames: false
 
   # Typo Linting
   - repo: https://github.com/crate-ci/typos

@@ -1,28 +1,20 @@
-# Contributing to vigOS Development Environment
+{# CONTRIBUTE.md.j2 - Template for contributor documentation
+   Generated from: scripts/requirements.yaml + just --list output
+   DO NOT EDIT CONTRIBUTE.md directly - edit this template instead #}
+# Contributing to {{ project_name }}
 
 This guide explains how to develop, build, test, and release the vigOS development container image.
 
 ## Requirements
 
-| Component            | Version | Purpose |
-|----------------------|---------|---------|
-| **Podman**           | v4.0+   | Container runtime, compose, and linting |
-| **just**             | Latest  | Command runner for task automation         |
-| **uv**               | v0.8+   | Python package and project manager      |
-| **git**              | >2.34.0 | Version control and pre-commit tools    |
-| **ssh**              | Latest  | GitHub sign in and commit signing       |
-| **gh**               | Latest  | GitHub CLI for repository and PR/issue management |
-| **npm**              | Latest  | Node.js package manager (for DevContainer CLI) |
-| **devcontainer CLI** | v0.80.1 | DevContainer CLI for testing devcontainer functionality |
+{{ requirements_table }}
 
-> **Note:** You do **not** need to manually install `uv` or `devcontainer CLI`.
-They will be installed automatically when running `./scripts/setup.sh` or `just setup`.
+{{ auto_install_note }}
 
 **Ubuntu/Debian:**
 
 ```bash
-sudo apt update
-sudo apt install -y podman git openssh-client gh nodejs npm
+{{ install_debian }}
 ```
 
 To build images for multiple architectures (e.g., AMD64 and ARM64), install QEMU user static binaries:
@@ -37,11 +29,11 @@ Verify the installation by checking that `cat /proc/sys/fs/binfmt_misc/qemu-aarc
 **macOS (Homebrew):**
 
 ```bash
-brew install podman git openssh gh node
+{{ install_macos }}
 ```
 
 - For other Linux distributions, use your package manager (e.g., `dnf`, `yum`, `zypper`, `apk`) to install these dependencies.
-- `uv` and `devcontainer CLI` will be set up automatically; no need to install them manually.
+- Run `./scripts/init.sh` to check dependencies and get OS-specific installation commands.
 - Ensure Docker is installed if you plan to use it instead of Podman.
 
 ## Setup
@@ -51,7 +43,8 @@ Clone this repository and prepare it for container development:
 ```bash
 git clone git@github.com:vig-os/devcontainer.git
 cd devcontainer
-just setup
+./scripts/init.sh    # Check/install dependencies
+just setup           # Setup Python environment and tools
 ```
 
 ## Development Workflow
@@ -80,7 +73,8 @@ When contributing to this project, follow this workflow:
    - Ensure your code follows the project's style and conventions
 
 4. **Update documentation if necessary**
-   - Update [README.md](README.md), [CONTRIBUTE.md](CONTRIBUTE.md), or other relevant docs
+   - Update templates in `docs/templates/` (not the generated files directly)
+   - Run `just docs` to regenerate documentation
    - Update the [CHANGELOG](CHANGELOG.md) with your changes in the `[Unreleased]` section
      - Add entries under appropriate categories (Added, Changed, Fixed, etc.)
      - Use clear, concise descriptions
@@ -111,7 +105,7 @@ When contributing to this project, follow this workflow:
 
 ## Just Recipes
 
-```
+```text
 {{ just_help_output }}
 ```
 
@@ -120,7 +114,8 @@ When contributing to this project, follow this workflow:
 When releasing a new version of the devcontainer image, follow these steps:
 
 1. **Update documentation**
-   - Ensure [README.md](README.md), [CONTRIBUTE.md](CONTRIBUTE.md), and other docs are up to date
+   - Ensure documentation templates are up to date
+   - Run `just docs` to regenerate all documentation
    - Update [CHANGELOG.md](CHANGELOG.md):
      - Move all `[Unreleased]` entries to a new version section (e.g., `[1.0]`)
      - Add the release date in YYYY-MM-DD format
@@ -151,12 +146,12 @@ When releasing a new version of the devcontainer image, follow these steps:
 
    ```bash
    # Replace X.Y with the version number (e.g. 1.0, 1.1, 2.0)
-   just push version=X.Y
+   just push X.Y
    ```
 
    - This will:
      - Build the image for the specified version
-     - Run tests (unless `NO_TEST=1` is specified)
+     - Run tests (unless `no_test=true` is specified)
      - Push the image to GHCR with both `:latest` and `:X.Y` tags
      - Update [README.md](README.md) with the new version
      - Create a git commit with the README.md update (commit message: "Release X.Y")
@@ -172,7 +167,7 @@ When releasing a new version of the devcontainer image, follow these steps:
 
 ## Version Tagging
 
-vigOS Development Environment uses **smart version detection** to manage both GHCR tags and git tags:
+{{ project_name }} uses **smart version detection** to manage both GHCR tags and git tags:
 
 - **Development versions** (`dev`):
   - Only local, without time stamp or git reference
@@ -182,13 +177,13 @@ vigOS Development Environment uses **smart version detection** to manage both GH
 - **Stable versions** (e.g., `1.2`, `2.0`):
   - Pushes to GHCR with both `:latest` and `:version` tags
   - Creates git tag `v{version}` (e.g., `v1.2`)
-  - Use `just push version=X.Y`
+  - Use `just push X.Y`
 
 This ensures that `:latest` always points to the latest stable release, and git tags provide traceability for all stable container versions.
 
 ## Multi-Architecture Support
 
-vigOS Development Environment supports both **AMD64** (x86_64) and **ARM64** (Apple Silicon) architectures:
+{{ project_name }} supports both **AMD64** (x86_64) and **ARM64** (Apple Silicon) architectures:
 
 - **Local builds** (`just build` and `just test`): Automatically builds and tests for your native platform (ARM64 on macOS, AMD64 on Linux)
 - **Push to registry** (`just push`): Builds and pushes multi-arch manifests supporting both platforms
@@ -198,5 +193,5 @@ This ensures seamless development across different platforms without manual plat
 
 ## Testing
 
-vigOS Development Environment relies on comprehensive tests to verify both container images and devcontainer functionality.
+{{ project_name }} relies on comprehensive tests to verify both container images and devcontainer functionality.
 For detailed information about the testing strategy, test structure, and how to develop tests, see the [Testing Guide](TESTING.md).

@@ -2,18 +2,19 @@
 # vigOS Devcontainer - Just Recipes
 # Build automation for devcontainer image development
 # ═══════════════════════════════════════════════════════════════════════════════
-
 # Import standard dev recipes
+
 import '.devcontainer/justfile.base'
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # VARIABLES
 # ═══════════════════════════════════════════════════════════════════════════════
-
 # Allow TEST_REGISTRY to override REPO for testing (e.g., localhost:5000/test/)
+
 repo := env_var_or_default("TEST_REGISTRY", "ghcr.io/vig-os/devcontainer")
 
 # Multi-arch support: build for both AMD64 and ARM64
+
 platforms := "linux/amd64,linux/arm64"
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -35,16 +36,26 @@ info:
     else
         NATIVE_ARCH="linux/amd64"
     fi
-    echo "Image: {{repo}}"
+    echo "Image: {{ repo }}"
     echo "Containerfile: Containerfile"
     echo "Native arch: $NATIVE_ARCH"
 
-# Setup configuration for this project
+# Check/install system dependencies (OS-sensitive)
+[group('info')]
+init *args:
+    ./scripts/init.sh {{ args }}
+
+# Setup Python environment and dev tools
 [group('info')]
 setup:
     #!/usr/bin/env bash
     echo "Setting up configuration..."
     ./scripts/setup.sh
+
+# Generate documentation from templates
+[group('info')]
+docs:
+    uv run python docs/generate.py
 
 # Test login to GHCR
 [group('info')]
@@ -67,10 +78,10 @@ build no_cache="":
     else
         NATIVE_ARCH="linux/amd64"
     fi
-    if [ -n "{{no_cache}}" ]; then
-        ./scripts/build.sh --no-cache dev "{{repo}}" "$NATIVE_ARCH"
+    if [ -n "{{ no_cache }}" ]; then
+        ./scripts/build.sh --no-cache dev "{{ repo }}" "$NATIVE_ARCH"
     else
-        ./scripts/build.sh dev "{{repo}}" "$NATIVE_ARCH"
+        ./scripts/build.sh dev "{{ repo }}" "$NATIVE_ARCH"
     fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -81,12 +92,12 @@ build no_cache="":
 [private]
 _ensure-dev-image version="dev":
     #!/usr/bin/env bash
-    if ! podman image exists "{{repo}}:{{version}}"; then
-        if [ "{{version}}" = "dev" ]; then
+    if ! podman image exists "{{ repo }}:{{ version }}"; then
+        if [ "{{ version }}" = "dev" ]; then
             echo "Building dev image..."
             just build
         else
-            echo "❌ Image {{repo}}:{{version}} not found. Please build it first."
+            echo "❌ Image {{ repo }}:{{ version }} not found. Please build it first."
             exit 1
         fi
     fi
@@ -94,16 +105,16 @@ _ensure-dev-image version="dev":
 # Run image tests only
 [group('test')]
 test-image version="dev":
-    @just _ensure-dev-image {{version}}
+    @just _ensure-dev-image {{ version }}
     #!/usr/bin/env bash
-    TEST_CONTAINER_TAG={{version}} uv run pytest tests/test_image.py -v --tb=short
+    TEST_CONTAINER_TAG={{ version }} uv run pytest tests/test_image.py -v --tb=short
 
 # Run integration tests only
 [group('test')]
 test-integration version="dev":
-    @just _ensure-dev-image {{version}}
+    @just _ensure-dev-image {{ version }}
     #!/usr/bin/env bash
-    TEST_CONTAINER_TAG={{version}} uv run pytest tests/test_integration.py -v --tb=short
+    TEST_CONTAINER_TAG={{ version }} uv run pytest tests/test_integration.py -v --tb=short
 
 # Run registry tests only (doesn't need image)
 [group('test')]
@@ -123,17 +134,17 @@ _test-cleanup-check:
 # Run all test suites (image, integration, registry)
 [private]
 _test-all version="dev":
-    @just _ensure-dev-image {{version}}
+    @just _ensure-dev-image {{ version }}
     #!/usr/bin/env bash
-    PYTEST_SKIP_CONTAINER_CHECK=1 TEST_CONTAINER_TAG={{version}} uv run pytest tests/test_image.py -v --tb=short
-    PYTEST_SKIP_CONTAINER_CHECK=1 TEST_CONTAINER_TAG={{version}} uv run pytest tests/test_integration.py -v --tb=short
+    PYTEST_SKIP_CONTAINER_CHECK=1 TEST_CONTAINER_TAG={{ version }} uv run pytest tests/test_image.py -v --tb=short
+    PYTEST_SKIP_CONTAINER_CHECK=1 TEST_CONTAINER_TAG={{ version }} uv run pytest tests/test_integration.py -v --tb=short
     PYTEST_SKIP_CONTAINER_CHECK=1 uv run pytest tests/test_registry.py -v -s --tb=short
 
 # Run all test suites
 [group('test')]
 test version="dev":
     @just _test-cleanup-check
-    @just _test-all {{version}}
+    @just _test-all {{ version }}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # RELEASE
@@ -149,18 +160,18 @@ push version:
     else
         NATIVE_ARCH="linux/amd64"
     fi
-    ./scripts/push.sh "{{version}}" "{{repo}}" "$NATIVE_ARCH" "{{platforms}}" "${REGISTRY_TEST:-}"
+    ./scripts/push.sh "{{ version }}" "{{ repo }}" "$NATIVE_ARCH" "{{ platforms }}" "${REGISTRY_TEST:-}"
 
 # Pull image from registry (default: latest)
 [group('release')]
 pull version="latest":
     #!/usr/bin/env bash
-    echo "Pulling image {{repo}}:{{version}}..."
+    echo "Pulling image {{ repo }}:{{ version }}..."
     TLS_FLAG=""
     if [ "${REGISTRY_TEST:-}" = "1" ]; then
         TLS_FLAG="--tls-verify=false"
     fi
-    podman pull $TLS_FLAG "{{repo}}:{{version}}" || echo "⚠️  Failed to pull {{repo}}:{{version}}"
+    podman pull $TLS_FLAG "{{ repo }}:{{ version }}" || echo "⚠️  Failed to pull {{ repo }}:{{ version }}"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CLEAN
@@ -170,7 +181,7 @@ pull version="latest":
 [group('clean')]
 clean version="dev":
     #!/usr/bin/env bash
-    ./scripts/clean.sh "{{version}}" "{{repo}}"
+    ./scripts/clean.sh "{{ version }}" "{{ repo }}"
 
 # Clean up lingering test containers
 [group('clean')]
@@ -201,4 +212,4 @@ clean-test-containers:
 # Convenience alias for test-sidecar (uses generic sidecar recipe)
 [group('sidecar')]
 test-sidecar *args:
-    @just sidecar test-sidecar {{args}}
+    @just sidecar test-sidecar {{ args }}

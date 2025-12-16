@@ -12,7 +12,7 @@ To use this devcontainer image, you need:
 - **Dev Containers extension** - VS Code extension for working with development containers
 - **Podman** or **Docker** - Container runtime to run the container image
 
-That's it! All development tools (Python, git, pre-commit, etc.) are included in the container image itself.
+That's it! All development tools (Python, git, pre-commit, just, etc.) are included in the container image itself.
 
 ## Quick Start
 
@@ -53,30 +53,65 @@ That's it! All development tools (Python, git, pre-commit, etc.) are included in
 
    VS Code will detect `.devcontainer/devcontainer.json` and offer to reopen inside the container automatically.
 
-## Upgrading from v0.1
+## Available Commands
 
-If you're upgrading from version 0.1, note these important changes:
+```text
+Available recipes:
+    [build]
+    build no_cache=""              # Build local development image
+    clean-artifacts                # Clean build artifacts
 
-### Docker Compose File Reorganization
+    [clean]
+    clean version="dev"            # Remove image (default: dev)
+    clean-test-containers          # Clean up lingering test containers
 
-The compose override system has been reorganized:
+    [deps]
+    sync                           # Sync dependencies from pyproject.toml
+    update                         # Update all dependencies
 
-**Old structure (v0.1)**:
-- `docker-compose.override.yml` - For all customizations
+    [info]
+    default                        # Show available commands (default)
+    docs                           # Generate documentation from templates
+    info                           # Show image information
+    init *args                     # Check/install system dependencies (OS-sensitive)
+    login                          # Test login to GHCR
+    setup                          # Setup Python environment and dev tools
 
-**New structure (v0.2+)**:
-- `docker-compose.project.yaml` - Team/project config (git-tracked)
-- `docker-compose.local.yaml` - Personal config (git-ignored)
+    [quality]
+    format                         # Format code
+    lint                           # Run all linters
+    precommit                      # Run pre-commit hooks on all files
 
-**Migration steps**:
+    [release]
+    pull version="latest"          # Pull image from registry (default: latest)
+    push version                   # Push versioned release to registry (builds, tests, tags, pushes)
 
-1. If you have customizations in `docker-compose.override.yml`:
-   - Move **team-shared** config → `docker-compose.project.yaml`
-   - Move **personal** config → `docker-compose.local.yaml`
-2. Run `init-workspace.sh --force` to update the devcontainer
-3. The old `docker-compose.override.yml` is no longer used
+    [sidecar]
+    sidecar name *args             # just sidecar redis flush
+    sidecars                       # List available sidecar containers
+    test-sidecar *args             # Convenience alias for test-sidecar (uses generic sidecar recipe)
 
-Both `project.yaml` and `local.yaml` are preserved during upgrades.
+    [test]
+    test version="dev"             # Run all test suites
+    test-cov *args                 # Run tests with coverage
+    test-image version="dev"       # Run image tests only
+    test-integration version="dev" # Run integration tests only
+    test-pytest *args              # Run tests with pytest
+    test-registry                  # Run registry tests only (doesn't need image)
+
+```
+
+For detailed command descriptions, run `just --list --unsorted` or `just --help`.
+
+## Image Details
+
+- **Base Image**: `python:3.12-slim-trixie`
+- **Registry**: `ghcr.io/vig-os/devcontainer`
+- **Architecture**: Multi-platform support (AMD64, ARM64)
+- **License**: Apache
+- **Version**: 0.1
+- **Built**: 2025-12-16T15:49:16
+- **Size**: ~920 MB
 
 ## Features
 
@@ -103,130 +138,8 @@ Both `project.yaml` and `local.yaml` are preserved during upgrades.
 
 - **pre-commit** - Git hook framework for code quality
 - **ruff** - Fast Python linter and formatter (replaces Black, isort, flake8, and more)
+- **just** - Command runner for task automation
 - **precommit alias** - Shortcut command for running pre-commit hooks
-
-## **VS Code Integration**
-
-The container includes a template that configures recommended VS Code
-integration when you initialize a project with `init-workspace`.
-
-### Deployment into a project
-
-To deploy the devcontainer into your project, run the `init-workspace` script
-from your host terminal:
-
-```bash
-podman run -it --rm -v "./:/workspace" ghcr.io/vig-os/devcontainer:latest /root/assets/init-workspace.sh
-```
-
-This script:
-- Copies the devcontainer asset files (`.devcontainer/` directory, a README...) to your workspace
-- Prompts for a project short name and replaces placeholders throughout the assets
-- Sets up executable permissions on scripts and git hooks
-- Initializes a git repository if one doesn't exist
-
-The template includes:
-- `devcontainer.json` - VS Code devcontainer configuration
-- Pre-configured scripts for git setup, authentication, and pre-commit hooks
-- Git hooks for commit signing and verification
-- Project template files: README and CHANGELOG
-
-### Mounting Additional Folders
-
-The devcontainer supports mounting additional folders/projects using Docker Compose override files. This is useful for:
-
-- Multi-project development (monorepos, microservices)
-- Shared libraries or resources
-- Reference documentation
-
-To mount additional folders:
-
-**For team-shared mounts** (committed to git):
-- Edit `.devcontainer/docker-compose.project.yaml`
-
-**For personal mounts** (local only):
-- Edit `.devcontainer/docker-compose.local.yaml`
-
-Example:
-
-```yaml
-services:
-  devcontainer:
-    volumes:
-      - ../other-project:/workspace/other-project:cached
-      - ~/shared-libs:/workspace/shared:cached
-```
-
-Then rebuild the devcontainer. The `local.yaml` file is gitignored, so each developer can have their own mounts.
-See `.devcontainer/README.md` for detailed documentation and examples.
-
-### Multi-root VS Code workspace
-
-Multi-root workspaces allow to **browse/edit the mounted folders from VS Code** —for
-runtime-only usage, mounting through `docker-compose.project.yaml` or `docker-compose.local.yaml` is enough.
-
-1. Copy the template once per machine:
-   `cp .devcontainer/workspace.code-workspace.example .devcontainer/workspace.code-workspace`
-2. Customize the `folders` array with additional projects mounted via compose files.
-3. VS Code will automatically offer the `Open Workspace` option.
-
-Your personal `workspace.code-workspace` stays gitignored and therefore only local.
-If you want to share new defaults, update `.devcontainer/workspace.code-workspace.example`
-and teammates can recopy or merge the changes locally.
-
-### Authentication
-
-GitHub authentication is handled automatically when the devcontainer starts:
-
-1. **GitHub CLI**: The container copies your host's GitHub CLI configuration
-   (from `~/.config/gh/`) into the container on startup
-2. **Token-based auth**: If a GitHub token is placed in
-   `.devcontainer/.conf/.gh_token`, it will be used to authenticate the GitHub CLI
-   and then automatically removed for security
-3. **SSH Agent**: SSH agent forwarding is configured automatically for git operations
-   and commit signing
-
-The authentication setup runs via the `postAttachCommand` hook, which executes
-`.devcontainer/scripts/post-attach.sh` when VS Code attaches to the container.
-
-### Git configuration
-
-Git configuration is synchronized from the host to ensure consistency:
-
-1. **Git config**: Your host's git configuration (user.name, user.email, etc.) is
-   copied from `.devcontainer/.conf/.gitconfig` into the container
-2. **Commit signing**: SSH public key for commit signing is copied from
-   `.devcontainer/.conf/id_ed25519_github.pub` and configured automatically
-3. **Signature verification**: The `allowed-signers` file is set up for git
-   signature verification
-4. **Git hooks**: Pre-commit hooks are installed and configured automatically
-
-To set up these files on the host, run `.devcontainer/scripts/copy-host-user-conf.sh`
-from your project root before starting the devcontainer.
-
-### Extensions
-
-The following VS Code extensions are automatically installed and configured:
-
-- **ms-python.python** - Python language support
-- **charliermarsh.ruff** - Ruff linter and formatter for Python
-- **ms-vscode.vscode-json** - JSON language support
-- **redhat.vscode-yaml** - YAML language support
-- **GitHub.vscode-pull-request-github** - GitHub Pull Request integration
-
-These extensions are configured in the `.devcontainer/devcontainer.json`
-template, not installed in the container image itself. VS Code settings are
-also pre-configured for development with format-on-save and automatic
-import organization.
-
-## Image Details
-
-- **Base Image**: `python:3.12-slim-trixie`
-- **Registry**: `ghcr.io/vig-os/devcontainer`
-- **Architecture**: Multi-platform support (AMD64, ARM64)
-- **License**: Apache
-- **Version**: [0.1](https://github.com/vig-os/devcontainer/releases/tag/v0.1), 2025-12-10
-- **Size**: ~920 MB
 
 ## Contributing
 
@@ -240,4 +153,4 @@ If you want to contribute to the development of this devcontainer image, see [CO
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License. See the [LICENSE](LICENSE) file for details.

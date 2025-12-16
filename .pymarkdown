@@ -5,9 +5,12 @@
     }
   },
   "plugins": {
-    "md013": {
+    "md012": {
       "enabled": true,
-      "line_length": 210
+      "maximum": 2
+    },
+    "md013": {
+      "enabled": false
     },
     "md036": {
       "enabled": false

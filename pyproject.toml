@@ -5,6 +5,7 @@ description = "vigOS development environment"
 requires-python = "==3.12.10"
 dependencies = [
     "github-backup>=0.50.3",
+    "jinja2>=3.1.0",
     "pexpect>=4.9.0",
     "pre-commit>=4.3.0",
     "pytest>=9.0.1",

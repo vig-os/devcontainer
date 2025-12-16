@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Generate documentation from narrative sources and just help output."""
+"""Generate documentation from narrative sources, requirements.yaml, and just help output.
+
+This script implements "docs as code" by generating documentation from:
+- Narrative markdown files (docs/narrative/)
+- Requirements definitions (scripts/requirements.yaml)
+- Just recipe help output (just --list)
+
+Single source of truth principle: All dependency information comes from requirements.yaml.
+"""
 
 import subprocess
 import sys
@@ -7,9 +15,10 @@ from datetime import datetime
 from pathlib import Path
 
 import jinja2
+import yaml
 
 
-def get_just_help():
+def get_just_help() -> str:
     """Extract just --list output."""
     try:
         result = subprocess.run(
@@ -20,11 +29,11 @@ def get_just_help():
         )
         return result.stdout
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"Error getting just help: {e}", file=sys.stderr)
-        return ""
+        print(f"Warning: Could not get just help: {e}", file=sys.stderr)
+        return "<!-- Run 'just --list' to see available recipes -->"
 
 
-def get_version_from_changelog():
+def get_version_from_changelog() -> str:
     """Extract version from CHANGELOG.md."""
     changelog = Path(__file__).parent.parent / "CHANGELOG.md"
     if changelog.exists():
@@ -37,15 +46,134 @@ def get_version_from_changelog():
     return "dev"
 
 
-def get_image_size():
+def get_image_size() -> str:
     """Get approximate image size from Containerfile notes."""
     return "~920 MB"
 
 
-def generate_docs():
+def load_requirements() -> dict:
+    """Load requirements from requirements.yaml.
+
+    Returns a dictionary with:
+    - dependencies: List of required dependencies
+    - optional: List of optional dependencies
+    - auto_install: List of auto-installed dependencies (via setup.sh)
+    """
+    requirements_file = Path(__file__).parent.parent / "scripts" / "requirements.yaml"
+
+    if not requirements_file.exists():
+        print(
+            f"Warning: Requirements file not found: {requirements_file}",
+            file=sys.stderr,
+        )
+        return {"dependencies": [], "optional": [], "auto_install": []}
+
+    with requirements_file.open() as f:
+        data = yaml.safe_load(f)
+
+    # Separate auto-install from manual dependencies
+    dependencies = []
+    auto_install = []
+
+    for dep in data.get("dependencies", []):
+        if dep.get("auto_install", False):
+            auto_install.append(dep)
+        else:
+            dependencies.append(dep)
+
+    return {
+        "dependencies": dependencies,
+        "optional": data.get("optional", []),
+        "auto_install": auto_install,
+    }
+
+
+def format_requirements_table(requirements: dict) -> str:
+    """Generate markdown table from requirements data."""
+    lines = [
+        "| Component            | Version | Purpose |",
+        "|----------------------|---------|---------|",
+    ]
+
+    # Required dependencies (manual install)
+    for dep in requirements["dependencies"]:
+        name = dep.get("name", "unknown")
+        version = dep.get("version", "latest")
+        purpose = dep.get("purpose", "")
+        lines.append(f"| **{name}** | {version} | {purpose} |")
+
+    # Auto-install dependencies
+    for dep in requirements["auto_install"]:
+        name = dep.get("name", "unknown")
+        version = dep.get("version", "latest")
+        purpose = dep.get("purpose", "")
+        lines.append(f"| **{name}** | {version} | {purpose} |")
+
+    return "\n".join(lines)
+
+
+def format_install_commands(requirements: dict, os_type: str) -> str:
+    """Generate installation command for a specific OS."""
+    deps = requirements["dependencies"]
+    install_field = {
+        "macos": "macos",
+        "debian": "debian",
+        "fedora": "fedora",
+    }.get(os_type, "debian")
+
+    # Collect package names for package manager installs
+    brew_packages = []
+    apt_packages = []
+    other_commands = []
+
+    for dep in deps:
+        install_info = dep.get("install", {})
+        cmd = install_info.get(install_field, "")
+
+        if not cmd:
+            continue
+
+        # Parse common package manager patterns
+        if os_type == "macos" and cmd.startswith("brew install "):
+            brew_packages.append(cmd.replace("brew install ", "").strip())
+        elif os_type == "debian" and cmd.startswith("sudo apt install -y "):
+            apt_packages.append(cmd.replace("sudo apt install -y ", "").strip())
+        elif "|" in cmd or "\n" in cmd:
+            # Multi-line or piped commands - keep separate
+            other_commands.append(f"# {dep.get('name', 'unknown')}\n{cmd}")
+        else:
+            other_commands.append(cmd)
+
+    result = []
+
+    if os_type == "macos" and brew_packages:
+        result.append(f"brew install {' '.join(brew_packages)}")
+    elif os_type == "debian" and apt_packages:
+        result.append("sudo apt update")
+        result.append(f"sudo apt install -y {' '.join(apt_packages)}")
+
+    result.extend(other_commands)
+
+    return "\n".join(result)
+
+
+def get_auto_install_note(requirements: dict) -> str:
+    """Generate note about auto-installed dependencies."""
+    auto_deps = requirements.get("auto_install", [])
+    if not auto_deps:
+        return ""
+
+    names = [f"`{dep.get('name', 'unknown')}`" for dep in auto_deps]
+    return f"> **Note:** You do **not** need to manually install {' or '.join(names)}.\nThey will be installed automatically when running `./scripts/init.sh` followed by `just setup`."
+
+
+def generate_docs() -> bool:
     """Generate documentation from templates."""
     docs_dir = Path(__file__).parent
     root_dir = docs_dir.parent
+
+    # Load requirements
+    requirements = load_requirements()
 
     # Set up Jinja2 environment
     env = jinja2.Environment(
@@ -54,11 +182,17 @@ def generate_docs():
     )
 
     # Register helper for including narrative files
-    def include_narrative(filename):
-        """Include a narrative markdown file."""
+    def include_narrative(filename: str) -> str:
+        """Include a narrative markdown file, stripping front-matter if present."""
         narrative_file = docs_dir / "narrative" / filename
         if narrative_file.exists():
-            return narrative_file.read_text()
+            content = narrative_file.read_text()
+            # Strip YAML front-matter if present
+            if content.startswith("---"):
+                parts = content.split("---", 2)
+                if len(parts) >= 3:
+                    content = parts[2]
+            return content.strip()
         return f"<!-- Missing: {filename} -->"
 
     env.globals["include_narrative"] = include_narrative
@@ -70,6 +204,12 @@ def generate_docs():
         "version": get_version_from_changelog(),
         "image_size": get_image_size(),
         "build_date": datetime.now().isoformat(timespec="seconds"),
+        # Requirements data
+        "requirements": requirements,
+        "requirements_table": format_requirements_table(requirements),
+        "install_macos": format_install_commands(requirements, "macos"),
+        "install_debian": format_install_commands(requirements, "debian"),
+        "auto_install_note": get_auto_install_note(requirements),
     }
 
     # Generate each template
@@ -79,6 +219,7 @@ def generate_docs():
         ("TESTING.md.j2", "TESTING.md"),
     ]
 
+    generated_count = 0
     for template_name, output_name in templates_to_generate:
         template_path = docs_dir / "templates" / template_name
         if not template_path.exists():
@@ -92,10 +233,12 @@ def generate_docs():
             output_path = root_dir / output_name
             output_path.write_text(output)
             print(f"Generated: {output_name}")
+            generated_count += 1
         except Exception as e:
             print(f"Error generating {output_name}: {e}", file=sys.stderr)
             return False
 
+    print(f"\n✓ Generated {generated_count} documentation files")
     return True
 
 

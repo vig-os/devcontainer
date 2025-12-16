@@ -8,7 +8,7 @@ We use a three-tiered testing approach:
 
 1. **Image Tests**: Verify the container image itself (installed tools, versions, environment variables, file structure)
 2. **Integration Tests**: Verify that the container works correctly as a devcontainer (template initialization, configuration files, scripts, VS Code integration)
-3. **Registry Tests**: Verify that the Makefile's push, pull, and clean workflows work correctly without leaving artifacts
+3. **Registry Tests**: Verify that the justfile's push, pull, and clean workflows work correctly without leaving artifacts
 
 The tests are organized into three main files:
 
@@ -25,9 +25,9 @@ tests/
 These tests run against a running container instance to verify the image itself
 (installed tools, versions, environment variables, file structure).
 
-- `TestSystemTools` - git, curl, openssh-client, gh
+- `TestSystemTools` - git, curl, openssh-client, gh, just
 - `TestPythonEnvironment` - Python 3.12, uv
-- `TestDevelopmentTools` - pre-commit, ruff
+- `TestDevelopmentTools` - pre-commit, ruff, just
 - `TestEnvironmentVariables` - environment variables
 - `TestFileStructure` - file structure
 
@@ -44,15 +44,16 @@ These tests run against an initialized workspace to verify that the container wo
 - `TestDevContainerGit` - git hooks/config
 - `TestDevContainerUserConf` - user configuration files
 - `TestDevContainerCLI` - devcontainer deployment and functionality
+- `TestSidecarConnectivity` - sidecar container integration with just
 
 ### Registry Tests
 
-These tests check that the Makefile's push, pull, and clean workflows work correctly without leaving artifacts,
+These tests check that the justfile's push, pull, and clean workflows work correctly without leaving artifacts,
 using a local temporary Docker registry.
 
-- `test_make_push_mechanism` - verifies push workflow
-- `test_make_pull_mechanism` - verifies pull workflow
-- `test_make_clean_mechanism` - verifies clean workflow
+- `test_just_push_mechanism` - verifies push workflow
+- `test_just_pull_mechanism` - verifies pull workflow
+- `test_just_clean_mechanism` - verifies clean workflow
 
 ### Test fixtures
 
@@ -70,8 +71,8 @@ Registry fixtures:
 - `local_registry`: Local Docker registry for testing (session-scoped)
 - `test_version`: Unique test version for registry tests (session-scoped)
 - `git_clean_state`: Ensures git repository is clean before/after tests (session-scoped)
-- `pushed_image`: Performs `make push` and verifies git tag creation and image existence (session-scoped)
-- `pulled_image`: Depends on `pushed_image`, performs `make pull` and verifies the image was pulled (session-scoped)
+- `pushed_image`: Performs `just push` and verifies git tag creation and image existence (session-scoped)
+- `pulled_image`: Depends on `pushed_image`, performs `just pull` and verifies the image was pulled (session-scoped)
 
 **Note**: Session-scoped fixtures (like `devcontainer_up`) are set up once per test session and reused by all tests.
 This is important for fixtures that take time to set up (e.g., `devcontainer_up` takes about a minute).
@@ -79,15 +80,15 @@ The fixtures automatically cleans up after all tests complete.
 
 ## Running Tests
 
-Tests are run using Makefile targets. The `test` target runs all three test suites (image, integration, and registry):
+Tests are run using just recipes. The `test` recipe runs all three test suites (image, integration, and registry):
 
 ```bash
 # Run all test suites (image, integration, registry)
-make test
+just test
 
 # Run tests for a specific image version (must be locally available)
 # Note: test-registry always uses a temporary local registry
-make test VERSION=1.0
+just test version=1.0
 ```
 
 ### Individual Test Suites
@@ -96,23 +97,23 @@ You can also run individual test suites:
 
 ```bash
 # Run only image tests (builds dev image if needed)
-make test-image
+just test-image
 
 # Run only integration tests (builds dev image if needed)
-make test-integration
+just test-integration
 
 # Run only registry tests (doesn't require pre-built image)
-make test-registry
+just test-registry
 
 # Run specific test suite for a locally available version
-make test-image VERSION=1.0
-make test-integration VERSION=1.0
+just test-image version=1.0
+just test-integration version=1.0
 ```
 
 ### Notes
 
-- `test-image` and `test-integration` automatically build the dev image if it doesn't exist (when `VERSION=dev` or none),
+- `test-image` and `test-integration` automatically build the dev image if it doesn't exist (when `version=dev` or none),
   but they don't automatically update it
 - `test-registry` uses its own local registry and doesn't require a pre-built image
-- The `TEST_CONTAINER_TAG` environment variable is automatically set based on the `VERSION` parameter (defaults to "dev")
+- The `TEST_CONTAINER_TAG` environment variable is automatically set based on the `version` parameter (defaults to "dev")
 - All tests use pytest with verbose output (`-v`) and short traceback format (`--tb=short`)

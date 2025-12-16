@@ -1,3 +1,4 @@
+
 # Contributing to vigOS Development Environment
 
 This guide explains how to develop, build, test, and release the vigOS development container image.
@@ -6,23 +7,31 @@ This guide explains how to develop, build, test, and release the vigOS developme
 
 | Component            | Version | Purpose |
 |----------------------|---------|---------|
-| **Podman**           | v4.0+   | Container runtime, compose, and linting |
-| **just**             | v1.0+   | Build automation and command runner     |
-| **uv**               | v0.8+   | Python package and project manager      |
-| **git**              | >2.34.0 | Version control and pre-commit tools    |
-| **ssh**              | Latest  | GitHub sign in and commit signing       |
-| **gh**               | Latest  | GitHub CLI for repository and PR/issue management |
-| **npm**              | Latest  | Node.js package manager (for DevContainer CLI) |
-| **devcontainer CLI** | v0.80.1 | DevContainer CLI for testing devcontainer functionality |
+| **podman** | >=4.0 | Container runtime, compose, and image building |
+| **just** | >=1.0 | Command runner for task automation |
+| **git** | >=2.34 | Version control and pre-commit hooks |
+| **ssh** | latest | GitHub authentication and commit signing |
+| **gh** | latest | GitHub CLI for repository and PR/issue management |
+| **npm** | latest | Node.js package manager (for DevContainer CLI) |
+| **uv** | >=0.8 | Python package and project manager |
+| **devcontainer** | 0.80.1 | DevContainer CLI for testing devcontainer functionality |
 
-> **Note:** You do **not** need to manually install `uv` or `devcontainer CLI`.
-They will be installed automatically when running `./scripts/setup.sh` or `just setup`.
+> **Note:** You do **not** need to manually install `uv` or `devcontainer`.
+They will be installed automatically when running `./scripts/init.sh` followed by `just setup`.
 
 **Ubuntu/Debian:**
 
 ```bash
 sudo apt update
-sudo apt install -y podman git openssh-client gh nodejs npm
+sudo apt install -y podman git openssh-client nodejs npm
+# just
+curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+
+# gh
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+sudo apt update && sudo apt install -y gh
+
 ```
 
 To build images for multiple architectures (e.g., AMD64 and ARM64), install QEMU user static binaries:
@@ -37,11 +46,11 @@ Verify the installation by checking that `cat /proc/sys/fs/binfmt_misc/qemu-aarc
 **macOS (Homebrew):**
 
 ```bash
-brew install podman git openssh gh node
+brew install podman just git openssh gh node
 ```
 
 - For other Linux distributions, use your package manager (e.g., `dnf`, `yum`, `zypper`, `apk`) to install these dependencies.
-- `uv` and `devcontainer CLI` will be set up automatically; no need to install them manually.
+- Run `./scripts/init.sh` to check dependencies and get OS-specific installation commands.
 - Ensure Docker is installed if you plan to use it instead of Podman.
 
 ## Setup
@@ -51,7 +60,8 @@ Clone this repository and prepare it for container development:
 ```bash
 git clone git@github.com:vig-os/devcontainer.git
 cd devcontainer
-just setup
+./scripts/init.sh    # Check/install dependencies
+just setup           # Setup Python environment and tools
 ```
 
 ## Development Workflow
@@ -80,7 +90,8 @@ When contributing to this project, follow this workflow:
    - Ensure your code follows the project's style and conventions
 
 4. **Update documentation if necessary**
-   - Update [README.md](README.md), [CONTRIBUTE.md](CONTRIBUTE.md), or other relevant docs
+   - Update templates in `docs/templates/` (not the generated files directly)
+   - Run `just docs` to regenerate documentation
    - Update the [CHANGELOG](CHANGELOG.md) with your changes in the `[Unreleased]` section
      - Add entries under appropriate categories (Added, Changed, Fixed, etc.)
      - Use clear, concise descriptions
@@ -111,27 +122,59 @@ When contributing to this project, follow this workflow:
 
 ## Just Recipes
 
-- **help**: Show a list of all available recipes
-- **info**: Show information about the image
-- **setup**: Setup this repository for container development
-- **login**: Test authentication to GitHub Container Registry
-- **build**: Build local development image (`dev` tag)
-- **test**: Run image and integration tests (not registry tests)
-- **test-image**: Run image tests only
-- **test-integration**: Run integration tests only
-- **test-registry**: Run registry tests only
-- **push X.Y**: Build, test, commit, push & tag image:X.Y
-- **push X.Y no_test=true**: Build, commit, push & tag image:X.Y (skip tests)
-- **push X.Y native_only=true**: Build only for native architecture
-- **pull {VER}**: Pull image:{VER} (default: latest)
-- **clean {VER}**: Remove image:{VER} (default: dev)
+```text
+Available recipes:
+    [build]
+    build no_cache=""              # Build local development image
+    clean-artifacts                # Clean build artifacts
+
+    [clean]
+    clean version="dev"            # Remove image (default: dev)
+    clean-test-containers          # Clean up lingering test containers
+
+    [deps]
+    sync                           # Sync dependencies from pyproject.toml
+    update                         # Update all dependencies
+
+    [info]
+    default                        # Show available commands (default)
+    docs                           # Generate documentation from templates
+    info                           # Show image information
+    init *args                     # Check/install system dependencies (OS-sensitive)
+    login                          # Test login to GHCR
+    setup                          # Setup Python environment and dev tools
+
+    [quality]
+    format                         # Format code
+    lint                           # Run all linters
+    precommit                      # Run pre-commit hooks on all files
+
+    [release]
+    pull version="latest"          # Pull image from registry (default: latest)
+    push version                   # Push versioned release to registry (builds, tests, tags, pushes)
+
+    [sidecar]
+    sidecar name *args             # just sidecar redis flush
+    sidecars                       # List available sidecar containers
+    test-sidecar *args             # Convenience alias for test-sidecar (uses generic sidecar recipe)
+
+    [test]
+    test version="dev"             # Run all test suites
+    test-cov *args                 # Run tests with coverage
+    test-image version="dev"       # Run image tests only
+    test-integration version="dev" # Run integration tests only
+    test-pytest *args              # Run tests with pytest
+    test-registry                  # Run registry tests only (doesn't need image)
+
+```
 
 ## Release Workflow
 
 When releasing a new version of the devcontainer image, follow these steps:
 
 1. **Update documentation**
-   - Ensure [README.md](README.md), [CONTRIBUTE.md](CONTRIBUTE.md), and other docs are up to date
+   - Ensure documentation templates are up to date
+   - Run `just docs` to regenerate all documentation
    - Update [CHANGELOG.md](CHANGELOG.md):
      - Move all `[Unreleased]` entries to a new version section (e.g., `[1.0]`)
      - Add the release date in YYYY-MM-DD format
