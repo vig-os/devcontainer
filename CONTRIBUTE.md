@@ -124,6 +124,8 @@ When contributing to this project, follow this workflow:
 
 ```text
 Available recipes:
+    podman ...                     # Podman module (use 'just podman <recipe>' for subcommands)
+
     [build]
     build no_cache=""              # Build local development image
     clean version="dev"            # Remove image (default: dev)
@@ -142,18 +144,6 @@ Available recipes:
     init *args                     # Check/install system dependencies (OS-sensitive)
     login                          # Test login to GHCR
     setup                          # Setup Python environment and dev tools
-
-    [podman]
-    podman-kill name               # Stop and remove a container by name or ID
-    podman-kill-all                # Stop and remove all containers (with confirmation)
-    podman-kill-project            # Stop and remove project-related containers
-    podman-prune                   # Prune unused containers, images, networks, and volumes
-    podman-prune-all               # Full cleanup: prune including volumes
-    podman-ps *args                # List containers/images (--all for all podman resources)
-    podman-rmi image               # Remove an image by name, tag, or ID
-    podman-rmi-all                 # Remove all images (with confirmation)
-    podman-rmi-dangling            # Remove dangling images (untagged)
-    podman-rmi-project             # Remove project-related images
 
     [quality]
     format                         # Format code

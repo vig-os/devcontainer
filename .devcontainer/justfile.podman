@@ -1,15 +1,20 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 # PODMAN RECIPES - Container and Image Management
-# All recipes prefixed with 'podman-' for clear namespacing
+# Access via: just podman <recipe>
 # ═══════════════════════════════════════════════════════════════════════════════
+
+# Show available podman recipes (default)
+[private]
+default:
+    @just --list --justfile {{ source_file() }}
 
 # ───────────────────────────────────────────────────────────────────────────────
 # LISTING
 # ───────────────────────────────────────────────────────────────────────────────
 
 # List containers/images (--all for all podman resources)
-[group('podman')]
-podman-ps *args:
+[group('list')]
+ps *args:
     #!/usr/bin/env bash
     FMT_ID=$(printf '\x7b\x7b.ID\x7d\x7d')
     FMT_NAMES=$(printf '\x7b\x7b.Names\x7d\x7d')
@@ -58,7 +63,7 @@ podman-ps *args:
             echo "  No project-related images found"
         fi
         echo ""
-        echo "Tip: Use 'just podman-ps --all' to see all containers and images"
+        echo "Tip: Use 'just podman ps --all' to see all containers and images"
     fi
 
 # ───────────────────────────────────────────────────────────────────────────────
@@ -66,8 +71,8 @@ podman-ps *args:
 # ───────────────────────────────────────────────────────────────────────────────
 
 # Stop and remove a container by name or ID
-[group('podman')]
-podman-kill name:
+[group('containers')]
+kill name:
     #!/usr/bin/env bash
     if podman ps -a --format "%(printf '\x7b\x7b.Names\x7d\x7d')" | grep -q "^{{ name }}$" || \
        podman ps -a --format "%(printf '\x7b\x7b.ID\x7d\x7d')" | grep -q "^{{ name }}"; then
@@ -79,9 +84,9 @@ podman-kill name:
     fi
 
 # Stop and remove all containers (with confirmation)
-[group('podman')]
+[group('containers')]
 [confirm("⚠️  This will remove ALL containers. Continue? [y/N]")]
-podman-kill-all:
+kill-all:
     #!/usr/bin/env bash
     CONTAINERS=$(podman ps -aq 2>/dev/null)
     if [ -n "$CONTAINERS" ]; then
@@ -93,8 +98,8 @@ podman-kill-all:
     fi
 
 # Stop and remove project-related containers
-[group('podman')]
-podman-kill-project:
+[group('containers')]
+kill-project:
     #!/usr/bin/env bash
     echo "🔪 Removing project-related containers..."
     FMT=$(printf '\x7b\x7b.ID\x7d\x7d')
@@ -111,8 +116,8 @@ podman-kill-project:
 # ───────────────────────────────────────────────────────────────────────────────
 
 # Remove an image by name, tag, or ID
-[group('podman')]
-podman-rmi image:
+[group('images')]
+rmi image:
     #!/usr/bin/env bash
     if podman image exists "{{ image }}" 2>/dev/null; then
         echo "🗑️  Removing image '{{ image }}'..."
@@ -123,9 +128,9 @@ podman-rmi image:
     fi
 
 # Remove all images (with confirmation)
-[group('podman')]
+[group('images')]
 [confirm("⚠️  This will remove ALL images. Continue? [y/N]")]
-podman-rmi-all:
+rmi-all:
     #!/usr/bin/env bash
     IMAGES=$(podman images -q 2>/dev/null)
     if [ -n "$IMAGES" ]; then
@@ -137,8 +142,8 @@ podman-rmi-all:
     fi
 
 # Remove project-related images
-[group('podman')]
-podman-rmi-project:
+[group('images')]
+rmi-project:
     #!/usr/bin/env bash
     echo "🗑️  Removing project-related images..."
     FMT=$(printf '\x7b\x7b.ID\x7d\x7d')
@@ -151,8 +156,8 @@ podman-rmi-project:
     fi
 
 # Remove dangling images (untagged)
-[group('podman')]
-podman-rmi-dangling:
+[group('images')]
+rmi-dangling:
     #!/usr/bin/env bash
     echo "🗑️  Removing dangling images..."
     DANGLING=$(podman images -f "dangling=true" -q 2>/dev/null)
@@ -168,18 +173,18 @@ podman-rmi-dangling:
 # ───────────────────────────────────────────────────────────────────────────────
 
 # Prune unused containers, images, networks, and volumes
-[group('podman')]
+[group('cleanup')]
 [confirm("⚠️  This will prune all unused podman resources. Continue? [y/N]")]
-podman-prune:
+prune:
     #!/usr/bin/env bash
     echo "🧹 Pruning unused podman resources..."
     podman system prune -f
     echo "✓ Prune complete"
 
 # Full cleanup: prune including volumes
-[group('podman')]
+[group('cleanup')]
 [confirm("⚠️  This will prune ALL unused resources including volumes. Continue? [y/N]")]
-podman-prune-all:
+prune-all:
     #!/usr/bin/env bash
     echo "🧹 Pruning all unused podman resources (including volumes)..."
     podman system prune -af --volumes

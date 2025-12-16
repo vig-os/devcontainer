@@ -6,9 +6,8 @@
 
 import '.devcontainer/justfile.base'
 
-# Podman container & image management
-
-import '.devcontainer/justfile.podman'
+# Podman module (use 'just podman <recipe>' for subcommands)
+mod podman '.devcontainer/justfile.podman'
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # VARIABLES
