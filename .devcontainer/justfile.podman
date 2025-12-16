@@ -80,7 +80,7 @@ podman-kill name:
 
 # Stop and remove all containers (with confirmation)
 [group('podman')]
-[confirm("⚠️  This will remove ALL containers. Continue?")]
+[confirm("⚠️  This will remove ALL containers. Continue? [y/N]")]
 podman-kill-all:
     #!/usr/bin/env bash
     CONTAINERS=$(podman ps -aq 2>/dev/null)
@@ -124,7 +124,7 @@ podman-rmi image:
 
 # Remove all images (with confirmation)
 [group('podman')]
-[confirm("⚠️  This will remove ALL images. Continue?")]
+[confirm("⚠️  This will remove ALL images. Continue? [y/N]")]
 podman-rmi-all:
     #!/usr/bin/env bash
     IMAGES=$(podman images -q 2>/dev/null)
@@ -169,7 +169,7 @@ podman-rmi-dangling:
 
 # Prune unused containers, images, networks, and volumes
 [group('podman')]
-[confirm("⚠️  This will prune all unused podman resources. Continue?")]
+[confirm("⚠️  This will prune all unused podman resources. Continue? [y/N]")]
 podman-prune:
     #!/usr/bin/env bash
     echo "🧹 Pruning unused podman resources..."
@@ -178,7 +178,7 @@ podman-prune:
 
 # Full cleanup: prune including volumes
 [group('podman')]
-[confirm("⚠️  This will prune ALL unused resources including volumes. Continue?")]
+[confirm("⚠️  This will prune ALL unused resources including volumes. Continue? [y/N]")]
 podman-prune-all:
     #!/usr/bin/env bash
     echo "🧹 Pruning all unused podman resources (including volumes)..."
