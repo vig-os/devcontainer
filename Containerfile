@@ -95,8 +95,8 @@ RUN set -eux; \
 
 # Install Python development tools directly into system using uv
 RUN uv pip install --system \
-    pre-commit==4.5.0 \
-    ruff==0.14.9
+    pre-commit \
+    ruff
 
 # Copy assets into container image
 COPY assets /root/assets
