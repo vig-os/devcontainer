@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Python project template with `pyproject.toml` and standard structure (`src/`, `tests/`, `docs/`)
+- Pre-built Python virtual environment with common dev/science dependencies (numpy, scipy, pandas, matplotlib, pytest, jupyter)
+- Auto-sync Python dependencies on container attach via `uv sync`
+- `UV_PROJECT_ENVIRONMENT` environment variable for instant venv access without rebuild
 - `pip-licenses` pre-commit hook for dependency license compliance checking (blocks GPL-3.0/AGPL-3.0)
 - Pre-flight container cleanup check in test suite with helpful error messages
 - `make clean-test-containers` target for removing lingering test containers
@@ -20,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- VS Code Python interpreter now points to pre-built venv (`/root/assets/workspace/.venv`)
+- Test container cleanup check runs once at start of `make test` instead of each test phase
 - **BREAKING**: Docker Compose file hierarchy now uses `project.yaml` and `local.yaml` instead of `override.yml`
 - Socket detection prioritizes Podman over Docker Desktop on macOS and Linux
 - `{{TAG}}` placeholder replacement moved to container with build-time manifest generation (significantly faster initialization)
@@ -37,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Test failures from lingering containers between test phases (added `PYTEST_SKIP_CONTAINER_CHECK`)
+- Improved error messages for devcontainer startup failures
 - SSH commit signing: Changed `user.signingkey` from file path to email identifier to support SSH agent forwarding.
   Git now uses the SSH agent for signing by looking up the email in allowed-signers and matching with the agent key.
 - Fixed `gpg.ssh.allowedSignersFile` path to use container path instead of host path after copying git configuration.
