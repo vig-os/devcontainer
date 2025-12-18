@@ -599,27 +599,48 @@ def test_just_clean_mechanism(pulled_image):
         f"Manifest list {pulled_image_name} still exists after clean"
     )
 
-    # Check for arch-less image
-    verify_result = subprocess.run(
-        ["podman", "image", "exists", pulled_image_name],
+    # Check for actual local images using podman images (not podman image exists)
+    # podman image exists can return true even if there's no local image (resolves through registry)
+    # Use --noheading to avoid header, and handle errors gracefully
+    images_result = subprocess.run(
+        ["podman", "images", "--format", "{{.Repository}}:{{.Tag}}", "--noheading"],
         capture_output=True,
         text=True,
     )
-    # The arch-less tag should not exist (clean should have removed it)
-    assert verify_result.returncode != 0, (
-        f"Image {pulled_image_name} still exists after clean"
+    # If podman images fails, fall back to checking individual images
+    if images_result.returncode != 0:
+        # Fallback: check each image individually
+        images_output = ""
+        for check_name in [pulled_image_name] + [
+            f"{pulled_image_name}-{arch}" for arch in ["amd64", "arm64"]
+        ]:
+            check_result = subprocess.run(
+                [
+                    "podman",
+                    "images",
+                    "--format",
+                    "{{.Repository}}:{{.Tag}}",
+                    "--filter",
+                    f"reference={check_name}",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if check_result.returncode == 0:
+                images_output += check_result.stdout
+    else:
+        images_output = images_result.stdout
+
+    # The arch-less tag should not exist in local images
+    assert pulled_image_name not in images_output, (
+        f"Image {pulled_image_name} still exists in local images after clean"
     )
 
     # Also check for arch-specific tags (amd64, arm64)
     for arch in ["amd64", "arm64"]:
         arch_specific_name = f"{pulled_image_name}-{arch}"
-        arch_verify = subprocess.run(
-            ["podman", "image", "exists", arch_specific_name],
-            capture_output=True,
-            text=True,
-        )
-        assert arch_verify.returncode != 0, (
-            f"Arch-specific image {arch_specific_name} still exists after clean"
+        assert arch_specific_name not in images_output, (
+            f"Arch-specific image {arch_specific_name} still exists in local images after clean"
         )
 
 

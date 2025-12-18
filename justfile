@@ -186,7 +186,16 @@ pull version="latest":
 [group('build')]
 clean version="dev":
     #!/usr/bin/env bash
-    ./scripts/clean.sh "{{ version }}" "{{ repo }}"
+    # Use TEST_REGISTRY from environment if set, otherwise use repo variable
+    # This allows tests to override the repo via TEST_REGISTRY at runtime
+    export TEST_REGISTRY
+    REPO="${TEST_REGISTRY:-{{ repo }}}"
+    # If TEST_REGISTRY was used and doesn't contain a path, append /test
+    # This handles cases where TEST_REGISTRY=localhost:PORT instead of localhost:PORT/test
+    if [[ -n "$TEST_REGISTRY" && "$REPO" == "$TEST_REGISTRY" && "$REPO" != *"/"* ]]; then
+        REPO="${REPO}/test"
+    fi
+    ./scripts/clean.sh "{{ version }}" "$REPO"
 
 # Clean up lingering test containers
 [group('build')]
