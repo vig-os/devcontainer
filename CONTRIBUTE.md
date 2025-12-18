@@ -8,7 +8,7 @@ This guide explains how to develop, build, test, and release the vigOS developme
 | Component            | Version | Purpose |
 |----------------------|---------|---------|
 | **podman** | >=4.0 | Container runtime, compose, and image building |
-| **just** | >=1.0 | Command runner for task automation |
+| **just** | >=1.40.0 | Command runner for task automation |
 | **git** | >=2.34 | Version control and pre-commit hooks |
 | **ssh** | latest | GitHub authentication and commit signing |
 | **gh** | latest | GitHub CLI for repository and PR/issue management |

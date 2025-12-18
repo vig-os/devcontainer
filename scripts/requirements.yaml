@@ -37,7 +37,7 @@ dependencies:
 
   # Build Automation
   - name: just
-    version: ">=1.0"
+    version: ">=1.40.0"
     purpose: Command runner for task automation
     required: true
     check:
