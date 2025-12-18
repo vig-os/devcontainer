@@ -31,12 +31,12 @@ def test_update_readme_version_helper(tmp_path):
     readme.write_text("- **Version**: placeholder\n")
 
     update_readme.update_version_line(
-        readme, "1.2", "https://example.com/v1.2", "2025-01-01"
+        readme, "1.2.0", "https://example.com/v1.2.0", "2025-01-01"
     )
 
     assert (
         readme.read_text().strip()
-        == "- **Version**: [1.2](https://example.com/v1.2), 2025-01-01"
+        == "- **Version**: [1.2.0](https://example.com/v1.2.0), 2025-01-01"
     )
 
 
@@ -127,8 +127,9 @@ def test_version():
     """Return a test version that's guaranteed to be unique."""
 
     # Use timestamp-based version to ensure uniqueness
+    # Format: MAJOR.MINOR.PATCH (Semantic Versioning)
     timestamp = int(time.time())
-    return f"99.{timestamp % 10000}"
+    return f"99.{timestamp % 10000}.0"
 
 
 @pytest.fixture(scope="session")
@@ -264,12 +265,12 @@ def pushed_image(local_registry, test_version, git_clean_state):
 
     # Return push info for use by tests
     # Note: REPO is set from TEST_REGISTRY, so images are at test_registry_path directly
-    # (e.g., localhost:32915/test:99.4401, not localhost:32915/test/devcontainer:99.4401)
+    # (e.g., localhost:32915/test:99.4401.0, not localhost:32915/test/devcontainer:99.4401.0)
     push_info = {
         "registry_path": test_registry_path,
         "image_name": "",  # Empty because REPO already includes the full path
         "version": test_version,
-        "git_tag": f"v{test_version}",  # Git tag format: v0.1, v1.0, etc.
+        "git_tag": f"v{test_version}",  # Git tag format: v0.1.0, v1.0.0, etc. (Semantic Versioning)
         "project_root": project_root,
         "original_head": git_clean_state["original_head"],
         "env": env,
@@ -341,7 +342,7 @@ class TestJustPushImage:
         # Extract info from fixture
         test_git_tag = pushed_image["git_tag"]
 
-        # Verify git tag was created (using version format: v99.8795)
+        # Verify git tag was created (using semantic version format: v99.8795.0)
         tag_result = subprocess.run(
             ["git", "rev-parse", test_git_tag],
             capture_output=True,
@@ -372,7 +373,7 @@ class TestJustPushImage:
         )
         assert version_match, (
             "Version line not found or missing required format "
-            "`- **Version**: [X.Y](link), YYYY-MM-DD`"
+            "`- **Version**: [X.Y.Z](link), YYYY-MM-DD` (Semantic Versioning)"
         )
         readme_version = version_match.group(1).strip()
         readme_link = version_match.group(2).strip()
@@ -649,12 +650,12 @@ def _cleanup_test_artifacts(version, registry_path, project_root, original_head)
     Helper function to clean up test artifacts.
 
     This function:
-    1. Deletes the git tag (using version format: v99.8795)
+    1. Deletes the git tag (using semantic version format: v99.8795.0)
     2. Resets to the original HEAD (removing any commit made by push)
     3. Restores README.md to its original state (reverts version update)
     4. Removes local images/manifests
     """
-    # Git tag format: v0.1, v1.0, etc. (new format)
+    # Git tag format: v0.1.0, v1.0.0, etc. (Semantic Versioning: MAJOR.MINOR.PATCH)
     # Also handle old format without 'v' prefix for cleanup
     test_git_tag = f"v{version}"
     old_git_tag = version  # Old format without 'v' prefix
@@ -715,7 +716,7 @@ def _cleanup_test_artifacts(version, registry_path, project_root, original_head)
     # Determine architectures to clean
     arch_suffixes = _get_arch_suffixes()
 
-    # Architecture-specific image tags (e.g., localhost:32811/test:99.305-amd64)
+    # Architecture-specific image tags (e.g., localhost:32811/test:99.305.0-amd64)
     arch_image_names = [f"{registry_base}:{version}-{arch}" for arch in arch_suffixes]
 
     # Remove manifests first (ignore errors if they don't exist)

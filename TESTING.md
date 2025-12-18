@@ -88,7 +88,7 @@ just test
 
 # Run tests for a specific image version (must be locally available)
 # Note: test-registry always uses a temporary local registry
-just test version=1.0
+just test version=1.0.0
 ```
 
 ### Individual Test Suites
@@ -106,8 +106,8 @@ just test-integration
 just test-registry
 
 # Run specific test suite for a locally available version
-just test-image version=1.0
-just test-integration version=1.0
+just test-image version=1.0.0
+just test-integration version=1.0.0
 ```
 
 ### Notes
