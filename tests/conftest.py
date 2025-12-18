@@ -10,7 +10,7 @@ variable to the host path that maps to /workspace/devcontainer in the container.
 This enables path translation for volume mounts.
 
 Example:
-    HOST_WORKSPACE_PATH=/Users/you/Projects/devcontainer make test-integration
+    HOST_WORKSPACE_PATH=/Users/you/Projects/devcontainer just test-integration
 """
 
 import atexit
@@ -31,10 +31,10 @@ def pytest_sessionstart(session):
     Pre-flight check: Detect lingering test containers from previous runs.
 
     Runs before any tests to ensure a clean environment.
-    Skip this check when running as part of 'make test' (PYTEST_SKIP_CONTAINER_CHECK=1)
+    Skip this check when running as part of 'just test' (PYTEST_SKIP_CONTAINER_CHECK=1)
     since the check is done once at the start of the full test run.
     """
-    # Skip check when running under 'make test' - check already done at start
+    # Skip check when running under 'just test' - check already done at start
     if os.environ.get("PYTEST_SKIP_CONTAINER_CHECK") == "1":
         return
 
@@ -83,8 +83,8 @@ To clean up these containers, run:
     # Clean up test sidecars
     podman ps -a --filter "name=test-sidecar" --format "{{{{.ID}}}}" | xargs -r podman rm -f
 
-    # Or use the Makefile target:
-    make clean-test-containers
+    # Or use the justfile recipe:
+    just clean-test-containers
 
 Alternatively, set PYTEST_AUTO_CLEANUP=1 to automatically clean up before tests:
 
@@ -220,7 +220,7 @@ def container_image(container_tag):
     if result.returncode != 0:
         pytest.fail(
             f"Podman image {image_name} not found. "
-            f"Please build it first with 'make build'"
+            f"Please build it first with 'just build'"
         )
 
     return image_name

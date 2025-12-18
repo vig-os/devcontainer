@@ -40,7 +40,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-# Determine REPO (same logic as Makefile)
+# Determine REPO (same logic as justfile)
 REPO="${TEST_REGISTRY:-ghcr.io/vig-os/devcontainer}"
 REPO="${REPO%/}"
 
@@ -129,5 +129,5 @@ echo ""
 print_status "info" "Image devcontainer:$TAG is ready for deployment to GHCR"
 echo ""
 print_status "info" "Next steps:"
-echo "  1. Check access to GHCR with:   make login"
-echo "  2. Push the image with:         make push VERSION=X.Y"
+echo "  1. Check access to GHCR with:   just login"
+echo "  2. Push the image with:         just push X.Y"

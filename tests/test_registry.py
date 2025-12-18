@@ -1,9 +1,9 @@
 """
-Test the Makefile push mechanism using a local registry.
+Test the justfile push mechanism using a local registry.
 
 This test verifies that the push mechanism works correctly by:
 1. Starting a local Docker registry using testcontainers
-2. Running the push target with the test registry
+2. Running the push recipe with the test registry
 3. Verifying that images and tags are created correctly
 4. Ensuring cleanup happens automatically (no artifacts remain)
 
@@ -235,12 +235,12 @@ def pushed_image(local_registry, test_version, git_clean_state):
     env = os.environ.copy()
     env["TEST_REGISTRY"] = test_registry_path
 
+    env["REGISTRY_TEST"] = "1"
     push_result = subprocess.run(
         [
-            "make",
+            "just",
             "push",
-            f"VERSION={test_version}",
-            "REGISTRY_TEST=1",
+            test_version,
         ],
         env=env,
         cwd=project_root,
@@ -287,12 +287,12 @@ def pushed_image(local_registry, test_version, git_clean_state):
         )
 
 
-class TestMakePushImage:
+class TestJustPushImage:
     """
     Tests for the push mechanism.
     """
 
-    def test_make_push_image(self, pushed_image):
+    def test_just_push_image(self, pushed_image):
         """
         Test that the push mechanism creates an image with version an latest tag.
         """
@@ -332,7 +332,7 @@ class TestMakePushImage:
             f"STDERR: {latest_result.stderr}"
         )
 
-    def test_make_push_creates_git_tag(self, pushed_image):
+    def test_just_push_creates_git_tag(self, pushed_image):
         """
         Test that the push mechanism creates a git tag.
         """
@@ -349,7 +349,7 @@ class TestMakePushImage:
         )
         assert tag_result.returncode == 0, f"Git tag {test_git_tag} was not created"
 
-    def test_make_push_updates_project_readme(self, pushed_image):
+    def test_just_push_updates_project_readme(self, pushed_image):
         """
         Test that the project README.md was updated with version and date during push.
         """
@@ -400,7 +400,7 @@ class TestMakePushImage:
             f"README.md size {readme_size} MB is outside valid range (100-2000 MB)"
         )
 
-    def test_make_push_image_has_correct_devcontainer_readme(self, pushed_image):
+    def test_just_push_image_has_correct_devcontainer_readme(self, pushed_image):
         """
         Test that the devcontainer README.md in the pushed image has the correct version.
         """
@@ -474,12 +474,12 @@ def pulled_image(pushed_image):
     original_head = pushed_image["original_head"]
     env = pushed_image["env"].copy()
 
-    # Explicitly set TEST_REGISTRY in the environment before calling make
+    # Explicitly set TEST_REGISTRY in the environment before calling just
     env["TEST_REGISTRY"] = test_registry_path
 
     # Pull the image from the registry using podman directly
-    # Note: We use podman directly instead of make pull to avoid output capturing issues
-    # The make pull target works correctly (as verified by manual testing), but when
+    # Note: We use podman directly instead of just pull to avoid output capturing issues
+    # The just pull recipe works correctly (as verified by manual testing), but when
     # called through subprocess with captured output, some output gets lost.
     registry_base = test_registry_path.rstrip("/")
     image_to_pull = f"{registry_base}:{test_version}"
@@ -532,7 +532,7 @@ def pulled_image(pushed_image):
     }
 
 
-def test_make_pull_mechanism(pulled_image):
+def test_just_pull_mechanism(pulled_image):
     """
     Test pulling an image from the local registry.
 
@@ -552,7 +552,7 @@ def test_make_pull_mechanism(pulled_image):
     )
 
 
-def test_make_clean_mechanism(pulled_image):
+def test_just_clean_mechanism(pulled_image):
     """
     Test cleaning a pulled image.
 
@@ -564,15 +564,15 @@ def test_make_clean_mechanism(pulled_image):
     env = pulled_image["env"].copy()
     pulled_image_name = pulled_image["pulled_image_name"]
 
-    # Explicitly set TEST_REGISTRY in the environment before calling make
+    # Explicitly set TEST_REGISTRY in the environment before calling just clean
     env["TEST_REGISTRY"] = test_registry_path
 
-    # Clean the image using make clean
+    # Clean the image using just clean
     clean_result = subprocess.run(
         [
-            "make",
+            "just",
             "clean",
-            f"VERSION={test_version}",
+            f"version={test_version}",
         ],
         env=env,
         cwd=pulled_image["project_root"],

@@ -227,8 +227,8 @@ else
 
 	# Tag native image without arch so devcontainer tests can pull it
 	podman tag "$REPO:$VERSION-$NATIVE_ARCH" "$REPO:$VERSION"
-	if ! ( make test-image VERSION="$VERSION" \
-		&& make test-integration VERSION="$VERSION" ); then
+	if ! ( just test-image version="$VERSION" \
+		&& just test-integration version="$VERSION" ); then
 			echo "❌ Tests failed"
 
 			# Clean tag to avoid leaving stray tag if tests fail
