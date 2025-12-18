@@ -585,17 +585,42 @@ def test_just_clean_mechanism(pulled_image):
             f"Clean failed:\nSTDOUT:\n{clean_result.stdout}\nSTDERR:\n{clean_result.stderr}"
         )
 
-    # Verify the image was removed
+    # Verify the image was removed (check both arch-less and arch-specific tags)
+    # When pulling multi-arch manifests, podman may create arch-specific local tags
+    # and/or manifest lists
+
+    # Check for manifest list first
+    manifest_check = subprocess.run(
+        ["podman", "manifest", "exists", pulled_image_name],
+        capture_output=True,
+        text=True,
+    )
+    assert manifest_check.returncode != 0, (
+        f"Manifest list {pulled_image_name} still exists after clean"
+    )
+
+    # Check for arch-less image
     verify_result = subprocess.run(
         ["podman", "image", "exists", pulled_image_name],
         capture_output=True,
         text=True,
     )
-    # The image should not exist (clean should have removed it)
-    # Note: clean might warn if image doesn't exist, but that's okay
+    # The arch-less tag should not exist (clean should have removed it)
     assert verify_result.returncode != 0, (
         f"Image {pulled_image_name} still exists after clean"
     )
+
+    # Also check for arch-specific tags (amd64, arm64)
+    for arch in ["amd64", "arm64"]:
+        arch_specific_name = f"{pulled_image_name}-{arch}"
+        arch_verify = subprocess.run(
+            ["podman", "image", "exists", arch_specific_name],
+            capture_output=True,
+            text=True,
+        )
+        assert arch_verify.returncode != 0, (
+            f"Arch-specific image {arch_specific_name} still exists after clean"
+        )
 
 
 def _cleanup_test_artifacts(version, registry_path, project_root, original_head):
