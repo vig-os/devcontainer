@@ -15,10 +15,11 @@ EXPECTED_VERSIONS = {
     "git": "2.",  # Major version check (from apt package)
     "curl": "8.",  # Major version check (from apt package)
     "gh": "2.83.2",  # GitHub CLI (manually installed from latest release)
-    "uv": "0.9.21",  # UV (manually installed from latest release)
+    "uv": "0.9.22",  # UV (manually installed from latest release)
     "python": "3.12",  # Python (from base image)
     "pre_commit": "4.5.1",  # pre-commit (installed via uv pip)
     "ruff": "0.14.10",  # ruff (installed via uv pip)
+    "just": "1.40.0",  # just (manually installed from latest release)
 }
 
 

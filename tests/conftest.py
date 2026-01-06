@@ -407,9 +407,7 @@ def initialized_workspace(container_image):
             child.sendline(project_name)
 
             # Stage 2: Wait for org name prompt
-            child.expect(
-                "Enter the name of your organization, e.g. 'vigOS': ", timeout=30
-            )
+            child.expect("Enter the name of your organization", timeout=30)
             stages["org_name_prompt"] = time.time()
             current_stage = "org_name_prompt"
             child.sendline(organization_name)
@@ -596,9 +594,7 @@ def initialized_workspace(container_image):
             child.sendline(project_name)
 
             # Stage 2: Wait for org name prompt
-            child.expect(
-                "Enter the name of your organization, e.g. 'vigOS': ", timeout=30
-            )
+            child.expect("Enter the name of your organization", timeout=30)
             stages["org_name_prompt"] = time.time()
             current_stage = "org_name_prompt"
             child.sendline(organization_name)
