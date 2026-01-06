@@ -1,3 +1,6 @@
+<!-- Auto-generated from docs/templates/README.md.j2 - DO NOT EDIT DIRECTLY -->
+<!-- Run 'just docs' to regenerate -->
+
 # vigOS Development Environment
 
 This repository provides a standardized development container image.
@@ -15,6 +18,47 @@ To use this devcontainer image, you need:
 That's it! All development tools (Python, git, pre-commit, just, etc.) are included in the container image itself.
 
 ## Quick Start
+
+### One-Line Install
+
+```bash
+curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- ~/Projects/my-project
+```
+
+This will:
+- Auto-detect podman or docker
+- Pull the latest devcontainer image
+- Initialize your project with the devcontainer template
+
+**Options:**
+
+```bash
+# Initialize current directory
+curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh
+
+# Use specific version
+curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- --version 1.0.0 ./my-project
+
+# Upgrade existing project (overwrites template files)
+curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- --force ./my-project
+
+# Override project name
+curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- --name my_custom_name ./my-project
+
+# Preview without executing
+curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- --dry-run ./my-project
+
+# Force specific runtime
+curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- --docker ./my-project
+curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- --podman ./my-project
+```
+
+> **Note:** If podman or docker is not installed, the script provides OS-specific installation instructions for macOS, Ubuntu/Debian, Fedora, Arch Linux, and Windows.
+
+### Manual Setup
+
+<details>
+<summary>Click to expand manual installation steps</summary>
 
 1. **Pull the latest image**
 
@@ -49,9 +93,11 @@ That's it! All development tools (Python, git, pre-commit, just, etc.) are inclu
 
    It is advised to commit all your changes before so that it can be easily reverted.
 
-4. **Open the project in VS Code**
+</details>
 
-   VS Code will detect `.devcontainer/devcontainer.json` and offer to reopen inside the container automatically.
+### Open in VS Code
+
+After installation, open the project in VS Code. It will detect `.devcontainer/devcontainer.json` and offer to reopen inside the container automatically.
 
 ## Available Commands
 
@@ -121,7 +167,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
 - **Version**: 0.1
-- **Built**: 2025-12-18T11:40:13
+- **Built**: 2026-01-06T15:10:48
 - **Size**: ~920 MB
 
 ## Features
