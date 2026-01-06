@@ -1,11 +1,32 @@
 {
+  "extensions": {
+    "front-matter": {
+      "enabled": true
+    }
+  },
   "plugins": {
+    "md012": {
+      "enabled": true,
+      "maximum": 2
+    },
     "md013": {
       "enabled": true,
-      "line_length": 210
+      "line_length": 120
     },
     "md036": {
       "enabled": false
+    },
+    "md003": {
+      "enabled": true,
+      "style": "atx"
+    },
+    "md041": {
+      "enabled": true,
+      "front_matter_title": "title"
+    },
+    "md025": {
+      "enabled": true,
+      "front_matter_title": "title"
     }
   }
 }

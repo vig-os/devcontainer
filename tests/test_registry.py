@@ -1,9 +1,9 @@
 """
-Test the Makefile push mechanism using a local registry.
+Test the justfile push mechanism using a local registry.
 
 This test verifies that the push mechanism works correctly by:
 1. Starting a local Docker registry using testcontainers
-2. Running the push target with the test registry
+2. Running the push recipe with the test registry
 3. Verifying that images and tags are created correctly
 4. Ensuring cleanup happens automatically (no artifacts remain)
 
@@ -31,12 +31,12 @@ def test_update_readme_version_helper(tmp_path):
     readme.write_text("- **Version**: placeholder\n")
 
     update_readme.update_version_line(
-        readme, "1.2", "https://example.com/v1.2", "2025-01-01"
+        readme, "1.2.0", "https://example.com/v1.2.0", "2025-01-01"
     )
 
     assert (
         readme.read_text().strip()
-        == "- **Version**: [1.2](https://example.com/v1.2), 2025-01-01"
+        == "- **Version**: [1.2.0](https://example.com/v1.2.0), 2025-01-01"
     )
 
 
@@ -127,8 +127,9 @@ def test_version():
     """Return a test version that's guaranteed to be unique."""
 
     # Use timestamp-based version to ensure uniqueness
+    # Format: MAJOR.MINOR.PATCH (Semantic Versioning)
     timestamp = int(time.time())
-    return f"99.{timestamp % 10000}"
+    return f"99.{timestamp % 10000}.0"
 
 
 @pytest.fixture(scope="session")
@@ -235,12 +236,12 @@ def pushed_image(local_registry, test_version, git_clean_state):
     env = os.environ.copy()
     env["TEST_REGISTRY"] = test_registry_path
 
+    env["REGISTRY_TEST"] = "1"
     push_result = subprocess.run(
         [
-            "make",
+            "just",
             "push",
-            f"VERSION={test_version}",
-            "REGISTRY_TEST=1",
+            test_version,
         ],
         env=env,
         cwd=project_root,
@@ -264,12 +265,12 @@ def pushed_image(local_registry, test_version, git_clean_state):
 
     # Return push info for use by tests
     # Note: REPO is set from TEST_REGISTRY, so images are at test_registry_path directly
-    # (e.g., localhost:32915/test:99.4401, not localhost:32915/test/devcontainer:99.4401)
+    # (e.g., localhost:32915/test:99.4401.0, not localhost:32915/test/devcontainer:99.4401.0)
     push_info = {
         "registry_path": test_registry_path,
         "image_name": "",  # Empty because REPO already includes the full path
         "version": test_version,
-        "git_tag": f"v{test_version}",  # Git tag format: v0.1, v1.0, etc.
+        "git_tag": f"v{test_version}",  # Git tag format: v0.1.0, v1.0.0, etc. (Semantic Versioning)
         "project_root": project_root,
         "original_head": git_clean_state["original_head"],
         "env": env,
@@ -287,12 +288,12 @@ def pushed_image(local_registry, test_version, git_clean_state):
         )
 
 
-class TestMakePushImage:
+class TestJustPushImage:
     """
     Tests for the push mechanism.
     """
 
-    def test_make_push_image(self, pushed_image):
+    def test_just_push_image(self, pushed_image):
         """
         Test that the push mechanism creates an image with version an latest tag.
         """
@@ -332,7 +333,7 @@ class TestMakePushImage:
             f"STDERR: {latest_result.stderr}"
         )
 
-    def test_make_push_creates_git_tag(self, pushed_image):
+    def test_just_push_creates_git_tag(self, pushed_image):
         """
         Test that the push mechanism creates a git tag.
         """
@@ -341,7 +342,7 @@ class TestMakePushImage:
         # Extract info from fixture
         test_git_tag = pushed_image["git_tag"]
 
-        # Verify git tag was created (using version format: v99.8795)
+        # Verify git tag was created (using semantic version format: v99.8795.0)
         tag_result = subprocess.run(
             ["git", "rev-parse", test_git_tag],
             capture_output=True,
@@ -349,7 +350,7 @@ class TestMakePushImage:
         )
         assert tag_result.returncode == 0, f"Git tag {test_git_tag} was not created"
 
-    def test_make_push_updates_project_readme(self, pushed_image):
+    def test_just_push_updates_project_readme(self, pushed_image):
         """
         Test that the project README.md was updated with version and date during push.
         """
@@ -372,7 +373,7 @@ class TestMakePushImage:
         )
         assert version_match, (
             "Version line not found or missing required format "
-            "`- **Version**: [X.Y](link), YYYY-MM-DD`"
+            "`- **Version**: [X.Y.Z](link), YYYY-MM-DD` (Semantic Versioning)"
         )
         readme_version = version_match.group(1).strip()
         readme_link = version_match.group(2).strip()
@@ -400,7 +401,7 @@ class TestMakePushImage:
             f"README.md size {readme_size} MB is outside valid range (100-2000 MB)"
         )
 
-    def test_make_push_image_has_correct_devcontainer_readme(self, pushed_image):
+    def test_just_push_image_has_correct_devcontainer_readme(self, pushed_image):
         """
         Test that the devcontainer README.md in the pushed image has the correct version.
         """
@@ -474,12 +475,12 @@ def pulled_image(pushed_image):
     original_head = pushed_image["original_head"]
     env = pushed_image["env"].copy()
 
-    # Explicitly set TEST_REGISTRY in the environment before calling make
+    # Explicitly set TEST_REGISTRY in the environment before calling just
     env["TEST_REGISTRY"] = test_registry_path
 
     # Pull the image from the registry using podman directly
-    # Note: We use podman directly instead of make pull to avoid output capturing issues
-    # The make pull target works correctly (as verified by manual testing), but when
+    # Note: We use podman directly instead of just pull to avoid output capturing issues
+    # The just pull recipe works correctly (as verified by manual testing), but when
     # called through subprocess with captured output, some output gets lost.
     registry_base = test_registry_path.rstrip("/")
     image_to_pull = f"{registry_base}:{test_version}"
@@ -532,7 +533,7 @@ def pulled_image(pushed_image):
     }
 
 
-def test_make_pull_mechanism(pulled_image):
+def test_just_pull_mechanism(pulled_image):
     """
     Test pulling an image from the local registry.
 
@@ -552,7 +553,7 @@ def test_make_pull_mechanism(pulled_image):
     )
 
 
-def test_make_clean_mechanism(pulled_image):
+def test_just_clean_mechanism(pulled_image):
     """
     Test cleaning a pulled image.
 
@@ -564,15 +565,15 @@ def test_make_clean_mechanism(pulled_image):
     env = pulled_image["env"].copy()
     pulled_image_name = pulled_image["pulled_image_name"]
 
-    # Explicitly set TEST_REGISTRY in the environment before calling make
+    # Explicitly set TEST_REGISTRY in the environment before calling just clean
     env["TEST_REGISTRY"] = test_registry_path
 
-    # Clean the image using make clean
+    # Clean the image using just clean
     clean_result = subprocess.run(
         [
-            "make",
+            "just",
             "clean",
-            f"VERSION={test_version}",
+            f"version={test_version}",
         ],
         env=env,
         cwd=pulled_image["project_root"],
@@ -585,17 +586,63 @@ def test_make_clean_mechanism(pulled_image):
             f"Clean failed:\nSTDOUT:\n{clean_result.stdout}\nSTDERR:\n{clean_result.stderr}"
         )
 
-    # Verify the image was removed
-    verify_result = subprocess.run(
-        ["podman", "image", "exists", pulled_image_name],
+    # Verify the image was removed (check both arch-less and arch-specific tags)
+    # When pulling multi-arch manifests, podman may create arch-specific local tags
+    # and/or manifest lists
+
+    # Check for manifest list first
+    manifest_check = subprocess.run(
+        ["podman", "manifest", "exists", pulled_image_name],
         capture_output=True,
         text=True,
     )
-    # The image should not exist (clean should have removed it)
-    # Note: clean might warn if image doesn't exist, but that's okay
-    assert verify_result.returncode != 0, (
-        f"Image {pulled_image_name} still exists after clean"
+    assert manifest_check.returncode != 0, (
+        f"Manifest list {pulled_image_name} still exists after clean"
     )
+
+    # Check for actual local images using podman images (not podman image exists)
+    # podman image exists can return true even if there's no local image (resolves through registry)
+    # Use --noheading to avoid header, and handle errors gracefully
+    images_result = subprocess.run(
+        ["podman", "images", "--format", "{{.Repository}}:{{.Tag}}", "--noheading"],
+        capture_output=True,
+        text=True,
+    )
+    # If podman images fails, fall back to checking individual images
+    if images_result.returncode != 0:
+        # Fallback: check each image individually
+        images_output = ""
+        for check_name in [pulled_image_name] + [
+            f"{pulled_image_name}-{arch}" for arch in ["amd64", "arm64"]
+        ]:
+            check_result = subprocess.run(
+                [
+                    "podman",
+                    "images",
+                    "--format",
+                    "{{.Repository}}:{{.Tag}}",
+                    "--filter",
+                    f"reference={check_name}",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if check_result.returncode == 0:
+                images_output += check_result.stdout
+    else:
+        images_output = images_result.stdout
+
+    # The arch-less tag should not exist in local images
+    assert pulled_image_name not in images_output, (
+        f"Image {pulled_image_name} still exists in local images after clean"
+    )
+
+    # Also check for arch-specific tags (amd64, arm64)
+    for arch in ["amd64", "arm64"]:
+        arch_specific_name = f"{pulled_image_name}-{arch}"
+        assert arch_specific_name not in images_output, (
+            f"Arch-specific image {arch_specific_name} still exists in local images after clean"
+        )
 
 
 def _cleanup_test_artifacts(version, registry_path, project_root, original_head):
@@ -603,12 +650,12 @@ def _cleanup_test_artifacts(version, registry_path, project_root, original_head)
     Helper function to clean up test artifacts.
 
     This function:
-    1. Deletes the git tag (using version format: v99.8795)
+    1. Deletes the git tag (using semantic version format: v99.8795.0)
     2. Resets to the original HEAD (removing any commit made by push)
     3. Restores README.md to its original state (reverts version update)
     4. Removes local images/manifests
     """
-    # Git tag format: v0.1, v1.0, etc. (new format)
+    # Git tag format: v0.1.0, v1.0.0, etc. (Semantic Versioning: MAJOR.MINOR.PATCH)
     # Also handle old format without 'v' prefix for cleanup
     test_git_tag = f"v{version}"
     old_git_tag = version  # Old format without 'v' prefix
@@ -669,7 +716,7 @@ def _cleanup_test_artifacts(version, registry_path, project_root, original_head)
     # Determine architectures to clean
     arch_suffixes = _get_arch_suffixes()
 
-    # Architecture-specific image tags (e.g., localhost:32811/test:99.305-amd64)
+    # Architecture-specific image tags (e.g., localhost:32811/test:99.305.0-amd64)
     arch_image_names = [f"{registry_base}:{version}-{arch}" for arch in arch_suffixes]
 
     # Remove manifests first (ignore errors if they don't exist)

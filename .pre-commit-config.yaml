@@ -1,20 +1,7 @@
 ---
 # .pre-commit-config.yaml
 
-exclude: ^\.cursor/
-
 repos:
-
-  # GitHub Data Sync
-  - repo: local
-    hooks:
-      - id: sync-github-data
-        name: Sync GitHub Issues and PRs
-        entry: .github/scripts/sync-prs-issues.sh
-        language: system
-        pass_filenames: false
-        always_run: true
-
   # General Pre-commit Hooks (Fixes formatting issues)
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -34,26 +21,12 @@ repos:
       - id: trailing-whitespace
 
   # Python Linting and Formatting (Ruff)
-  # on pre-commit, fix linting errors
-  # on push, fix linting errors and enforce docstrings
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.3
     hooks:
       - id: ruff
-        name: ruff (commit)
-        # ignore docstring linting errors on pre-commit
-        args: [--fix, --ignore=D]
-        stages: [pre-commit]
+        args: [--fix]
       - id: ruff-format
-        name: ruff-format (commit)
-        stages: [pre-commit]
-      - id: ruff
-        name: ruff (push - strict)
-        args: [--fix, --extend-select=D]  # enforce docstrings on push
-        stages: [pre-push]
-      - id: ruff-format
-        name: ruff-format (push - strict)
-        stages: [pre-push]
 
   # YAML Linting
   - repo: https://github.com/adrienverge/yamllint
@@ -68,42 +41,53 @@ repos:
     hooks:
       - id: shellcheck
         name: shellcheck
-        args: [-x]
+        args: ["-x"]
 
-  # Markdown Linting (auto-fixes issues)
+  # Markdown Linting (excludes auto-generated docs)
   - repo: https://github.com/jackdewinter/pymarkdown
     rev: v0.9.23
     hooks:
       - id: pymarkdown
-        name: pymarkdown
-        args: ["fix"]
-        exclude: ^\.github_data/
+        name: pymarkdown (fix)
+        args: ["-c", ".pymarkdown", "fix"]
+        exclude: ^(README\.md|CONTRIBUTE\.md|TESTING\.md|\.github_data/)
+      - id: pymarkdown
+        name: pymarkdown (scan)
+        args: ["-c", ".pymarkdown", "scan"]
+        exclude: ^(README\.md|CONTRIBUTE\.md|TESTING\.md|\.github_data/)
 
-  # Dockerfile Linting (using Podman instead of Docker)
+  # Justfile formatting
   - repo: local
     hooks:
-      - id: hadolint
-        name: hadolint
+      - id: just-fmt
+        name: just (format justfiles)
+        entry: just --fmt --unstable
         language: system
-        entry: >
-          bash -c 'for file in "$@"; do
-          podman run --rm -i
-          -v "$PWD/.hadolint.yaml:/hadolint.yaml:ro"
-          docker.io/hadolint/hadolint
-          hadolint --config /hadolint.yaml - < "$file";
-          done' --
-        files: (Containerfile|Dockerfile)$
+        files: ^justfile(\..*)?$
+        pass_filenames: false
 
-  # Makefile
-  - repo: https://github.com/checkmake/checkmake
-    rev: 0.2.2
+  # Documentation Generation (auto-regenerate on template/requirements changes)
+  - repo: local
     hooks:
-      - id: checkmake
-        name: checkmake (lint Makefile)
-        files: ^Makefile$
+      - id: generate-docs
+        name: generate-docs (regenerate from templates)
+        entry: bash -c 'uv run python docs/generate.py && git add README.md CONTRIBUTE.md TESTING.md 2>/dev/null || true'
+        language: system
+        files: ^(docs/templates/.*\.j2|docs/narrative/.*\.md|scripts/requirements\.yaml|justfile)$
+        pass_filenames: false
 
   # Typo Linting
   - repo: https://github.com/crate-ci/typos
     rev: v1.39.0
     hooks:
       - id: typos
+
+  # License Compliance Check (runs only when dependencies change)
+  - repo: local
+    hooks:
+      - id: pip-licenses
+        name: pip-licenses (check dependency licenses)
+        entry: uv run pip-licenses --fail-on="GPL-3.0-only;GPL-3.0-or-later;AGPL-3.0-only;AGPL-3.0-or-later"
+        language: system
+        files: ^(pyproject\.toml|uv\.lock|requirements.*\.txt)$
+        pass_filenames: false

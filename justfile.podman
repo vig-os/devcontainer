@@ -1,0 +1,168 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# PODMAN RECIPES - Container and Image Management
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# List containers/images (--all for all podman resources)
+[group('podman')]
+podman-ps *args:
+    #!/usr/bin/env bash
+    FMT_ID=$(printf '\x7b\x7b.ID\x7d\x7d')
+    FMT_NAMES=$(printf '\x7b\x7b.Names\x7d\x7d')
+    FMT_IMAGE=$(printf '\x7b\x7b.Image\x7d\x7d')
+    FMT_STATUS=$(printf '\x7b\x7b.Status\x7d\x7d')
+    FMT_REPO=$(printf '\x7b\x7b.Repository\x7d\x7d')
+    FMT_TAG=$(printf '\x7b\x7b.Tag\x7d\x7d')
+    FMT_SIZE=$(printf '\x7b\x7b.Size\x7d\x7d')
+
+    if [[ "{{ args }}" == *"--all"* ]]; then
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "  All Podman Containers"
+        echo "═══════════════════════════════════════════════════════════════"
+        podman ps -a --format "table $FMT_NAMES\t$FMT_IMAGE\t$FMT_STATUS" 2>/dev/null || echo "  No containers found"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "  All Podman Images"
+        echo "═══════════════════════════════════════════════════════════════"
+        podman images --format "table $FMT_REPO\t$FMT_TAG\t$FMT_SIZE" 2>/dev/null || echo "  No images found"
+    else
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "  Project-Related Containers"
+        echo "═══════════════════════════════════════════════════════════════"
+        PATTERNS="devcontainer|test-sidecar|init-workspace|workspace-inspector|vig-os"
+        CONTAINERS=$(podman ps -a --format "$FMT_NAMES|$FMT_IMAGE|$FMT_STATUS" 2>/dev/null | grep -iE "$PATTERNS" || true)
+        if [ -n "$CONTAINERS" ]; then
+            echo "  NAME                          IMAGE                           STATUS"
+            echo "$CONTAINERS" | while IFS='|' read -r name image status; do
+                printf "  %-30s %-30s %s\n" "$name" "$image" "$status"
+            done
+        else
+            echo "  No project-related containers found"
+        fi
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "  Project-Related Images"
+        echo "═══════════════════════════════════════════════════════════════"
+        IMAGES=$(podman images --format "$FMT_REPO|$FMT_TAG|$FMT_SIZE" 2>/dev/null | grep -iE "devcontainer|test-sidecar|vig-os" || true)
+        if [ -n "$IMAGES" ]; then
+            echo "  REPOSITORY                    TAG        SIZE"
+            echo "$IMAGES" | while IFS='|' read -r repo tag size; do
+                printf "  %-30s %-10s %s\n" "$repo" "$tag" "$size"
+            done
+        else
+            echo "  No project-related images found"
+        fi
+        echo ""
+        echo "Tip: Use 'just podman-ps --all' to see all containers and images"
+    fi
+
+# Stop and remove a container by name or ID
+[group('podman')]
+podman-kill name:
+    #!/usr/bin/env bash
+    if podman ps -a --format "%(printf '\x7b\x7b.Names\x7d\x7d')" | grep -q "^{{ name }}$" || \
+       podman ps -a --format "%(printf '\x7b\x7b.ID\x7d\x7d')" | grep -q "^{{ name }}"; then
+        echo "🔪 Stopping and removing container '{{ name }}'..."
+        podman rm -f "{{ name }}" 2>/dev/null && echo "✓ Removed '{{ name }}'" || echo "❌ Failed to remove '{{ name }}'"
+    else
+        echo "❌ Container '{{ name }}' not found"
+        exit 1
+    fi
+
+# Stop and remove all containers (with confirmation)
+[group('podman')]
+[confirm("⚠️  This will remove ALL containers. Continue? [y/N]")]
+podman-kill-all:
+    #!/usr/bin/env bash
+    CONTAINERS=$(podman ps -aq 2>/dev/null)
+    if [ -n "$CONTAINERS" ]; then
+        echo "🔪 Removing all containers..."
+        echo "$CONTAINERS" | xargs podman rm -f
+        echo "✓ All containers removed"
+    else
+        echo "✨ No containers to remove"
+    fi
+
+# Stop and remove project-related containers
+[group('podman')]
+podman-kill-project:
+    #!/usr/bin/env bash
+    echo "🔪 Removing project-related containers..."
+    FMT=$(printf '\x7b\x7b.ID\x7d\x7d')
+    CONTAINERS=$(podman ps -a --filter "name=devcontainer" --filter "name=test-sidecar" --filter "name=init-workspace" --filter "name=workspace-inspector" --format "$FMT" 2>/dev/null || true)
+    if [ -n "$CONTAINERS" ]; then
+        echo "$CONTAINERS" | xargs podman rm -f
+        echo "✓ Project containers removed"
+    else
+        echo "✨ No project-related containers found"
+    fi
+
+# Remove an image by name, tag, or ID
+[group('podman')]
+podman-rmi image:
+    #!/usr/bin/env bash
+    if podman image exists "{{ image }}" 2>/dev/null; then
+        echo "🗑️  Removing image '{{ image }}'..."
+        podman rmi -f "{{ image }}" && echo "✓ Removed '{{ image }}'" || echo "❌ Failed to remove '{{ image }}'"
+    else
+        echo "❌ Image '{{ image }}' not found"
+        exit 1
+    fi
+
+# Remove all images (with confirmation)
+[group('podman')]
+[confirm("⚠️  This will remove ALL images. Continue? [y/N]")]
+podman-rmi-all:
+    #!/usr/bin/env bash
+    IMAGES=$(podman images -q 2>/dev/null)
+    if [ -n "$IMAGES" ]; then
+        echo "🗑️  Removing all images..."
+        echo "$IMAGES" | xargs podman rmi -f
+        echo "✓ All images removed"
+    else
+        echo "✨ No images to remove"
+    fi
+
+# Remove project-related images
+[group('podman')]
+podman-rmi-project:
+    #!/usr/bin/env bash
+    echo "🗑️  Removing project-related images..."
+    FMT=$(printf '\x7b\x7b.ID\x7d\x7d')
+    IMAGES=$(podman images --format "$FMT\t%(printf '\x7b\x7b.Repository\x7d\x7d')" 2>/dev/null | grep -iE "devcontainer|test-sidecar|vig-os" | cut -f1 || true)
+    if [ -n "$IMAGES" ]; then
+        echo "$IMAGES" | xargs podman rmi -f
+        echo "✓ Project images removed"
+    else
+        echo "✨ No project-related images found"
+    fi
+
+# Remove dangling images (untagged)
+[group('podman')]
+podman-rmi-dangling:
+    #!/usr/bin/env bash
+    echo "🗑️  Removing dangling images..."
+    DANGLING=$(podman images -f "dangling=true" -q 2>/dev/null)
+    if [ -n "$DANGLING" ]; then
+        echo "$DANGLING" | xargs podman rmi -f
+        echo "✓ Dangling images removed"
+    else
+        echo "✨ No dangling images found"
+    fi
+
+# Prune unused containers, images, networks, and volumes
+[group('podman')]
+[confirm("⚠️  This will prune all unused podman resources. Continue? [y/N]")]
+podman-prune:
+    #!/usr/bin/env bash
+    echo "🧹 Pruning unused podman resources..."
+    podman system prune -f
+    echo "✓ Prune complete"
+
+# Full cleanup: prune including volumes
+[group('podman')]
+[confirm("⚠️  This will prune ALL unused resources including volumes. Continue? [y/N]")]
+podman-prune-all:
+    #!/usr/bin/env bash
+    echo "🧹 Pruning all unused podman resources (including volumes)..."
+    podman system prune -af --volumes
+    echo "✓ Full prune complete"

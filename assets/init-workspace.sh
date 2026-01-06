@@ -1,22 +1,33 @@
 #!/bin/bash
 # Initialize workspace by copying template files
-# Usage: init-workspace [--force]
+#
+# Usage: init-workspace [--force] [--no-prompts]
+#
+# Options:
+#   --force       Overwrite existing files (for upgrades)
+#   --no-prompts  Run non-interactively (requires SHORT_NAME env var)
+#
+# Environment variables (used with --no-prompts):
+#   SHORT_NAME  - Project short name (required)
+#   ORG_NAME    - Organization name (optional, defaults to "vigOS/devc")
 
 set -euo pipefail
 
 TEMPLATE_DIR="/root/assets/workspace"
 WORKSPACE_DIR="/workspace"
 FORCE=false
+NO_PROMPTS=false
 
-# Check if running in interactive mode
-if [[ ! -t 0 ]]; then
-    echo "Error: This script requires an interactive terminal." >&2
-    echo "" >&2
-    echo "Please run with the -it flags:" >&2
-    echo "  podman run -it --rm -v \"./:/workspace\" ghcr.io/vig-os/devcontainer:latest /root/assets/init-workspace.sh" >&2
-    echo "  docker run -it --rm -v \"./:/workspace\" ghcr.io/vig-os/devcontainer:latest /root/assets/init-workspace.sh" >&2
-    exit 1
-fi
+# Files to preserve during --force upgrades (never overwrite if they exist)
+# These are user/project customization files that should survive upgrades
+PRESERVE_FILES=(
+    ".devcontainer/docker-compose.project.yaml"
+    ".devcontainer/docker-compose.local.yaml"
+)
+
+# Get script directory for manifest location
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MANIFEST_FILE="$SCRIPT_DIR/.placeholder-manifest.txt"
 
 # Parse arguments
 for arg in "$@"; do
@@ -24,13 +35,26 @@ for arg in "$@"; do
         --force)
             FORCE=true
             ;;
+        --no-prompts)
+            NO_PROMPTS=true
+            ;;
         *)
             echo "Unknown option: $arg" >&2
-            echo "Usage: init-workspace [--force]" >&2
+            echo "Usage: init-workspace [--force] [--no-prompts]" >&2
             exit 1
             ;;
     esac
 done
+
+# Check if running in interactive mode (only if prompts are needed)
+if [[ "$NO_PROMPTS" != "true" ]] && [[ ! -t 0 ]]; then
+    echo "Error: This script requires an interactive terminal." >&2
+    echo "" >&2
+    echo "Please run with the -it flags:" >&2
+    echo "  podman run -it --rm -v \"./:/workspace\" ghcr.io/vig-os/devcontainer:latest /root/assets/init-workspace.sh" >&2
+    echo "  docker run -it --rm -v \"./:/workspace\" ghcr.io/vig-os/devcontainer:latest /root/assets/init-workspace.sh" >&2
+    exit 1
+fi
 
 # Check if template directory exists
 if [[ ! -d "$TEMPLATE_DIR" ]]; then
@@ -61,33 +85,109 @@ if ! is_workspace_empty && [[ "$FORCE" != "true" ]]; then
     exit 1
 fi
 
-# Ask user for short project name
-read -rp "Enter a short name for your project (letters/numbers only, e.g. my_proj): " SHORT_NAME
-if [[ -z "$SHORT_NAME" ]]; then
-    echo "Error: Short project name is required" >&2
-    exit 1
+# Get SHORT_NAME - from env var or prompt
+if [[ "$NO_PROMPTS" == "true" ]]; then
+    # Non-interactive mode: require SHORT_NAME env var
+    if [[ -z "${SHORT_NAME:-}" ]]; then
+        echo "Error: SHORT_NAME environment variable is required with --no-prompts" >&2
+        exit 1
+    fi
+else
+    # Interactive mode: prompt user
+    read -rp "Enter a short name for your project (letters/numbers only, e.g. my_proj): " SHORT_NAME
+    if [[ -z "$SHORT_NAME" ]]; then
+        echo "Error: Short project name is required" >&2
+        exit 1
+    fi
 fi
 
 # Sanitize: replace hyphens and spaces with underscore; lowercase; remove other special chars
 SHORT_NAME=$(echo "$SHORT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[ -]/_/g' | sed 's/[^a-z0-9_]/_/g')
 echo "Project short name set to: $SHORT_NAME"
 
-# Ask user for organization name
-read -rp "Enter the name of your organization, e.g. 'vigOS': " ORG_NAME
-if [[ -z "$ORG_NAME" ]]; then
-    echo "Error: Organization name is required" >&2
-    exit 1
+# Get ORG_NAME - from env var, default, or prompt
+if [[ "$NO_PROMPTS" == "true" ]]; then
+    # Non-interactive mode: use env var or default
+    ORG_NAME="${ORG_NAME:-vigOS/devc}"
+else
+    # Interactive mode: prompt user
+    read -rp "Enter the name of your organization, e.g. 'vigOS': " ORG_NAME
+    if [[ -z "$ORG_NAME" ]]; then
+        echo "Error: Organization name is required" >&2
+        exit 1
+    fi
 fi
 echo "Organization name set to: $ORG_NAME"
 
-# Warn if forcing (prompt user)
+# Helper: check if a file is in the preserve list
+is_preserved_file() {
+    local file="$1"
+    for preserved in "${PRESERVE_FILES[@]}"; do
+        if [[ "$file" == "$preserved" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Warn if forcing (prompt user) - show which files would be overwritten
 if [[ "$FORCE" == "true" ]]; then
-    echo "Warning: --force flag detected. Existing files may be overwritten."
-    read -rp "Continue? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Aborted."
-        exit 0
+    echo ""
+    echo "Checking for files that would be affected..."
+
+    # Find files that exist in both template and workspace
+    CONFLICTS=()
+    PRESERVED=()
+    while IFS= read -r -d '' template_file; do
+        # Get relative path from template directory
+        rel_path="${template_file#"$TEMPLATE_DIR"/}"
+        workspace_file="$WORKSPACE_DIR/$rel_path"
+
+        if [[ -e "$workspace_file" ]]; then
+            if is_preserved_file "$rel_path"; then
+                PRESERVED+=("$rel_path")
+            else
+                CONFLICTS+=("$rel_path")
+            fi
+        fi
+    done < <(find "$TEMPLATE_DIR" -type f ! -path "*/.git/*" -print0)
+
+    # Show preserved files
+    if [[ ${#PRESERVED[@]} -gt 0 ]]; then
+        echo ""
+        echo "The following ${#PRESERVED[@]} file(s) will be PRESERVED (not overwritten):"
+        echo "─────────────────────────────────────────────────────────────"
+        for preserved in "${PRESERVED[@]}"; do
+            echo "  ✓  $preserved"
+        done
+        echo "─────────────────────────────────────────────────────────────"
+    fi
+
+    # Show files that will be overwritten
+    if [[ ${#CONFLICTS[@]} -eq 0 ]]; then
+        echo ""
+        echo "No existing files would be overwritten."
+    else
+        echo ""
+        echo "The following ${#CONFLICTS[@]} file(s) will be OVERWRITTEN:"
+        echo "─────────────────────────────────────────────────────────────"
+        for conflict in "${CONFLICTS[@]}"; do
+            echo "  ⚠  $conflict"
+        done
+        echo "─────────────────────────────────────────────────────────────"
+        echo ""
+    fi
+
+    # Only prompt for confirmation in interactive mode
+    if [[ "$NO_PROMPTS" != "true" ]]; then
+        read -rp "Continue with --force? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Aborted."
+            exit 0
+        fi
+    else
+        echo "Proceeding with --force (non-interactive mode)"
     fi
 fi
 
@@ -95,24 +195,73 @@ fi
 echo "Initializing workspace from template..."
 echo "Copying files from $TEMPLATE_DIR to $WORKSPACE_DIR..."
 
-# Use rsync if available, otherwise cp
-if command -v rsync &> /dev/null; then
-    rsync -av --exclude='.git' "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
-else
-    # Fallback to cp with proper handling
-    cp -r "$TEMPLATE_DIR"/* "$WORKSPACE_DIR/" 2>/dev/null || true
-    cp -r "$TEMPLATE_DIR"/.[!.]* "$WORKSPACE_DIR/" 2>/dev/null || true
-fi
-
-# Replace placeholders in all files (recursively, excluding .git)
-echo "Replacing placeholders in files..."
-# Use a more efficient approach: only process files that contain placeholders
-# and combine both replacements in a single sed pass
-find "$WORKSPACE_DIR" -type f ! -path "*/.git/*" -print0 | while IFS= read -r -d '' file; do
-    if grep -q '{{SHORT_NAME}}\|{{ORG_NAME}}' "$file" 2>/dev/null; then
-        sed -i "s/{{SHORT_NAME}}/${SHORT_NAME}/g; s/{{ORG_NAME}}/${ORG_NAME}/g" "$file"
+# Build exclude list for preserved files that already exist
+EXCLUDE_ARGS=()
+for preserved in "${PRESERVE_FILES[@]}"; do
+    if [[ -e "$WORKSPACE_DIR/$preserved" ]]; then
+        EXCLUDE_ARGS+=("--exclude=$preserved")
     fi
 done
+
+# Use rsync if available, otherwise cp
+# Note: Excluding .venv - it is used directly from the container image
+# via UV_PROJECT_ENVIRONMENT environment variable (set in docker-compose.yml)
+# Pre-commit cache is now at /opt/pre-commit-cache (not in assets/workspace)
+if command -v rsync &> /dev/null; then
+    rsync -av --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
+else
+    # Fallback to cp with proper handling (less precise, may overwrite preserved files)
+    echo "Warning: rsync not available, preserved files may be overwritten"
+    for item in "$TEMPLATE_DIR"/*; do
+        [[ -e "$item" ]] || continue
+        cp -r "$item" "$WORKSPACE_DIR/" 2>/dev/null || true
+    done
+    for item in "$TEMPLATE_DIR"/.[!.]*; do
+        [[ -e "$item" ]] || continue
+        [[ "$(basename "$item")" == ".venv" ]] && continue
+        cp -r "$item" "$WORKSPACE_DIR/" 2>/dev/null || true
+    done
+fi
+
+# Replace placeholders in files (using pre-built manifest from image)
+echo "Replacing placeholders in files..."
+
+# Escape special characters in variables for sed (especially slashes in ORG_NAME)
+SHORT_NAME_ESCAPED=$(printf '%s\n' "$SHORT_NAME" | sed 's/[&/\]/\\&/g')
+ORG_NAME_ESCAPED=$(printf '%s\n' "$ORG_NAME" | sed 's/[&/\]/\\&/g')
+
+if [[ -f "$MANIFEST_FILE" ]]; then
+    # Use build-time manifest (much faster - no searching at runtime)
+    echo "Using build-time manifest ($(wc -l < "$MANIFEST_FILE") files)"
+    while IFS= read -r template_file; do
+        # Translate template path to workspace path
+        workspace_file="${template_file/\/root\/assets\/workspace/$WORKSPACE_DIR}"
+
+        if [[ -f "$workspace_file" ]]; then
+            # Simple sed -i (always Linux in container - no cross-platform needed)
+            sed -i "s/{{SHORT_NAME}}/${SHORT_NAME_ESCAPED}/g; s/{{ORG_NAME}}/${ORG_NAME_ESCAPED}/g" "$workspace_file"
+        fi
+    done < "$MANIFEST_FILE"
+else
+    # Fallback: search at runtime (slower, but works if manifest is missing)
+    echo "Warning: Manifest not found, searching at runtime (slower)"
+    find "$WORKSPACE_DIR" -type f ! -path "*/.git/*" -print0 | while IFS= read -r -d '' file; do
+        if grep -q '{{SHORT_NAME}}\|{{ORG_NAME}}' "$file" 2>/dev/null; then
+            sed -i "s/{{SHORT_NAME}}/${SHORT_NAME_ESCAPED}/g; s/{{ORG_NAME}}/${ORG_NAME_ESCAPED}/g" "$file"
+        fi
+    done
+fi
+
+# Rename template_project directory to match project short name
+if [[ -d "$WORKSPACE_DIR/src/template_project" ]]; then
+    echo "Renaming src/template_project to src/${SHORT_NAME}..."
+    mv "$WORKSPACE_DIR/src/template_project" "$WORKSPACE_DIR/src/${SHORT_NAME}"
+fi
+
+# Update test imports to use actual project name (template_project -> $SHORT_NAME)
+if [[ -f "$WORKSPACE_DIR/tests/test_example.py" ]]; then
+    sed -i "s/import template_project/import ${SHORT_NAME}/g; s/template_project\.__version__/${SHORT_NAME}.__version__/g" "$WORKSPACE_DIR/tests/test_example.py"
+fi
 
 # Restore executable permissions on shell scripts and hooks (must be after sed -i)
 echo "Setting executable permissions on shell scripts and hooks..."

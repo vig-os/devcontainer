@@ -38,18 +38,18 @@ if [ -z "$VERSION" ]; then
 	echo "❌ ERROR: VERSION is required to push"
 	echo ""
 	echo "   Usage: push.sh VERSION [REPO] [NATIVE_PLATFORM] [PLATFORMS] [REGISTRY_TEST]"
-	echo "   Example: push.sh 1.0"
+	echo "   Example: push.sh 1.0.0"
 	echo ""
 	exit 1
 fi
 
-if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+$'; then
+if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
 	echo ""
 	echo "❌ ERROR: Invalid version format '$VERSION'"
 	echo ""
-	echo "   Version must follow the format X.Y (e.g., 1.0, 2.5, 10.3)"
-	echo "   Examples of valid versions: 1.0, 2.1, 10.5, 0.9"
-	echo "   Examples of invalid versions: 1, 1.0.0, v1.0, 1.0-dev"
+	echo "   Version must follow semantic versioning format X.Y.Z (e.g., 1.0.0, 2.5.3, 0.2.1)"
+	echo "   Examples of valid versions: 1.0.0, 2.1.0, 10.5.2, 0.9.1"
+	echo "   Examples of invalid versions: 1, 1.0, v1.0.0, 1.0.0-dev"
 	echo ""
 	exit 1
 fi
@@ -90,14 +90,19 @@ echo "✓ Version $VERSION does not exist on GHCR"
 
 # Check latest version tag
 echo "Checking latest version tag..."
-LATEST_TAG=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+$' | sed 's/^v//' | sort -t. -k1,1n -k2,2n | tail -1)
+LATEST_TAG=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed 's/^v//' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
 if [ -n "$LATEST_TAG" ]; then
 	echo "  Latest tag: v$LATEST_TAG"
 	MAJOR_NEW=$(echo "$VERSION" | cut -d. -f1)
 	MINOR_NEW=$(echo "$VERSION" | cut -d. -f2)
+	PATCH_NEW=$(echo "$VERSION" | cut -d. -f3)
 	MAJOR_LATEST=$(echo "$LATEST_TAG" | cut -d. -f1)
 	MINOR_LATEST=$(echo "$LATEST_TAG" | cut -d. -f2)
-	if [ "$MAJOR_NEW" -lt "$MAJOR_LATEST" ] || { [ "$MAJOR_NEW" -eq "$MAJOR_LATEST" ] && [ "$MINOR_NEW" -le "$MINOR_LATEST" ]; }; then
+	PATCH_LATEST=$(echo "$LATEST_TAG" | cut -d. -f3)
+	# Compare semantic versions: MAJOR.MINOR.PATCH
+	if [ "$MAJOR_NEW" -lt "$MAJOR_LATEST" ] || \
+	   { [ "$MAJOR_NEW" -eq "$MAJOR_LATEST" ] && [ "$MINOR_NEW" -lt "$MINOR_LATEST" ]; } || \
+	   { [ "$MAJOR_NEW" -eq "$MAJOR_LATEST" ] && [ "$MINOR_NEW" -eq "$MINOR_LATEST" ] && [ "$PATCH_NEW" -le "$PATCH_LATEST" ]; }; then
 		echo ""
 		echo "❌ ERROR: New version $VERSION is not higher than latest version v$LATEST_TAG!"
 		echo ""
@@ -227,8 +232,8 @@ else
 
 	# Tag native image without arch so devcontainer tests can pull it
 	podman tag "$REPO:$VERSION-$NATIVE_ARCH" "$REPO:$VERSION"
-	if ! ( make test-image VERSION="$VERSION" \
-		&& make test-integration VERSION="$VERSION" ); then
+	if ! ( just test-image version="$VERSION" \
+		&& just test-integration version="$VERSION" ); then
 			echo "❌ Tests failed"
 
 			# Clean tag to avoid leaving stray tag if tests fail

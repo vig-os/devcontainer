@@ -1,3 +1,4 @@
+
 # Contributing to vigOS Development Environment
 
 This guide explains how to develop, build, test, and release the vigOS development container image.
@@ -6,23 +7,31 @@ This guide explains how to develop, build, test, and release the vigOS developme
 
 | Component            | Version | Purpose |
 |----------------------|---------|---------|
-| **Podman**           | v4.0+   | Container runtime, compose, and linting |
-| **make**             | GNU     | Build automation and management         |
-| **uv**               | v0.8+   | Python package and project manager      |
-| **git**              | >2.34.0 | Version control and pre-commit tools    |
-| **ssh**              | Latest  | GitHub sign in and commit signing       |
-| **gh**               | Latest  | GitHub CLI for repository and PR/issue management |
-| **npm**              | Latest  | Node.js package manager (for DevContainer CLI) |
-| **devcontainer CLI** | v0.80.1 | DevContainer CLI for testing devcontainer functionality |
+| **podman** | >=4.0 | Container runtime, compose, and image building |
+| **just** | >=1.40.0 | Command runner for task automation |
+| **git** | >=2.34 | Version control and pre-commit hooks |
+| **ssh** | latest | GitHub authentication and commit signing |
+| **gh** | latest | GitHub CLI for repository and PR/issue management |
+| **npm** | latest | Node.js package manager (for DevContainer CLI) |
+| **uv** | >=0.8 | Python package and project manager |
+| **devcontainer** | 0.80.1 | DevContainer CLI for testing devcontainer functionality |
 
-> **Note:** You do **not** need to manually install `uv` or `devcontainer CLI`.
-They will be installed automatically when running `./scripts/setup.sh` or `make setup`.
+> **Note:** You do **not** need to manually install `uv` or `devcontainer`.
+They will be installed automatically when running `./scripts/init.sh` followed by `just setup`.
 
 **Ubuntu/Debian:**
 
 ```bash
 sudo apt update
-sudo apt install -y podman git openssh-client gh nodejs npm
+sudo apt install -y podman git openssh-client nodejs npm
+# just
+curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+
+# gh
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+sudo apt update && sudo apt install -y gh
+
 ```
 
 To build images for multiple architectures (e.g., AMD64 and ARM64), install QEMU user static binaries:
@@ -37,11 +46,11 @@ Verify the installation by checking that `cat /proc/sys/fs/binfmt_misc/qemu-aarc
 **macOS (Homebrew):**
 
 ```bash
-brew install podman git openssh gh node
+brew install podman just git openssh gh node
 ```
 
 - For other Linux distributions, use your package manager (e.g., `dnf`, `yum`, `zypper`, `apk`) to install these dependencies.
-- `uv` and `devcontainer CLI` will be set up automatically; no need to install them manually.
+- Run `./scripts/init.sh` to check dependencies and get OS-specific installation commands.
 - Ensure Docker is installed if you plan to use it instead of Podman.
 
 ## Setup
@@ -51,7 +60,8 @@ Clone this repository and prepare it for container development:
 ```bash
 git clone git@github.com:vig-os/devcontainer.git
 cd devcontainer
-make setup
+./scripts/init.sh    # Check/install dependencies
+just setup           # Setup Python environment and tools
 ```
 
 ## Development Workflow
@@ -76,11 +86,12 @@ When contributing to this project, follow this workflow:
    - Make your changes
    - Commit often and descriptively
    - Add tests
-   - Build and test locally: `make build && make test`
+   - Build and test locally: `just build && just test`
    - Ensure your code follows the project's style and conventions
 
 4. **Update documentation if necessary**
-   - Update [README.md](README.md), [CONTRIBUTE.md](CONTRIBUTE.md), or other relevant docs
+   - Update templates in `docs/templates/` (not the generated files directly)
+   - Run `just docs` to regenerate documentation
    - Update the [CHANGELOG](CHANGELOG.md) with your changes in the `[Unreleased]` section
      - Add entries under appropriate categories (Added, Changed, Fixed, etc.)
      - Use clear, concise descriptions
@@ -91,12 +102,12 @@ When contributing to this project, follow this workflow:
 
    ```bash
    # Run all test suites (image, integration, registry)
-   make test
+   just test
 
    # Or run individual test suites
-   make test-image
-   make test-integration
-   make test-registry
+   just test-image
+   just test-integration
+   just test-registry
    ```
 
 6. **Create a pull request**
@@ -109,31 +120,74 @@ When contributing to this project, follow this workflow:
    - Address any feedback or requested changes
    - Once approved, your changes will be merged into `dev`
 
-## Make Targets
+## Just Recipes
 
-- **help**: Show a list of all available make targets
-- **info**: Show information about the image
-- **setup**: Setup this repository for container development
-- **login**: Test authentication to GitHub Container Registry
-- **build**: Build local development image (`dev` tag)
-- **test**: Run image and integration tests (not registry tests)
-- **test-image**: Run image tests only
-- **test-integration**: Run integration tests only
-- **test-registry**: Run registry tests only
-- **push VERSION=X.Y**: Build, test, commit, push & tag image:X.Y
-- **push VERSION=X.Y NO_TEST=1**: Build, commit, push & tag image:X.Y (skip tests)
-- **push VERSION=X.Y NATIVE_ARCH_ONLY=1**: Build only for native architecture
-- **pull VERSION={VER}**: Pull image:{VER} (default: latest)
-- **clean VERSION={VER}**: Remove image:{VER} (default: dev)
+```text
+Available recipes:
+    [build]
+    build no_cache=""              # Build local development image
+    clean version="dev"            # Remove image (default: dev)
+    clean-artifacts                # Clean build artifacts
+    clean-test-containers          # Clean up lingering test containers
+
+    [deps]
+    sync                           # Sync dependencies from pyproject.toml
+    update                         # Update all dependencies
+
+    [info]
+    default                        # Show available commands (default)
+    docs                           # Generate documentation from templates
+    help                           # Show available commands
+    info                           # Show image information
+    init *args                     # Check/install system dependencies (OS-sensitive)
+    login                          # Test login to GHCR
+    setup                          # Setup Python environment and dev tools
+
+    [podman]
+    podman-kill name               # Stop and remove a container by name or ID
+    podman-kill-all                # Stop and remove all containers (with confirmation)
+    podman-kill-project            # Stop and remove project-related containers
+    podman-prune                   # Prune unused containers, images, networks, and volumes
+    podman-prune-all               # Full cleanup: prune including volumes
+    podman-ps *args                # List containers/images (--all for all podman resources)
+    podman-rmi image               # Remove an image by name, tag, or ID
+    podman-rmi-all                 # Remove all images (with confirmation)
+    podman-rmi-dangling            # Remove dangling images (untagged)
+    podman-rmi-project             # Remove project-related images
+
+    [quality]
+    format                         # Format code
+    lint                           # Run all linters
+    precommit                      # Run pre-commit hooks on all files
+
+    [release]
+    pull version="latest"          # Pull image from registry (default: latest)
+    push version                   # Push versioned release to registry (builds, tests, tags, pushes)
+
+    [sidecar]
+    sidecar name *args             # just sidecar redis flush
+    sidecars                       # List available sidecar containers
+    test-sidecar *args             # Convenience alias for test-sidecar (uses generic sidecar recipe)
+
+    [test]
+    test version="dev"             # Run all test suites
+    test-cov *args                 # Run tests with coverage
+    test-image version="dev"       # Run image tests only
+    test-integration version="dev" # Run integration tests only
+    test-pytest *args              # Run tests with pytest
+    test-registry                  # Run registry tests only (doesn't need image)
+
+```
 
 ## Release Workflow
 
 When releasing a new version of the devcontainer image, follow these steps:
 
 1. **Update documentation**
-   - Ensure [README.md](README.md), [CONTRIBUTE.md](CONTRIBUTE.md), and other docs are up to date
+   - Ensure documentation templates are up to date
+   - Run `just docs` to regenerate all documentation
    - Update [CHANGELOG.md](CHANGELOG.md):
-     - Move all `[Unreleased]` entries to a new version section (e.g., `[1.0]`)
+     - Move all `[Unreleased]` entries to a new version section (e.g., `[1.0.0]`)
      - Add the release date in YYYY-MM-DD format
      - Update the version links at the bottom of the file
      - Clear the `[Unreleased]` section for future changes
@@ -143,7 +197,7 @@ When releasing a new version of the devcontainer image, follow these steps:
 
    ```bash
    # Run all test suites to ensure everything works
-   make test
+   just test
    ```
 
 3. **Ensure clean git state**
@@ -158,20 +212,21 @@ When releasing a new version of the devcontainer image, follow these steps:
    # All changes should be committed before releasing
    ```
 
-4. **Release with `make push` (creates tag)**
+4. **Release with `just push` (creates tag)**
 
    ```bash
-   # Replace X.Y with the version number (e.g. 1.0, 1.1, 2.0)
-   make push VERSION=X.Y
+   # Replace X.Y.Z with the semantic version (e.g. 1.0.0, 1.1.0, 2.0.0)
+   # Version must follow Semantic Versioning format: MAJOR.MINOR.PATCH
+   just push X.Y.Z
    ```
 
    - This will:
      - Build the image for the specified version
-     - Run tests (unless `NO_TEST=1` is specified)
-     - Push the image to GHCR with both `:latest` and `:X.Y` tags
+     - Run tests (unless `no_test=true` is specified)
+     - Push the image to GHCR with both `:latest` and `:X.Y.Z` tags
      - Update [README.md](README.md) with the new version
-     - Create a git commit with the README.md update (commit message: "Release X.Y")
-     - Create a git tag `vX.Y` pointing to that commit
+     - Create a git commit with the README.md update (commit message: "Release X.Y.Z")
+     - Create a git tag `vX.Y.Z` pointing to that commit
 
 5. **Create pull request to merge into `main`**
    - After the release is pushed, create a [pull request](https://github.com/vig-os/devcontainer/pulls) from `dev` to `main`
@@ -183,17 +238,18 @@ When releasing a new version of the devcontainer image, follow these steps:
 
 ## Version Tagging
 
-vigOS Development Environment uses **smart version detection** to manage both GHCR tags and git tags:
+vigOS Development Environment uses **Semantic Versioning** ([SemVer](https://semver.org/)) to manage both GHCR tags and git tags:
 
 - **Development versions** (`dev`):
   - Only local, without time stamp or git reference
   - Meant for development and testing only
-  - Use `make build` and `make test` to build and test
+  - Use `just build` and `just test` to build and test
 
-- **Stable versions** (e.g., `1.2`, `2.0`):
+- **Stable versions** (e.g., `1.2.0`, `2.0.0`):
+  - Follow Semantic Versioning format: `MAJOR.MINOR.PATCH` (e.g., `1.0.0`, `1.2.3`, `2.0.0`)
   - Pushes to GHCR with both `:latest` and `:version` tags
-  - Creates git tag `v{version}` (e.g., `v1.2`)
-  - Use `make push VERSION=X.Y`
+  - Creates git tag `v{version}` (e.g., `v1.2.0`)
+  - Use `just push X.Y.Z` where X.Y.Z is the semantic version
 
 This ensures that `:latest` always points to the latest stable release, and git tags provide traceability for all stable container versions.
 
@@ -201,9 +257,9 @@ This ensures that `:latest` always points to the latest stable release, and git 
 
 vigOS Development Environment supports both **AMD64** (x86_64) and **ARM64** (Apple Silicon) architectures:
 
-- **Local builds** (`make build` and `make test`): Automatically builds and tests for your native platform (ARM64 on macOS, AMD64 on Linux)
-- **Push to registry** (`make push`): Builds and pushes multi-arch manifests supporting both platforms
-- **Pull from registry** (`make pull`): Automatically pulls the correct architecture for your platform
+- **Local builds** (`just build` and `just test`): Automatically builds and tests for your native platform (ARM64 on macOS, AMD64 on Linux)
+- **Push to registry** (`just push`): Builds and pushes multi-arch manifests supporting both platforms
+- **Pull from registry** (`just pull`): Automatically pulls the correct architecture for your platform
 
 This ensures seamless development across different platforms without manual platform specification.
 

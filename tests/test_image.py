@@ -14,11 +14,12 @@ base functionality is preserved in their containers.
 EXPECTED_VERSIONS = {
     "git": "2.",  # Major version check (from apt package)
     "curl": "8.",  # Major version check (from apt package)
-    "gh": "2.83.1",  # GitHub CLI (manually installed from latest release)
-    "uv": "0.9.17",  # UV (manually installed from latest release)
+    "gh": "2.83.2",  # GitHub CLI (manually installed from latest release)
+    "uv": "0.9.22",  # UV (manually installed from latest release)
     "python": "3.12",  # Python (from base image)
-    "pre_commit": "4.5.0",  # pre-commit (installed via uv pip)
-    "ruff": "0.14.8",  # ruff (installed via uv pip)
+    "pre_commit": "4.5.1",  # pre-commit (installed via uv pip)
+    "ruff": "0.14.10",  # ruff (installed via uv pip)
+    "just": "1.40.0",  # just (manually installed from latest release)
 }
 
 
@@ -97,6 +98,83 @@ class TestPythonEnvironment:
         assert expected in result.stdout, (
             f"Expected uv {expected}, got: {result.stdout}"
         )
+
+    def test_uv_venv_workflow(self, host):
+        """Test that uv sync creates venv and manages project dependencies correctly."""
+        # Use /tmp for test project to avoid conflicts
+        test_dir = "/tmp/uv_test_project"
+        pyproject_path = f"{test_dir}/pyproject.toml"
+        lockfile_path = f"{test_dir}/uv.lock"
+        venv_path = f"{test_dir}/.venv"
+
+        # Clean up any existing test directory
+        host.run(f"rm -rf {test_dir}")
+        host.run(f"mkdir -p {test_dir}")
+
+        try:
+            # Step 1: Create a simple pyproject.toml using a here-document
+            create_pyproject = f"""cat > {pyproject_path} << 'PYPROJECT_EOF'
+[project]
+name = "test-project"
+version = "0.1.0"
+description = "Test project for uv venv workflow"
+requires-python = ">=3.12"
+dependencies = []
+PYPROJECT_EOF"""
+            result = host.run(f"cd {test_dir} && {create_pyproject}")
+            assert result.rc == 0, f"Failed to create pyproject.toml: {result.stderr}"
+
+            # Step 2: Run uv sync (should create .venv by default)
+            result = host.run(f"cd {test_dir} && uv sync")
+            assert result.rc == 0, f"uv sync failed: {result.stderr}"
+            assert host.file(lockfile_path).exists, "uv.lock file was not created"
+            assert host.file(venv_path).is_directory, ".venv directory was not created"
+
+            # Step 3: Run uv add with a lightweight package (typing-extensions is very lightweight)
+            package_name = "typing-extensions"
+            result = host.run(f"cd {test_dir} && uv add {package_name}")
+            assert result.rc == 0, f"uv add {package_name} failed: {result.stderr}"
+
+            # Verify package was added to pyproject.toml
+            pyproject_content_after = host.file(pyproject_path).content_string
+            assert package_name in pyproject_content_after, (
+                f"{package_name} was not added to pyproject.toml"
+            )
+
+            # Step 4: Run uv sync again
+            result = host.run(f"cd {test_dir} && uv sync")
+            assert result.rc == 0, f"Second uv sync failed: {result.stderr}"
+
+            # Verify the package is installed in venv (not system-wide)
+            # Use uv run to execute in the venv context
+            result = host.run(
+                f"cd {test_dir} && uv run python -c 'import {package_name.replace('-', '_')}; print(\"OK\")'"
+            )
+            assert result.rc == 0, (
+                f"{package_name} is not importable in venv after uv sync"
+            )
+            assert "OK" in result.stdout, f"Failed to import {package_name} in venv"
+
+            # Verify package is NOT available system-wide (should fail)
+            result = host.run(
+                f"python3 -c 'import {package_name.replace('-', '_')}; print(\"OK\")'"
+            )
+            assert result.rc != 0, (
+                f"{package_name} should not be available system-wide, only in venv"
+            )
+
+            # Step 5: Verify system packages (pre-commit, ruff) are still available
+            # This confirms uv sync didn't remove them
+            result = host.run("pre-commit --version")
+            assert result.rc == 0, (
+                "pre-commit was removed by uv sync (should not happen)"
+            )
+            result = host.run("ruff --version")
+            assert result.rc == 0, "ruff was removed by uv sync (should not happen)"
+
+        finally:
+            # Clean up test directory
+            host.run(f"rm -rf {test_dir}")
 
 
 class TestDevelopmentTools:
@@ -196,7 +274,8 @@ class TestFileStructure:
             "/root/assets/workspace/.devcontainer/README.md",
             "/root/assets/workspace/.devcontainer/devcontainer.json",
             "/root/assets/workspace/.devcontainer/docker-compose.yml",
-            "/root/assets/workspace/.devcontainer/docker-compose.override.yml.example",
+            "/root/assets/workspace/.devcontainer/docker-compose.project.yaml",
+            "/root/assets/workspace/.devcontainer/docker-compose.local.yaml",
             "/root/assets/workspace/.devcontainer/workspace.code-workspace.example",
             # .devcontainer/scripts files
             "/root/assets/workspace/.devcontainer/scripts/post-create.sh",
@@ -210,9 +289,8 @@ class TestFileStructure:
             "/root/assets/workspace/.githooks/pre-commit",
         ]
 
-        # Define files and folders that should be gitignored
+        # Define files and folders that should be gitignored (user-specific, not in image)
         gitignored_content = [
-            "/root/assets/workspace/.devcontainer/docker-compose.override.yml",
             "/root/assets/workspace/.devcontainer/docker-compose.local.yml",
             "/root/assets/workspace/.devcontainer/.conf",
             "/root/assets/workspace/.devcontainer/workspace.code-workspace",
@@ -243,16 +321,16 @@ class TestFileStructure:
             )
 
     def test_workspace_template_pre_commit_hooks_initialized(self, host):
-        """Test that pre-commit hooks are pre-initialized in workspace template."""
-        cache_dir = host.file("/root/assets/workspace/.pre-commit-cache")
+        """Test that pre-commit hooks are pre-initialized at system cache location."""
+        # Pre-commit cache is built to /opt/pre-commit-cache (not in workspace assets)
+        # This allows init-workspace.sh to skip excluding it during copy
+        cache_dir = host.file("/opt/pre-commit-cache")
         assert cache_dir.exists, (
-            "Pre-commit cache directory not found in workspace template"
+            "Pre-commit cache directory not found at /opt/pre-commit-cache"
         )
         assert cache_dir.is_directory, "Pre-commit cache is not a directory"
         # Verify the cache directory is not empty (contains installed hooks)
-        result = host.run(
-            'test -n "$(ls -A /root/assets/workspace/.pre-commit-cache 2>/dev/null)"'
-        )
+        result = host.run('test -n "$(ls -A /opt/pre-commit-cache 2>/dev/null)"')
         assert result.rc == 0, (
             "Pre-commit cache directory is empty - hooks were not initialized"
         )
@@ -269,6 +347,7 @@ class TestPlaceholders:
         excluded_paths = [
             ".pre-commit-cache",
             ".ruff_cache",
+            ".venv",
         ]
 
         # Build find command with exclusions

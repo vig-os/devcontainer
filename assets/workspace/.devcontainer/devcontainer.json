@@ -1,6 +1,10 @@
 {
     "name": "{{SHORT_NAME}}-devc",
-    "dockerComposeFile": "docker-compose.yml",
+    "dockerComposeFile": [
+        "docker-compose.yml",
+        "docker-compose.project.yaml",
+        "docker-compose.local.yaml"
+    ],
     "service": "devcontainer",
     "workspaceFolder": "/workspace/{{SHORT_NAME}}",
     "customizations": {
@@ -10,10 +14,11 @@
                 "charliermarsh.ruff",
                 "ms-vscode.vscode-json",
                 "redhat.vscode-yaml",
-                "GitHub.vscode-pull-request-github"
+                "GitHub.vscode-pull-request-github",
+                "promptexecution.justlang-lsp"
             ],
             "settings": {
-                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.defaultInterpreterPath": "/root/assets/workspace/.venv/bin/python",
                 "[python]": {
                     "editor.defaultFormatter": "charliermarsh.ruff",
                     "editor.formatOnSave": true,
@@ -33,6 +38,18 @@
             }
         }
     },
+    "containerEnv": {
+        "CONTAINER_HOST": "unix:///var/run/docker.sock",
+        "DOCKER_HOST": "unix:///var/run/docker.sock"
+    },
+    "runArgs": [
+        "--cap-add=SYS_ADMIN",
+        "--cap-add=MKNOD",
+        "--security-opt=label=disable",
+        "--device=/dev/fuse",
+        "--group-add=0"
+    ],
+    "postStartCommand": "sudo chmod 666 /var/run/docker.sock 2>/dev/null || true",
     "initializeCommand": ".devcontainer/scripts/initialize.sh",
     "postAttachCommand": "/workspace/{{SHORT_NAME}}/.devcontainer/scripts/post-attach.sh",
     "postCreateCommand": "/workspace/{{SHORT_NAME}}/.devcontainer/scripts/post-create.sh"

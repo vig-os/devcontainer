@@ -19,4 +19,10 @@ fi
 "$SCRIPT_DIR/setup-git-conf.sh"
 "$SCRIPT_DIR/init-precommit.sh"
 
+# Sync Python dependencies if pyproject.toml changed (fast, only installs missing deps)
+# Use --no-install-project since new projects may not have source code yet
+if [[ -f "$PROJECT_ROOT/pyproject.toml" ]]; then
+    uv sync --all-extras --no-install-project --quiet
+fi
+
 echo "Post-attach setup complete"

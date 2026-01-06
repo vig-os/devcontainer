@@ -1,15 +1,23 @@
 ---
-version: '3.8'
-
 services:
   devcontainer:
     image: ghcr.io/vig-os/devcontainer:{{IMAGE_TAG}}
     volumes:
       # Mount the project folder to a subdirectory of workspace
       - ..:/workspace/{{SHORT_NAME}}:cached
+      # Container socket for Docker-out-of-Docker (DooD) - enables sidecars
+      # Path is set by initialize.sh in .env, falls back to Docker default
+      - "${CONTAINER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock"
     environment:
-      # Override default paths to match project subdirectory structure
-      - PRE_COMMIT_HOME=/workspace/{{SHORT_NAME}}/.pre-commit-cache
+      # Use pre-built pre-commit cache from container image (instant, no download needed)
+      # The cache is baked into the image at /opt/pre-commit-cache via Containerfile
+      # Host users running pre-commit locally will use their own cache (~/.cache/pre-commit)
+      - PRE_COMMIT_HOME=/opt/pre-commit-cache
+      # Use pre-built Python venv from container image (instant, no install needed)
+      - UV_PROJECT_ENVIRONMENT=/root/assets/workspace/.venv
+      # Tell Podman/Docker to use the mounted socket (for sidecars and container builds)
+      - CONTAINER_HOST=unix:///var/run/docker.sock
+      - DOCKER_HOST=unix:///var/run/docker.sock
     # Keep container running for VS Code to attach
     command: sleep infinity
     # Use root user (default from image)
@@ -17,3 +25,6 @@ services:
     # Keep stdin open and allocate a pseudo-TTY for interactive use
     stdin_open: true
     tty: true
+    # Disable SELinux labeling to allow socket access (required for sidecars)
+    security_opt:
+      - label=disable

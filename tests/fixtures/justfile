@@ -1,0 +1,18 @@
+# Test sidecar recipes
+# Demonstrates sidecar justfile pattern for build containers
+
+# Say hello from the sidecar
+hello:
+    @echo "Hello from sidecar test script"
+    @echo "Sidecar is ready for build commands"
+    @echo "Communication verified!"
+
+# Run test build workflow
+build:
+    /usr/local/bin/test-build.sh
+
+# Show sidecar info
+info:
+    @echo "Test sidecar container"
+    @echo "Alpine Linux with just installed"
+    @just --version

@@ -46,6 +46,15 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
+# Install Podman client for Docker-out-of-Docker (DooD) pattern
+# This allows the container to communicate with the host's Podman daemon via mounted socket
+RUN set -eux; \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        podman \
+    && rm -rf /var/lib/apt/lists/*; \
+    podman --version
+
 # Install latest GitHub CLI manually from releases
 ARG TARGETARCH=amd64
 RUN set -eux; \
@@ -95,12 +104,34 @@ COPY assets /root/assets
 # Set execute permissions on all shell scripts in the assets
 RUN find /root/assets -type f -name "*.sh" -exec chmod +x {} \;
 
-# Pre-initialize pre-commit hooks in workspace assets
+# Note: Container socket configuration is now handled at runtime
+# The initialize.sh script detects the host OS and writes CONTAINER_SOCKET_PATH to .env
+# docker-compose.yml uses this environment variable for the socket mount
+
+# Generate build-time manifest of files containing placeholders
+# This avoids expensive runtime searching in init-workspace.sh
+RUN grep -rl '{{SHORT_NAME}}\|{{ORG_NAME}}\|{{IMAGE_TAG}}' /root/assets/workspace/ \
+    --exclude-dir=.git \
+    --exclude-dir=.venv \
+    --exclude-dir=.pre-commit-cache \
+    2>/dev/null > /root/assets/.placeholder-manifest.txt || true
+
+# Pre-initialize pre-commit hooks to system cache location
+# This cache is used by the container (not copied to workspace by init-workspace.sh)
+# Host users will use their own cache (~/.cache/pre-commit or project-local)
 WORKDIR /root/assets/workspace
 RUN git init && \
-    PRE_COMMIT_HOME=/root/assets/workspace/.pre-commit-cache \
+    PRE_COMMIT_HOME=/opt/pre-commit-cache \
     pre-commit install-hooks && \
     rm -rf .git
+
+# Pre-build Python virtual environment with template dependencies
+# This venv is used directly via UV_PROJECT_ENVIRONMENT (not copied to workspace)
+# Temporarily replace {{SHORT_NAME}} placeholder for uv sync, then restore for init-workspace.sh
+RUN sed -i 's/{{SHORT_NAME}}/template_project/g' pyproject.toml && \
+    uv sync --all-extras --no-install-project && \
+    uv pip list && \
+    sed -i 's/template_project/{{SHORT_NAME}}/g' pyproject.toml
 
 # Create workspace directory
 RUN mkdir -p /workspace

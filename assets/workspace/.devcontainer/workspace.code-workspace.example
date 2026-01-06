@@ -1,9 +1,9 @@
 {
     "$schema": "https://aka.ms/vscode-workspace-schema",
-    "name": "{{SHORT_NAME}}",
+    "name": "devcontainer",
     "folders": [
         {
-            "name": "{{SHORT_NAME}}",
+            "name": "devcontainer",
             "path": "."
         },
         {

@@ -1,3 +1,5 @@
+# Pull Request
+
 ## Description
 
 <!-- Provide a clear and concise description of what this PR does. -->
@@ -6,7 +8,6 @@
 
 <!-- Link to related issue(s) using #issue_number -->
 <!-- Example: Closes #123, Related to #456 -->
-
 Closes #
 
 ## Type of Change
@@ -24,18 +25,13 @@ Closes #
 
 <!-- Describe the changes in detail -->
 
--
--
--
-
 ## Testing
 
 <!-- Describe the tests you ran and how to verify your changes -->
-
-- [ ] All tests pass locally (`make test` - runs image, integration, and registry tests)
-- [ ] Image tests pass (`make test-image`)
-- [ ] Integration tests pass (`make test-integration`)
-- [ ] Registry tests pass (`make test-registry`)
+- [ ] Tests pass locally (`just test`)
+- [ ] Image tests pass (`just test-image`)
+- [ ] Integration tests pass (`just test-integration`)
+- [ ] Registry tests pass (`just test-registry`) (if applicable)
 - [ ] Manual testing performed (describe below)
 
 ### Manual Testing Details
@@ -45,7 +41,6 @@ Closes #
 ## Checklist
 
 <!-- Mark completed items with an 'x' -->
-
 - [ ] My code follows the project's style guidelines
 - [ ] I have performed a self-review of my code
 - [ ] I have commented my code, particularly in hard-to-understand areas

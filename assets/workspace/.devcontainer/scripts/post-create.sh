@@ -7,6 +7,13 @@ set -euo pipefail
 
 echo "Running post-create setup..."
 
+# Sync Python dependencies (fast if nothing changed from pre-built venv)
+# Use --no-install-project since new projects may not have source code yet
+if [[ -f "pyproject.toml" ]]; then
+    echo "Syncing Python dependencies..."
+    uv sync --all-extras --no-install-project
+fi
+
 # User specific setup
 # Add your custom setup commands here to install any dependencies or tools needed for your project
 
