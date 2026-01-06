@@ -1,3 +1,6 @@
+<!-- Auto-generated from docs/templates/TESTING.md.j2 - DO NOT EDIT DIRECTLY -->
+<!-- Run 'just docs' to regenerate -->
+
 # Testing
 
 This document describes the testing strategy and structure for this project.

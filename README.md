@@ -167,7 +167,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
 - **Version**: 0.1
-- **Built**: 2026-01-06T16:42:56
+- **Built**: 2026-01-06T17:34:35
 - **Size**: ~920 MB
 
 ## Features
