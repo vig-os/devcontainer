@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Automatic version check** for devcontainer updates with DRY & SOLID design
+  - Checks GitHub API for new releases and notifies users when updates are available
+  - Silent mode with graceful failure (no disruption to workflow)
+  - Configurable check interval (default: 24 hours) with spam prevention
+  - Mute notifications for specified duration (`just check 7d`, `1w`, `12h`, etc.)
+  - Enable/disable toggle (`just check on|off`)
+  - One-command update: `just update` downloads install script and updates template files
+  - Configuration stored in `.devcontainer/.local/` (gitignored, machine-specific)
+  - Auto-runs on `just` default command (can be disabled)
+  - Comprehensive test suite (`tests/test_version_check.py`) with 24 tests covering all functionality
 - **One-line install script** (`install.sh`) for curl-based devcontainer deployment
   - Auto-detection of podman/docker runtime (prefers podman)
   - Auto-detection and sanitization of project name from folder name (lowercase, underscores)

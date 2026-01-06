@@ -1,3 +1,6 @@
+# Local configuration (machine-specific, not tracked)
+.local/
+
 # User-specific configuration (personal, not shared with team)
 .conf/
 .env
