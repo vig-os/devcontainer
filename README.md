@@ -22,7 +22,7 @@ That's it! All development tools (Python, git, pre-commit, just, etc.) are inclu
 ### One-Line Install
 
 ```bash
-curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- ~/Projects/my-project
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | sh | sh -s -- ~/Projects/my-project
 ```
 
 This will:
@@ -167,7 +167,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
 - **Version**: 0.1
-- **Built**: 2026-01-06T15:10:48
+- **Built**: 2026-01-06T16:42:56
 - **Size**: ~920 MB
 
 ## Features
