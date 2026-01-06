@@ -472,7 +472,7 @@ main() {
 
         if check_dependency "$check_cmd"; then
             log_success "${status_prefix}${BOLD}$name${NC} $version - installed"
-            ((installed_count++))
+            installed_count=$((installed_count + 1))
         else
             if [ "$auto_install" = "true" ]; then
                 log_warning "${status_prefix}${BOLD}$name${NC} $version - not installed (auto-install via setup.sh)"
@@ -538,7 +538,7 @@ main() {
             if [ -n "$manual" ]; then
                 log_info "Manual installation: $manual"
             fi
-            ((failed_count++))
+            failed_count=$((failed_count + 1))
             continue
         fi
 
@@ -546,14 +546,14 @@ main() {
 
         if confirm "Install $name?"; then
             if install_dependency "$name" "$install_cmd" "$manual"; then
-                ((install_count++))
+                install_count=$((install_count + 1))
             else
-                ((failed_count++))
+                failed_count=$((failed_count + 1))
             fi
         else
             log_info "Skipped $name"
             if [ "$required" = "true" ]; then
-                ((failed_count++))
+                failed_count=$((failed_count + 1))
             fi
         fi
     done
