@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **One-line install script** (`install.sh`) for curl-based devcontainer deployment
+  - Auto-detection of podman/docker runtime (prefers podman)
+  - Auto-detection and sanitization of project name from folder name (lowercase, underscores)
+  - OS-specific installation instructions when runtime is missing (macOS, Ubuntu, Fedora, Arch, Windows)
+  - Runtime health check with troubleshooting advice (e.g., "podman machine start" on macOS)
+  - Flags: `--force`, `--version`, `--name`, `--dry-run`, `--docker`, `--podman`, `--skip-pull`
+- `--no-prompts` flag for `init-workspace.sh` enabling non-interactive/CI usage
+- `SHORT_NAME` environment variable support in `init-workspace.sh`
+- Test suite for install script (`tests/test_install_script.py`) with unit and integration tests
 - `just` as build automation tool (replaces `make`)
 - Layered justfile architecture: `justfile.base` (managed), `justfile.project` (team-shared), `justfile.local` (personal)
 - Generic sidecar passthrough: `just sidecar <name> <recipe>` for executing commands in sidecar containers
@@ -28,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `ORG_NAME` now defaults to `"vigOS/devc"` instead of requiring user input
+- `init-workspace.sh` now escapes special characters in placeholder values (fixes sed errors with `/` in ORG_NAME)
+- Documentation updated with curl-based install as primary quick start method
 - **BREAKING**: Replaced `make` with `just` - all build commands now use `just` (e.g., `just test`, `just build`, `just push`)
 - **Versioning scheme**: Switched from X.Y format to Semantic Versioning (X.Y.Z format).
 All new releases use MAJOR.MINOR.PATCH format (e.g., 0.2.0).
