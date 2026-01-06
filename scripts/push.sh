@@ -90,15 +90,41 @@ echo "✓ Version $VERSION does not exist on GHCR"
 
 # Check latest version tag
 echo "Checking latest version tag..."
-LATEST_TAG=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed 's/^v//' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
-if [ -n "$LATEST_TAG" ]; then
+# Match both vX.Y.Z and vX.Y formats, normalize to X.Y.Z for comparison
+# Process tags: strip 'v' prefix, normalize X.Y to X.Y.0, sort, get latest
+LATEST_TAG_NORMALIZED=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+(\.[0-9]+)?$' | sed 's/^v//' | while IFS= read -r tag; do
+	# Normalize X.Y to X.Y.0 for proper sorting and comparison
+	if echo "$tag" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+		echo "$tag"
+	else
+		# It's X.Y format, append .0
+		echo "${tag}.0"
+	fi
+done | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+
+if [ -n "$LATEST_TAG_NORMALIZED" ]; then
+	# Get original tag format for display (remove trailing .0 if it was normalized)
+	LATEST_TAG_ORIGINAL=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+(\.[0-9]+)?$' | sed 's/^v//' | while IFS= read -r tag; do
+		# Normalize for comparison
+		if echo "$tag" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+			normalized="$tag"
+		else
+			normalized="${tag}.0"
+		fi
+		# If this normalized version matches the latest, output original
+		if [ "$normalized" = "$LATEST_TAG_NORMALIZED" ]; then
+			echo "$tag"
+		fi
+	done | head -1)
+
+	LATEST_TAG="$LATEST_TAG_ORIGINAL"
 	echo "  Latest tag: v$LATEST_TAG"
 	MAJOR_NEW=$(echo "$VERSION" | cut -d. -f1)
 	MINOR_NEW=$(echo "$VERSION" | cut -d. -f2)
 	PATCH_NEW=$(echo "$VERSION" | cut -d. -f3)
-	MAJOR_LATEST=$(echo "$LATEST_TAG" | cut -d. -f1)
-	MINOR_LATEST=$(echo "$LATEST_TAG" | cut -d. -f2)
-	PATCH_LATEST=$(echo "$LATEST_TAG" | cut -d. -f3)
+	MAJOR_LATEST=$(echo "$LATEST_TAG_NORMALIZED" | cut -d. -f1)
+	MINOR_LATEST=$(echo "$LATEST_TAG_NORMALIZED" | cut -d. -f2)
+	PATCH_LATEST=$(echo "$LATEST_TAG_NORMALIZED" | cut -d. -f3)
 	# Compare semantic versions: MAJOR.MINOR.PATCH
 	if [ "$MAJOR_NEW" -lt "$MAJOR_LATEST" ] || \
 	   { [ "$MAJOR_NEW" -eq "$MAJOR_LATEST" ] && [ "$MINOR_NEW" -lt "$MINOR_LATEST" ]; } || \
@@ -232,8 +258,8 @@ else
 
 	# Tag native image without arch so devcontainer tests can pull it
 	podman tag "$REPO:$VERSION-$NATIVE_ARCH" "$REPO:$VERSION"
-	if ! ( just test-image version="$VERSION" \
-		&& just test-integration version="$VERSION" ); then
+	if ! ( just test-image "$VERSION" \
+		&& just test-integration "$VERSION" ); then
 			echo "❌ Tests failed"
 
 			# Clean tag to avoid leaving stray tag if tests fail

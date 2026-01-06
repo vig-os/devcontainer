@@ -1,4 +1,7 @@
 
+<!-- Auto-generated from docs/templates/CONTRIBUTE.md.j2 - DO NOT EDIT DIRECTLY -->
+<!-- Run 'just docs' to regenerate -->
+
 # Contributing to vigOS Development Environment
 
 This guide explains how to develop, build, test, and release the vigOS development container image.
