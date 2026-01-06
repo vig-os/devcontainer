@@ -1,12 +1,22 @@
 #!/bin/bash
 # Initialize workspace by copying template files
-# Usage: init-workspace [--force]
+#
+# Usage: init-workspace [--force] [--no-prompts]
+#
+# Options:
+#   --force       Overwrite existing files (for upgrades)
+#   --no-prompts  Run non-interactively (requires SHORT_NAME env var)
+#
+# Environment variables (used with --no-prompts):
+#   SHORT_NAME  - Project short name (required)
+#   ORG_NAME    - Organization name (optional, defaults to "vigOS/devc")
 
 set -euo pipefail
 
 TEMPLATE_DIR="/root/assets/workspace"
 WORKSPACE_DIR="/workspace"
 FORCE=false
+NO_PROMPTS=false
 
 # Files to preserve during --force upgrades (never overwrite if they exist)
 # These are user/project customization files that should survive upgrades
@@ -19,8 +29,25 @@ PRESERVE_FILES=(
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST_FILE="$SCRIPT_DIR/.placeholder-manifest.txt"
 
-# Check if running in interactive mode
-if [[ ! -t 0 ]]; then
+# Parse arguments
+for arg in "$@"; do
+    case "$arg" in
+        --force)
+            FORCE=true
+            ;;
+        --no-prompts)
+            NO_PROMPTS=true
+            ;;
+        *)
+            echo "Unknown option: $arg" >&2
+            echo "Usage: init-workspace [--force] [--no-prompts]" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Check if running in interactive mode (only if prompts are needed)
+if [[ "$NO_PROMPTS" != "true" ]] && [[ ! -t 0 ]]; then
     echo "Error: This script requires an interactive terminal." >&2
     echo "" >&2
     echo "Please run with the -it flags:" >&2
@@ -28,20 +55,6 @@ if [[ ! -t 0 ]]; then
     echo "  docker run -it --rm -v \"./:/workspace\" ghcr.io/vig-os/devcontainer:latest /root/assets/init-workspace.sh" >&2
     exit 1
 fi
-
-# Parse arguments
-for arg in "$@"; do
-    case "$arg" in
-        --force)
-            FORCE=true
-            ;;
-        *)
-            echo "Unknown option: $arg" >&2
-            echo "Usage: init-workspace [--force]" >&2
-            exit 1
-            ;;
-    esac
-done
 
 # Check if template directory exists
 if [[ ! -d "$TEMPLATE_DIR" ]]; then
@@ -72,22 +85,37 @@ if ! is_workspace_empty && [[ "$FORCE" != "true" ]]; then
     exit 1
 fi
 
-# Ask user for short project name
-read -rp "Enter a short name for your project (letters/numbers only, e.g. my_proj): " SHORT_NAME
-if [[ -z "$SHORT_NAME" ]]; then
-    echo "Error: Short project name is required" >&2
-    exit 1
+# Get SHORT_NAME - from env var or prompt
+if [[ "$NO_PROMPTS" == "true" ]]; then
+    # Non-interactive mode: require SHORT_NAME env var
+    if [[ -z "${SHORT_NAME:-}" ]]; then
+        echo "Error: SHORT_NAME environment variable is required with --no-prompts" >&2
+        exit 1
+    fi
+else
+    # Interactive mode: prompt user
+    read -rp "Enter a short name for your project (letters/numbers only, e.g. my_proj): " SHORT_NAME
+    if [[ -z "$SHORT_NAME" ]]; then
+        echo "Error: Short project name is required" >&2
+        exit 1
+    fi
 fi
 
 # Sanitize: replace hyphens and spaces with underscore; lowercase; remove other special chars
 SHORT_NAME=$(echo "$SHORT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[ -]/_/g' | sed 's/[^a-z0-9_]/_/g')
 echo "Project short name set to: $SHORT_NAME"
 
-# Ask user for organization name
-read -rp "Enter the name of your organization, e.g. 'vigOS': " ORG_NAME
-if [[ -z "$ORG_NAME" ]]; then
-    echo "Error: Organization name is required" >&2
-    exit 1
+# Get ORG_NAME - from env var, default, or prompt
+if [[ "$NO_PROMPTS" == "true" ]]; then
+    # Non-interactive mode: use env var or default
+    ORG_NAME="${ORG_NAME:-vigOS/devc}"
+else
+    # Interactive mode: prompt user
+    read -rp "Enter the name of your organization, e.g. 'vigOS': " ORG_NAME
+    if [[ -z "$ORG_NAME" ]]; then
+        echo "Error: Organization name is required" >&2
+        exit 1
+    fi
 fi
 echo "Organization name set to: $ORG_NAME"
 
@@ -150,11 +178,16 @@ if [[ "$FORCE" == "true" ]]; then
         echo ""
     fi
 
-    read -rp "Continue with --force? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Aborted."
-        exit 0
+    # Only prompt for confirmation in interactive mode
+    if [[ "$NO_PROMPTS" != "true" ]]; then
+        read -rp "Continue with --force? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Aborted."
+            exit 0
+        fi
+    else
+        echo "Proceeding with --force (non-interactive mode)"
     fi
 fi
 
@@ -193,6 +226,10 @@ fi
 # Replace placeholders in files (using pre-built manifest from image)
 echo "Replacing placeholders in files..."
 
+# Escape special characters in variables for sed (especially slashes in ORG_NAME)
+SHORT_NAME_ESCAPED=$(printf '%s\n' "$SHORT_NAME" | sed 's/[&/\]/\\&/g')
+ORG_NAME_ESCAPED=$(printf '%s\n' "$ORG_NAME" | sed 's/[&/\]/\\&/g')
+
 if [[ -f "$MANIFEST_FILE" ]]; then
     # Use build-time manifest (much faster - no searching at runtime)
     echo "Using build-time manifest ($(wc -l < "$MANIFEST_FILE") files)"
@@ -202,7 +239,7 @@ if [[ -f "$MANIFEST_FILE" ]]; then
 
         if [[ -f "$workspace_file" ]]; then
             # Simple sed -i (always Linux in container - no cross-platform needed)
-            sed -i "s/{{SHORT_NAME}}/${SHORT_NAME}/g; s/{{ORG_NAME}}/${ORG_NAME}/g" "$workspace_file"
+            sed -i "s/{{SHORT_NAME}}/${SHORT_NAME_ESCAPED}/g; s/{{ORG_NAME}}/${ORG_NAME_ESCAPED}/g" "$workspace_file"
         fi
     done < "$MANIFEST_FILE"
 else
@@ -210,7 +247,7 @@ else
     echo "Warning: Manifest not found, searching at runtime (slower)"
     find "$WORKSPACE_DIR" -type f ! -path "*/.git/*" -print0 | while IFS= read -r -d '' file; do
         if grep -q '{{SHORT_NAME}}\|{{ORG_NAME}}' "$file" 2>/dev/null; then
-            sed -i "s/{{SHORT_NAME}}/${SHORT_NAME}/g; s/{{ORG_NAME}}/${ORG_NAME}/g" "$file"
+            sed -i "s/{{SHORT_NAME}}/${SHORT_NAME_ESCAPED}/g; s/{{ORG_NAME}}/${ORG_NAME_ESCAPED}/g" "$file"
         fi
     done
 fi
