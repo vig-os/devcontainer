@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.2.0] - 2026-01-06
+
+### Added
+
 - **Automatic version check** for devcontainer updates with DRY & SOLID design
   - Checks GitHub API for new releases and notifies users when updates are available
   - Silent mode with graceful failure (no disruption to workflow)
@@ -137,3 +151,4 @@ The previous v0.1 release is kept as-is for backwards compatibility.
 - Push script updates README files in both project and assets
 
 [0.1]: https://github.com/vig-os/devcontainer/releases/tag/v0.1
+[0.2.0]: https://github.com/vig-os/devcontainer/releases/tag/v0.2.0
