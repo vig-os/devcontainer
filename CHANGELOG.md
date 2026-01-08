@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Just command runner** installation and version verification
+  - Added installation of the latest version of `just` (1.46.0) in the Containerfile
+  - Added tests to verify `just` installation and version in `test_image.py`
+  - Added integration tests for `just` recipes (`test_just_default`, `test_just_help`, `test_just_info`, `test_just_pytest`)
+
 ### Changed
 
 ### Deprecated
@@ -16,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+
+- **Justfile default recipe conflict**
+  - Fixed multiple default recipes issue by moving `help` command to the main justfile
+  - Removed default command from `justfile.project` and `justfile.base` to prevent conflicts
+  - Updated just recipe tests to handle variable whitespace in command output formatting
 
 ### Security
 
