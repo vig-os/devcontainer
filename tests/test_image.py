@@ -19,7 +19,7 @@ EXPECTED_VERSIONS = {
     "python": "3.12",  # Python (from base image)
     "pre_commit": "4.5.1",  # pre-commit (installed via uv pip)
     "ruff": "0.14.10",  # ruff (installed via uv pip)
-    "just": "1.40.0",  # just (manually installed from latest release)
+    "just": "1.46.0",  # just (manually installed from latest release)
 }
 
 
@@ -74,6 +74,22 @@ class TestSystemTools:
         expected = EXPECTED_VERSIONS["gh"]
         assert expected in result.stdout, (
             f"Expected gh {expected}, got: {result.stdout}"
+        )
+
+    def test_just_installed(self, host):
+        """Test that just is installed."""
+        # just is manually installed, so check for the binary file
+        assert host.file("/usr/local/bin/just").exists, "just binary not found"
+        assert host.file("/usr/local/bin/just").is_file, "just is not a file"
+
+    def test_just_version(self, host):
+        """Test that just version is correct."""
+        result = host.run("just --version")
+        assert result.rc == 0, "just --version failed"
+        assert "just" in result.stdout.lower()
+        expected = EXPECTED_VERSIONS["just"]
+        assert expected in result.stdout, (
+            f"Expected just {expected}, got: {result.stdout}"
         )
 
 
