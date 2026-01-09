@@ -45,17 +45,10 @@ info:
     echo "Containerfile: Containerfile"
     echo "Native arch: $NATIVE_ARCH"
 
-# Check/install system dependencies (OS-sensitive)
+# Install system dependencies and setup development environment
 [group('info')]
 init *args:
     ./scripts/init.sh {{ args }}
-
-# Setup Python environment and dev tools
-[group('info')]
-setup:
-    #!/usr/bin/env bash
-    echo "Setting up configuration..."
-    ./scripts/setup.sh
 
 # Generate documentation from templates
 [group('info')]

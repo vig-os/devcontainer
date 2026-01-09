@@ -19,9 +19,6 @@ This guide explains how to develop, build, test, and release the vigOS developme
 | **uv** | >=0.8 | Python package and project manager |
 | **devcontainer** | 0.80.1 | DevContainer CLI for testing devcontainer functionality |
 
-> **Note:** You do **not** need to manually install `uv` or `devcontainer`.
-They will be installed automatically when running `./scripts/init.sh` followed by `just setup`.
-
 **Ubuntu/Debian:**
 
 ```bash
@@ -142,9 +139,8 @@ Available recipes:
     docs                           # Generate documentation from templates
     help                           # Show available commands
     info                           # Show image information
-    init *args                     # Check/install system dependencies (OS-sensitive)
+    init *args                     # Install system dependencies and setup development environment
     login                          # Test login to GHCR
-    setup                          # Setup Python environment and dev tools
 
     [podman]
     podman-kill name               # Stop and remove a container by name or ID

@@ -57,7 +57,6 @@ def load_requirements() -> dict:
     Returns a dictionary with:
     - dependencies: List of required dependencies
     - optional: List of optional dependencies
-    - auto_install: List of auto-installed dependencies (via setup.sh)
     """
     requirements_file = Path(__file__).parent.parent / "scripts" / "requirements.yaml"
 
@@ -71,20 +70,9 @@ def load_requirements() -> dict:
     with requirements_file.open() as f:
         data = yaml.safe_load(f)
 
-    # Separate auto-install from manual dependencies
-    dependencies = []
-    auto_install = []
-
-    for dep in data.get("dependencies", []):
-        if dep.get("auto_install", False):
-            auto_install.append(dep)
-        else:
-            dependencies.append(dep)
-
     return {
-        "dependencies": dependencies,
+        "dependencies": data.get("dependencies", []),
         "optional": data.get("optional", []),
-        "auto_install": auto_install,
     }
 
 
@@ -97,13 +85,6 @@ def format_requirements_table(requirements: dict) -> str:
 
     # Required dependencies (manual install)
     for dep in requirements["dependencies"]:
-        name = dep.get("name", "unknown")
-        version = dep.get("version", "latest")
-        purpose = dep.get("purpose", "")
-        lines.append(f"| **{name}** | {version} | {purpose} |")
-
-    # Auto-install dependencies
-    for dep in requirements["auto_install"]:
         name = dep.get("name", "unknown")
         version = dep.get("version", "latest")
         purpose = dep.get("purpose", "")
@@ -157,16 +138,6 @@ def format_install_commands(requirements: dict, os_type: str) -> str:
     return "\n".join(result)
 
 
-def get_auto_install_note(requirements: dict) -> str:
-    """Generate note about auto-installed dependencies."""
-    auto_deps = requirements.get("auto_install", [])
-    if not auto_deps:
-        return ""
-
-    names = [f"`{dep.get('name', 'unknown')}`" for dep in auto_deps]
-    return f"> **Note:** You do **not** need to manually install {' or '.join(names)}.\nThey will be installed automatically when running `./scripts/init.sh` followed by `just setup`."
-
-
 def generate_docs() -> bool:
     """Generate documentation from templates."""
     docs_dir = Path(__file__).parent
@@ -209,7 +180,6 @@ def generate_docs() -> bool:
         "requirements_table": format_requirements_table(requirements),
         "install_macos": format_install_commands(requirements, "macos"),
         "install_debian": format_install_commands(requirements, "debian"),
-        "auto_install_note": get_auto_install_note(requirements),
     }
 
     # Generate each template

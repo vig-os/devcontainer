@@ -118,9 +118,8 @@ Available recipes:
     docs                           # Generate documentation from templates
     help                           # Show available commands
     info                           # Show image information
-    init *args                     # Check/install system dependencies (OS-sensitive)
+    init *args                     # Install system dependencies and setup development environment
     login                          # Test login to GHCR
-    setup                          # Setup Python environment and dev tools
 
     [podman]
     podman-kill name               # Stop and remove a container by name or ID
@@ -166,8 +165,8 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **Registry**: `ghcr.io/vig-os/devcontainer`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
-- **Version**: 0.1
-- **Built**: 2026-01-07T09:37:55
+- **Version**: 0.2.0
+- **Built**: 2026-01-09T14:46:02
 - **Size**: ~920 MB
 
 ## Features
