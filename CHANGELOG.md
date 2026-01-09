@@ -13,12 +13,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added installation of the latest version of `just` (1.46.0) in the Containerfile
   - Added tests to verify `just` installation and version in `test_image.py`
   - Added integration tests for `just` recipes (`test_just_default`, `test_just_help`, `test_just_info`, `test_just_pytest`)
+- **GitHub Actions workflow for multi-architecture container image publishing** (`.github/workflows/publish-container-image.yml`)
+  - Automated build and publish workflow triggered on semantic version tags (vX.Y.Z)
+  - Multi-architecture support (amd64, arm64) with parallel builds on native runners
+  - Image testing before push: runs `pytest tests/test_image.py` against built images
+  - Manual dispatch support for testing workflow changes without pushing images (default version: 99.0.1)
+  - Comprehensive error handling and verification steps
+  - OCI-standard labels via `docker/metadata-action`
+  - Build log artifacts for debugging (always uploaded for manual dispatch and on failure)
+  - Multi-architecture manifest creation for automatic platform selection
+  - Centralized version extraction job for reuse across build and manifest jobs
+  - Concurrency control to prevent duplicate builds
+  - Timeout protection (60 minutes for builds, 10 minutes for manifest)
+- **GitHub Actions workflow for syncing issues and PRs** (`.github/workflows/sync-issues.yml`)
+  - Automated sync of GitHub issues and PRs to markdown files in `.github_data/`
+  - Runs on schedule (daily), manual trigger, issue events, and PR events
+  - Smart branch selection: commits to `main` when PRs are merged into `main`, otherwise commits to `dev`
+  - Cache-based state management to track last sync timestamp
+  - Force update option for manual workflow dispatch
+- **Enhanced test suite**
+  - Added utility function tests (`tests/test_utils.py`) for `sed_inplace` and `update_version_line`
+  - Improved test organization in justfile with grouped test commands (`just test-all`, `just test-image`, `just test-utils`)
+- **Documentation improvements**
+  - Added workflow status badge to README template showing publish workflow status
+  - Simplified contribution guidelines by removing QEMU build instructions
 
 ### Changed
+
+- **Build process refactoring**
+  - Separated build preparation into dedicated `prepare-build.sh` script
+  - Handles template replacement, asset copying, and README version updates
+  - Improved build script with `--no-cache` flag support and better error handling
+- **Development workflow streamlining**
+  - Simplified contribution guidelines: removed QEMU build instructions and registry testing complexity
+  - Consolidated test commands in justfile for better clarity
+  - Updated development setup instructions to reflect simplified workflow
+- **Package versions**
+  - Updated `ruff` from 0.14.10 to 0.14.11 in test expectations
 
 ### Deprecated
 
 ### Removed
+
+- **Registry testing infrastructure** (moved to GitHub Actions workflow)
+  - Removed `scripts/push.sh` (455 lines) - functionality now in GitHub Actions workflow
+  - Removed `tests/test_registry.py` (788 lines) - registry tests now in CI/CD pipeline
+  - Removed `scripts/update_readme.py` (80 lines) - README updates handled by workflow
+  - Removed `scripts/utils.sh` (75 lines) - utilities consolidated into other scripts
+  - Removed `just test-registry` command - no longer needed with automated workflow
 
 ### Fixed
 
@@ -26,6 +68,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed multiple default recipes issue by moving `help` command to the main justfile
   - Removed default command from `justfile.project` and `justfile.base` to prevent conflicts
   - Updated just recipe tests to handle variable whitespace in command output formatting
+- **Invalid docker-compose.project.yaml**
+  - Added empty services section to docker-compose.project.yaml to fix YAML validation
+- **Python import resolution in tests**
+  - Fixed import errors in `tests/test_utils.py` by using `importlib.util` for explicit module loading
+  - Improved compatibility with static analysis tools and linters
+- **Build script improvements**
+  - Fixed shellcheck warnings by properly quoting script paths
+  - Improved debug output and error messages
 
 ### Security
 
