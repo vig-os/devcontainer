@@ -46,9 +46,15 @@ def get_version_from_changelog() -> str:
     return "dev"
 
 
-def get_image_size() -> str:
-    """Get approximate image size from Containerfile notes."""
-    return "~920 MB"
+def get_release_date_from_changelog() -> str:
+    """Extract release date from CHANGELOG.md."""
+    changelog = Path(__file__).parent.parent / "CHANGELOG.md"
+    if changelog.exists():
+        with changelog.open() as f:
+            for line in f:
+                if line.startswith("## ["):
+                    return line.split("]")[1].split(" - ")[1].strip()
+    return datetime.now().isoformat(timespec="seconds")
 
 
 def load_requirements() -> dict:
@@ -173,8 +179,8 @@ def generate_docs() -> bool:
         "project_name": "vigOS Development Environment",
         "just_help_output": get_just_help(),
         "version": get_version_from_changelog(),
-        "image_size": get_image_size(),
-        "build_date": datetime.now().isoformat(timespec="seconds"),
+        "release_date": get_release_date_from_changelog(),
+        "release_url": f"https://github.com/vig-os/devcontainer/releases/tag/v{get_version_from_changelog()}",
         # Requirements data
         "requirements": requirements,
         "requirements_table": format_requirements_table(requirements),
