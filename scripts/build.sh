@@ -16,13 +16,9 @@ if [ "${1:-}" = "--no-cache" ]; then
 fi
 
 VERSION="${1:-dev}"
-REPO="${2:-${TEST_REGISTRY:-ghcr.io/vig-os/devcontainer}}"
+REPO="ghcr.io/vig-os/devcontainer"
 echo "🔍 DEBUG: VERSION='$VERSION'"
-echo "🔍 DEBUG: REPO (before cleanup)='$REPO'"
-
-# Remove trailing slash from REPO to avoid invalid tag format (e.g., localhost:5000/test/:tag)
-REPO="${REPO%/}"
-echo "🔍 DEBUG: REPO (after cleanup)='$REPO'"
+echo "🔍 DEBUG: REPO='$REPO'"
 
 # Detect native platform
 NATIVE_ARCH=$(uname -m)
@@ -40,10 +36,6 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 echo "🔍 DEBUG: SCRIPT_DIR='$SCRIPT_DIR'"
 echo "🔍 DEBUG: PROJECT_ROOT='$PROJECT_ROOT'"
 
-# Source utilities
-# shellcheck source=scripts/utils.sh
-source "$SCRIPT_DIR/utils.sh"
-
 cd "$PROJECT_ROOT"
 echo "🔍 DEBUG: Changed to PROJECT_ROOT"
 
@@ -59,41 +51,7 @@ echo "🔍 DEBUG: VCS_REF='$VCS_REF'"
 echo "Building $REPO:$VERSION..."
 
 # Create and clear build folder
-echo "Preparing build folder..."
-echo "🔍 DEBUG: Removing existing build directory..."
-rm -rf "$BUILD_DIR"
-echo "🔍 DEBUG: Creating build directory..."
-mkdir -p "$BUILD_DIR"
-echo "🔍 DEBUG: Build directory created"
-
-# Copy Containerfile and assets to build folder
-echo "Copying Containerfile and assets to build folder..."
-echo "🔍 DEBUG: Copying Containerfile..."
-cp Containerfile "$BUILD_DIR/"
-echo "🔍 DEBUG: Copying assets directory..."
-cp -r assets "$BUILD_DIR/"
-echo "🔍 DEBUG: Files copied successfully"
-
-# Modify assets if needed (replace version placeholders)
-if [ -d "$BUILD_DIR/assets/workspace" ]; then
-	echo "Replacing {{IMAGE_TAG}} with $BUILD_VERSION in template files..."
-	echo "🔍 DEBUG: Searching for files in $BUILD_DIR/assets/workspace..."
-	echo "🔍 DEBUG: Using $(get_sed_type) sed syntax"
-
-	find "$BUILD_DIR/assets/workspace" -type f -print0 | while IFS= read -r -d '' file; do
-		sed_inplace "s|{{IMAGE_TAG}}|$BUILD_VERSION|g" "$file"
-	done
-
-	echo "🔍 DEBUG: Template replacement completed"
-	echo "🔍 DEBUG: Verifying replacements..."
-	if grep -r "{{IMAGE_TAG}}" "$BUILD_DIR/assets/workspace" 2>/dev/null; then
-		echo "⚠️  WARNING: Some {{IMAGE_TAG}} placeholders were not replaced!"
-	else
-		echo "🔍 DEBUG: All {{IMAGE_TAG}} placeholders successfully replaced"
-	fi
-else
-	echo "🔍 DEBUG: $BUILD_DIR/assets/workspace does not exist, skipping template replacement"
-fi
+"$SCRIPT_DIR"/prepare-build.sh "$VERSION" "$BUILD_DIR"
 
 # Build the image from build folder
 echo "Building image from build folder..."

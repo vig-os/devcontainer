@@ -7,7 +7,6 @@
 #   version: Version constraint (for display)
 #   purpose: Brief description of why it's needed
 #   required: Whether the dependency is mandatory (default: true)
-#   auto_install: Whether setup.sh will install it automatically (default: false)
 #   check:
 #     command: Command to check if installed (returns 0 if installed)
 #     version_command: Command to get version string (optional)
@@ -119,7 +118,6 @@ dependencies:
     version: ">=0.8"
     purpose: Python package and project manager
     required: true
-    auto_install: true
     check:
       command: command -v uv
       version_command: uv --version
@@ -133,13 +131,12 @@ dependencies:
     version: "0.80.1"
     purpose: DevContainer CLI for testing devcontainer functionality
     required: true
-    auto_install: true
     check:
       command: command -v devcontainer
       version_command: devcontainer --version
       version_regex: '(\d+\.\d+\.\d+)'
     install:
-      all: npm install -g @devcontainers/cli@0.80.1
+      all: npm install -g @devcontainers/cli@{{version}}
       manual: https://github.com/devcontainers/cli
 
 # Optional dependencies for multi-arch builds

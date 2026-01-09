@@ -1474,6 +1474,178 @@ class TestDevContainerCLI:
         )
 
 
+class TestJustRecipes:
+    """Test the just recipes."""
+
+    _just_help_output_lines = [
+        "Available recipes:",
+        "    [info]",
+        r"    help\s+# Show available commands",
+        r"    info\s+# Show project information",
+        "    [build]",
+        "    [test]",
+        "    [quality]",
+        "    [deps]",
+        "    [sidecar]",
+    ]
+
+    def _just_cmd(self, workspace_path: str, args: list[str]) -> list[str]:
+        return [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "just",
+            *args,
+        ]
+
+    def test_just_default(self, devcontainer_up):
+        """Test the default just recipe."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        just_cmd = self._just_cmd(workspace_path, [])
+        result = subprocess.run(
+            just_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=10,
+        )
+
+        # Return code must be 0
+        assert result.returncode == 0, (
+            f"`just` recipe failed\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(just_cmd)}"
+        )
+
+        # Verify we got expected lines in the response
+        output = result.stdout
+        for line in self._just_help_output_lines:
+            # Use regex for lines that contain \s+ (variable whitespace)
+            # Otherwise use exact string matching
+            if "\\s+" in line:
+                pattern = re.compile(line)
+                assert pattern.search(output) is not None, (
+                    f"Expected pattern '{line}' not found in output\n"
+                    f"stdout: {result.stdout}\n"
+                    f"stderr: {result.stderr}"
+                )
+            else:
+                assert line in output, (
+                    f"Expected line '{line}' not found in output\n"
+                    f"stdout: {result.stdout}\n"
+                    f"stderr: {result.stderr}"
+                )
+
+    def test_just_help(self, devcontainer_up):
+        """Test the just help command."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        just_cmd = self._just_cmd(workspace_path, ["help"])
+        result = subprocess.run(
+            just_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=10,
+        )
+
+        # Return code must be 0
+        assert result.returncode == 0, (
+            f"`just help` recipe failed\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(just_cmd)}"
+        )
+
+        # Verify we got expected lines in the response
+        output = result.stdout
+        for line in self._just_help_output_lines:
+            # Use regex for lines that contain \s+ (variable whitespace)
+            # Otherwise use exact string matching
+            if "\\s+" in line:
+                pattern = re.compile(line)
+                assert pattern.search(output) is not None, (
+                    f"Expected pattern '{line}' not found in output\n"
+                    f"stdout: {result.stdout}\n"
+                    f"stderr: {result.stderr}"
+                )
+            else:
+                assert line in output, (
+                    f"Expected line '{line}' not found in output\n"
+                    f"stdout: {result.stdout}\n"
+                    f"stderr: {result.stderr}"
+                )
+
+    def test_just_info(self, devcontainer_up):
+        """Test the just info command."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        just_cmd = self._just_cmd(workspace_path, ["info"])
+        result = subprocess.run(
+            just_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=10,
+        )
+
+        assert result.returncode == 0, (
+            f"`just info` recipe failed\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(just_cmd)}"
+        )
+
+        assert "Project: test_project" in result.stdout, (
+            f"Project information not found in output\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(just_cmd)}"
+        )
+
+    def test_just_pytest(self, devcontainer_up):
+        """Test the just pytest command."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        just_cmd = self._just_cmd(workspace_path, ["test-pytest"])
+        result = subprocess.run(
+            just_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=10,
+        )
+
+        assert result.returncode == 0, (
+            f"`just test-pytest` recipe failed\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(just_cmd)}"
+        )
+
+        assert (
+            "test session starts" in result.stdout
+            and "passed" in result.stdout
+            and "failed" not in result.stdout
+        ), (
+            f"Unexpected pytest output\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(just_cmd)}"
+        )
+
+
 class TestDockerComposeProjectOverrides:
     """Test docker-compose.project.yaml functionality for additional mounts."""
 

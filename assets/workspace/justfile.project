@@ -14,16 +14,6 @@ project := "{{SHORT_NAME}}"
 # INFO
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Show available commands (default, with optional update check)
-[group('info')]
-default:
-    @just --list --unsorted
-
-# Show available commands
-[group('info')]
-help:
-    @just --list
-
 # Show project information
 [group('info')]
 info:

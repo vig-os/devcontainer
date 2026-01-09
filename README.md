@@ -22,7 +22,7 @@ That's it! All development tools (Python, git, pre-commit, just, etc.) are inclu
 ### One-Line Install
 
 ```bash
-curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | sh | sh -s -- ~/Projects/my-project
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- ~/my-project
 ```
 
 This will:
@@ -34,23 +34,23 @@ This will:
 
 ```bash
 # Initialize current directory
-curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- ~/my-project
 
 # Use specific version
-curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- --version 1.0.0 ./my-project
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --version 1.0.0 -- ~/my-project
 
 # Upgrade existing project (overwrites template files)
-curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- --force ./my-project
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --force --  ~/my-project
 
 # Override project name
-curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- --name my_custom_name ./my-project
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --name my_custom_name -- ~/my-project
 
 # Preview without executing
-curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- --dry-run ./my-project
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --dry-run -- ~/my-project
 
 # Force specific runtime
-curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- --docker ./my-project
-curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- --podman ./my-project
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --docker -- ~/my-project
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --podman -- ~/my-project
 ```
 
 > **Note:** If podman or docker is not installed, the script provides OS-specific installation instructions for macOS, Ubuntu/Debian, Fedora, Arch Linux, and Windows.
@@ -118,9 +118,8 @@ Available recipes:
     docs                           # Generate documentation from templates
     help                           # Show available commands
     info                           # Show image information
-    init *args                     # Check/install system dependencies (OS-sensitive)
+    init *args                     # Install system dependencies and setup development environment
     login                          # Test login to GHCR
-    setup                          # Setup Python environment and dev tools
 
     [podman]
     podman-kill name               # Stop and remove a container by name or ID
@@ -154,7 +153,8 @@ Available recipes:
     test-image version="dev"       # Run image tests only
     test-integration version="dev" # Run integration tests only
     test-pytest *args              # Run tests with pytest
-    test-registry                  # Run registry tests only (doesn't need image)
+    test-utils                     # Run utils tests only
+    test-version-check             # Run version check tests only
 
 ```
 
@@ -166,9 +166,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **Registry**: `ghcr.io/vig-os/devcontainer`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
-- **Version**: [0.2.0](https://github.com/vig-os/devcontainer/releases/tag/v0.2.0), 2026-01-06
-- **Built**: 2026-01-06T17:34:35
-- **Size**: ~1370 MB
+- **Latest Version**: [0.2.0](https://github.com/vig-os/devcontainer/releases/tag/v0.2.0) - 2026-01-06
 
 ## Features
 

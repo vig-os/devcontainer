@@ -1,13 +1,22 @@
-title:	[BUG] docker-compose.override.yml is not picked up
-state:	OPEN
-author:	c-vigo
-labels:	bug
-comments:	0
-assignees:	c-vigo
-projects:
-milestone:	0.2
-number:	15
---
+---
+type: issue
+state: closed
+created: 2025-12-15T07:39:16Z
+updated: 2026-01-06T15:43:28Z
+author: c-vigo
+author_url: https://github.com/c-vigo
+url: https://github.com/vig-os/devcontainer/issues/15
+comments: 0
+labels: bug
+assignees: c-vigo
+milestone: 0.2
+projects: none
+relationship: none
+synced: 2026-01-09T16:17:34.620Z
+---
+
+# [Issue 15]: [[BUG] docker-compose.override.yml is not picked up](https://github.com/vig-os/devcontainer/issues/15)
+
 ### Description
 
 The file `docker-compose.override.yml` is not picked up.

@@ -19,9 +19,6 @@ This guide explains how to develop, build, test, and release the vigOS developme
 | **uv** | >=0.8 | Python package and project manager |
 | **devcontainer** | 0.80.1 | DevContainer CLI for testing devcontainer functionality |
 
-> **Note:** You do **not** need to manually install `uv` or `devcontainer`.
-They will be installed automatically when running `./scripts/init.sh` followed by `just setup`.
-
 **Ubuntu/Debian:**
 
 ```bash
@@ -36,15 +33,6 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githu
 sudo apt update && sudo apt install -y gh
 
 ```
-
-To build images for multiple architectures (e.g., AMD64 and ARM64), install QEMU user static binaries:
-
-```bash
-sudo apt install -y qemu-user-static
-sudo podman run --privileged --rm docker.io/tonistiigi/binfmt --install all
-```
-
-Verify the installation by checking that `cat /proc/sys/fs/binfmt_misc/qemu-aarch64` shows output (not an error).
 
 **macOS (Homebrew):**
 
@@ -63,8 +51,7 @@ Clone this repository and prepare it for container development:
 ```bash
 git clone git@github.com:vig-os/devcontainer.git
 cd devcontainer
-./scripts/init.sh    # Check/install dependencies
-just setup           # Setup Python environment and tools
+just init           # Install dependencies and setup development environment
 ```
 
 ## Development Workflow
@@ -110,7 +97,8 @@ When contributing to this project, follow this workflow:
    # Or run individual test suites
    just test-image
    just test-integration
-   just test-registry
+   just test-utils
+   just test-version-check
    ```
 
 6. **Create a pull request**
@@ -142,9 +130,8 @@ Available recipes:
     docs                           # Generate documentation from templates
     help                           # Show available commands
     info                           # Show image information
-    init *args                     # Check/install system dependencies (OS-sensitive)
+    init *args                     # Install system dependencies and setup development environment
     login                          # Test login to GHCR
-    setup                          # Setup Python environment and dev tools
 
     [podman]
     podman-kill name               # Stop and remove a container by name or ID
@@ -178,7 +165,8 @@ Available recipes:
     test-image version="dev"       # Run image tests only
     test-integration version="dev" # Run integration tests only
     test-pytest *args              # Run tests with pytest
-    test-registry                  # Run registry tests only (doesn't need image)
+    test-utils                     # Run utils tests only
+    test-version-check             # Run version check tests only
 
 ```
 

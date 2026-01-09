@@ -29,9 +29,6 @@ Closes #
 
 <!-- Describe the tests you ran and how to verify your changes -->
 - [ ] Tests pass locally (`just test`)
-- [ ] Image tests pass (`just test-image`)
-- [ ] Integration tests pass (`just test-integration`)
-- [ ] Registry tests pass (`just test-registry`) (if applicable)
 - [ ] Manual testing performed (describe below)
 
 ### Manual Testing Details

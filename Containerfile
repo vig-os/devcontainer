@@ -76,6 +76,11 @@ RUN set -eux; \
     rm -rf "gh_${GH_VERSION}_${ARCH}" "$FILE"; \
     gh --version;
 
+# Install latest just
+RUN set -eux; \
+    curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin; \
+    just --version;
+
 # Install latest uv verifying checksum
 RUN set -eux; \
     case "${TARGETARCH}" in \
