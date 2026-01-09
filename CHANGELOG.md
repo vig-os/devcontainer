@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Just command runner** installation and version verification
+  - Added installation of the latest version of `just` (1.46.0) in the Containerfile
+  - Added tests to verify `just` installation and version in `test_image.py`
+  - Added integration tests for `just` recipes (`test_just_default`, `test_just_help`, `test_just_info`, `test_just_pytest`)
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+- **Justfile default recipe conflict**
+  - Fixed multiple default recipes issue by moving `help` command to the main justfile
+  - Removed default command from `justfile.project` and `justfile.base` to prevent conflicts
+  - Updated just recipe tests to handle variable whitespace in command output formatting
+
+### Security
+
+## [0.2.0] - 2026-01-06
+
+### Added
+
 - **Automatic version check** for devcontainer updates with DRY & SOLID design
   - Checks GitHub API for new releases and notifies users when updates are available
   - Silent mode with graceful failure (no disruption to workflow)
@@ -137,3 +161,4 @@ The previous v0.1 release is kept as-is for backwards compatibility.
 - Push script updates README files in both project and assets
 
 [0.1]: https://github.com/vig-os/devcontainer/releases/tag/v0.1
+[0.2.0]: https://github.com/vig-os/devcontainer/releases/tag/v0.2.0

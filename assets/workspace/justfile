@@ -2,6 +2,11 @@
 # MAIN JUSTFILE - Orchestrates all recipe sources
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# Show available commands
+[group('info')]
+help:
+    @just --list
+
 # Import devcontainer-managed base recipes (replaced on upgrade)
 import '.devcontainer/justfile.base'
 
