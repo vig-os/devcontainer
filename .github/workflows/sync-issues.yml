@@ -1,0 +1,130 @@
+# Workflow to sync issues and PRs to markdown files
+# Uses:
+# - sync-issues action from this public repository (vig-os/sync-issues-action)
+# - commit-action from the public repository (vig-os/commit-action)
+
+name: Sync Issues and PRs
+
+on:  # yamllint disable-line rule:truthy
+  # Run on a schedule (daily at midnight UTC)
+  schedule:
+    - cron: '0 0 * * *'
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      force-update:
+        description: 'Force update all issues and PRs (ignores last sync timestamp)'
+        required: false
+        default: false
+        type: boolean
+  # Run on issue creation/updates
+  issues:
+    types:
+      - opened
+      - edited
+      - reopened
+      - closed
+  # Run on PR creation and closure
+  pull_request:
+    types:
+      - opened
+      - edited
+      - closed
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # Prevent concurrent runs to avoid race conditions when committing and cache collisions
+    concurrency:
+      group: sync-issues-${{ github.repository }}
+      cancel-in-progress: true
+    permissions:
+      contents: write
+      issues: read
+      pull-requests: read
+      actions: write  # Required for cache deletion
+
+    steps:
+      - name: Determine target branch
+        id: branch
+        run: |
+          # If PR was merged into main, commit to main; otherwise use dev
+          if [ "${{ github.event_name }}" = "pull_request" ] && \
+             [ "${{ github.event.pull_request.merged }}" = "true" ] && \
+             [ "${{ github.event.pull_request.base.ref }}" = "main" ]; then
+            TARGET_BRANCH="main"
+            echo "✓ PR merged into main - will commit to main"
+          else
+            TARGET_BRANCH="dev"
+            echo "✓ Will commit to dev (default for issues, scheduled, or non-main PRs)"
+          fi
+          echo "branch=$TARGET_BRANCH" >> $GITHUB_OUTPUT
+          echo "Target branch: $TARGET_BRANCH"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.branch.outputs.branch || 'dev' }}
+          persist-credentials: false
+
+      - name: Restore sync state (last synced timestamp)
+        id: restore-state
+        uses: actions/cache/restore@v4
+        with:
+          path: .sync-state
+          key: sync-issues-state-${{ github.repository }}
+          restore-keys: |
+            sync-issues-state-${{ github.repository }}
+            sync-issues-state-
+
+      - name: Delete old cache to free key for this run
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Attempting to delete old cache to prevent save collisions..."
+          # Wait a moment to ensure any previous cache saves have completed
+          sleep 2
+          # Try to delete cache using GitHub API
+          CACHE_KEY="sync-issues-state-${{ github.repository }}"
+          CACHE_ID=$(gh api repos/${{ github.repository }}/actions/caches --jq ".actions_caches[] | select(.key == \"$CACHE_KEY\") | .id" | head -1)
+          if [ -n "$CACHE_ID" ]; then
+            echo "Found cache ID: $CACHE_ID, attempting deletion..."
+            gh api repos/${{ github.repository }}/actions/caches/$CACHE_ID -X DELETE && echo "Cache deleted successfully" || echo "Cache deletion failed (may be locked or already deleted)"
+          else
+            echo "No cache found with key: $CACHE_KEY (this is OK for first run)"
+          fi
+
+      - name: Sync Issues and PRs
+        id: sync
+        # Using local action for testing
+        uses: vig-os/sync-issues-action@v0.1.1
+        with:
+          app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
+          app-private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
+          output-dir: '.github_data'
+          sync-issues: 'true'
+          sync-prs: 'true'
+          include-closed: 'true'
+          state-file: '.sync-state/last-sync.txt'
+          updated-since: ${{ github.event.inputs.force-update == 'true' && '1970-01-01T00:00:00Z' || '' }}
+
+      - name: Commit and push changes via API
+        id: commit
+        if: steps.sync.outputs.modified-files != ''
+        uses: vig-os/commit-action@v0.1.1
+        env:
+          # Use app token if available, otherwise fall back to github token
+          GITHUB_TOKEN: ${{ steps.sync.outputs.app-token || steps.sync.outputs.github-token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF: refs/heads/${{ steps.branch.outputs.branch }}
+          COMMIT_MESSAGE: "chore: sync issues and PRs"
+          FILE_PATHS: ${{ steps.sync.outputs.modified-files }}
+
+      - name: Save sync state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .sync-state
+          key: sync-issues-state-${{ github.repository }}
