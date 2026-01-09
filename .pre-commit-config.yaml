@@ -1,6 +1,8 @@
 ---
 # .pre-commit-config.yaml
 
+exclude: ^\.github_data/
+
 repos:
   # General Pre-commit Hooks (Fixes formatting issues)
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -48,13 +50,9 @@ repos:
     rev: v0.9.23
     hooks:
       - id: pymarkdown
-        name: pymarkdown (fix)
+        name: pymarkdown
         args: ["-c", ".pymarkdown", "fix"]
-        exclude: ^(README\.md|CONTRIBUTE\.md|TESTING\.md|\.github_data/)
-      - id: pymarkdown
-        name: pymarkdown (scan)
-        args: ["-c", ".pymarkdown", "scan"]
-        exclude: ^(README\.md|CONTRIBUTE\.md|TESTING\.md|\.github_data/)
+        exclude: ^(README\.md|CONTRIBUTE\.md|TESTING\.md/)
 
   # Justfile formatting
   - repo: local

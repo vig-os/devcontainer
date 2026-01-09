@@ -27,6 +27,10 @@
     "md025": {
       "enabled": true,
       "front_matter_title": "title"
+    },
+    "md024": {
+      "enabled": true,
+      "siblings_only": true
     }
   }
 }
