@@ -1,0 +1,384 @@
+# This workflow builds and publishes multi-architecture container images to GitHub Container Registry.
+#
+# Workflow Overview:
+# 1. Build Job (matrix strategy):
+#    - Builds architecture-specific images (amd64, arm64) in parallel
+#    - Each architecture builds on its native runner (amd64 on ubuntu-latest, arm64 on ubuntu-latest-arm64)
+#    - Images are tagged with version-architecture (e.g., 1.2.3-amd64, 1.2.3-arm64)
+#    - Images are pushed directly to registry after verification
+#
+# 2. Manifest Job:
+#    - Runs after all build jobs complete successfully
+#    - Creates multi-architecture manifests combining amd64 and arm64 images
+#    - Creates two manifests:
+#      a) Version-specific: ghcr.io/vig-os/devcontainer:1.2.3 (points to both architectures)
+#      b) Latest: ghcr.io/vig-os/devcontainer:latest (always points to latest release)
+#
+# Design Decisions:
+# - Separate architecture builds: Better performance (native builds) and clearer failure isolation
+# - Architecture-specific tags: Allows users to pull specific architecture if needed
+# - Multi-arch manifests: Provides automatic architecture selection for users
+# - Latest tag: Always updated to newest release for convenience
+# - Concurrency control: Prevents race conditions when multiple tags are pushed simultaneously
+#
+# Trigger: Pushes to tags matching semantic versioning (vX.Y.Z)
+
+name: Publish Container Image
+
+on:  # yamllint disable-line rule:truthy
+  push:
+    tags:
+      # Only trigger on semantic version tags (e.g., v1.2.3)
+      # Pattern ensures we only build on valid version tags
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 1.2.3-test)'
+        required: false
+        default: '99.0.1'
+        type: string
+      architectures:
+        description: 'Architectures to build (comma-separated: amd64,arm64)'
+        required: false
+        default: 'amd64,arm64'
+        type: string
+
+concurrency:
+  # Prevent multiple workflows from running simultaneously
+  # This avoids race conditions in manifest creation
+  group: publish-image
+  cancel-in-progress: false  # Queue instead of cancel to ensure all releases are published
+
+permissions:
+  contents: read   # Read repository contents for checkout
+  packages: write  # Write access to GitHub Container Registry
+
+jobs:
+  extract-version:
+    # Extract version information once for reuse by all jobs
+    # This avoids duplicating the version extraction logic
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release_url: ${{ steps.version.outputs.release_url }}
+      release_date: ${{ steps.version.outputs.release_date }}
+      build_timestamp: ${{ steps.version.outputs.build_timestamp }}
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: |
+          # Handle both tag push and manual workflow_dispatch
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            # For manual dispatch, allow more flexible version formats (e.g., 1.2.3-test)
+            if [ -z "$VERSION" ]; then
+              echo "❌ ERROR: Version is required for manual dispatch"
+              exit 1
+            fi
+          else
+            # Extract from tag (e.g., refs/tags/v1.2.3 -> 1.2.3)
+            VERSION=${GITHUB_REF#refs/tags/v}
+            # Validate semantic version format for tag pushes
+            if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "❌ ERROR: Invalid version format '$VERSION'"
+              echo "Version must follow semantic versioning format X.Y.Z"
+              exit 1
+            fi
+          fi
+          RELEASE_URL="https://github.com/vig-os/devcontainer/releases/tag/v$VERSION"
+          RELEASE_DATE=$(date -u +%Y-%m-%d)
+          BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
+          echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
+          echo "build_timestamp=$BUILD_TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "✓ Extracted version: $VERSION"
+
+  build:
+    # Build architecture-specific images in parallel
+    # Each architecture builds on its native runner for optimal performance
+    needs: extract-version
+    timeout-minutes: 60  # Prevent stuck builds from consuming excessive resources
+
+    strategy:
+      matrix:
+        # Build for both architectures (can be filtered later if needed)
+        # For manual testing, you can run the workflow multiple times with different filters
+        arch: [amd64, arm64]
+
+    runs-on: ${{ matrix.arch == 'amd64' && 'ubuntu-latest' || 'ubuntu-latest-arm64' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare build directory
+        run: |
+          ./scripts/prepare-build.sh "${{ needs.extract-version.outputs.version }}" "build" "${{ needs.extract-version.outputs.release_date }}" "${{ needs.extract-version.outputs.release_url }}"
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/vig-os/devcontainer
+          # Generate architecture-specific tag for this build
+          tags: |
+            type=raw,value=${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}
+          # Generate OCI-standard labels for image metadata
+          labels: |
+            org.opencontainers.image.title=vigOS development environment
+            org.opencontainers.image.description=Development environment with common tools and utilities
+            org.opencontainers.image.version=${{ needs.extract-version.outputs.version }}
+            org.opencontainers.image.created=${{ needs.extract-version.outputs.build_timestamp }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/vig-os/devcontainer
+            org.opencontainers.image.vendor=vigOS
+            org.opencontainers.image.licenses=MIT
+
+      - name: Build image
+        # Build architecture-specific image and save it for testing
+        # Tag format: ghcr.io/vig-os/devcontainer:VERSION-ARCH
+        # Example: ghcr.io/vig-os/devcontainer:1.2.3-amd64
+        # We build without pushing first so we can test it before publishing
+        # Using outputs to save image, then load it for testing
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./build
+          file: ./build/Containerfile
+          platforms: linux/${{ matrix.arch }}
+          push: false
+          outputs: type=docker,dest=/tmp/image.tar
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            BUILD_DATE=${{ needs.extract-version.outputs.build_timestamp }}
+            VCS_REF=${{ github.sha }}
+            IMAGE_TAG=${{ needs.extract-version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Set up test environment
+        # Install dependencies for running tests
+        # Tests require: podman (for container operations), uv (for Python package management)
+        run: |
+          set -euo pipefail
+          # Install podman if not available (GitHub runners have docker by default)
+          if ! command -v podman &> /dev/null; then
+            echo "Installing podman..."
+            sudo apt-get update
+            sudo apt-get install -y podman
+          fi
+          podman --version
+          # Install uv (Python package manager)
+          if ! command -v uv &> /dev/null; then
+            echo "Installing uv..."
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          uv --version
+          # Install test dependencies
+          echo "Installing test dependencies..."
+          uv sync --group test
+          echo "✓ Test environment ready"
+
+      - name: Load image for testing
+        # Load the built image into podman for testing
+        # Tests use podman, so we need the image in podman's image store
+        run: |
+          set -euo pipefail
+          echo "Loading image from /tmp/image.tar into podman..."
+          if ! command -v podman &> /dev/null; then
+            echo "❌ ERROR: podman not available (should have been installed in previous step)"
+            exit 1
+          fi
+          podman load < /tmp/image.tar
+          podman images | grep "ghcr.io/vig-os/devcontainer"
+          echo "✓ Image loaded successfully into podman"
+
+      - name: Run tests
+        # Run image tests against the built image before pushing
+        # Tests verify the container image: installed tools, versions, environment variables
+        run: |
+          set -euo pipefail
+          IMAGE_TAG="${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}"
+          echo "Running tests against image: ghcr.io/vig-os/devcontainer:$IMAGE_TAG"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "🧪 TEST MODE: Manual dispatch - tests only, no push"
+          fi
+          echo "Setting TEST_CONTAINER_TAG=$IMAGE_TAG"
+          export TEST_CONTAINER_TAG="$IMAGE_TAG"
+          export PYTEST_SKIP_CONTAINER_CHECK=1
+          # Run image tests (these test the container itself)
+          uv run pytest tests/test_image.py -v --tb=short
+          echo "✓ All image tests passed"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "✓ Test mode complete - image not pushed (manual dispatch)"
+          fi
+
+      - name: Push image
+        # Push the tested image to registry
+        # Only runs if tests passed (workflow would have failed otherwise)
+        # Skip pushing for manual dispatch (test mode only)
+        if: github.event_name != 'workflow_dispatch'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./build
+          file: ./build/Containerfile
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            BUILD_DATE=${{ needs.extract-version.outputs.build_timestamp }}
+            VCS_REF=${{ github.sha }}
+            IMAGE_TAG=${{ needs.extract-version.outputs.version }}
+          # Use cache from previous build
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify image push
+        # Verify that the image was successfully pushed to the registry
+        # This catches silent push failures that might not be detected otherwise
+        # Skip for manual dispatch (no push was performed)
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          IMAGE_TAG="ghcr.io/vig-os/devcontainer:${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}"
+          echo "Verifying image was pushed successfully: $IMAGE_TAG"
+
+          # Verify image exists and is accessible
+          if ! docker buildx imagetools inspect "$IMAGE_TAG" >/dev/null 2>&1; then
+            echo "❌ ERROR: Failed to verify image push - image not found or not accessible"
+            exit 1
+          fi
+
+          # Get and display image digest
+          DIGEST=$(docker buildx imagetools inspect "$IMAGE_TAG" --format '{{.Manifest.Digest}}' 2>&1 || echo "")
+          if [ -n "$DIGEST" ] && [ "$DIGEST" != "null" ]; then
+            echo "✓ Image verified successfully"
+            echo "Digest: $DIGEST"
+          else
+            echo "⚠️  WARNING: Could not retrieve image digest, but image exists"
+          fi
+
+          echo "✓ Image push verification complete"
+
+      - name: Upload build logs
+        # Upload build logs for debugging:
+        # - On failure (for production tag pushes)
+        # - Always for manual dispatch (test mode - useful for debugging test runs)
+        # Retention: 7 days (sufficient for post-mortem analysis)
+        if: failure() || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ matrix.arch }}-${{ needs.extract-version.outputs.version }}
+          path: |
+            **/*.log
+          retention-days: 7
+
+  manifest:
+    # Multi-Architecture Manifest Creation
+    #
+    # After architecture-specific images are built and pushed, this job creates
+    # multi-architecture manifests that allow users to pull images without
+    # specifying an architecture. Docker/Podman automatically selects the
+    # correct architecture based on the user's platform.
+    #
+    # Why separate job?
+    # - Build jobs run in parallel on different runners (amd64 vs arm64)
+    # - Manifest creation requires both images to exist
+    # - Separating concerns makes failure isolation clearer
+    #
+    # Why verify before creating?
+    # - Prevents creating incomplete manifests if one architecture build failed
+    # - Provides clear error messages if images are missing
+    # - Catches registry push failures early
+    needs: [extract-version, build]
+    # Only run for tag pushes (not manual dispatch/test mode)
+    if: needs.build.result == 'success' && github.event_name != 'workflow_dispatch'
+    timeout-minutes: 10  # Manifest operations are fast, short timeout prevents hangs
+    runs-on: ubuntu-latest  # Can run on any runner, no architecture-specific code
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        # Creates two manifests:
+        # 1. Version-specific: ghcr.io/vig-os/devcontainer:VERSION
+        # 2. Latest: ghcr.io/vig-os/devcontainer:latest
+        # Both point to the same architecture-specific images, allowing Docker
+        # to automatically select the correct architecture for the user's platform
+        run: |
+          set -euo pipefail  # Exit on error, undefined vars, pipe failures
+          VERSION="${{ needs.extract-version.outputs.version }}"
+          REPO="ghcr.io/vig-os/devcontainer"
+
+          # Verification phase: Ensure both architecture images exist
+          # This prevents creating incomplete manifests
+          echo "Verifying architecture-specific images exist..."
+          if ! docker buildx imagetools inspect "$REPO:$VERSION-amd64" >/dev/null 2>&1; then
+            echo "❌ ERROR: amd64 image not found: $REPO:$VERSION-amd64"
+            exit 1
+          fi
+          echo "✓ Verified amd64 image exists"
+
+          if ! docker buildx imagetools inspect "$REPO:$VERSION-arm64" >/dev/null 2>&1; then
+            echo "❌ ERROR: arm64 image not found: $REPO:$VERSION-arm64"
+            exit 1
+          fi
+          echo "✓ Verified arm64 image exists"
+
+          # Manifest creation phase: Create version and latest manifests
+          # Each step has explicit error handling to provide clear failure messages
+          echo "Creating version manifest: $REPO:$VERSION"
+          if ! docker buildx imagetools create \
+            --tag "$REPO:$VERSION" \
+            "$REPO:$VERSION-amd64" \
+            "$REPO:$VERSION-arm64"; then
+            echo "❌ ERROR: Failed to create version manifest"
+            exit 1
+          fi
+          echo "✓ Created version manifest: $REPO:$VERSION"
+
+          # Create/update latest manifest
+          echo "Creating/updating latest manifest: $REPO:latest"
+          if ! docker buildx imagetools create \
+            --tag "$REPO:latest" \
+            "$REPO:$VERSION-amd64" \
+            "$REPO:$VERSION-arm64"; then
+            echo "❌ ERROR: Failed to create latest manifest"
+            exit 1
+          fi
+          echo "✓ Created/updated latest manifest: $REPO:latest"
+
+          # Verification phase: Confirm manifests were created successfully
+          # Final check ensures the entire process completed correctly
+          echo "Verifying manifests..."
+          if ! docker buildx imagetools inspect "$REPO:$VERSION" >/dev/null 2>&1; then
+            echo "❌ ERROR: Version manifest verification failed"
+            exit 1
+          fi
+          if ! docker buildx imagetools inspect "$REPO:latest" >/dev/null 2>&1; then
+            echo "❌ ERROR: Latest manifest verification failed"
+            exit 1
+          fi
+
+          echo "✓ Successfully created and verified multi-arch manifests for $VERSION and latest"
