@@ -154,6 +154,8 @@ Available recipes:
     test-integration version="dev" # Run integration tests only
     test-pytest *args              # Run tests with pytest
     test-registry                  # Run registry tests only (doesn't need image)
+    test-utils                     # Run utils tests only
+    test-version-check             # Run version check tests only
 
 ```
 

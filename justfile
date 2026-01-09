@@ -120,6 +120,18 @@ test-registry:
     #!/usr/bin/env bash
     uv run pytest tests/test_registry.py -v -s --tb=short
 
+# Run utils tests only
+[group('test')]
+test-utils:
+    #!/usr/bin/env bash
+    uv run pytest tests/test_utils.py -v -s --tb=short
+
+# Run version check tests only
+[group('test')]
+test-version-check:
+    #!/usr/bin/env bash
+    uv run pytest tests/test_version_check.py -v -s --tb=short
+
 # Clean up lingering containers before running tests
 [private]
 _test-cleanup-check:
