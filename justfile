@@ -114,12 +114,6 @@ test-integration version="dev":
     #!/usr/bin/env bash
     TEST_CONTAINER_TAG={{ version }} uv run pytest tests/test_integration.py -v --tb=short
 
-# Run registry tests only (doesn't need image)
-[group('test')]
-test-registry:
-    #!/usr/bin/env bash
-    uv run pytest tests/test_registry.py -v -s --tb=short
-
 # Run utils tests only
 [group('test')]
 test-utils:
@@ -146,15 +140,15 @@ _test-cleanup-check:
 _test-all version="dev":
     @just _ensure-dev-image {{ version }}
     #!/usr/bin/env bash
-    PYTEST_SKIP_CONTAINER_CHECK=1 TEST_CONTAINER_TAG={{ version }} uv run pytest tests/test_image.py -v --tb=short
-    PYTEST_SKIP_CONTAINER_CHECK=1 TEST_CONTAINER_TAG={{ version }} uv run pytest tests/test_integration.py -v --tb=short
-    PYTEST_SKIP_CONTAINER_CHECK=1 uv run pytest tests/test_registry.py -v -s --tb=short
+    PYTEST_SKIP_CONTAINER_CHECK=1 uv run pytest tests -v -s --tb=short
 
 # Run all test suites
 [group('test')]
 test version="dev":
     @just _test-cleanup-check
-    @just _test-all {{ version }}
+    @just _ensure-dev-image {{ version }}
+    #!/usr/bin/env bash
+    TEST_CONTAINER_TAG={{ version }}  uv run pytest tests -v -s --tb=short
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # RELEASE

@@ -34,15 +34,6 @@ sudo apt update && sudo apt install -y gh
 
 ```
 
-To build images for multiple architectures (e.g., AMD64 and ARM64), install QEMU user static binaries:
-
-```bash
-sudo apt install -y qemu-user-static
-sudo podman run --privileged --rm docker.io/tonistiigi/binfmt --install all
-```
-
-Verify the installation by checking that `cat /proc/sys/fs/binfmt_misc/qemu-aarch64` shows output (not an error).
-
 **macOS (Homebrew):**
 
 ```bash
@@ -60,8 +51,7 @@ Clone this repository and prepare it for container development:
 ```bash
 git clone git@github.com:vig-os/devcontainer.git
 cd devcontainer
-./scripts/init.sh    # Check/install dependencies
-just setup           # Setup Python environment and tools
+just init           # Install dependencies and setup development environment
 ```
 
 ## Development Workflow
@@ -107,7 +97,8 @@ When contributing to this project, follow this workflow:
    # Or run individual test suites
    just test-image
    just test-integration
-   just test-registry
+   just test-utils
+   just test-version-check
    ```
 
 6. **Create a pull request**
@@ -174,7 +165,6 @@ Available recipes:
     test-image version="dev"       # Run image tests only
     test-integration version="dev" # Run integration tests only
     test-pytest *args              # Run tests with pytest
-    test-registry                  # Run registry tests only (doesn't need image)
     test-utils                     # Run utils tests only
     test-version-check             # Run version check tests only
 
