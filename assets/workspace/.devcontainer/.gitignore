@@ -7,8 +7,8 @@
 .env.local
 docker-compose.local.yaml
 
-# VS Code workspace file (personal editor layout)
-workspace.code-workspace
+# VS Code workspace files (personal editor layout)
+*.code-workspace
 
 # Temporary files
 *.tmp
