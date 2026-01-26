@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.2.1] - 2026-01-26
+
+### Added
+
+- **cargo-binstall** in Containerfile
+  - Install via official install script; binaries in `/root/.cargo/bin` with `ENV PATH` set
+  - Version check in `tests/test_image.py`
+- **typstyle** linting
+  - Install via `cargo-binstall` in Containerfile
+  - Version check in test suite
+  - Pre-commit hook configuration for typstyle
 - **Just command runner** installation and version verification
   - Added installation of the latest version of `just` (1.46.0) in the Containerfile
   - Added tests to verify `just` installation and version in `test_image.py`
@@ -40,6 +61,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Devcontainer test fixtures** (`tests/conftest.py`)
+  - Shared helpers for `devcontainer_up` and `devcontainer_with_sidecar`: path resolution, env/SSH, project yaml mount, run up, teardown
+  - `devcontainer_with_sidecar` scope set to session (one bring-up per session for sidecar tests)
+  - Cleanup uses same approach as `just clean-test-containers` (list containers by name, `podman rm -f`) so stacks are torn down reliably
+  - Redundant imports removed; fixture logic simplified for maintainability
 - **Build process refactoring**
   - Separated build preparation into dedicated `prepare-build.sh` script
   - Handles template replacement, asset copying, and README version updates
@@ -51,10 +77,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Package versions**
   - Updated `ruff` from 0.14.10 to 0.14.11 in test expectations
 
-### Deprecated
-
 ### Removed
 
+- **Deprecated justfile test recipe and test**
+  - Removed deprecated test command from justfile
+  - Removed deprecated test for default recipe in justfile (`TestJustIntegration.test_default_recipe_includes_check`)
 - **Registry testing infrastructure** (moved to GitHub Actions workflow)
   - Removed `scripts/push.sh` (455 lines) - functionality now in GitHub Actions workflow
   - Removed `tests/test_registry.py` (788 lines) - registry tests now in CI/CD pipeline
@@ -76,8 +103,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Build script improvements**
   - Fixed shellcheck warnings by properly quoting script paths
   - Improved debug output and error messages
-
-### Security
 
 ## [0.2.0] - 2026-01-06
 
@@ -212,3 +237,4 @@ The previous v0.1 release is kept as-is for backwards compatibility.
 
 [0.1]: https://github.com/vig-os/devcontainer/releases/tag/v0.1
 [0.2.0]: https://github.com/vig-os/devcontainer/releases/tag/v0.2.0
+[0.2.1]: https://github.com/vig-os/devcontainer/releases/tag/v0.2.1
