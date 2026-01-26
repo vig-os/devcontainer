@@ -14,7 +14,9 @@ Example:
 """
 
 import atexit
+import json
 import os
+import platform
 import shutil
 import subprocess
 import tempfile
@@ -24,6 +26,7 @@ from pathlib import Path
 import pexpect
 import pytest
 import testinfra
+import yaml
 
 
 def pytest_sessionstart(session):
@@ -233,8 +236,6 @@ def test_container(container_image):
     The container will be cleaned up after all tests.
     """
     # Create a unique container name
-    import time
-
     container_id = f"test-devcontainer-{int(time.time())}"
 
     # Start the container in detached mode
@@ -379,8 +380,6 @@ def initialized_workspace(container_image):
         ]
 
         # Track progress through stages for better timeout diagnostics
-        import time
-
         stages = {
             "started": None,
             "short_name_prompt": None,
@@ -569,8 +568,6 @@ def initialized_workspace(container_image):
         ]
 
         # Track progress through stages for better timeout diagnostics
-        import time
-
         stages = {
             "started": None,
             "short_name_prompt": None,
@@ -715,6 +712,227 @@ def initialized_workspace(container_image):
     cleanup()
 
 
+# --- Shared helpers for devcontainer_up and devcontainer_with_sidecar ---
+
+
+def _resolve_devcontainer_cli_workspace(workspace_path):
+    """
+    Resolve workspace paths for devcontainer CLI (DooD-aware).
+    Returns (workspace_path, workspace_path_for_cli, in_container).
+    Calls pytest.skip() if running in container without HOST_WORKSPACE_PATH.
+    """
+    workspace_path = workspace_path.resolve()
+    in_container = is_running_in_container()
+    host_workspace = os.environ.get("HOST_WORKSPACE_PATH")
+    if in_container and not host_workspace:
+        pytest.skip(
+            "Running inside a container without HOST_WORKSPACE_PATH set. "
+            "Devcontainer CLI tests require host path translation. "
+            "Set HOST_WORKSPACE_PATH to the host path that maps to /workspace/devcontainer"
+        )
+    if in_container and host_workspace:
+        workspace_path_for_cli = get_host_path(workspace_path)
+        print(
+            f"[DEBUG] Translated workspace path: {workspace_path} -> {workspace_path_for_cli}"
+        )
+    else:
+        workspace_path_for_cli = workspace_path
+    return workspace_path, workspace_path_for_cli, in_container
+
+
+def _prepare_devcontainer_env(
+    workspace_path, docker_path="podman", enable_ssh_forwarding=True
+):
+    """
+    Prepare env for devcontainer CLI and optionally add SSH agent to devcontainer.json.
+    Returns (env, original_devcontainer_json_str or None for restore).
+    """
+    env = os.environ.copy()
+    devcontainer_json_path = workspace_path / ".devcontainer" / "devcontainer.json"
+    original_config = None
+    if (
+        platform.system() == "Darwin"
+        and docker_path == "podman"
+        and "SSH_AUTH_SOCK" in env
+    ):
+        print("[DEBUG] Disabling SSH agent forwarding on macOS+podman")
+        print("[DEBUG] (VM isolation prevents socket mounting)")
+        del env["SSH_AUTH_SOCK"]
+    elif (
+        enable_ssh_forwarding
+        and "SSH_AUTH_SOCK" in env
+        and Path(env["SSH_AUTH_SOCK"]).exists()
+    ):
+        print("[DEBUG] Setting up SSH agent forwarding in devcontainer.json")
+        with devcontainer_json_path.open() as f:
+            config = json.load(f)
+        original_config = json.dumps(config, indent=4)
+        if "mounts" not in config:
+            config["mounts"] = []
+        if "remoteEnv" not in config:
+            config["remoteEnv"] = {}
+        ssh_mount = (
+            f"source={env['SSH_AUTH_SOCK']},target=/tmp/ssh-agent.sock,type=bind"
+        )
+        if ssh_mount not in config["mounts"]:
+            config["mounts"].append(ssh_mount)
+        if config["remoteEnv"].get("SSH_AUTH_SOCK") != "/tmp/ssh-agent.sock":
+            config["remoteEnv"]["SSH_AUTH_SOCK"] = "/tmp/ssh-agent.sock"
+        with devcontainer_json_path.open("w") as f:
+            json.dump(config, f, indent=4)
+        print("[DEBUG] Added SSH agent forwarding to devcontainer.json")
+    return env, original_config
+
+
+def _ensure_project_yaml_test_mount(project_config, workspace_path, in_container):
+    """Ensure devcontainer service has the tests-mounted volume. Mutates project_config."""
+    tests_dir = Path(__file__).parent.resolve()
+    tests_dir_for_mount = get_host_path(tests_dir) if in_container else tests_dir
+    if "services" not in project_config:
+        project_config["services"] = {}
+    if "devcontainer" not in project_config["services"]:
+        project_config["services"]["devcontainer"] = {}
+    if "volumes" not in project_config["services"]["devcontainer"]:
+        project_config["services"]["devcontainer"]["volumes"] = []
+    test_mount = f"{tests_dir_for_mount}:/workspace/tests-mounted:cached"
+    if test_mount not in project_config["services"]["devcontainer"]["volumes"]:
+        project_config["services"]["devcontainer"]["volumes"].append(test_mount)
+        print(f"[DEBUG] Added test mount: {tests_dir_for_mount}")
+    return project_config
+
+
+def _run_devcontainer_up(
+    workspace_path_for_cli, workspace_path, env, docker_path="podman"
+):
+    """Run devcontainer up. Returns subprocess.CompletedProcess."""
+    up_cmd = [
+        "devcontainer",
+        "up",
+        "--workspace-folder",
+        str(workspace_path_for_cli),
+        "--config",
+        f"{workspace_path_for_cli}/.devcontainer/devcontainer.json",
+        "--remove-existing-container",
+        "--docker-path",
+        docker_path,
+        "--log-level",
+        "trace",
+    ]
+    print(f"\n[DEBUG] Setting up devcontainer: {' '.join(up_cmd)}")
+    print("[DEBUG] This may take about a minute...")
+    return subprocess.run(
+        up_cmd,
+        capture_output=True,
+        text=True,
+        cwd=str(workspace_path),
+        env=env,
+        timeout=120,
+    )
+
+
+def _teardown_devcontainer_containers(
+    docker_path, workspace_path, extra_name_filters=None
+):
+    """List containers by name (workspace_path.name + extra_name_filters) and rm -f. Same as just clean-test-containers."""
+    filters = [workspace_path.name]
+    if extra_name_filters:
+        filters = list(extra_name_filters) + filters
+    for name_filter in filters:
+        list_result = subprocess.run(
+            [
+                docker_path,
+                "ps",
+                "-a",
+                "--filter",
+                f"name={name_filter}",
+                "--format",
+                "{{.ID}}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if list_result.returncode == 0 and list_result.stdout.strip():
+            for cid in list_result.stdout.strip().splitlines():
+                subprocess.run(
+                    [docker_path, "rm", "-f", cid.strip()],
+                    capture_output=True,
+                    timeout=30,
+                )
+
+
+@pytest.fixture(scope="session")
+def devcontainer_up(initialized_workspace):
+    """
+    Set up a devcontainer using devcontainer CLI.
+
+    This fixture:
+    - Builds and starts the devcontainer using `devcontainer up`
+    - SSH agent forwarding is disabled on macOS+podman due to VM isolation
+    - Yields the workspace path for tests to use
+    - Cleans up containers by name (same approach as just clean-test-containers)
+
+    When running from inside a container (DooD), set HOST_WORKSPACE_PATH
+    environment variable to enable path translation for devcontainer CLI.
+
+    Note: This fixture takes some time to set up.
+    """
+    workspace_path, workspace_path_for_cli, in_container = (
+        _resolve_devcontainer_cli_workspace(initialized_workspace)
+    )
+    if not shutil.which("devcontainer"):
+        pytest.skip(
+            "devcontainer CLI not available. "
+            "Install with: npm install -g @devcontainers/cli@0.80.1"
+        )
+
+    docker_path = "podman"
+    env, original_config = _prepare_devcontainer_env(
+        workspace_path, docker_path, enable_ssh_forwarding=True
+    )
+    if not original_config:
+        devcontainer_json_path = workspace_path / ".devcontainer" / "devcontainer.json"
+        with devcontainer_json_path.open() as f:
+            original_config = json.dumps(json.load(f), indent=4)
+
+    project_yaml_path = workspace_path / ".devcontainer" / "docker-compose.project.yaml"
+    if project_yaml_path.exists():
+        with project_yaml_path.open() as f:
+            project_config = yaml.safe_load(f) or {}
+    else:
+        project_config = {}
+    if not project_config:
+        project_config = {"services": {"devcontainer": {"volumes": []}}}
+    _ensure_project_yaml_test_mount(project_config, workspace_path, in_container)
+    with project_yaml_path.open("w") as f:
+        yaml.dump(project_config, f, default_flow_style=False, sort_keys=False)
+    print("[DEBUG] Updated docker-compose.project.yaml with test mount")
+
+    up_result = _run_devcontainer_up(
+        workspace_path_for_cli=workspace_path_for_cli,
+        workspace_path=workspace_path,
+        env=env,
+        docker_path=docker_path,
+    )
+    if up_result.returncode != 0:
+        pytest.fail(
+            f"devcontainer up failed\n"
+            f"stdout: {up_result.stdout}\n"
+            f"stderr: {up_result.stderr}"
+        )
+    print("[DEBUG] Devcontainer is up and running")
+
+    yield workspace_path
+
+    print("\n[DEBUG] Cleaning up devcontainer...")
+    _teardown_devcontainer_containers(docker_path, workspace_path)
+    devcontainer_json_path = workspace_path / ".devcontainer" / "devcontainer.json"
+    if original_config:
+        with devcontainer_json_path.open("w") as f:
+            f.write(original_config)
+        print("[DEBUG] Restored original devcontainer.json")
+
+
 @pytest.fixture(scope="session")
 def sidecar_image():
     """
@@ -726,7 +944,6 @@ def sidecar_image():
     - Returns the image name for use in compose configuration
     - Skips all sidecar tests if build fails
     """
-    import subprocess
 
     sidecar_dir = Path(__file__).parent / "fixtures"
     image_name = "localhost/test-sidecar:latest"
@@ -757,7 +974,7 @@ def sidecar_image():
     return image_name
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
     """
     Set up a devcontainer WITH a sidecar for testing multi-container setups.
@@ -767,150 +984,59 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
     - Configures docker-compose.project.yaml with sidecar service
     - Starts both devcontainer and sidecar together
     - Enables testing of Approach 1: command execution via podman exec
-    - Cleans up both containers after tests
+    - Cleans up both containers after the test session (session scope, like devcontainer_up)
 
     When running from inside a container (DooD), set HOST_WORKSPACE_PATH
     environment variable to enable path translation for devcontainer CLI.
 
     Note: This is separate from devcontainer_up to avoid breaking other tests.
     """
-    import json
-    import os
-    import platform
-    import shutil
-    import subprocess
-
-    workspace_path = initialized_workspace.resolve()
-
-    # Check if we need path translation for DooD
-    in_container = is_running_in_container()
-    host_workspace = os.environ.get("HOST_WORKSPACE_PATH")
-
-    if in_container and not host_workspace:
-        pytest.skip(
-            "Running inside a container without HOST_WORKSPACE_PATH set. "
-            "Devcontainer CLI tests require host path translation. "
-            "Set HOST_WORKSPACE_PATH to the host path that maps to /workspace/devcontainer"
-        )
-
-    # Translate workspace path to host path if needed
-    if in_container and host_workspace:
-        workspace_path_for_cli = get_host_path(workspace_path)
-        print(
-            f"[DEBUG] Translated workspace path: {workspace_path} -> {workspace_path_for_cli}"
-        )
-    else:
-        workspace_path_for_cli = workspace_path
-
-    # Check if devcontainer CLI is available
+    workspace_path, workspace_path_for_cli, in_container = (
+        _resolve_devcontainer_cli_workspace(initialized_workspace)
+    )
     if not shutil.which("devcontainer"):
         pytest.skip(
             "devcontainer CLI not available. "
             "Install with: npm install -g @devcontainers/cli@0.80.1"
         )
 
-    # Prepare environment
-    env = os.environ.copy()
     docker_path = "podman"
-    original_config = None
+    env, _ = _prepare_devcontainer_env(
+        workspace_path, docker_path, enable_ssh_forwarding=False
+    )
     devcontainer_json_path = workspace_path / ".devcontainer" / "devcontainer.json"
-
-    # Disable SSH agent forwarding on macOS+podman
-    if (
-        platform.system() == "Darwin"
-        and docker_path == "podman"
-        and "SSH_AUTH_SOCK" in env
-    ):
-        print("[DEBUG] Disabling SSH agent forwarding on macOS+podman (sidecar test)")
-        del env["SSH_AUTH_SOCK"]
-
-    # Configure docker-compose.project.yaml with sidecar
-    # This file is already in the devcontainer.json dockerComposeFile list
-    import yaml
+    with devcontainer_json_path.open() as f:
+        original_config = json.dumps(json.load(f), indent=4)
 
     project_yaml_path = workspace_path / ".devcontainer" / "docker-compose.project.yaml"
-
-    # Read existing project config (from init-workspace.sh template)
     if project_yaml_path.exists():
         with project_yaml_path.open() as f:
             project_config = yaml.safe_load(f) or {}
-        print("[DEBUG] Loaded existing docker-compose.project.yaml")
     else:
         project_config = {}
-
-    # Initialize if empty (template file has only comments)
     if not project_config:
         project_config = {"services": {"devcontainer": {"volumes": []}}}
-
-    # Ensure structure exists
-    if "services" not in project_config:
-        project_config["services"] = {}
-    if "devcontainer" not in project_config["services"]:
-        project_config["services"]["devcontainer"] = {}
-    if "volumes" not in project_config["services"]["devcontainer"]:
-        project_config["services"]["devcontainer"]["volumes"] = []
-
-    # Add test mount - use host path for mount
-    tests_dir = Path(__file__).parent.resolve()
-    tests_dir_for_mount = get_host_path(tests_dir) if in_container else tests_dir
-    test_mount = f"{tests_dir_for_mount}:/workspace/tests-mounted:cached"
-    if test_mount not in project_config["services"]["devcontainer"]["volumes"]:
-        project_config["services"]["devcontainer"]["volumes"].append(test_mount)
-
-    # Add sidecar service
+    _ensure_project_yaml_test_mount(project_config, workspace_path, in_container)
     project_config["services"]["test-sidecar"] = {
         "image": sidecar_image,
         "container_name": "test-sidecar",
         "command": "sleep infinity",
-        "volumes": [
-            # Share workspace for build artifacts
-            f"..:/workspace/{initialized_workspace.name}:cached"
-        ],
+        "volumes": [f"..:/workspace/{initialized_workspace.name}:cached"],
     }
     print(f"[DEBUG] Added test-sidecar service using image: {sidecar_image}")
-
-    # Write project yaml file (already in devcontainer.json dockerComposeFile list)
     with project_yaml_path.open("w") as f:
         yaml.dump(project_config, f, default_flow_style=False, sort_keys=False)
     print("[DEBUG] Updated docker-compose.project.yaml with sidecar")
 
-    # Read devcontainer.json for potential restoration later
-    with devcontainer_json_path.open() as f:
-        config = json.load(f)
-    original_config = json.dumps(config, indent=4)
-    # Note: No need to modify devcontainer.json - project.yaml is already in dockerComposeFile list
-
-    # Build and start devcontainer with sidecar
-    # Use workspace_path_for_cli for CLI operations (host path when running in container)
-    up_cmd = [
-        "devcontainer",
-        "up",
-        "--workspace-folder",
-        str(workspace_path_for_cli),
-        "--config",
-        f"{workspace_path_for_cli}/.devcontainer/devcontainer.json",
-        "--remove-existing-container",
-        "--docker-path",
-        docker_path,
-        "--log-level",
-        "trace",
-    ]
-
-    print(f"\n[DEBUG] Starting devcontainer with sidecar: {' '.join(up_cmd)}")
-
-    up_result = subprocess.run(
-        up_cmd,
-        capture_output=True,
-        text=True,
-        cwd=str(workspace_path),
+    up_result = _run_devcontainer_up(
+        workspace_path_for_cli=workspace_path_for_cli,
+        workspace_path=workspace_path,
         env=env,
-        timeout=120,
+        docker_path=docker_path,
     )
 
     if up_result.returncode != 0:
         # Extract error details for better diagnostics
-        import json
-
         # Try to parse JSON error from stdout
         error_message = "Unknown error"
         podman_command = None
@@ -1031,7 +1157,7 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
         skip_msg += "\n"
         skip_msg += "🔍 Full Details:\n"
         skip_msg += f"   Return code: {up_result.returncode}\n"
-        skip_msg += f"   Devcontainer command: {' '.join(up_cmd)}\n"
+        skip_msg += f"   Devcontainer command: devcontainer up --workspace-folder {workspace_path_for_cli} ...\n"
         skip_msg += "\n"
         skip_msg += "📤 stdout (last 1000 chars):\n"
         skip_msg += f"{up_result.stdout[-1000:]}\n"
@@ -1047,256 +1173,12 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
 
     print("[DEBUG] Devcontainer with sidecar is up and running")
 
-    # Yield workspace path for tests
     yield workspace_path
 
-    # Cleanup
     print("[DEBUG] Cleaning up devcontainer with sidecar...")
-
-    # Stop containers manually using podman
-    stop_cmds = [
-        ["podman", "stop", "test-sidecar"],
-        ["podman", "rm", "test-sidecar"],
-    ]
-
-    for cmd in stop_cmds:
-        subprocess.run(cmd, capture_output=True, timeout=30)
-
-    # Restore original devcontainer.json
-    if original_config:
-        with devcontainer_json_path.open("w") as f:
-            f.write(original_config)
-        print("[DEBUG] Restored original devcontainer.json")
-
-
-@pytest.fixture(scope="session")
-def devcontainer_up(initialized_workspace):
-    """
-    Set up a devcontainer using devcontainer CLI.
-
-    This fixture:
-    - Builds and starts the devcontainer using `devcontainer up`
-    - SSH agent forwarding is disabled on macOS+podman due to VM isolation
-    - Yields the workspace path for tests to use
-    - Cleans up by running `devcontainer down` after all tests
-
-    When running from inside a container (DooD), set HOST_WORKSPACE_PATH
-    environment variable to enable path translation for devcontainer CLI.
-
-    Note: This fixture takes some time to set up.
-    """
-    import json
-    import os
-    import platform
-    import shutil
-    import subprocess
-
-    workspace_path = initialized_workspace.resolve()
-
-    # Check if we need path translation for DooD
-    in_container = is_running_in_container()
-    host_workspace = os.environ.get("HOST_WORKSPACE_PATH")
-
-    if in_container and not host_workspace:
-        pytest.skip(
-            "Running inside a container without HOST_WORKSPACE_PATH set. "
-            "Devcontainer CLI tests require host path translation. "
-            "Set HOST_WORKSPACE_PATH to the host path that maps to /workspace/devcontainer"
-        )
-
-    # Translate workspace path to host path if needed
-    if in_container and host_workspace:
-        workspace_path_for_cli = get_host_path(workspace_path)
-        print(
-            f"[DEBUG] Translated workspace path: {workspace_path} -> {workspace_path_for_cli}"
-        )
-    else:
-        workspace_path_for_cli = workspace_path
-
-    # Check if devcontainer CLI is available
-    if not shutil.which("devcontainer"):
-        pytest.skip(
-            "devcontainer CLI not available. "
-            "Install with: npm install -g @devcontainers/cli@0.80.1"
-        )
-
-    # Prepare environment for devcontainer CLI
-    env = os.environ.copy()
-
-    # On macOS with podman, disable SSH agent forwarding
-    # Podman runs in a VM that cannot access /private/tmp/com.apple.launchd.*
-    # VS Code Dev Containers extension handles this automatically, but devcontainer
-    # CLI does not. Since tests don't require SSH operations, we disable it.
-    docker_path = "podman"
-    original_config = None
-    devcontainer_json_path = workspace_path / ".devcontainer" / "devcontainer.json"
-    if (
-        platform.system() == "Darwin"
-        and docker_path == "podman"
-        and "SSH_AUTH_SOCK" in env
-    ):
-        print("[DEBUG] Disabling SSH agent forwarding on macOS+podman")
-        print("[DEBUG] (VM isolation prevents socket mounting)")
-        del env["SSH_AUTH_SOCK"]
-    elif "SSH_AUTH_SOCK" in env and Path(env["SSH_AUTH_SOCK"]).exists():
-        print("[DEBUG] Setting up SSH agent forwarding in devcontainer.json")
-        # Read the devcontainer.json
-        with devcontainer_json_path.open() as f:
-            config = json.load(f)
-
-        # Store original config for restoration
-        original_config = json.dumps(config, indent=4)
-
-        # Add SSH agent forwarding if not already present
-        if "mounts" not in config:
-            config["mounts"] = []
-        if "remoteEnv" not in config:
-            config["remoteEnv"] = {}
-
-        # Track if we made changes
-        ssh_agent_added = False
-
-        # Check if SSH agent mount already exists
-        ssh_mount = (
-            f"source={env['SSH_AUTH_SOCK']},target=/tmp/ssh-agent.sock,type=bind"
-        )
-        if ssh_mount not in config["mounts"]:
-            config["mounts"].append(ssh_mount)
-            ssh_agent_added = True
-
-        # Set SSH_AUTH_SOCK environment variable
-        if config["remoteEnv"].get("SSH_AUTH_SOCK") != "/tmp/ssh-agent.sock":
-            config["remoteEnv"]["SSH_AUTH_SOCK"] = "/tmp/ssh-agent.sock"
-            ssh_agent_added = True
-
-        # Write back the modified config
-        if ssh_agent_added:
-            with devcontainer_json_path.open("w") as f:
-                json.dump(config, f, indent=4)
-            print("[DEBUG] Added SSH agent forwarding to devcontainer.json")
-
-    # Extend docker-compose.project.yaml for testing
-    # This file is already in the devcontainer.json dockerComposeFile list
-    # We just need to add our test-specific mount
-    import yaml
-
-    project_yaml_path = workspace_path / ".devcontainer" / "docker-compose.project.yaml"
-    tests_dir = Path(__file__).parent.resolve()  # Path to tests/ directory
-
-    # For test mounts, we need to use host path if running in container
-    tests_dir_for_mount = get_host_path(tests_dir) if in_container else tests_dir
-
-    # Read the existing project yaml (created by init-workspace.sh from template)
-    if project_yaml_path.exists():
-        with project_yaml_path.open() as f:
-            project_config = yaml.safe_load(f) or {}
-        print("[DEBUG] Loaded existing docker-compose.project.yaml from workspace")
-    else:
-        project_config = {}
-        print("[DEBUG] No existing project.yaml found, creating new one")
-
-    # Initialize if empty (template file has only comments)
-    if not project_config:
-        project_config = {"services": {"devcontainer": {"volumes": []}}}
-
-    # Ensure the structure exists
-    if "services" not in project_config:
-        project_config["services"] = {}
-    if "devcontainer" not in project_config["services"]:
-        project_config["services"]["devcontainer"] = {}
-    if "volumes" not in project_config["services"]["devcontainer"]:
-        project_config["services"]["devcontainer"]["volumes"] = []
-
-    # Add test mount (if not already present) - use host path for mount
-    test_mount = f"{tests_dir_for_mount}:/workspace/tests-mounted:cached"
-    if test_mount not in project_config["services"]["devcontainer"]["volumes"]:
-        project_config["services"]["devcontainer"]["volumes"].append(test_mount)
-        print(f"[DEBUG] Added test mount: {tests_dir_for_mount}")
-
-    # Write back the project yaml
-    with project_yaml_path.open("w") as f:
-        yaml.dump(project_config, f, default_flow_style=False, sort_keys=False)
-    print("[DEBUG] Updated docker-compose.project.yaml with test mount")
-
-    # Read devcontainer.json for potential restoration later
-    # Note: No need to modify it - project.yaml is already in dockerComposeFile list
-    with devcontainer_json_path.open() as f:
-        config = json.load(f)
-
-    if not original_config:
-        original_config = json.dumps(config, indent=4)
-
-    # Build and start the devcontainer
-    # Use workspace_path_for_cli for CLI operations (host path when running in container)
-    up_cmd = [
-        "devcontainer",
-        "up",
-        "--workspace-folder",
-        str(workspace_path_for_cli),
-        "--config",
-        f"{workspace_path_for_cli}/.devcontainer/devcontainer.json",
-        "--remove-existing-container",
-        "--docker-path",
-        docker_path,
-        "--log-level",
-        "trace",
-    ]
-
-    print(f"\n[DEBUG] Setting up devcontainer: {' '.join(up_cmd)}")
-    print("[DEBUG] This may take about a minute...")
-
-    up_result = subprocess.run(
-        up_cmd,
-        capture_output=True,
-        text=True,
-        cwd=str(workspace_path),  # Local operations use container path
-        env=env,  # Use environment without SSH_AUTH_SOCK on macOS
-        timeout=120,
+    _teardown_devcontainer_containers(
+        docker_path, workspace_path, extra_name_filters=["test-sidecar"]
     )
-
-    if up_result.returncode != 0:
-        pytest.fail(
-            f"devcontainer up failed\n"
-            f"stdout: {up_result.stdout}\n"
-            f"stderr: {up_result.stderr}\n"
-            f"command: {' '.join(up_cmd)}"
-        )
-
-    print("[DEBUG] Devcontainer is up and running")
-
-    yield workspace_path
-
-    # Clean up: stop the devcontainer
-    print("\n[DEBUG] Cleaning up devcontainer...")
-    down_cmd = [
-        "devcontainer",
-        "down",
-        "--workspace-folder",
-        str(workspace_path_for_cli),
-        "--config",
-        f"{workspace_path_for_cli}/.devcontainer/devcontainer.json",
-        "--docker-path",
-        docker_path,
-    ]
-    down_result = subprocess.run(
-        down_cmd,
-        capture_output=True,
-        text=True,
-        cwd=str(workspace_path),
-        env=os.environ.copy(),
-    )
-
-    if down_result.returncode != 0:
-        print(
-            f"[WARNING] devcontainer down failed (non-fatal):\n"
-            f"stdout: {down_result.stdout}\n"
-            f"stderr: {down_result.stderr}\n"
-        )
-
-    # Note: docker-compose.project.yaml is part of the template, not test-created
-    # The temporary workspace will be cleaned up anyway, so no need to restore it
-
-    # Restore original devcontainer.json if we modified it
     if original_config:
         with devcontainer_json_path.open("w") as f:
             f.write(original_config)
