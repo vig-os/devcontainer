@@ -20,6 +20,7 @@ EXPECTED_VERSIONS = {
     "pre_commit": "4.5.",  # Minor version check (installed via uv pip)
     "ruff": "0.14.",  # Minor version check (installed via uv pip)
     "just": "1.46.",  # Minor version check (manually installed from latest release)
+    "cargo-binstall": "1.17.",  # Minor version check (installed from latest release)
 }
 
 
@@ -90,6 +91,15 @@ class TestSystemTools:
         expected = EXPECTED_VERSIONS["just"]
         assert expected in result.stdout, (
             f"Expected just {expected}, got: {result.stdout}"
+        )
+
+    def test_cargo_binstall(self, host):
+        """Test that cargo-binstall is installed and right version."""
+        result = host.run("cargo-binstall -V")
+        assert result.rc == 0, "cargo-binstall -V failed"
+        expected = EXPECTED_VERSIONS["cargo-binstall"]
+        assert expected in result.stdout, (
+            f"Expected cargo-binstall {expected}, got: {result.stdout}"
         )
 
 
