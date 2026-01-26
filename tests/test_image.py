@@ -20,7 +20,8 @@ EXPECTED_VERSIONS = {
     "pre_commit": "4.5.",  # Minor version check (installed via uv pip)
     "ruff": "0.14.",  # Minor version check (installed via uv pip)
     "just": "1.46.",  # Minor version check (manually installed from latest release)
-    "cargo-binstall": "1.17.",  # Minor version check (installed from latest release)
+    "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),
+    "typstyle": "0.14.",  # Minor version check (installed from latest release)
 }
 
 
@@ -100,6 +101,15 @@ class TestSystemTools:
         expected = EXPECTED_VERSIONS["cargo-binstall"]
         assert expected in result.stdout, (
             f"Expected cargo-binstall {expected}, got: {result.stdout}"
+        )
+
+    def test_typstyle(self, host):
+        """Test that typstyle is installed and right version."""
+        result = host.run("typstyle --version")
+        assert result.rc == 0, "typstyle --version failed"
+        expected = EXPECTED_VERSIONS["typstyle"]
+        assert expected in result.stdout, (
+            f"Expected typstyle {expected}, got: {result.stdout}"
         )
 
 
