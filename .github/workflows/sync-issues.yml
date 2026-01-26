@@ -45,6 +45,13 @@ jobs:
       actions: write  # Required for cache deletion
 
     steps:
+      - name: Generate a token
+        id: generate-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Determine target branch
         id: branch
         run: |
@@ -115,8 +122,8 @@ jobs:
         if: steps.sync.outputs.modified-files != ''
         uses: vig-os/commit-action@v0.1.1
         env:
-          # Use app token if available, otherwise fall back to github token
-          GITHUB_TOKEN: ${{ steps.sync.outputs.app-token || steps.sync.outputs.github-token }}
+          # Use App token so push can bypass branch protection when App is in bypass list
+          GH_TOKEN: ${{ steps.generate-token.outputs.token || github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_REF: refs/heads/${{ steps.branch.outputs.branch }}
           COMMIT_MESSAGE: "chore: sync issues and PRs"
