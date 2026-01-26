@@ -65,3 +65,14 @@ repos:
     rev: v1.39.0
     hooks:
       - id: typos
+
+  # Typstyle Linting
+  - repo: local
+    hooks:
+      - id: typstyle
+        name: typstyle
+        entry: typstyle
+        language: system
+        files: ^.*\.typ$
+        pass_filenames: true
+        args: [--inplace]
