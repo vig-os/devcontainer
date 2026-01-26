@@ -135,13 +135,6 @@ _test-cleanup-check:
         just clean-test-containers
     fi
 
-# Run all test suites (image, integration, registry)
-[private]
-_test-all version="dev":
-    @just _ensure-dev-image {{ version }}
-    #!/usr/bin/env bash
-    PYTEST_SKIP_CONTAINER_CHECK=1 uv run pytest tests -v -s --tb=short
-
 # Run all test suites
 [group('test')]
 test version="dev":
