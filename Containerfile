@@ -81,6 +81,12 @@ RUN set -eux; \
     curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin; \
     just --version;
 
+# Install latest cargo-binstall (installs to ~/.cargo/bin)
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN set -eux; \
+    curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash; \
+    cargo-binstall -V;
+
 # Install latest uv verifying checksum
 RUN set -eux; \
     case "${TARGETARCH}" in \
