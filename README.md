@@ -33,9 +33,6 @@ This will:
 **Options:**
 
 ```bash
-# Initialize current directory
-curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- ~/my-project
-
 # Use specific version
 curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --version 1.0.0 -- ~/my-project
 
@@ -182,6 +179,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **openssh-client** – SSH client for secure Git operations and remote access
 - **ca-certificates** – SSL/TLS certificate support for secure connections
 - **locales** – UTF-8 locale support for internationalization
+- **cargo-binstall** - Install Rust binary crates without full Rust toolchain
 
 ### **Python Environment**
 
@@ -193,6 +191,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 
 - **pre-commit** - Git hook framework for code quality
 - **ruff** - Fast Python linter and formatter (replaces Black, isort, flake8, and more)
+- **typstyle** - Typo and style checks (e.g. in docs and prose)
 - **just** - Command runner for task automation
 - **precommit alias** - Shortcut command for running pre-commit hooks
 
