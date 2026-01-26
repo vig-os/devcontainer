@@ -28,7 +28,9 @@ set -euo pipefail
 # ═══════════════════════════════════════════════════════════════════════════════
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.yaml"
+PYTHON_VERSION="3.12.10"
 
 # Colors for output
 RED='\033[0;31m'
@@ -185,7 +187,6 @@ parse_requirements() {
     DEPS_VERSIONS=()
     DEPS_PURPOSES=()
     DEPS_REQUIRED=()
-    DEPS_AUTO_INSTALL=()
     DEPS_CHECK_CMDS=()
     DEPS_INSTALL_MACOS=()
     DEPS_INSTALL_DEBIAN=()
@@ -198,7 +199,6 @@ parse_requirements() {
     local current_version=""
     local current_purpose=""
     local current_required="true"
-    local current_auto_install="false"
     local current_check_cmd=""
     local current_install_macos=""
     local current_install_debian=""
@@ -233,7 +233,6 @@ parse_requirements() {
                     DEPS_VERSIONS+=("$current_version")
                     DEPS_PURPOSES+=("$current_purpose")
                     DEPS_REQUIRED+=("$current_required")
-                    DEPS_AUTO_INSTALL+=("$current_auto_install")
                     DEPS_CHECK_CMDS+=("$current_check_cmd")
                     DEPS_INSTALL_MACOS+=("$current_install_macos")
                     DEPS_INSTALL_DEBIAN+=("$current_install_debian")
@@ -248,7 +247,6 @@ parse_requirements() {
                 current_version=""
                 current_purpose=""
                 current_required="$($in_optional && echo "false" || echo "true")"
-                current_auto_install="false"
                 current_check_cmd=""
                 current_install_macos=""
                 current_install_debian=""
@@ -267,8 +265,6 @@ parse_requirements() {
                 current_purpose="${BASH_REMATCH[1]}"
             elif [[ "$line" =~ ^[[:space:]]{4}required:[[:space:]]*(true|false) ]]; then
                 current_required="${BASH_REMATCH[1]}"
-            elif [[ "$line" =~ ^[[:space:]]{4}auto_install:[[:space:]]*(true|false) ]]; then
-                current_auto_install="${BASH_REMATCH[1]}"
             elif [[ "$line" =~ ^[[:space:]]{4}check: ]]; then
                 current_section="check"
             elif [[ "$line" =~ ^[[:space:]]{4}install: ]]; then
@@ -297,7 +293,6 @@ parse_requirements() {
         DEPS_VERSIONS+=("$current_version")
         DEPS_PURPOSES+=("$current_purpose")
         DEPS_REQUIRED+=("$current_required")
-        DEPS_AUTO_INSTALL+=("$current_auto_install")
         DEPS_CHECK_CMDS+=("$current_check_cmd")
         DEPS_INSTALL_MACOS+=("$current_install_macos")
         DEPS_INSTALL_DEBIAN+=("$current_install_debian")
@@ -351,6 +346,11 @@ get_install_command() {
                 install_cmd="${DEPS_INSTALL_ALPINE[$idx]:-}"
                 ;;
         esac
+    fi
+
+    # Substitute {{version}} placeholder with actual version
+    if [ -n "$install_cmd" ] && [ -n "${DEPS_VERSIONS[$idx]:-}" ]; then
+        install_cmd="${install_cmd//\{\{version\}\}/${DEPS_VERSIONS[$idx]}}"
     fi
 
     echo "$install_cmd"
@@ -453,8 +453,6 @@ main() {
 
     local missing_deps=()
     local missing_indices=()
-    local auto_install_deps=()
-    local auto_install_indices=()
     local installed_count=0
 
     for i in "${!DEPS_NAMES[@]}"; do
@@ -462,7 +460,6 @@ main() {
         local version="${DEPS_VERSIONS[$i]}"
         local purpose="${DEPS_PURPOSES[$i]}"
         local required="${DEPS_REQUIRED[$i]}"
-        local auto_install="${DEPS_AUTO_INSTALL[$i]}"
         local check_cmd="${DEPS_CHECK_CMDS[$i]}"
 
         local status_prefix=""
@@ -474,16 +471,10 @@ main() {
             log_success "${status_prefix}${BOLD}$name${NC} $version - installed"
             installed_count=$((installed_count + 1))
         else
-            if [ "$auto_install" = "true" ]; then
-                log_warning "${status_prefix}${BOLD}$name${NC} $version - not installed (auto-install via setup.sh)"
-                auto_install_deps+=("$name")
-                auto_install_indices+=("$i")
-            else
-                log_error "${status_prefix}${BOLD}$name${NC} $version - ${RED}not installed${NC}"
-                log_info "  └─ $purpose"
-                missing_deps+=("$name")
-                missing_indices+=("$i")
-            fi
+            log_error "${status_prefix}${BOLD}$name${NC} $version - ${RED}not installed${NC}"
+            log_info "  └─ $purpose"
+            missing_deps+=("$name")
+            missing_indices+=("$i")
         fi
     done
 
@@ -491,20 +482,7 @@ main() {
     print_section "Summary"
 
     echo -e "  ${GREEN}Installed:${NC}      $installed_count"
-    echo -e "  ${YELLOW}Auto-install:${NC}   ${#auto_install_deps[@]} (via setup.sh: ${auto_install_deps[*]:-none})"
     echo -e "  ${RED}Missing:${NC}        ${#missing_deps[@]}"
-
-    if [ ${#missing_deps[@]} -eq 0 ]; then
-        echo ""
-        log_success "All required dependencies are installed!"
-
-        if [ ${#auto_install_deps[@]} -gt 0 ]; then
-            echo ""
-            log_info "Run ${BOLD}just setup${NC} to install auto-install dependencies."
-        fi
-
-        exit 0
-    fi
 
     # Check-only mode
     if $CHECK_ONLY; then
@@ -515,7 +493,9 @@ main() {
     fi
 
     # Offer to install missing dependencies
-    print_section "Install Missing Dependencies"
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        print_section "Install Missing Dependencies"
+    fi
 
     local install_count=0
     local failed_count=0
@@ -558,22 +538,109 @@ main() {
         fi
     done
 
-    # Final summary
-    print_section "Installation Complete"
+    # Summary
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        print_section "Installation Complete"
 
-    echo -e "  ${GREEN}Installed:${NC}  $install_count"
-    echo -e "  ${RED}Failed:${NC}     $failed_count"
+        echo -e "  ${GREEN}Installed:${NC}  $install_count"
+        echo -e "  ${RED}Failed:${NC}     $failed_count"
 
-    if [ $failed_count -gt 0 ]; then
-        echo ""
-        log_warning "Some dependencies could not be installed."
-        log_info "You may need to install them manually before running ${BOLD}just setup${NC}"
-        exit 1
+        if [ $failed_count -gt 0 ]; then
+            echo ""
+            log_warning "Some dependencies could not be installed."
+            log_info "You may need to install them manually before running ${BOLD}just setup${NC}"
+            exit 1
+        fi
     fi
 
     echo ""
     log_success "All dependencies installed!"
-    log_info "Next step: Run ${BOLD}just setup${NC} to complete environment setup."
+
+    # Environment Setup
+    cd "$PROJECT_ROOT"
+    print_section "Environment Setup"
+
+    # Create virtual environment with specific Python version
+    log_info "Creating virtual environment with Python $PYTHON_VERSION in: $PROJECT_ROOT/.venv"
+    if uv venv --python "$PYTHON_VERSION" .venv; then
+        log_success "Virtual environment created"
+    else
+        log_error "Failed to create virtual environment"
+        exit 1
+    fi
+
+    # Sync project dependencies from lockfile
+    log_info "Installing project dependencies (including dev dependencies)..."
+    if uv sync --frozen --all-extras; then
+        log_success "Project dependencies installed"
+    else
+        log_error "Failed to install project dependencies"
+        exit 1
+    fi
+
+    # Setup hooks
+    log_info "Setting up hooks..."
+    if git config core.hooksPath .githooks && chmod +x .githooks/pre-commit 2>/dev/null; then
+        log_success "Git hooks path configured"
+    else
+        log_warning "Could not configure Git hooks path (may not exist yet)"
+    fi
+
+    if uv run pre-commit install-hooks 2>/dev/null; then
+        log_success "Pre-commit hooks installed"
+    else
+        log_warning "Pre-commit hooks installation failed (may not be in dependencies)"
+    fi
+
+    # Docker/Podman authentication
+    print_section "Container Registry Authentication"
+
+    local DOCKER_CONFIG="$HOME/.docker/config.json"
+    if [ ! -f "$DOCKER_CONFIG" ]; then
+        log_info "Container registry config not found. Setting up GitHub Container Registry authentication..."
+
+        mkdir -p "$HOME/.docker"
+
+        if [ -t 0 ]; then
+            # Interactive mode
+            read -r -p "Enter GitHub Username: " GITHUB_USER
+            read -r -s -p "Enter GitHub Token: " GITHUB_TOKEN
+            echo
+
+            if echo "$GITHUB_TOKEN" | podman login ghcr.io -u "$GITHUB_USER" --password-stdin; then
+                log_success "GitHub Container Registry authentication configured"
+            else
+                log_error "Failed to authenticate with GitHub Container Registry"
+            fi
+        else
+            log_warning "Non-interactive mode: Skipping GHCR authentication"
+            log_info "Run manually: podman login ghcr.io"
+        fi
+    else
+        log_info "Container registry config exists at $DOCKER_CONFIG"
+        if podman login ghcr.io --get-login >/dev/null 2>&1; then
+            log_success "GitHub Container Registry authentication verified"
+        else
+            log_warning "Could not verify authentication"
+            log_info "If you encounter authentication issues, run: podman login ghcr.io"
+        fi
+    fi
+
+    # Verify GitHub CLI authentication
+    if gh auth status >/dev/null 2>&1; then
+        log_success "GitHub CLI authentication verified"
+    else
+        log_warning "GitHub CLI is not authenticated."
+        log_info "Run 'gh auth login' to authenticate with GitHub."
+    fi
+
+    # Done
+    echo ""
+    print_section "Setup Complete"
+    log_success "Environment setup complete!"
+    echo ""
+    log_info "Run ${BOLD}just${NC} to see available commands."
+
 }
 
 # Run main function

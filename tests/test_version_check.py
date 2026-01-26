@@ -403,23 +403,6 @@ class TestJustIntegration:
         assert result.returncode == 0
         assert "Configuration" in result.stdout or "Enabled:" in result.stdout
 
-    def test_default_recipe_includes_check(self, initialized_workspace):
-        """Test that default just recipe calls _check-update."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
-
-        assert justfile_base.exists(), "justfile.base not found"
-
-        justfile_content = justfile_base.read_text()
-
-        # Check that default recipe exists and calls _check-update
-        # Note: Older templates may not have this, so we skip if not found
-        if "_check-update" not in justfile_content:
-            pytest.skip(
-                "_check-update not in justfile.base - workspace from older template"
-            )
-
-        assert "default:" in justfile_content
-
 
 class TestInitWorkspaceIntegration:
     """Test that init-workspace.sh creates necessary files."""

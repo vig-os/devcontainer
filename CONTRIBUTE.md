@@ -19,9 +19,6 @@ This guide explains how to develop, build, test, and release the vigOS developme
 | **uv** | >=0.8 | Python package and project manager |
 | **devcontainer** | 0.80.1 | DevContainer CLI for testing devcontainer functionality |
 
-> **Note:** You do **not** need to manually install `uv` or `devcontainer`.
-They will be installed automatically when running `./scripts/init.sh` followed by `just setup`.
-
 **Ubuntu/Debian:**
 
 ```bash
@@ -36,15 +33,6 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githu
 sudo apt update && sudo apt install -y gh
 
 ```
-
-To build images for multiple architectures (e.g., AMD64 and ARM64), install QEMU user static binaries:
-
-```bash
-sudo apt install -y qemu-user-static
-sudo podman run --privileged --rm docker.io/tonistiigi/binfmt --install all
-```
-
-Verify the installation by checking that `cat /proc/sys/fs/binfmt_misc/qemu-aarch64` shows output (not an error).
 
 **macOS (Homebrew):**
 
@@ -63,8 +51,7 @@ Clone this repository and prepare it for container development:
 ```bash
 git clone git@github.com:vig-os/devcontainer.git
 cd devcontainer
-./scripts/init.sh    # Check/install dependencies
-just setup           # Setup Python environment and tools
+just init           # Install dependencies and setup development environment
 ```
 
 ## Development Workflow
@@ -104,13 +91,15 @@ When contributing to this project, follow this workflow:
 5. **Verify tests pass**
 
    ```bash
-   # Run all test suites (image, integration, registry)
+   # Run all test suites (image, integration, utils, version-check, install script)
    just test
 
    # Or run individual test suites
    just test-image
    just test-integration
-   just test-registry
+   just test-utils
+   just test-version-check
+   just test-sidecar
    ```
 
 6. **Create a pull request**
@@ -142,9 +131,8 @@ Available recipes:
     docs                           # Generate documentation from templates
     help                           # Show available commands
     info                           # Show image information
-    init *args                     # Check/install system dependencies (OS-sensitive)
+    init *args                     # Install system dependencies and setup development environment
     login                          # Test login to GHCR
-    setup                          # Setup Python environment and dev tools
 
     [podman]
     podman-kill name               # Stop and remove a container by name or ID
@@ -178,7 +166,8 @@ Available recipes:
     test-image version="dev"       # Run image tests only
     test-integration version="dev" # Run integration tests only
     test-pytest *args              # Run tests with pytest
-    test-registry                  # Run registry tests only (doesn't need image)
+    test-utils                     # Run utils tests only
+    test-version-check             # Run version check tests only
 
 ```
 
@@ -215,24 +204,27 @@ When releasing a new version of the devcontainer image, follow these steps:
    # All changes should be committed before releasing
    ```
 
-4. **Release with `just push` (creates tag)**
+4. **Create and push the version tag to trigger the release workflow**
+
+   Releases are published by the [GitHub Actions workflow](.github/workflows/publish-container-image.yml) when a version tag (e.g. `v1.0.0`) is pushed.
 
    ```bash
    # Replace X.Y.Z with the semantic version (e.g. 1.0.0, 1.1.0, 2.0.0)
-   # Version must follow Semantic Versioning format: MAJOR.MINOR.PATCH
-   just push X.Y.Z
+   # Version must follow Semantic Versioning: MAJOR.MINOR.PATCH
+   git tag -a vX.Y.Z -m "Release X.Y.Z"
+   git push origin vX.Y.Z
    ```
 
-   - This will:
-     - Build the image for the specified version
-     - Run tests (unless `no_test=true` is specified)
-     - Push the image to GHCR with both `:latest` and `:X.Y.Z` tags
-     - Update [README.md](README.md) with the new version
-     - Create a git commit with the README.md update (commit message: "Release X.Y.Z")
-     - Create a git tag `vX.Y.Z` pointing to that commit
+   The workflow will:
+   - Build the image for the specified version (multi-arch: amd64, arm64)
+   - Run image tests before push
+   - Push to GHCR with `:latest` and `:X.Y.Z` tags
+   - Create a multi-architecture manifest
+
+   Ensure [CHANGELOG.md](CHANGELOG.md) and any version references are updated before tagging.
 
 5. **Create pull request to merge into `main`**
-   - After the release is pushed, create a [pull request](https://github.com/vig-os/devcontainer/pulls) from `dev` to `main`
+   - After the version tag is pushed and the publish workflow completes, create a [pull request](https://github.com/vig-os/devcontainer/pulls) from `dev` to `main`
    - The PR should include:
      - Summary of changes in this release
      - Reference to the version tag created
@@ -260,11 +252,11 @@ This ensures that `:latest` always points to the latest stable release, and git 
 
 vigOS Development Environment supports both **AMD64** (x86_64) and **ARM64** (Apple Silicon) architectures:
 
-- **Local builds** (`just build` and `just test`): Automatically builds and tests for your native platform (ARM64 on macOS, AMD64 on Linux)
-- **Push to registry** (`just push`): Builds and pushes multi-arch manifests supporting both platforms
-- **Pull from registry** (`just pull`): Automatically pulls the correct architecture for your platform
+- **Local builds** (`just build` and `just test`): Build and test for your native platform (ARM64 on macOS, AMD64 on Linux)
+- **Releases** (GitHub Actions on version tags): The publish workflow builds and pushes multi-arch manifests (amd64, arm64) to GHCR
+- **Pull from registry** (`just pull`): Pull the correct architecture for your platform from GHCR
 
-This ensures seamless development across different platforms without manual platform specification.
+This allows development on any supported platform and consistent multi-arch images for releases.
 
 ## Testing
 

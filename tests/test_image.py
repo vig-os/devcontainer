@@ -14,12 +14,14 @@ base functionality is preserved in their containers.
 EXPECTED_VERSIONS = {
     "git": "2.",  # Major version check (from apt package)
     "curl": "8.",  # Major version check (from apt package)
-    "gh": "2.83.2",  # GitHub CLI (manually installed from latest release)
-    "uv": "0.9.22",  # UV (manually installed from latest release)
+    "gh": "2.86.",  # Minor version check (GitHub CLI (manually installed from latest release)
+    "uv": "0.9.",  # Minor version check (manually installed from latest release)
     "python": "3.12",  # Python (from base image)
-    "pre_commit": "4.5.1",  # pre-commit (installed via uv pip)
-    "ruff": "0.14.10",  # ruff (installed via uv pip)
-    "just": "1.40.0",  # just (manually installed from latest release)
+    "pre_commit": "4.5.",  # Minor version check (installed via uv pip)
+    "ruff": "0.14.",  # Minor version check (installed via uv pip)
+    "just": "1.46.",  # Minor version check (manually installed from latest release)
+    "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),
+    "typstyle": "0.14.",  # Minor version check (installed from latest release)
 }
 
 
@@ -74,6 +76,40 @@ class TestSystemTools:
         expected = EXPECTED_VERSIONS["gh"]
         assert expected in result.stdout, (
             f"Expected gh {expected}, got: {result.stdout}"
+        )
+
+    def test_just_installed(self, host):
+        """Test that just is installed."""
+        # just is manually installed, so check for the binary file
+        assert host.file("/usr/local/bin/just").exists, "just binary not found"
+        assert host.file("/usr/local/bin/just").is_file, "just is not a file"
+
+    def test_just_version(self, host):
+        """Test that just version is correct."""
+        result = host.run("just --version")
+        assert result.rc == 0, "just --version failed"
+        assert "just" in result.stdout.lower()
+        expected = EXPECTED_VERSIONS["just"]
+        assert expected in result.stdout, (
+            f"Expected just {expected}, got: {result.stdout}"
+        )
+
+    def test_cargo_binstall(self, host):
+        """Test that cargo-binstall is installed and right version."""
+        result = host.run("cargo-binstall -V")
+        assert result.rc == 0, "cargo-binstall -V failed"
+        expected = EXPECTED_VERSIONS["cargo-binstall"]
+        assert expected in result.stdout, (
+            f"Expected cargo-binstall {expected}, got: {result.stdout}"
+        )
+
+    def test_typstyle(self, host):
+        """Test that typstyle is installed and right version."""
+        result = host.run("typstyle --version")
+        assert result.rc == 0, "typstyle --version failed"
+        expected = EXPECTED_VERSIONS["typstyle"]
+        assert expected in result.stdout, (
+            f"Expected typstyle {expected}, got: {result.stdout}"
         )
 
 

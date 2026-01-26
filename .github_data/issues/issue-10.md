@@ -1,13 +1,22 @@
-title:	[FEATURE] ci/publish-container-image
-state:	OPEN
-author:	c-vigo
-labels:	enhancement
-comments:	0
-assignees:
-projects:
-milestone:	0.2
-number:	10
---
+---
+type: issue
+state: open
+created: 2025-12-10T09:36:23Z
+updated: 2026-01-09T09:52:28Z
+author: c-vigo
+author_url: https://github.com/c-vigo
+url: https://github.com/vig-os/devcontainer/issues/10
+comments: 0
+labels: enhancement
+assignees: c-vigo
+milestone: 0.3
+projects: none
+relationship: none
+synced: 2026-01-09T16:17:36.067Z
+---
+
+# [Issue 10]: [[FEATURE] ci/publish-container-image](https://github.com/vig-os/devcontainer/issues/10)
+
 ## Description
 Introduce a CI workflow that automatically builds and publishes the project's container image for all supported architectures, especially `arm64`, which is currently slow to build locally. The goal is to formalize and automate the image publishing process using GitHub Actions.
 
@@ -39,9 +48,10 @@ This provides a fast, reliable, and industry-standard solution.
 A proper reproducible CI pipeline ensures that container images are always built in the same environment and available immediately after releases. Using GitHub runners aligns with modern best practices for multi-arch container publishing. After the CI is established, consider moving the infrastructure to [actions](https://github.com/vig-os/actions) to make it the default scheme for other repositories.
 
 ## Impact
-- **Who benefits?**
+- **Who benefits?**  
   Developers and users relying on the container image; releases become faster and reproducible.
-
-- **Compatibility considerations:**
-  Fully backward compatible.
+  
+- **Compatibility considerations:**  
+  Fully backward compatible.  
   Integrating tests into the release workflow further improves reliability without breaking existing behavior.
+

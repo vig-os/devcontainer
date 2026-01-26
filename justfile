@@ -45,17 +45,10 @@ info:
     echo "Containerfile: Containerfile"
     echo "Native arch: $NATIVE_ARCH"
 
-# Check/install system dependencies (OS-sensitive)
+# Install system dependencies and setup development environment
 [group('info')]
 init *args:
     ./scripts/init.sh {{ args }}
-
-# Setup Python environment and dev tools
-[group('info')]
-setup:
-    #!/usr/bin/env bash
-    echo "Setting up configuration..."
-    ./scripts/setup.sh
 
 # Generate documentation from templates
 [group('info')]
@@ -121,11 +114,17 @@ test-integration version="dev":
     #!/usr/bin/env bash
     TEST_CONTAINER_TAG={{ version }} uv run pytest tests/test_integration.py -v --tb=short
 
-# Run registry tests only (doesn't need image)
+# Run utils tests only
 [group('test')]
-test-registry:
+test-utils:
     #!/usr/bin/env bash
-    uv run pytest tests/test_registry.py -v -s --tb=short
+    uv run pytest tests/test_utils.py -v -s --tb=short
+
+# Run version check tests only
+[group('test')]
+test-version-check:
+    #!/usr/bin/env bash
+    uv run pytest tests/test_version_check.py -v -s --tb=short
 
 # Clean up lingering containers before running tests
 [private]
@@ -136,20 +135,13 @@ _test-cleanup-check:
         just clean-test-containers
     fi
 
-# Run all test suites (image, integration, registry)
-[private]
-_test-all version="dev":
-    @just _ensure-dev-image {{ version }}
-    #!/usr/bin/env bash
-    PYTEST_SKIP_CONTAINER_CHECK=1 TEST_CONTAINER_TAG={{ version }} uv run pytest tests/test_image.py -v --tb=short
-    PYTEST_SKIP_CONTAINER_CHECK=1 TEST_CONTAINER_TAG={{ version }} uv run pytest tests/test_integration.py -v --tb=short
-    PYTEST_SKIP_CONTAINER_CHECK=1 uv run pytest tests/test_registry.py -v -s --tb=short
-
 # Run all test suites
 [group('test')]
 test version="dev":
     @just _test-cleanup-check
-    @just _test-all {{ version }}
+    @just _ensure-dev-image {{ version }}
+    #!/usr/bin/env bash
+    TEST_CONTAINER_TAG={{ version }}  uv run pytest tests -v -s --tb=short
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # RELEASE
