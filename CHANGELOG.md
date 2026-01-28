@@ -91,6 +91,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed default value from `TARGETARCH` ARG to allow Docker BuildKit's automatic platform detection
   - Fixes "Exec format error" when building for different architectures (amd64, arm64)
   - Ensures correct architecture-specific binaries are downloaded during build
+- **Image tagging after podman load** in publish workflow
+  - Explicitly tag loaded images with expected name format (`ghcr.io/vig-os/devcontainer:VERSION-ARCH`)
+  - Fixes test failures where tests couldn't find the image after loading from tar file
+  - Ensures proper image availability for testing before publishing
 - **GHCR publish workflow push permissions**
   - Authenticate to `ghcr.io` with the repository owner and token context, and set explicit job-level `packages: write` permissions to prevent `403 Forbidden` errors when pushing layers.
 - **Sync-issues workflow branch determination logic**

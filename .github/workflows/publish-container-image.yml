@@ -266,7 +266,17 @@ jobs:
             echo "ERROR: podman not available (should have been installed in previous step)"
             exit 1
           fi
-          podman load < /tmp/image.tar
+
+          # Load the image and capture the loaded image ID
+          LOADED_IMAGE=$(podman load < /tmp/image.tar | grep -oP 'Loaded image.*: \K.*')
+          echo "Loaded image: $LOADED_IMAGE"
+
+          # Tag the loaded image with the expected name
+          IMAGE_TAG="ghcr.io/vig-os/devcontainer:${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}"
+          podman tag "$LOADED_IMAGE" "$IMAGE_TAG"
+          echo "Tagged image as: $IMAGE_TAG"
+
+          # Verify the image is available
           podman images | grep "ghcr.io/vig-os/devcontainer"
           echo "Image loaded successfully into podman"
 
