@@ -56,7 +56,8 @@ RUN set -eux; \
     podman --version
 
 # Install latest GitHub CLI manually from releases
-ARG TARGETARCH=amd64
+# TARGETARCH is automatically provided by Docker BuildKit for multi-platform builds
+ARG TARGETARCH
 RUN set -eux; \
     case "${TARGETARCH}" in \
         amd64) ARCH=linux_amd64 ;; \

@@ -87,6 +87,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Multi-platform container builds** in Containerfile
+  - Removed default value from `TARGETARCH` ARG to allow Docker BuildKit's automatic platform detection
+  - Fixes "Exec format error" when building for different architectures (amd64, arm64)
+  - Ensures correct architecture-specific binaries are downloaded during build
 - **GHCR publish workflow push permissions**
   - Authenticate to `ghcr.io` with the repository owner and token context, and set explicit job-level `packages: write` permissions to prevent `403 Forbidden` errors when pushing layers.
 - **Sync-issues workflow branch determination logic**
