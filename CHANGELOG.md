@@ -86,6 +86,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **GHCR publish workflow push permissions**
+  - Authenticate to `ghcr.io` with the repository owner and token context, and set explicit job-level `packages: write` permissions to prevent `403 Forbidden` errors when pushing layers.
 - **Sync-issues workflow branch determination logic**
   - Fixed branch selection to prioritize manual `target-branch` input when provided via `workflow_dispatch`
   - Improved branch detection: manual input → PR merge detection → default to `dev`
