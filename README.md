@@ -163,7 +163,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **Registry**: `ghcr.io/vig-os/devcontainer`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
-- **Latest Version**: [0.2.0](https://github.com/vig-os/devcontainer/releases/tag/v0.2.0) - 2026-01-06
+- **Latest Version**: [0.2.1](https://github.com/vig-os/devcontainer/releases/tag/v0.2.1) - 2026-01-28
 
 ## Features
 
