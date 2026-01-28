@@ -3,8 +3,8 @@
 # Workflow Overview:
 # 1. Build Job (matrix strategy):
 #    - Builds architecture-specific images (amd64, arm64) in parallel
-#    - Each architecture builds on its native runner (amd64 on ubuntu-latest, arm64 on ubuntu-latest-arm64)
-#    - Images are tagged with version-architecture (e.g., 1.2.3-amd64, 1.2.3-arm64)
+#    - Each architecture builds on its native runner on ubuntu-22.04
+#    - Images are tagged with version-architecture (e.g., 1.2.3-amd64, 1.2.3-arm)
 #    - Images are pushed directly to registry after verification
 #
 # 2. Manifest Job:
@@ -63,7 +63,7 @@ jobs:
   extract-version:
     # Extract version information once for reuse by all jobs
     # This avoids duplicating the version extraction logic
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       version: ${{ steps.version.outputs.version }}
       release_url: ${{ steps.version.outputs.release_url }}
@@ -100,22 +100,78 @@ jobs:
           echo "build_timestamp=$BUILD_TIMESTAMP" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION"
 
+  validate-architectures:
+    # Validate and parse architecture inputs
+    # Ensures only valid architectures (amd64, arm64) are specified
+    runs-on: ubuntu-22.04
+    outputs:
+      architectures: ${{ steps.parse.outputs.architectures }}
+      matrix: ${{ steps.parse.outputs.matrix }}
+    steps:
+      - name: Parse and validate architectures
+        id: parse
+        run: |
+          set -euo pipefail
+
+          # Get architectures input (default to both for tag pushes)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ARCHS="${{ github.event.inputs.architectures }}"
+          else
+            # For tag pushes, always build both architectures
+            ARCHS="amd64,arm64"
+          fi
+
+          echo "Input architectures: $ARCHS"
+
+          # Remove spaces and convert to array
+          ARCHS=$(echo "$ARCHS" | tr -d ' ')
+          IFS=',' read -ra ARCH_ARRAY <<< "$ARCHS"
+
+          # Validate each architecture
+          VALID_ARCHS="amd64 arm64"
+          VALIDATED_ARCHS=()
+
+          for arch in "${ARCH_ARRAY[@]}"; do
+            if [[ " $VALID_ARCHS " =~ " $arch " ]]; then
+              VALIDATED_ARCHS+=("$arch")
+              echo "✓ Valid architecture: $arch"
+            else
+              echo "ERROR: Invalid architecture '$arch'"
+              echo "Valid architectures are: amd64, arm64"
+              exit 1
+            fi
+          done
+
+          # Check for duplicates
+          UNIQUE_ARCHS=($(echo "${VALIDATED_ARCHS[@]}" | tr ' ' '\n' | sort -u))
+          if [ ${#UNIQUE_ARCHS[@]} -ne ${#VALIDATED_ARCHS[@]} ]; then
+            echo "ERROR: Duplicate architectures found"
+            exit 1
+          fi
+
+          # Generate matrix JSON
+          MATRIX_JSON=$(printf '%s\n' "${VALIDATED_ARCHS[@]}" | jq -R . | jq -s -c '{arch: .}')
+
+          echo "Validated architectures: ${VALIDATED_ARCHS[*]}"
+          echo "Matrix JSON: $MATRIX_JSON"
+
+          # Output for other jobs
+          echo "architectures=${VALIDATED_ARCHS[*]}" >> $GITHUB_OUTPUT
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+
   build:
     # Build architecture-specific images in parallel
     # Each architecture builds on its native runner for optimal performance
-    needs: extract-version
+    needs: [extract-version, validate-architectures]
     timeout-minutes: 60  # Prevent stuck builds from consuming excessive resources
     permissions:
       contents: read
       packages: write
 
     strategy:
-      matrix:
-        # Build for both architectures (can be filtered later if needed)
-        # For manual testing, you can run the workflow multiple times with different filters
-        arch: [amd64, arm64]
+      matrix: ${{ fromJson(needs.validate-architectures.outputs.matrix) }}
 
-    runs-on: ${{ matrix.arch == 'amd64' && 'ubuntu-latest' || 'ubuntu-latest-arm64' }}
+    runs-on: ${{ matrix.arch == 'amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6.0.1
@@ -307,18 +363,18 @@ jobs:
     #
     # Why separate job?
     # - Build jobs run in parallel on different runners (amd64 vs arm64)
-    # - Manifest creation requires both images to exist
+    # - Manifest creation requires all images to exist
     # - Separating concerns makes failure isolation clearer
     #
     # Why verify before creating?
     # - Prevents creating incomplete manifests if one architecture build failed
     # - Provides clear error messages if images are missing
     # - Catches registry push failures early
-    needs: [extract-version, build]
+    needs: [extract-version, validate-architectures, build]
     # For workflow_dispatch, run only when inputs.publish=true (default false)
     if: needs.build.result == 'success' && (github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true')
     timeout-minutes: 10  # Manifest operations are fast, short timeout prevents hangs
-    runs-on: ubuntu-latest  # Can run on any runner, no architecture-specific code
+    runs-on: ubuntu-22.04  # Can run on any runner, no architecture-specific code
     permissions:
       contents: read
       packages: write
@@ -336,62 +392,75 @@ jobs:
       - name: Create and push multi-arch manifest
         # Creates two manifests:
         # 1. Version-specific: ghcr.io/vig-os/devcontainer:VERSION
-        # 2. Latest: ghcr.io/vig-os/devcontainer:latest
-        # Both point to the same architecture-specific images, allowing Docker
-        # to automatically select the correct architecture for the user's platform
+        # 2. Latest: ghcr.io/vig-os/devcontainer:latest (only for tag pushes)
+        # Both point to the architecture-specific images that were built,
+        # allowing Docker to automatically select the correct architecture
         run: |
           set -euo pipefail  # Exit on error, undefined vars, pipe failures
           VERSION="${{ needs.extract-version.outputs.version }}"
           REPO="ghcr.io/vig-os/devcontainer"
+          ARCHS="${{ needs.validate-architectures.outputs.architectures }}"
 
-          # Verification phase: Ensure both architecture images exist
+          echo "Building manifest for architectures: $ARCHS"
+
+          # Convert space-separated list to array
+          IFS=' ' read -ra ARCH_ARRAY <<< "$ARCHS"
+
+          # Verification phase: Ensure all architecture images exist
           # This prevents creating incomplete manifests
           echo "Verifying architecture-specific images exist..."
-          if ! docker buildx imagetools inspect "$REPO:$VERSION-amd64" >/dev/null 2>&1; then
-            echo "ERROR: amd64 image not found: $REPO:$VERSION-amd64"
-            exit 1
-          fi
-          echo "Verified amd64 image exists"
+          ARCH_IMAGES=()
+          for arch in "${ARCH_ARRAY[@]}"; do
+            IMAGE="$REPO:$VERSION-$arch"
+            echo "Checking image: $IMAGE"
+            if ! docker buildx imagetools inspect "$IMAGE" >/dev/null 2>&1; then
+              echo "ERROR: $arch image not found: $IMAGE"
+              exit 1
+            fi
+            echo "✓ Verified $arch image exists"
+            ARCH_IMAGES+=("$IMAGE")
+          done
 
-          if ! docker buildx imagetools inspect "$REPO:$VERSION-arm64" >/dev/null 2>&1; then
-            echo "ERROR: arm64 image not found: $REPO:$VERSION-arm64"
-            exit 1
-          fi
-          echo "Verified arm64 image exists"
-
-          # Manifest creation phase: Create version and latest manifests
-          # Each step has explicit error handling to provide clear failure messages
+          # Manifest creation phase: Create version manifest
           echo "Creating version manifest: $REPO:$VERSION"
           if ! docker buildx imagetools create \
             --tag "$REPO:$VERSION" \
-            "$REPO:$VERSION-amd64" \
-            "$REPO:$VERSION-arm64"; then
+            "${ARCH_IMAGES[@]}"; then
             echo "ERROR: Failed to create version manifest"
             exit 1
           fi
-          echo "Created version manifest: $REPO:$VERSION"
+          echo "✓ Created version manifest: $REPO:$VERSION"
 
-          # Create/update latest manifest
-          echo "Creating/updating latest manifest: $REPO:latest"
-          if ! docker buildx imagetools create \
-            --tag "$REPO:latest" \
-            "$REPO:$VERSION-amd64" \
-            "$REPO:$VERSION-arm64"; then
-            echo "ERROR: Failed to create latest manifest"
-            exit 1
+          # Create/update latest manifest only for tag pushes with both architectures
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "${#ARCH_ARRAY[@]}" -eq 2 ]; then
+            echo "Creating/updating latest manifest: $REPO:latest"
+            if ! docker buildx imagetools create \
+              --tag "$REPO:latest" \
+              "${ARCH_IMAGES[@]}"; then
+              echo "ERROR: Failed to create latest manifest"
+              exit 1
+            fi
+            echo "✓ Created/updated latest manifest: $REPO:latest"
+          else
+            echo "Skipping 'latest' tag (workflow_dispatch or single architecture build)"
           fi
-          echo "Created/updated latest manifest: $REPO:latest"
 
-          # Verification phase: Confirm manifests were created successfully
-          # Final check ensures the entire process completed correctly
-          echo "Verifying manifests..."
+          # Verification phase: Confirm version manifest was created successfully
+          echo "Verifying version manifest..."
           if ! docker buildx imagetools inspect "$REPO:$VERSION" >/dev/null 2>&1; then
             echo "ERROR: Version manifest verification failed"
             exit 1
           fi
-          if ! docker buildx imagetools inspect "$REPO:latest" >/dev/null 2>&1; then
-            echo "ERROR: Latest manifest verification failed"
-            exit 1
+          echo "✓ Version manifest verified"
+
+          # Verify latest manifest if it was created
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "${#ARCH_ARRAY[@]}" -eq 2 ]; then
+            echo "Verifying latest manifest..."
+            if ! docker buildx imagetools inspect "$REPO:latest" >/dev/null 2>&1; then
+              echo "ERROR: Latest manifest verification failed"
+              exit 1
+            fi
+            echo "✓ Latest manifest verified"
           fi
 
-          echo "Successfully created and verified multi-arch manifests for $VERSION and latest"
+          echo "✓ Successfully created and verified multi-arch manifest(s)"
