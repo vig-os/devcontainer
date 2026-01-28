@@ -5,24 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.2.1] - 2026-01-28
 
 ### Added
 
-### Changed
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
-
-## [0.2.1] - 2026-01-26
-
-### Added
-
+- **Manual target branch specification** for sync-issues workflow
+  - Added `target-branch` input to `workflow_dispatch` trigger for manually specifying commit target branch
+  - Allows explicit branch selection when triggering workflow manually (e.g., `main`, `dev`)
 - **cargo-binstall** in Containerfile
   - Install via official install script; binaries in `/root/.cargo/bin` with `ENV PATH` set
   - Version check in `tests/test_image.py`
@@ -61,6 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Sync-issues workflow branch protection bypass**
+  - Added GitHub App token generation step using `actions/create-github-app-token@v2`
+  - Updated commit-action to use GitHub App token for bypassing branch protection rules
+  - Updated `vig-os/commit-action` from `v0.1.1` to `v0.1.3`
+  - Changed commit-action environment variable from `GITHUB_TOKEN`/`GITHUB_REF` to `GH_TOKEN`/`TARGET_BRANCH` to match action's expected interface
 - **Devcontainer test fixtures** (`tests/conftest.py`)
   - Shared helpers for `devcontainer_up` and `devcontainer_with_sidecar`: path resolution, env/SSH, project yaml mount, run up, teardown
   - `devcontainer_with_sidecar` scope set to session (one bring-up per session for sidecar tests)
@@ -91,6 +85,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Sync-issues workflow branch determination logic**
+  - Fixed branch selection to prioritize manual `target-branch` input when provided via `workflow_dispatch`
+  - Improved branch detection: manual input → PR merge detection → default to `dev`
 - **Justfile default recipe conflict**
   - Fixed multiple default recipes issue by moving `help` command to the main justfile
   - Removed default command from `justfile.project` and `justfile.base` to prevent conflicts
