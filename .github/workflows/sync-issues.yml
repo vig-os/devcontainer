@@ -54,8 +54,8 @@ jobs:
         id: generate-token
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ vars.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
+          private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
 
       - name: Determine target branch
         id: branch
