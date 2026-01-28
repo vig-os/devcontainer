@@ -113,9 +113,9 @@ jobs:
       matrix:
         # Build for both architectures (can be filtered later if needed)
         # For manual testing, you can run the workflow multiple times with different filters
-        arch: [amd64, arm64]
+        arch: [amd64, arm]
 
-    runs-on: ${{ matrix.arch == 'amd64' && 'ubuntu-latest' || 'ubuntu-latest-arm64' }}
+    runs-on: ${{ matrix.arch == 'amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6.0.1
