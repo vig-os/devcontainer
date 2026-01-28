@@ -17,6 +17,11 @@ on:  # yamllint disable-line rule:truthy
         required: false
         default: false
         type: boolean
+      target-branch:
+        description: 'Target branch to commit changes to (e.g., main, dev). If not provided, uses automatic detection.'
+        required: false
+        default: ''
+        type: string
   # Run on issue creation/updates
   issues:
     types:
@@ -55,10 +60,14 @@ jobs:
       - name: Determine target branch
         id: branch
         run: |
+          # Use manual input if provided (workflow_dispatch), otherwise use automatic detection
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.target-branch }}" ]; then
+            TARGET_BRANCH="${{ github.event.inputs.target-branch }}"
+            echo "✓ Using manual target branch: $TARGET_BRANCH"
           # If PR was merged into main, commit to main; otherwise use dev
-          if [ "${{ github.event_name }}" = "pull_request" ] && \
-             [ "${{ github.event.pull_request.merged }}" = "true" ] && \
-             [ "${{ github.event.pull_request.base.ref }}" = "main" ]; then
+          elif [ "${{ github.event_name }}" = "pull_request" ] && \
+               [ "${{ github.event.pull_request.merged }}" = "true" ] && \
+               [ "${{ github.event.pull_request.base.ref }}" = "main" ]; then
             TARGET_BRANCH="main"
             echo "✓ PR merged into main - will commit to main"
           else
