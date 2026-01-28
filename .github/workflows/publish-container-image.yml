@@ -38,6 +38,11 @@ on:  # yamllint disable-line rule:truthy
         required: false
         default: '99.0.1'
         type: string
+      publish:
+        description: 'Publish images to the registry'
+        required: false
+        default: false
+        type: boolean
       architectures:
         description: 'Architectures to build (comma-separated: amd64,arm64)'
         required: false
@@ -73,7 +78,7 @@ jobs:
             VERSION="${{ github.event.inputs.version }}"
             # For manual dispatch, allow more flexible version formats (e.g., 1.2.3-test)
             if [ -z "$VERSION" ]; then
-              echo "❌ ERROR: Version is required for manual dispatch"
+              echo "ERROR: Version is required for manual dispatch"
               exit 1
             fi
           else
@@ -81,7 +86,7 @@ jobs:
             VERSION=${GITHUB_REF#refs/tags/v}
             # Validate semantic version format for tag pushes
             if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-              echo "❌ ERROR: Invalid version format '$VERSION'"
+              echo "ERROR: Invalid version format '$VERSION'"
               echo "Version must follow semantic versioning format X.Y.Z"
               exit 1
             fi
@@ -93,7 +98,7 @@ jobs:
           echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
           echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
           echo "build_timestamp=$BUILD_TIMESTAMP" >> $GITHUB_OUTPUT
-          echo "✓ Extracted version: $VERSION"
+          echo "Extracted version: $VERSION"
 
   build:
     # Build architecture-specific images in parallel
@@ -190,7 +195,7 @@ jobs:
           # Install test dependencies
           echo "Installing test dependencies..."
           uv sync --group test
-          echo "✓ Test environment ready"
+          echo "Test environment ready"
 
       - name: Load image for testing
         # Load the built image into podman for testing
@@ -199,12 +204,12 @@ jobs:
           set -euo pipefail
           echo "Loading image from /tmp/image.tar into podman..."
           if ! command -v podman &> /dev/null; then
-            echo "❌ ERROR: podman not available (should have been installed in previous step)"
+            echo "ERROR: podman not available (should have been installed in previous step)"
             exit 1
           fi
           podman load < /tmp/image.tar
           podman images | grep "ghcr.io/vig-os/devcontainer"
-          echo "✓ Image loaded successfully into podman"
+          echo "Image loaded successfully into podman"
 
       - name: Run tests
         # Run image tests against the built image before pushing
@@ -213,24 +218,26 @@ jobs:
           set -euo pipefail
           IMAGE_TAG="${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}"
           echo "Running tests against image: ghcr.io/vig-os/devcontainer:$IMAGE_TAG"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "🧪 TEST MODE: Manual dispatch - tests only, no push"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.publish }}" != "true" ]; then
+            echo "TEST MODE: Manual dispatch - tests only, no publish"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.publish }}" = "true" ]; then
+            echo "PUBLISH MODE: Manual dispatch - tests + publish"
           fi
           echo "Setting TEST_CONTAINER_TAG=$IMAGE_TAG"
           export TEST_CONTAINER_TAG="$IMAGE_TAG"
           export PYTEST_SKIP_CONTAINER_CHECK=1
           # Run image tests (these test the container itself)
           uv run pytest tests/test_image.py -v --tb=short
-          echo "✓ All image tests passed"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "✓ Test mode complete - image not pushed (manual dispatch)"
+          echo "All image tests passed"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.publish }}" != "true" ]; then
+            echo "Test mode complete - image not published (manual dispatch)"
           fi
 
       - name: Push image
         # Push the tested image to registry
         # Only runs if tests passed (workflow would have failed otherwise)
-        # Skip pushing for manual dispatch (test mode only)
-        if: github.event_name != 'workflow_dispatch'
+        # For workflow_dispatch, push only when inputs.publish=true (default false)
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./build
@@ -250,8 +257,8 @@ jobs:
       - name: Verify image push
         # Verify that the image was successfully pushed to the registry
         # This catches silent push failures that might not be detected otherwise
-        # Skip for manual dispatch (no push was performed)
-        if: github.event_name != 'workflow_dispatch'
+        # For workflow_dispatch, verify only when inputs.publish=true (default false)
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true'
         run: |
           set -euo pipefail
           IMAGE_TAG="ghcr.io/vig-os/devcontainer:${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}"
@@ -259,20 +266,20 @@ jobs:
 
           # Verify image exists and is accessible
           if ! docker buildx imagetools inspect "$IMAGE_TAG" >/dev/null 2>&1; then
-            echo "❌ ERROR: Failed to verify image push - image not found or not accessible"
+            echo "ERROR: Failed to verify image push - image not found or not accessible"
             exit 1
           fi
 
           # Get and display image digest
           DIGEST=$(docker buildx imagetools inspect "$IMAGE_TAG" --format '{{.Manifest.Digest}}' 2>&1 || echo "")
           if [ -n "$DIGEST" ] && [ "$DIGEST" != "null" ]; then
-            echo "✓ Image verified successfully"
+            echo "Image verified successfully"
             echo "Digest: $DIGEST"
           else
-            echo "⚠️  WARNING: Could not retrieve image digest, but image exists"
+            echo "WARNING: Could not retrieve image digest, but image exists"
           fi
 
-          echo "✓ Image push verification complete"
+          echo "Image push verification complete"
 
       - name: Upload build logs
         # Upload build logs for debugging:
@@ -305,8 +312,8 @@ jobs:
     # - Provides clear error messages if images are missing
     # - Catches registry push failures early
     needs: [extract-version, build]
-    # Only run for tag pushes (not manual dispatch/test mode)
-    if: needs.build.result == 'success' && github.event_name != 'workflow_dispatch'
+    # For workflow_dispatch, run only when inputs.publish=true (default false)
+    if: needs.build.result == 'success' && (github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true')
     timeout-minutes: 10  # Manifest operations are fast, short timeout prevents hangs
     runs-on: ubuntu-latest  # Can run on any runner, no architecture-specific code
     steps:
@@ -335,16 +342,16 @@ jobs:
           # This prevents creating incomplete manifests
           echo "Verifying architecture-specific images exist..."
           if ! docker buildx imagetools inspect "$REPO:$VERSION-amd64" >/dev/null 2>&1; then
-            echo "❌ ERROR: amd64 image not found: $REPO:$VERSION-amd64"
+            echo "ERROR: amd64 image not found: $REPO:$VERSION-amd64"
             exit 1
           fi
-          echo "✓ Verified amd64 image exists"
+          echo "Verified amd64 image exists"
 
           if ! docker buildx imagetools inspect "$REPO:$VERSION-arm64" >/dev/null 2>&1; then
-            echo "❌ ERROR: arm64 image not found: $REPO:$VERSION-arm64"
+            echo "ERROR: arm64 image not found: $REPO:$VERSION-arm64"
             exit 1
           fi
-          echo "✓ Verified arm64 image exists"
+          echo "Verified arm64 image exists"
 
           # Manifest creation phase: Create version and latest manifests
           # Each step has explicit error handling to provide clear failure messages
@@ -353,10 +360,10 @@ jobs:
             --tag "$REPO:$VERSION" \
             "$REPO:$VERSION-amd64" \
             "$REPO:$VERSION-arm64"; then
-            echo "❌ ERROR: Failed to create version manifest"
+            echo "ERROR: Failed to create version manifest"
             exit 1
           fi
-          echo "✓ Created version manifest: $REPO:$VERSION"
+          echo "Created version manifest: $REPO:$VERSION"
 
           # Create/update latest manifest
           echo "Creating/updating latest manifest: $REPO:latest"
@@ -364,21 +371,21 @@ jobs:
             --tag "$REPO:latest" \
             "$REPO:$VERSION-amd64" \
             "$REPO:$VERSION-arm64"; then
-            echo "❌ ERROR: Failed to create latest manifest"
+            echo "ERROR: Failed to create latest manifest"
             exit 1
           fi
-          echo "✓ Created/updated latest manifest: $REPO:latest"
+          echo "Created/updated latest manifest: $REPO:latest"
 
           # Verification phase: Confirm manifests were created successfully
           # Final check ensures the entire process completed correctly
           echo "Verifying manifests..."
           if ! docker buildx imagetools inspect "$REPO:$VERSION" >/dev/null 2>&1; then
-            echo "❌ ERROR: Version manifest verification failed"
+            echo "ERROR: Version manifest verification failed"
             exit 1
           fi
           if ! docker buildx imagetools inspect "$REPO:latest" >/dev/null 2>&1; then
-            echo "❌ ERROR: Latest manifest verification failed"
+            echo "ERROR: Latest manifest verification failed"
             exit 1
           fi
 
-          echo "✓ Successfully created and verified multi-arch manifests for $VERSION and latest"
+          echo "Successfully created and verified multi-arch manifests for $VERSION and latest"

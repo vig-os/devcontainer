@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Multi-architecture support (amd64, arm64) with parallel builds on native runners
   - Image testing before push: runs `pytest tests/test_image.py` against built images
   - Manual dispatch support for testing workflow changes without pushing images (default version: 99.0.1)
+  - Optional manual publishing: `workflow_dispatch` can publish images/manifests when `publish=true` (default false)
   - Comprehensive error handling and verification steps
   - OCI-standard labels via `docker/metadata-action`
   - Build log artifacts for debugging (always uploaded for manual dispatch and on failure)
