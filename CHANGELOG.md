@@ -5,7 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.1] - 2026-01-28
+## Unreleased
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.2.1](https://github.com/vig-os/devcontainer/releases/tag/v0.2.1) - 2026-01-28
 
 ### Added
 
@@ -113,7 +127,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed shellcheck warnings by properly quoting script paths
   - Improved debug output and error messages
 
-## [0.2.0] - 2026-01-06
+## [0.2.0](https://github.com/vig-os/devcontainer/releases/tag/v0.2.0) - 2026-01-06
 
 ### Added
 
@@ -195,7 +209,7 @@ The previous v0.1 release is kept as-is for backwards compatibility.
 - macOS Podman socket mounting errors caused by SELinux `:Z` flag on socket files
 - Socket detection during tests now matches runtime behavior (Podman-first)
 
-## [0.1] - 2025-12-10
+## [0.1](https://github.com/vig-os/devcontainer/releases/tag/v0.1) - 2025-12-10
 
 ### Core Image
 
@@ -243,7 +257,3 @@ The previous v0.1 release is kept as-is for backwards compatibility.
 - Complete project documentation (README.md, CONTRIBUTE.md, TESTING.md)
 - Detailed testing strategy and workflow documentation
 - Push script updates README files in both project and assets
-
-[0.1]: https://github.com/vig-os/devcontainer/releases/tag/v0.1
-[0.2.0]: https://github.com/vig-os/devcontainer/releases/tag/v0.2.0
-[0.2.1]: https://github.com/vig-os/devcontainer/releases/tag/v0.2.1
