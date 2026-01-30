@@ -1,6 +1,8 @@
 ---
 # .pre-commit-config.yaml
 
+exclude: ^\.github_data/
+
 repos:
   # General Pre-commit Hooks (Fixes formatting issues)
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -50,14 +52,15 @@ repos:
     hooks:
       - id: shellcheck
         name: shellcheck
+        args: ["-x"]
 
-  # Markdown Linting
+  # Markdown Linting (excludes auto-generated docs)
   - repo: https://github.com/jackdewinter/pymarkdown
     rev: v0.9.23
     hooks:
       - id: pymarkdown
         name: pymarkdown
-        args: ["scan"]
+        args: ["-c", ".pymarkdown", "fix"]
 
   # Justfile formatting
   - repo: local
@@ -75,13 +78,12 @@ repos:
     hooks:
       - id: typos
 
-  # Typstyle Linting
+  # License Compliance Check (runs only when dependencies change)
   - repo: local
     hooks:
-      - id: typstyle
-        name: typstyle
-        entry: typstyle
+      - id: pip-licenses
+        name: pip-licenses (check dependency licenses)
+        entry: uv run pip-licenses --fail-on="GPL-3.0-only;GPL-3.0-or-later;AGPL-3.0-only;AGPL-3.0-or-later"
         language: system
-        files: ^.*\.typ$
-        pass_filenames: true
-        args: [--inplace]
+        files: ^(pyproject\.toml|uv\.lock|requirements.*\.txt)$
+        pass_filenames: false
