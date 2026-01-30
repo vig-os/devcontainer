@@ -8,6 +8,15 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
+      # Enforce topic branch naming: <type>/<issue_number>-<short_summary>
+      # Allows main, dev, and branches matching the convention.
+      - id: no-commit-to-branch
+        name: branch-name (enforce <type>/<issue>-<summary>)
+        args:
+          - --branch
+          - __none__  # override default so main/dev are not protected
+          - --pattern
+          - "^(?!main$)(?!dev$)(?!^(feature|bugfix|hotfix|release|docs|test|refactor)/[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$).+$"
       - id: check-added-large-files
       - id: check-case-conflict
       - id: check-json

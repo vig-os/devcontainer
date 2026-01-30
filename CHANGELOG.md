@@ -9,7 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Branch name enforcement as a pre-commit hook**
+  - New `branch-name` hook enforcing `<type>/<issue>-<summary>` convention (e.g. `feature/38-standardize-branching-strategy-enforcement`)
+  - Pre-commit configuration updated in repo and in workspace assets (`.pre-commit-config.yaml`, `assets/workspace/.pre-commit-config.yaml`)
+  - Integration tests added for valid and invalid branch names
+- **Cursor rules for branch naming and issue workflow**
+  - `.cursor/rules/branch-naming.mdc`: topic branch naming format, branch types, workflow for creating/linking branches via `gh issue develop`
+  - Guidelines for inferring branch type from issue labels and deriving short summary from issue title
+
 ### Changed
+
+- **Updated pre-commit hook configuration in the devcontainer**
+  - Exclude issue and template docs from .github_data
+  - Autofix shellcheck
+  - Autofix pymarkdown
+  - Add license compliance check
 
 ### Deprecated
 
