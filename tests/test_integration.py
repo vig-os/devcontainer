@@ -1473,6 +1473,118 @@ class TestDevContainerCLI:
             f"Expected 'Logged in to github.com' or similar in output"
         )
 
+    def test_valid_branch_names_commit_succeeds(self, devcontainer_up):
+        """Valid branch names (convention) allow commits; passes with or without branch-name hook."""
+        # Create dummy file to commit
+        workspace_path = devcontainer_up.resolve()
+        dummy_file = workspace_path / "dummy.txt"
+        dummy_file.write_text("dummy\n")
+
+        # Define valid branch names
+        valid_branch_names = [
+            "feature/123-test-branch",
+            "bugfix/123-test-branch",
+            "hotfix/123-test-branch",
+            "release/123-test-branch",
+            "docs/123-test-branch",
+            "test/123-test-branch",
+            "refactor/123-test-branch",
+        ]
+
+        # Test valid branch names
+        for branch_name in valid_branch_names:
+            # Create branch and run pre-commit hook
+            exec_cmd = [
+                "devcontainer",
+                "exec",
+                "--workspace-folder",
+                str(workspace_path),
+                "--config",
+                f"{workspace_path}/.devcontainer/devcontainer.json",
+                "--docker-path",
+                "podman",
+                "bash",
+                "-c",
+                (
+                    "cd /workspace/test_project"
+                    " && printf 'dummy\\n' > dummy.txt"
+                    f" && git checkout -b '{branch_name}'"
+                    " && git add dummy.txt"
+                    " && pre-commit run -a"
+                ),
+            ]
+            result = subprocess.run(
+                exec_cmd,
+                capture_output=True,
+                text=True,
+                cwd=str(workspace_path),
+                env=os.environ.copy(),
+                timeout=120,
+            )
+
+            assert result.returncode == 0, (
+                f"pre-commit on valid branch '{branch_name}' should succeed\n"
+                f"stdout: {result.stdout}\n"
+                f"stderr: {result.stderr}\n"
+                f"command: {' '.join(exec_cmd)}"
+            )
+
+    def test_invalid_branch_names_commit_fails(self, devcontainer_up):
+        """Invalid branch names (convention) fail commits (branch-name pre-commit hook)."""
+        # Create dummy file to commit
+        workspace_path = devcontainer_up.resolve()
+        dummy_file = workspace_path / "dummy.txt"
+        dummy_file.write_text("dummy\n")
+
+        invalid_branch_names = [
+            "featur/123-typo",
+            "bugfix/missing-issue-number",
+            "hotfix/123",
+            "release123-missing-/",
+            "random-string",
+        ]
+
+        for branch_name in invalid_branch_names:
+            exec_cmd = [
+                "devcontainer",
+                "exec",
+                "--workspace-folder",
+                str(workspace_path),
+                "--config",
+                f"{workspace_path}/.devcontainer/devcontainer.json",
+                "--docker-path",
+                "podman",
+                "bash",
+                "-c",
+                (
+                    "cd /workspace/test_project"
+                    " && printf 'dummy\\n' > dummy.txt"
+                    f" && git checkout -b '{branch_name}'"
+                    " && git add dummy.txt"
+                    " && pre-commit run -a"
+                ),
+            ]
+            result = subprocess.run(
+                exec_cmd,
+                capture_output=True,
+                text=True,
+                cwd=str(workspace_path),
+                env=os.environ.copy(),
+                timeout=120,
+            )
+
+            assert result.returncode != 0, (
+                f"pre-commit on invalid branch '{branch_name}' should fail\n"
+                f"stdout: {result.stdout}\n"
+                f"stderr: {result.stderr}\n"
+                f"command: {' '.join(exec_cmd)}"
+            )
+            output = (result.stdout + result.stderr).lower()
+            assert "branch" in output or "no-commit-to-branch" in output, (
+                f"Expected branch-name hook failure in output\n"
+                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+            )
+
 
 class TestJustRecipes:
     """Test the just recipes."""
