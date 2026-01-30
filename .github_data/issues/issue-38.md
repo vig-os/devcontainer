@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-01-30T10:29:19Z
-updated: 2026-01-30T10:29:19Z
+updated: 2026-01-30T15:00:02Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/38
-comments: 0
-labels: enhancement
-assignees: none
+comments: 1
+labels: feature
+assignees: c-vigo
 milestone: none
 projects: none
 relationship: none
-synced: 2026-01-30T10:29:37.280Z
+synced: 2026-01-30T15:31:08.594Z
 ---
 
 # [Issue 38]: [[FEATURE] Standardize Branching Strategy and Enforcement](https://github.com/vig-os/devcontainer/issues/38)
@@ -61,4 +61,23 @@ Deliverables can include: documentation of the strategy, scripts or config to ap
 - **Beneficiaries:** Developers (clear workflow), QA/RA (audit trail, change control), auditors (consistent branching and protection).
 - **Compatibility:** Backward compatible; new rules apply to repos created or updated from the template.
 - **Risks:** Low; mainly adoption of signed commits and branch protection in existing repos that adopt the template.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on January 30, 2026 at 02:59 PM_
+
+### Organization Rules
+
+Using GitHub Enterprise, we set rules across all repositories for any organization within the Enterprise.
+Currently:
+
+- **Main Branch Protection**
+  - Protection against force push and deletion
+  - PR merging only, with at least one reviewer and review resolution required
+- **Dev Branch Protection**:
+  - Protection against force push and deletion
+  - PR merging only, with review resolution required
+- **Signed Commits**: commits in any branch must be signed
 
