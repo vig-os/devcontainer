@@ -586,6 +586,13 @@ main() {
         log_warning "Could not configure Git hooks path (may not exist yet)"
     fi
 
+    # Commit message template (see docs/COMMIT_MESSAGE_STANDARD.md)
+    if [ -f .gitmessage ]; then
+        if git config commit.template .gitmessage 2>/dev/null; then
+            log_success "Commit message template configured (.gitmessage)"
+        fi
+    fi
+
     if uv run pre-commit install-hooks 2>/dev/null; then
         log_success "Pre-commit hooks installed"
     else
