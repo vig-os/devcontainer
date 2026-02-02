@@ -37,17 +37,16 @@ APPROVED_TYPES = frozenset[str](
 SUBJECT_PATTERN = re.compile(r"^([a-z]+)(\([a-zA-Z0-9-]+\))?!?: .+$")
 
 # Refs line: Refs: followed by at least one reference (must include at least one issue)
-# Reference: #?\d+ (issue) or REQ-..., RISK-..., SOP-... (alphanumeric/hyphens)
+# Issue refs must use # (e.g. #36). Other refs: REQ-..., RISK-..., SOP-...
 REF_PATTERN = re.compile(
     r"^Refs:\s+"
-    r"(?:(?:#?\d+)|(?:REQ-[a-zA-Z0-9-]+)|(?:RISK-[a-zA-Z0-9-]+)|(?:SOP-[a-zA-Z0-9-]+))"
+    r"(?:(?:#\d+)|(?:REQ-[a-zA-Z0-9-]+)|(?:RISK-[a-zA-Z0-9-]+)|(?:SOP-[a-zA-Z0-9-]+))"
     r"(?:\s*,\s*"
-    r"(?:(?:#?\d+)|(?:REQ-[a-zA-Z0-9-]+)|(?:RISK-[a-zA-Z0-9-]+)|(?:SOP-[a-zA-Z0-9-]+))"
+    r"(?:(?:#\d+)|(?:REQ-[a-zA-Z0-9-]+)|(?:RISK-[a-zA-Z0-9-]+)|(?:SOP-[a-zA-Z0-9-]+))"
     r")*\s*$"
 )
-# At least one GitHub issue (#36 or 36 as standalone ref) must be present in Refs
-# Match #36 or "Refs: 36" or ", 36" so we don't match 123 in REQ-123
-ISSUE_REF_PATTERN = re.compile(r"#\d+|(?:Refs:\s+|,\s+)\d+")
+# At least one GitHub issue with # (e.g. #36) must be present
+ISSUE_REF_PATTERN = re.compile(r"#\d+")
 
 
 def validate_commit_message(content: str) -> tuple[bool, str | None]:

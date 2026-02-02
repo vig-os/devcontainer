@@ -133,6 +133,12 @@ class TestValidateCommitMessage:
         assert valid is True
         assert err is None
 
+    def test_invalid_missing_hashtag_in_refs(self):
+        msg = "feat: add feature\n\nRefs: 36\n"
+        valid, err = validate_commit_message(msg)
+        assert valid is False
+        assert "Refs" in err or "reference" in err.lower()
+
     def test_invalid_refs_line_empty_refs(self):
         msg = "feat: add feature\n\nRefs:\n"
         valid, err = validate_commit_message(msg)
