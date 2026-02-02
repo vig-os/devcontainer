@@ -73,23 +73,11 @@ class TestValidateCommitMessage:
         assert valid is True
         assert err is None
 
-    def test_valid_exactly_one_trailing_newline(self):
-        msg = "feat: add x\n\nRefs: #36\n"
+    def test_valid_message_without_trailing_newline(self):
+        msg = "feat: add x\n\nRefs: #36"
         valid, err = validate_commit_message(msg)
         assert valid is True
         assert err is None
-
-    def test_invalid_no_trailing_newline(self):
-        msg = "feat: add x\n\nRefs: #36"
-        valid, err = validate_commit_message(msg)
-        assert valid is False
-        assert "trailing newline" in err.lower()
-
-    def test_invalid_multiple_trailing_newlines(self):
-        msg = "feat: add x\n\nRefs: #36\n\n"
-        valid, err = validate_commit_message(msg)
-        assert valid is False
-        assert "trailing newline" in err.lower()
 
     def test_invalid_empty_message(self):
         valid, err = validate_commit_message("")

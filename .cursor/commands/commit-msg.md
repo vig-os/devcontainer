@@ -20,7 +20,6 @@ git status && echo "=== STAGED CHANGES ===" && git diff --cached
 3. **Write accurate commit message** based on staged changes only:
 - Follow rules in [.commit-messages.mdc](../rules/commit-messages.mdc)
 - Include details in list form if helpful for larger commits
-- End the message with a blank newline
 
 4. **Execute git commit command** using run_terminal_cmd for user review
 

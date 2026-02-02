@@ -59,15 +59,6 @@ def validate_commit_message(content: str) -> tuple[bool, str | None]:
     if not content:
         return False, "Commit message is empty."
 
-    # Enforce exactly one trailing newline
-    if not content.endswith("\n"):
-        return False, "Commit message must end with exactly one trailing newline."
-    if len(content) >= 2 and content[-2] == "\n":
-        return (
-            False,
-            "Commit message must end with exactly one trailing newline (no multiple newlines at end).",
-        )
-
     lines = content.rstrip().splitlines()
     if not lines:
         return False, "Commit message is empty."

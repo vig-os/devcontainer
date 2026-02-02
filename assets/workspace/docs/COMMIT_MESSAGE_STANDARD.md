@@ -20,7 +20,6 @@ Refs: <IDs>
 - **Blank line** — Required after the subject.
 - **Body** — Optional. Include additional context on _what_ and _why_. May have multiple paragraphs. If present, end the body with a blank line before the Refs line.
 - **Refs line** — Mandatory. Exactly one line starting with `Refs:`; it must be the last non-empty line. Include at least one GitHub issue ID (e.g. `#36`); other references (e.g. `REQ-...`, `RISK-...`, `SOP-...`) may follow.
-- **Trailing newline** — The message must end with exactly one newline (no missing newline, no multiple blank lines at the end).
 
 ## Enforcing the template in VS Code / Cursor
 

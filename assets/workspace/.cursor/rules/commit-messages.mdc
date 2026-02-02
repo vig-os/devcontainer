@@ -1,5 +1,5 @@
 ---
-description: Commit message format and rules (type, Refs, trailing newline)
+description: Commit message format and rules (type, Refs)
 alwaysApply: true
 ---
 
@@ -19,8 +19,7 @@ Refs: #<issue>
 - **Blank line** after the subject.
 - **Optional body** (what/why). If present, end body with a blank line.
 - **Refs line** — mandatory. At least one GitHub issue, e.g. `Refs: #36` or `Refs: #36, #37`. May add `REQ-...`, `RISK-...`, `SOP-...` after the issue.
-- **Exactly one trailing newline** at end of message.
-- **Exactly one Refs line** — no duplicate `Refs:` lines; Refs must be the last non-empty line.
+- **Exactly one Refs line** — no duplicate `Refs:` lines; Refs must be the last line.
 
 ## Examples
 
