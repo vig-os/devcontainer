@@ -126,6 +126,12 @@ test-version-check:
     #!/usr/bin/env bash
     uv run pytest tests/test_version_check.py -v -s --tb=short
 
+# Run validate commit msg tests only
+[group('test')]
+test-validate-commit-msg:
+    #!/usr/bin/env bash
+    uv run pytest tests/test_validate_commit_msg.py -v -s --tb=short
+
 # Clean up lingering containers before running tests
 [private]
 _test-cleanup-check:
