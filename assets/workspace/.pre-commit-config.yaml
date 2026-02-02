@@ -87,3 +87,12 @@ repos:
         language: system
         files: ^(pyproject\.toml|uv\.lock|requirements.*\.txt)$
         pass_filenames: false
+
+  # Commit message validation (commit-msg stage)
+  - repo: local
+    hooks:
+      - id: validate-commit-msg
+        name: validate commit message
+        entry: uv run python /root/assets/validate_commit_msg.py
+        language: system
+        stages: [commit-msg]
