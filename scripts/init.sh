@@ -580,7 +580,7 @@ main() {
 
     # Setup hooks
     log_info "Setting up hooks..."
-    if git config core.hooksPath .githooks && chmod +x .githooks/pre-commit 2>/dev/null; then
+    if git config core.hooksPath .githooks && chmod +x .githooks/pre-commit .githooks/commit-msg 2>/dev/null; then
         log_success "Git hooks path configured"
     else
         log_warning "Could not configure Git hooks path (may not exist yet)"
