@@ -67,3 +67,5 @@ indent-style = "space"
 filterwarnings = [
     "ignore::DeprecationWarning:testcontainers",
 ]
+# Do not collect tests from tests/tmp (integration-test workspace dirs with template tests)
+norecursedirs = "tmp"

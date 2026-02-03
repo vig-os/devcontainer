@@ -716,6 +716,7 @@ class TestPlaceholders:
         # Files with short name in specific paths
         files = [
             initialized_workspace / ".devcontainer" / "devcontainer.json",
+            initialized_workspace / ".devcontainer" / "scripts" / "post-create.sh",
         ]
 
         # Check each file for short name placeholder (not literal "devcontainer")
@@ -755,6 +756,45 @@ class TestDevContainerGit:
 
 class TestDevContainerUserConf:
     """Test that user configuration files are set up."""
+
+    def test_venv_prompt_name(self, devcontainer_up):
+        """Test that .venv/bin/activate in the image does not contain 'template-project', but is renamed to `test_project`."""
+        workspace_path = str(devcontainer_up.resolve())
+        activate_path = "/root/assets/workspace/.venv/bin/activate"
+        cat_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "bash",
+            "-c",
+            f"cat {activate_path}",
+        ]
+        result = subprocess.run(
+            cat_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+        )
+        assert result.returncode == 0, (
+            f"Failed to read {activate_path}\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(cat_cmd)}"
+        )
+        assert "template-project" not in result.stdout, (
+            f"{activate_path} still contains 'template-project'; "
+            "should be replaced with project short name during container init (e.g. post-create)"
+        )
+        assert "test_project" in result.stdout, (
+            f"{activate_path} does not contain 'test_project'; "
+            "should be renamed to project short name during container init (e.g. post-create)"
+        )
 
     def test_conf_directory_files(self, devcontainer_up):
         """Test that .devcontainer/.conf contains all expected files."""
@@ -1341,7 +1381,7 @@ class TestDevContainerCLI:
                 "git config user.name 'Test User' && "
                 "git config user.email 'test@example.com' && "
                 "git add test_commit.txt && "
-                "git commit -m 'Test commit for signature verification' && "
+                "git commit -m 'test: a dummy test\n\nRefs: #1' && "
                 "git log -1 --show-signature"
             ),
         ]
