@@ -1341,7 +1341,7 @@ class TestDevContainerCLI:
                 "git config user.name 'Test User' && "
                 "git config user.email 'test@example.com' && "
                 "git add test_commit.txt && "
-                "git commit -m 'Test commit for signature verification' && "
+                "git commit -m 'test: a dummy test\n\nRefs: #1' && "
                 "git log -1 --show-signature"
             ),
         ]
