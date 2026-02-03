@@ -7,6 +7,9 @@ set -euo pipefail
 
 echo "Running post-create setup..."
 
+# Set venv prompt
+sed -i 's/template-project/{{SHORT_NAME}}/g' /root/assets/workspace/.venv/bin/activate
+
 # Sync Python dependencies (fast if nothing changed from pre-built venv)
 # Use --no-install-project since new projects may not have source code yet
 if [[ -f "pyproject.toml" ]]; then
