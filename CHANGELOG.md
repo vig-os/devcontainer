@@ -9,17 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Branch name enforcement as a pre-commit hook**
+- **Commit message standardization** ([#36](https://github.com/vig-os/devcontainer/issues/36))
+  - Commit message format: `type(scope)!: subject` with mandatory `Refs: #<issue>` line
+  - Documentation: `docs/COMMIT_MESSAGE_STANDARD.md` defining format, approved types (feat, fix, docs, chore, refactor, test, ci, build, revert, style), and traceability requirements
+  - Validation script: `scripts/validate_commit_msg.py` enforcing the standard
+  - Commit-msg hook: `.githooks/commit-msg` runs validation on every commit
+  - Pre-commit integration: commit-msg stage hook in `.pre-commit-config.yaml`
+  - Git commit template: `.gitmessage` with format placeholder
+  - Cursor integration: `.cursor/rules/commit-messages.mdc` and `.cursor/commands/commit-msg.md` for AI-assisted commit messages
+  - Workspace template: all commit message tooling included in `assets/workspace/` for new projects
+  - Tests: `tests/test_validate_commit_msg.py` with comprehensive validation test cases
+- **Branch name enforcement as a pre-commit hook** ([#38](https://github.com/vig-os/devcontainer/issues/38))
   - New `branch-name` hook enforcing `<type>/<issue>-<summary>` convention (e.g. `feature/38-standardize-branching-strategy-enforcement`)
   - Pre-commit configuration updated in repo and in workspace assets (`.pre-commit-config.yaml`, `assets/workspace/.pre-commit-config.yaml`)
   - Integration tests added for valid and invalid branch names
-- **Cursor rules for branch naming and issue workflow**
+- **Cursor rules for branch naming and issue workflow** ([#38](https://github.com/vig-os/devcontainer/issues/38))
   - `.cursor/rules/branch-naming.mdc`: topic branch naming format, branch types, workflow for creating/linking branches via `gh issue develop`
   - Guidelines for inferring branch type from issue labels and deriving short summary from issue title
+- **Virtual environment prompt renaming** ([#34](https://github.com/vig-os/devcontainer/issues/34))
+  - Post-create script updates venv prompt from "template-project" to project short name
+  - Integration test verifies venv activate script does not contain "template-project"
 
 ### Changed
 
-- **Updated pre-commit hook configuration in the devcontainer**
+- **Updated pre-commit hook configuration in the devcontainer** ([#38](https://github.com/vig-os/devcontainer/issues/38))
   - Exclude issue and template docs from .github_data
   - Autofix shellcheck
   - Autofix pymarkdown
@@ -30,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+
+- **Pytest test collection** - Exclude `tests/tmp/` directory (integration test workspaces) from test discovery to prevent import errors
 
 ### Security
 
