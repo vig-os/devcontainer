@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-02-05T07:46:56Z
-updated: 2026-02-05T07:46:56Z
+updated: 2026-02-05T07:47:24Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/43
@@ -12,7 +12,7 @@ assignees: none
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-05T07:47:16.137Z
+synced: 2026-02-05T07:47:40.728Z
 ---
 
 # [Issue 43]: [[BUG] pip-licenses not installed in fresh workspace](https://github.com/vig-os/devcontainer/issues/43)
@@ -184,7 +184,7 @@ error: Failed to spawn: `pip-licenses`
 
 ### Additional Context
 
-### Format `justfile`
+#### Format `justfile`
 
 Take this opportunity to fix `justfile` formatting for pre-commit compliance (see message above):
 
