@@ -15,10 +15,10 @@ EXPECTED_VERSIONS = {
     "git": "2.",  # Major version check (from apt package)
     "curl": "8.",  # Major version check (from apt package)
     "gh": "2.86.",  # Minor version check (GitHub CLI (manually installed from latest release)
-    "uv": "0.9.",  # Minor version check (manually installed from latest release)
+    "uv": "0.10.",  # Minor version check (manually installed from latest release)
     "python": "3.12",  # Python (from base image)
     "pre_commit": "4.5.",  # Minor version check (installed via uv pip)
-    "ruff": "0.14.",  # Minor version check (installed via uv pip)
+    "ruff": "0.15.",  # Minor version check (installed via uv pip)
     "just": "1.46.",  # Minor version check (manually installed from latest release)
     "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),
     "typstyle": "0.14.",  # Minor version check (installed from latest release)
