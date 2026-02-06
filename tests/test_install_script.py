@@ -267,13 +267,13 @@ class TestInstallScriptIntegration:
         )
 
     def test_install_uses_default_org_name(self, install_workspace):
-        """Test ORG_NAME defaults to vigOS/devc."""
+        """Test ORG_NAME defaults to vigOS."""
         license_file = install_workspace / "LICENSE"
         assert license_file.exists(), "LICENSE file not created"
 
         content = license_file.read_text()
-        assert "vigOS/devc" in content, (
-            f"Expected 'vigOS/devc' in LICENSE (default ORG_NAME), "
+        assert "vigOS" in content, (
+            f"Expected 'vigOS' in LICENSE (default ORG_NAME), "
             f"but found: {content[-500:]}"
         )
 
