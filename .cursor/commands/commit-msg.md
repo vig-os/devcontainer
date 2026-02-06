@@ -21,7 +21,7 @@ git status && echo "=== STAGED CHANGES ===" && git diff --cached
 - Follow rules in [.commit-messages.mdc](../rules/commit-messages.mdc)
 - Include details in list form if helpful for larger commits
 
-4. **Execute git commit command** using run_terminal_cmd for user review
+4. **Suggest a git commit command** for the user to review
 
 ## Important Notes
 
@@ -29,3 +29,6 @@ git status && echo "=== STAGED CHANGES ===" && git diff --cached
 - Do not read/summarize git command output after execution unless asked
 - User can modify the commit command in shell before executing
 - Your shell is already at the project root so you do not need `cd` or 'bash', just use `git ...`
+- Do not use `--no-verify` to cheat
+- Do not add any trailer
+- Do not put yourself as co-author
