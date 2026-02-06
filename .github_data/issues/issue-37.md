@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-01-29T09:44:01Z
-updated: 2026-01-30T10:30:18Z
+updated: 2026-02-06T15:57:57Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/37
 comments: 0
-labels: enhancement
+labels: feature
 assignees: none
 milestone: none
 projects: none
 relationship: none
-synced: 2026-01-30T10:30:34.865Z
+synced: 2026-02-06T15:58:15.558Z
 ---
 
 # [Issue 37]: [[FEATURE] Automate and Standardize Repository Setup for Devcontainer Template](https://github.com/vig-os/devcontainer/issues/37)
@@ -42,7 +42,7 @@ so all projects start compliant and maintainable from day one.
 
 Automatically configure new repositories with:
 
-1. **Commit Message Standardization** #36 
+1. **Commit Message Standardization** #36
    - Conventional Commits–based, restricted types
    - Mandatory references to issues, requirements, risks, or SOPs
    - Git commit template included
@@ -50,14 +50,14 @@ Automatically configure new repositories with:
    - Local commit-msg hook
    - CI validation
 
-2. **Branching Strategy & Enforcement** #38 
+2. **Branching Strategy & Enforcement** #38
    - Standard branches: `main`, `develop`, `release/*`, `hotfix/*`, `feature/*`, `bugfix/*`
    - Branch protection rules programmatically applied
    - Require signed commits
    - Require PR reviews
    - Enforce naming conventions via CI
 
-3. **Release Cycle**
+3. **Release Cycle** #48
    - Automated release branch creation templates
    - Recommended tagging conventions
    - Integration with QMS baselining for audits
