@@ -36,6 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     locales \
     ca-certificates \
+    nano \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Generate en_US.UTF-8 locale

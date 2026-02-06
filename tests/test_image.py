@@ -62,6 +62,10 @@ class TestSystemTools:
             "openssh-client is not installed"
         )
 
+    def test_nano_installed(self, host):
+        """Test that nano is installed."""
+        assert host.package("nano").is_installed, "nano is not installed"
+
     def test_gh_installed(self, host):
         """Test that GitHub CLI (gh) is installed."""
         # gh is manually installed, so check for the binary file
