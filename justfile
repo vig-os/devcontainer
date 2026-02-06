@@ -181,6 +181,11 @@ prepare-release version *flags:
 finalize-release version *flags:
     ./scripts/finalize-release.sh {{ version }} {{ flags }}
 
+# Reset CHANGELOG Unreleased section (after merging release to dev)
+[group('release')]
+reset-changelog:
+    uv run python scripts/prepare-changelog.py reset CHANGELOG.md
+
 # Pull image from registry (default: latest)
 [group('release')]
 pull version="latest":

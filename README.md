@@ -142,6 +142,7 @@ Available recipes:
     finalize-release version *flags # Finalize and publish release (step 3, after testing)
     prepare-release version *flags  # Prepare release branch for testing (step 1)
     pull version="latest"           # Pull image from registry (default: latest)
+    reset-changelog                 # Reset CHANGELOG Unreleased section (after merging release to dev)
 
     [sidecar]
     sidecar name *args              # just sidecar redis flush
