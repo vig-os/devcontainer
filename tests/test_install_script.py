@@ -120,6 +120,47 @@ class TestInstallScriptUnit:
         assert result.returncode == 0, f"Failed: {result.stderr}"
         assert "--force" in result.stdout
 
+    def test_org_flag_in_help(self, install_script):
+        """Test --org flag is documented in help output."""
+        result = subprocess.run(
+            [str(install_script), "--help"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0, f"--help failed: {result.stderr}"
+        assert "--org" in result.stdout, "--org flag not documented in help"
+
+    def test_default_org_in_dry_run(self, install_script, tmp_path):
+        """Test default ORG_NAME is 'vigOS' when --org is not specified."""
+        result = subprocess.run(
+            [str(install_script), "--dry-run", str(tmp_path)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0, f"Failed: {result.stderr}"
+        # Should show ORG_NAME=vigOS being passed to container
+        assert "ORG_NAME" in result.stdout, "ORG_NAME should be passed to container"
+        # Default should be vigOS
+        assert (
+            'ORG_NAME="vigOS"' in result.stdout or "ORG_NAME=vigOS" in result.stdout
+        ), f"Default ORG_NAME should be 'vigOS', got: {result.stdout}"
+
+    def test_custom_org_in_dry_run(self, install_script, tmp_path):
+        """Test --org flag sets custom ORG_NAME."""
+        result = subprocess.run(
+            [str(install_script), "--dry-run", "--org", "MyOrg", str(tmp_path)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0, f"Failed: {result.stderr}"
+        # Should show custom ORG_NAME being passed to container
+        assert (
+            'ORG_NAME="MyOrg"' in result.stdout or "ORG_NAME=MyOrg" in result.stdout
+        ), f"Custom ORG_NAME 'MyOrg' should be in output, got: {result.stdout}"
+
 
 class TestInstallScriptIntegration:
     """Integration tests - actually deploy using install.sh.

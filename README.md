@@ -42,6 +42,9 @@ curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh 
 # Override project name
 curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --name my_custom_name -- ~/my-project
 
+# Override organization name (default: vigOS)
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --org MyOrg -- ~/my-project
+
 # Preview without executing
 curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --dry-run -- ~/my-project
 

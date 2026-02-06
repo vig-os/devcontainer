@@ -11,6 +11,7 @@
 #   --docker          Force docker (default: auto-detect, prefers podman)
 #   --podman          Force podman
 #   --name NAME       Override project name (SHORT_NAME)
+#   --org ORG         Override organization name (default: vigOS)
 #   --dry-run         Show what would be done without executing
 #   -h, --help        Show this help message
 #
@@ -18,6 +19,7 @@
 #   curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh
 #   curl -sSf ... | sh -s -- ~/Projects/my-project
 #   curl -sSf ... | sh -s -- --version 1.0.0 --force ./my-project
+#   curl -sSf ... | sh -s -- --org MyOrg ./my-project
 
 set -euo pipefail
 
@@ -30,6 +32,7 @@ DRY_RUN=false
 SKIP_PULL=false
 PROJECT_PATH=""
 PROJECT_NAME=""
+ORG_NAME="vigOS"
 
 # Colors (disabled if not a tty)
 if [ -t 1 ]; then
@@ -61,6 +64,7 @@ OPTIONS:
     --docker          Force docker runtime
     --podman          Force podman runtime
     --name NAME       Override project name (SHORT_NAME, used for module name)
+    --org ORG         Override organization name (default: vigOS)
     --dry-run         Show what would be done
     -h, --help        Show this help
 
@@ -79,6 +83,9 @@ EXAMPLES:
 
     # Override project name
     curl -sSf ... | sh -s -- --name my_custom_name ./my-project
+
+    # Use custom organization name
+    curl -sSf ... | sh -s -- --org MyOrg ./my-project
 EOF
 }
 
@@ -225,6 +232,10 @@ while [ $# -gt 0 ]; do
             PROJECT_NAME="$2"
             shift 2
             ;;
+        --org)
+            ORG_NAME="$2"
+            shift 2
+            ;;
         --dry-run)
             DRY_RUN=true
             shift
@@ -336,8 +347,8 @@ fi
 
 # Build the command
 # Use --rm to cleanup container after run; no -it since we use --no-prompts (non-interactive)
-# Pass SHORT_NAME as environment variable to the container
-CMD="$RUNTIME run --rm -e SHORT_NAME=\"$PROJECT_NAME\" -v \"$PROJECT_PATH:/workspace\" \"$IMAGE\" /root/assets/init-workspace.sh --no-prompts $FORCE"
+# Pass SHORT_NAME and ORG_NAME as environment variables to the container
+CMD="$RUNTIME run --rm -e SHORT_NAME=\"$PROJECT_NAME\" -e ORG_NAME=\"$ORG_NAME\" -v \"$PROJECT_PATH:/workspace\" \"$IMAGE\" /root/assets/init-workspace.sh --no-prompts $FORCE"
 
 if [ "$DRY_RUN" = true ]; then
     info "Would execute:"
