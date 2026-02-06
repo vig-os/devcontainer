@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`--org` flag for install script** ([#33](https://github.com/vig-os/devcontainer/issues/33))
+  - Allows overriding the default organization name (default: `vigOS`)
+  - Passes `ORG_NAME` as environment variable to the container
+  - Usage: `curl -sSf ... | bash -s --org MyOrg -- ~/my-project`
+  - Unit tests for `--org` flag in help, default value, and custom override
 - **nano text editor** in devcontainer image ([#37](https://github.com/vig-os/devcontainer/issues/37))
 - **just-lsp** language server and VS Code extension for Just files ([#44](https://github.com/vig-os/devcontainer/issues/37))
 - **pip-licenses** installed system-wide with version verification test ([#43](https://github.com/vig-os/devcontainer/issues/37))
