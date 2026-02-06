@@ -165,11 +165,21 @@ test version="dev":
 #   6. GitHub Actions will build, test, and publish the image
 #   7. Create PR from dev to main after release completes
 #
-# Planned automation (issue #48):
-#   - just create-release X.Y.Z  (automates steps 1-5)
-#   - just finalize-release X.Y.Z (automates step 7)
-#   - just test-release X.Y.Z (test build without publishing)
+# Automated release workflow (issue #48):
+#   1. just prepare-release X.Y.Z  - Create branch, prepare structure
+#   2. Test and fix bugs on release branch
+#   3. just finalize-release X.Y.Z - Set date, tag, publish
 # ═══════════════════════════════════════════════════════════════════════════════
+
+# Prepare release branch for testing (step 1)
+[group('release')]
+prepare-release version *flags:
+    ./scripts/prepare-release.sh {{ version }} {{ flags }}
+
+# Finalize and publish release (step 3, after testing)
+[group('release')]
+finalize-release version *flags:
+    ./scripts/finalize-release.sh {{ version }} {{ flags }}
 
 # Pull image from registry (default: latest)
 [group('release')]

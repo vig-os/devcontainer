@@ -117,57 +117,59 @@ When contributing to this project, follow this workflow:
 ```text
 Available recipes:
     [build]
-    build no_cache=""              # Build local development image
-    clean version="dev"            # Remove image (default: dev)
-    clean-artifacts                # Clean build artifacts
-    clean-test-containers          # Clean up lingering test containers
+    build no_cache=""               # Build local development image
+    clean version="dev"             # Remove image (default: dev)
+    clean-artifacts                 # Clean build artifacts
+    clean-test-containers           # Clean up lingering test containers
 
     [deps]
-    sync                           # Sync dependencies from pyproject.toml
-    update                         # Update all dependencies
+    sync                            # Sync dependencies from pyproject.toml
+    update                          # Update all dependencies
 
     [info]
-    default                        # Show available commands (default)
-    docs                           # Generate documentation from templates
-    help                           # Show available commands
-    info                           # Show image information
-    init *args                     # Install system dependencies and setup development environment
-    login                          # Test login to GHCR
+    default                         # Show available commands (default)
+    docs                            # Generate documentation from templates
+    help                            # Show available commands
+    info                            # Show image information
+    init *args                      # Install system dependencies and setup development environment
+    login                           # Test login to GHCR
 
     [podman]
-    podman-kill name               # Stop and remove a container by name or ID
-    podman-kill-all                # Stop and remove all containers (with confirmation)
-    podman-kill-project            # Stop and remove project-related containers
-    podman-prune                   # Prune unused containers, images, networks, and volumes
-    podman-prune-all               # Full cleanup: prune including volumes
-    podman-ps *args                # List containers/images (--all for all podman resources)
-    podman-rmi image               # Remove an image by name, tag, or ID
-    podman-rmi-all                 # Remove all images (with confirmation)
-    podman-rmi-dangling            # Remove dangling images (untagged)
-    podman-rmi-project             # Remove project-related images
+    podman-kill name                # Stop and remove a container by name or ID
+    podman-kill-all                 # Stop and remove all containers (with confirmation)
+    podman-kill-project             # Stop and remove project-related containers
+    podman-prune                    # Prune unused containers, images, networks, and volumes
+    podman-prune-all                # Full cleanup: prune including volumes
+    podman-ps *args                 # List containers/images (--all for all podman resources)
+    podman-rmi image                # Remove an image by name, tag, or ID
+    podman-rmi-all                  # Remove all images (with confirmation)
+    podman-rmi-dangling             # Remove dangling images (untagged)
+    podman-rmi-project              # Remove project-related images
 
     [quality]
-    format                         # Format code
-    lint                           # Run all linters
-    precommit                      # Run pre-commit hooks on all files
+    format                          # Format code
+    lint                            # Run all linters
+    precommit                       # Run pre-commit hooks on all files
 
     [release]
-    pull version="latest"          # Pull image from registry (default: latest)
+    finalize-release version *flags # Finalize and publish release (step 3, after testing)
+    prepare-release version *flags  # Prepare release branch for testing (step 1)
+    pull version="latest"           # Pull image from registry (default: latest)
 
     [sidecar]
-    sidecar name *args             # just sidecar redis flush
-    sidecars                       # List available sidecar containers
-    test-sidecar *args             # Convenience alias for test-sidecar (uses generic sidecar recipe)
+    sidecar name *args              # just sidecar redis flush
+    sidecars                        # List available sidecar containers
+    test-sidecar *args              # Convenience alias for test-sidecar (uses generic sidecar recipe)
 
     [test]
-    test version="dev"             # Run all test suites
-    test-cov *args                 # Run tests with coverage
-    test-image version="dev"       # Run image tests only
-    test-integration version="dev" # Run integration tests only
-    test-pytest *args              # Run tests with pytest
-    test-utils                     # Run utils tests only
-    test-validate-commit-msg       # Run validate commit msg tests only
-    test-version-check             # Run version check tests only
+    test version="dev"              # Run all test suites
+    test-cov *args                  # Run tests with coverage
+    test-image version="dev"        # Run image tests only
+    test-integration version="dev"  # Run integration tests only
+    test-pytest *args               # Run tests with pytest
+    test-utils                      # Run utils tests only
+    test-validate-commit-msg        # Run validate commit msg tests only
+    test-version-check              # Run version check tests only
 
 ```
 
