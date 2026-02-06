@@ -153,7 +153,6 @@ Available recipes:
 
     [release]
     pull version="latest"          # Pull image from registry (default: latest)
-    push version                   # Push versioned release to registry (builds, tests, tags, pushes)
 
     [sidecar]
     sidecar name *args             # just sidecar redis flush

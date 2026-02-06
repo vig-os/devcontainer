@@ -150,20 +150,26 @@ test version="dev":
     TEST_CONTAINER_TAG={{ version }}  uv run pytest tests -v -s --tb=short
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# RELEASE
+# RELEASE MANAGEMENT
 # ═══════════════════════════════════════════════════════════════════════════════
-
-# Push versioned release to registry (builds, tests, tags, pushes)
-[group('release')]
-push version:
-    #!/usr/bin/env bash
-    ARCH=$(uname -m)
-    if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-        NATIVE_ARCH="linux/arm64"
-    else
-        NATIVE_ARCH="linux/amd64"
-    fi
-    ./scripts/push.sh "{{ version }}" "{{ repo }}" "$NATIVE_ARCH" "{{ platforms }}" "${REGISTRY_TEST:-}"
+# Release process is now handled by GitHub Actions workflow.
+# Pushing a semantic version tag (e.g., v1.2.3) triggers the CI/CD pipeline:
+#   .github/workflows/publish-container-image.yml
+#
+# Manual release process:
+#   1. Ensure on dev branch and up to date
+#   2. Run tests: just test
+#   3. Update CHANGELOG.md (move Unreleased to version section)
+#   4. Commit changes
+#   5. Create and push tag: git tag -a vX.Y.Z -m "Release X.Y.Z" && git push origin vX.Y.Z
+#   6. GitHub Actions will build, test, and publish the image
+#   7. Create PR from dev to main after release completes
+#
+# Planned automation (issue #48):
+#   - just create-release X.Y.Z  (automates steps 1-5)
+#   - just finalize-release X.Y.Z (automates step 7)
+#   - just test-release X.Y.Z (test build without publishing)
+# ═══════════════════════════════════════════════════════════════════════════════
 
 # Pull image from registry (default: latest)
 [group('release')]
