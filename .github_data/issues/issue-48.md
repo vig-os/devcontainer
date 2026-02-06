@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-02-06T15:54:31Z
-updated: 2026-02-06T15:54:31Z
+updated: 2026-02-06T16:03:24Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/48
@@ -12,11 +12,28 @@ assignees: c-vigo
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-06T15:54:52.080Z
+synced: 2026-02-06T16:03:46.100Z
 ---
 
 # [Issue 48]: [[FEATURE] Implement Automated Release Cycle with QMS Baseline Integration](https://github.com/vig-os/devcontainer/issues/48)
 
+## Description
+
+Implement a structured, auditable release cycle with automated release branch creation, semantic versioning enforcement, and QMS baseline documentation generation following IEC 62304 configuration management requirements.
+
+## Problem Statement
+
+Currently, the release process has several gaps:
+
+1. **No formal release branch workflow** - Releases are created by manually pushing tags from `dev` branch
+2. **Manual CHANGELOG finalization** - No automation to move Unreleased entries to versioned sections
+3. **No QMS baseline documentation** - Missing configuration management documentation required for IEC 62304 audits
+4. **Limited release testing** - No pre-release validation workflow before production deployment
+5. **Broken tooling** - `just push` command references deleted `scripts/push.sh`
+6. **Missing traceability artifacts** - No structured baseline reports linking issues → commits → tests → releases
+
+This creates risks for:
+- **Audit compliance**: Insufficient configuration management documentation
 - **Quality**: Inadequate testing before production releases
 - **Traceability**: Difficulty reconstructing what changed and why for specific releases
 - **Consistency**: Manual processes lead to variations between releases
@@ -201,3 +218,4 @@ The proposed solution addresses IEC 62304 Section 5.8 (Software Release) require
 - Parent: #37 (Automate and Standardize Repository Setup)
 - Related: #36 (Commit Message Standardization) - provides traceability foundation
 - Related: #38 (Branching Strategy & Enforcement) - branch protection for release branches
+
