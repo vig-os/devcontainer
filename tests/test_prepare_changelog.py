@@ -104,7 +104,7 @@ class TestPrepareChangelog:
 """
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # RED TESTS - Basic Functionality
+    # Prepare Action Tests - Basic Functionality
     # ═══════════════════════════════════════════════════════════════════════════
 
     def test_creates_new_version_section_with_tbd(
@@ -115,7 +115,7 @@ class TestPrepareChangelog:
         changelog_file.write_text(basic_changelog)
 
         result = subprocess.run(
-            [sys.executable, str(script_path), "1.0.0", str(changelog_file)],
+            [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
             capture_output=True,
             text=True,
         )
@@ -133,7 +133,7 @@ class TestPrepareChangelog:
         changelog_file.write_text(basic_changelog)
 
         subprocess.run(
-            [sys.executable, str(script_path), "1.0.0", str(changelog_file)],
+            [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
             check=True,
             capture_output=True,
         )
@@ -160,7 +160,7 @@ class TestPrepareChangelog:
         changelog_file.write_text(basic_changelog)
 
         subprocess.run(
-            [sys.executable, str(script_path), "1.0.0", str(changelog_file)],
+            [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
             check=True,
             capture_output=True,
         )
@@ -191,7 +191,7 @@ class TestPrepareChangelog:
         changelog_file.write_text(empty_sections_changelog)
 
         subprocess.run(
-            [sys.executable, str(script_path), "1.0.0", str(changelog_file)],
+            [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
             check=True,
             capture_output=True,
         )
@@ -220,7 +220,7 @@ class TestPrepareChangelog:
         changelog_file.write_text(basic_changelog)
 
         subprocess.run(
-            [sys.executable, str(script_path), "1.0.0", str(changelog_file)],
+            [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
             check=True,
             capture_output=True,
         )
@@ -232,7 +232,7 @@ class TestPrepareChangelog:
         assert "- Previous feature" in content
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # RED TESTS - Version Validation
+    # Prepare Action Tests - Version Validation
     # ═══════════════════════════════════════════════════════════════════════════
 
     def test_rejects_invalid_semver(self, script_path, basic_changelog, tmp_path):
@@ -241,7 +241,13 @@ class TestPrepareChangelog:
         changelog_file.write_text(basic_changelog)
 
         result = subprocess.run(
-            [sys.executable, str(script_path), "1.2.3.4", str(changelog_file)],
+            [
+                sys.executable,
+                str(script_path),
+                "prepare",
+                "1.2.3.4",
+                str(changelog_file),
+            ],
             capture_output=True,
             text=True,
         )
@@ -257,7 +263,13 @@ class TestPrepareChangelog:
         changelog_file.write_text(basic_changelog)
 
         result = subprocess.run(
-            [sys.executable, str(script_path), "v1.2.3", str(changelog_file)],
+            [
+                sys.executable,
+                str(script_path),
+                "prepare",
+                "v1.2.3",
+                str(changelog_file),
+            ],
             capture_output=True,
             text=True,
         )
@@ -273,7 +285,13 @@ class TestPrepareChangelog:
         changelog_file.write_text(basic_changelog)
 
         result = subprocess.run(
-            [sys.executable, str(script_path), "1.2.3-alpha", str(changelog_file)],
+            [
+                sys.executable,
+                str(script_path),
+                "prepare",
+                "1.2.3-alpha",
+                str(changelog_file),
+            ],
             capture_output=True,
             text=True,
         )
@@ -286,7 +304,7 @@ class TestPrepareChangelog:
         changelog_file.write_text(basic_changelog)
 
         result = subprocess.run(
-            [sys.executable, str(script_path), "1.2.3", str(changelog_file)],
+            [sys.executable, str(script_path), "prepare", "1.2.3", str(changelog_file)],
             capture_output=True,
             text=True,
         )
@@ -294,7 +312,7 @@ class TestPrepareChangelog:
         assert result.returncode == 0, f"Should accept valid semver: {result.stderr}"
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # RED TESTS - Error Handling
+    # Prepare Action Tests - Error Handling
     # ═══════════════════════════════════════════════════════════════════════════
 
     def test_fails_for_missing_changelog(self, script_path, tmp_path):
@@ -302,7 +320,7 @@ class TestPrepareChangelog:
         nonexistent = tmp_path / "nonexistent.md"
 
         result = subprocess.run(
-            [sys.executable, str(script_path), "1.0.0", str(nonexistent)],
+            [sys.executable, str(script_path), "prepare", "1.0.0", str(nonexistent)],
             capture_output=True,
             text=True,
         )
@@ -323,7 +341,7 @@ class TestPrepareChangelog:
 """)
 
         result = subprocess.run(
-            [sys.executable, str(script_path), "1.0.0", str(changelog_file)],
+            [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
             capture_output=True,
             text=True,
         )
@@ -352,7 +370,7 @@ class TestPrepareChangelog:
 """)
 
         result = subprocess.run(
-            [sys.executable, str(script_path), "1.0.0", str(changelog_file)],
+            [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
             capture_output=True,
             text=True,
         )
@@ -363,7 +381,7 @@ class TestPrepareChangelog:
         assert "warn" in output.lower() or "no content" in output.lower()
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # RED TESTS - Content Preservation
+    # Prepare Action Tests - Content Preservation
     # ═══════════════════════════════════════════════════════════════════════════
 
     def test_preserves_multiline_bullets(self, script_path, tmp_path):
@@ -384,7 +402,7 @@ class TestPrepareChangelog:
         changelog_file.write_text(changelog)
 
         subprocess.run(
-            [sys.executable, str(script_path), "1.0.0", str(changelog_file)],
+            [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
             check=True,
             capture_output=True,
         )
@@ -411,7 +429,7 @@ class TestPrepareChangelog:
         changelog_file.write_text(changelog)
 
         subprocess.run(
-            [sys.executable, str(script_path), "1.0.0", str(changelog_file)],
+            [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
             check=True,
             capture_output=True,
         )
@@ -422,7 +440,7 @@ class TestPrepareChangelog:
         assert "- Sub-feature B" in content
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # RED TESTS - Output Messages
+    # Prepare Action Tests - Output Messages
     # ═══════════════════════════════════════════════════════════════════════════
 
     def test_reports_sections_moved(self, script_path, basic_changelog, tmp_path):
@@ -431,7 +449,7 @@ class TestPrepareChangelog:
         changelog_file.write_text(basic_changelog)
 
         result = subprocess.run(
-            [sys.executable, str(script_path), "1.0.0", str(changelog_file)],
+            [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
             capture_output=True,
             text=True,
         )
@@ -448,7 +466,7 @@ class TestPrepareChangelog:
         changelog_file.write_text(basic_changelog)
 
         result = subprocess.run(
-            [sys.executable, str(script_path), "1.0.0", str(changelog_file)],
+            [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
             capture_output=True,
             text=True,
         )
@@ -456,3 +474,157 @@ class TestPrepareChangelog:
         assert result.returncode == 0
         assert "1.0.0" in result.stdout
         assert "✓" in result.stdout or "success" in result.stdout.lower()
+
+    def test_validate_passes_with_unreleased_content(
+        self, script_path, basic_changelog, tmp_path
+    ):
+        """validate action should pass when Unreleased has content."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text(basic_changelog)
+
+        result = subprocess.run(
+            [sys.executable, str(script_path), "validate", str(changelog_file)],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, f"Should pass validation: {result.stderr}"
+        assert "✓" in result.stdout or "valid" in result.stdout.lower()
+
+    def test_validate_fails_without_unreleased_section(self, script_path, tmp_path):
+        """validate action should fail if no Unreleased section."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text("""# Changelog
+
+## [0.2.0] - 2026-01-01
+
+### Added
+
+- Old feature
+""")
+
+        result = subprocess.run(
+            [sys.executable, str(script_path), "validate", str(changelog_file)],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0
+        assert "unreleased" in result.stderr.lower()
+
+    def test_validate_warns_for_empty_unreleased(self, script_path, tmp_path):
+        """validate action should warn if Unreleased is empty."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text("""# Changelog
+
+## Unreleased
+
+### Added
+
+### Changed
+
+## [0.2.0] - 2026-01-01
+""")
+
+        result = subprocess.run(
+            [sys.executable, str(script_path), "validate", str(changelog_file)],
+            capture_output=True,
+            text=True,
+        )
+
+        # Should succeed but warn
+        assert result.returncode == 0
+        output = result.stdout.lower()
+        assert "warn" in output or "empty" in output
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Reset Action Tests
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_reset_creates_fresh_unreleased_section(self, script_path, tmp_path):
+        """reset action should create fresh Unreleased section."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text("""# Changelog
+
+## [1.0.0] - 2026-02-06
+
+### Added
+
+- Released feature
+
+## [0.2.0] - 2026-01-01
+
+### Added
+
+- Old feature
+""")
+
+        result = subprocess.run(
+            [sys.executable, str(script_path), "reset", str(changelog_file)],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, f"Should succeed: {result.stderr}"
+
+        content = changelog_file.read_text()
+        assert "## Unreleased" in content
+
+        # Check all standard sections are present
+        unreleased_section = content.split("## [1.0.0]")[0]
+        assert "### Added" in unreleased_section
+        assert "### Changed" in unreleased_section
+        assert "### Deprecated" in unreleased_section
+        assert "### Removed" in unreleased_section
+        assert "### Fixed" in unreleased_section
+        assert "### Security" in unreleased_section
+
+    def test_reset_preserves_existing_versions(self, script_path, tmp_path):
+        """reset action should not modify existing version sections."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        original = """# Changelog
+
+## [1.0.0] - 2026-02-06
+
+### Added
+
+- Released feature
+
+## [0.2.0] - 2026-01-01
+
+### Added
+
+- Old feature
+"""
+        changelog_file.write_text(original)
+
+        subprocess.run(
+            [sys.executable, str(script_path), "reset", str(changelog_file)],
+            check=True,
+            capture_output=True,
+        )
+
+        content = changelog_file.read_text()
+        assert "## [1.0.0] - 2026-02-06" in content
+        assert "## [0.2.0] - 2026-01-01" in content
+        assert "- Released feature" in content
+        assert "- Old feature" in content
+
+    def test_reset_fails_if_unreleased_exists(
+        self, script_path, basic_changelog, tmp_path
+    ):
+        """reset action should fail if Unreleased section already exists."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text(basic_changelog)
+
+        result = subprocess.run(
+            [sys.executable, str(script_path), "reset", str(changelog_file)],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0
+        assert (
+            "already exists" in result.stderr.lower()
+            or "unreleased" in result.stderr.lower()
+        )

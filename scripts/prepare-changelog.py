@@ -1,19 +1,11 @@
 #!/usr/bin/env python3
 """
-Prepare CHANGELOG.md for release.
+CHANGELOG.md management tool.
 
-This script:
-1. Moves Unreleased section content to a new version section (with TBD date)
-2. Creates a fresh Unreleased section at the top
-3. Cleans up empty subsections (only keeps those with actual content)
-
-Usage:
-    python3 scripts/prepare-changelog.py VERSION [CHANGELOG_FILE]
-
-Example:
-    python3 scripts/prepare-changelog.py 1.0.0 CHANGELOG.md
+Provides commands for managing CHANGELOG.md during the release workflow.
 """
 
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -113,9 +105,79 @@ def create_new_changelog(version, old_sections, rest_of_changelog):
     return "".join(lines)
 
 
+def validate_changelog(filepath="CHANGELOG.md"):
+    """
+    Validate that CHANGELOG has Unreleased section with content.
+
+    Returns: (has_section, has_content)
+    """
+    path = Path(filepath)
+    if not path.exists():
+        raise FileNotFoundError(f"CHANGELOG not found: {filepath}")
+
+    content = path.read_text()
+
+    # Check for Unreleased section
+    has_section = bool(re.search(r"## Unreleased", content))
+
+    # Check for content in Unreleased section
+    has_content = False
+    if has_section:
+        unreleased_match = re.search(
+            r"## Unreleased\s*\n(.*?)(?=\n## \[|\Z)", content, re.DOTALL
+        )
+        if unreleased_match:
+            unreleased_text = unreleased_match.group(1)
+            # Check if any line starts with '-' (bullet point)
+            has_content = bool(re.search(r"^\s*-", unreleased_text, re.MULTILINE))
+
+    return has_section, has_content
+
+
+def reset_unreleased(filepath="CHANGELOG.md"):
+    """
+    Create fresh Unreleased section after merging a release back to dev.
+
+    This should only be called when there is NO Unreleased section (i.e., after
+    the release has been merged to main and back to dev, removing the Unreleased section).
+
+    Raises an error if Unreleased section already exists.
+    """
+    path = Path(filepath)
+    if not path.exists():
+        raise FileNotFoundError(f"CHANGELOG not found: {filepath}")
+
+    content = path.read_text()
+
+    # Error if Unreleased already exists - this indicates wrong timing
+    if re.search(r"## Unreleased", content):
+        raise ValueError(
+            "Unreleased section already exists in CHANGELOG.\n"
+            "The reset action should only be used after merging a release to dev,\n"
+            "when the Unreleased section has been removed."
+        )
+
+    # Insert fresh Unreleased at the top (after header)
+    # Find end of header (after the last line before first ## heading)
+    header_match = re.search(r"(.*?\n\n)(?=## \[)", content, re.DOTALL)
+    if header_match:
+        header = header_match.group(1)
+        rest = content[header_match.end() :]
+
+        # Build fresh Unreleased section
+        unreleased = "## Unreleased\n\n"
+        for section in STANDARD_SECTIONS:
+            unreleased += f"### {section}\n\n"
+
+        new_content = header + unreleased + rest
+        path.write_text(new_content)
+    else:
+        raise ValueError("Could not find appropriate location for Unreleased section")
+
+
 def prepare_changelog(version, filepath="CHANGELOG.md"):
     """
-    Main function to prepare CHANGELOG for release.
+    Prepare CHANGELOG for release.
 
     Args:
         version: Semantic version (e.g., "1.0.0")
@@ -157,32 +219,119 @@ def prepare_changelog(version, filepath="CHANGELOG.md"):
     return old_sections
 
 
-def main():
-    """CLI entry point."""
-    if len(sys.argv) < 2:
-        print("Usage: python3 scripts/prepare-changelog.py VERSION [CHANGELOG_FILE]")
-        print("\nExample:")
-        print("  python3 scripts/prepare-changelog.py 1.0.0")
-        print("  python3 scripts/prepare-changelog.py 1.0.0 CHANGELOG.md")
+def cmd_prepare(args):
+    """Handle prepare command."""
+    sections = prepare_changelog(args.version, args.file)
+
+    print(f"✓ Prepared CHANGELOG for version {args.version}")
+    if sections:
+        print(
+            f"✓ Moved {len(sections)} section(s) with content to [{args.version}] - TBD"
+        )
+        for section in sections:
+            print(f"  - {section}")
+    else:
+        print("⚠ Warning: No content found in Unreleased section")
+    print("✓ Created fresh Unreleased section")
+
+
+def cmd_validate(args):
+    """Handle validate command."""
+    has_section, has_content = validate_changelog(args.file)
+
+    if not has_section:
+        print("Error: No Unreleased section found in CHANGELOG", file=sys.stderr)
         sys.exit(1)
 
-    version = sys.argv[1]
-    filepath = sys.argv[2] if len(sys.argv) > 2 else "CHANGELOG.md"
+    if not has_content:
+        print("⚠ Warning: Unreleased section is empty (no changes to release)")
+        sys.exit(0)
+
+    print("✓ CHANGELOG validation passed")
+    print("✓ Unreleased section exists with content")
+
+
+def cmd_reset(args):
+    """Handle reset command."""
+    reset_unreleased(args.file)
+
+    print(f"✓ Reset Unreleased section in {args.file}")
+    print("✓ Created fresh empty section for next release")
+
+
+def main():
+    """CLI entry point."""
+    parser = argparse.ArgumentParser(
+        description="CHANGELOG.md management tool for release workflow",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Prepare CHANGELOG for release 1.0.0
+  %(prog)s prepare 1.0.0
+
+  # Validate CHANGELOG has unreleased changes
+  %(prog)s validate
+
+  # Reset Unreleased section after release merge
+  %(prog)s reset
+        """,
+    )
+
+    subparsers = parser.add_subparsers(
+        title="commands",
+        description="Available commands",
+        dest="command",
+        required=True,
+    )
+
+    # prepare command
+    prepare_parser = subparsers.add_parser(
+        "prepare",
+        help="Prepare CHANGELOG for release (move Unreleased to version section)",
+    )
+    prepare_parser.add_argument(
+        "version",
+        help="Semantic version (e.g., 1.0.0)",
+    )
+    prepare_parser.add_argument(
+        "file",
+        nargs="?",
+        default="CHANGELOG.md",
+        help="Path to CHANGELOG file (default: CHANGELOG.md)",
+    )
+    prepare_parser.set_defaults(func=cmd_prepare)
+
+    # validate command
+    validate_parser = subparsers.add_parser(
+        "validate",
+        help="Validate CHANGELOG has Unreleased section with content",
+    )
+    validate_parser.add_argument(
+        "file",
+        nargs="?",
+        default="CHANGELOG.md",
+        help="Path to CHANGELOG file (default: CHANGELOG.md)",
+    )
+    validate_parser.set_defaults(func=cmd_validate)
+
+    # reset command
+    reset_parser = subparsers.add_parser(
+        "reset",
+        help="Create fresh Unreleased section (for after release merge to dev)",
+    )
+    reset_parser.add_argument(
+        "file",
+        nargs="?",
+        default="CHANGELOG.md",
+        help="Path to CHANGELOG file (default: CHANGELOG.md)",
+    )
+    reset_parser.set_defaults(func=cmd_reset)
+
+    # Parse and execute
+    args = parser.parse_args()
 
     try:
-        sections = prepare_changelog(version, filepath)
-
-        print(f"✓ Prepared CHANGELOG for version {version}")
-        if sections:
-            print(
-                f"✓ Moved {len(sections)} section(s) with content to [{version}] - TBD"
-            )
-            for section in sections:
-                print(f"  - {section}")
-        else:
-            print("⚠ Warning: No content found in Unreleased section")
-        print("✓ Created fresh Unreleased section")
-
+        args.func(args)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
