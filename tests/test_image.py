@@ -112,6 +112,14 @@ class TestSystemTools:
             f"Expected typstyle {expected}, got: {result.stdout}"
         )
 
+    def test_just_lsp_installed(self, host):
+        """Test that just-lsp is installed."""
+        result = host.run("just-lsp --version")
+        assert result.rc == 0, "just-lsp --version failed"
+        assert "just-lsp" in result.stdout.lower(), (
+            f"Expected just-lsp version output, got: {result.stdout}"
+        )
+
 
 class TestPythonEnvironment:
     """Test Python environment setup."""

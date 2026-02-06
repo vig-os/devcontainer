@@ -88,6 +88,10 @@ RUN set -eux; \
     curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash; \
     cargo-binstall -V;
 
+# Install just LSP
+RUN cargo-binstall just-lsp; \
+    just-lsp --version;
+
 # Install typstyle
 RUN cargo-binstall typstyle; \
     typstyle --version;
