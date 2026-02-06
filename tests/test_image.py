@@ -19,6 +19,7 @@ EXPECTED_VERSIONS = {
     "python": "3.12",  # Python (from base image)
     "pre_commit": "4.5.",  # Minor version check (installed via uv pip)
     "ruff": "0.15.",  # Minor version check (installed via uv pip)
+    "pip_licenses": "5.",  # Major version check (installed via uv pip)
     "just": "1.46.",  # Minor version check (manually installed from latest release)
     "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),
     "typstyle": "0.14.",  # Minor version check (installed from latest release)
@@ -246,6 +247,16 @@ class TestDevelopmentTools:
         expected = EXPECTED_VERSIONS["ruff"]
         assert expected in result.stdout, (
             f"Expected ruff {expected}, got: {result.stdout}"
+        )
+
+    def test_pip_licenses_installed(self, host):
+        """Test that pip-licenses is installed."""
+        result = host.run("pip-licenses --version")
+        assert result.rc == 0, "pip-licenses --version failed"
+        assert "pip-licenses" in result.stdout.lower()
+        expected = EXPECTED_VERSIONS["pip_licenses"]
+        assert expected in result.stdout, (
+            f"Expected pip-licenses {expected}, got: {result.stdout}"
         )
 
 
