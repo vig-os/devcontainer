@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Non-ASCII characters in justfiles** - Replaced Unicode box-drawing characters (═, ───) and emojis with ASCII equivalents for just-lsp compatibility ([#49](https://github.com/vig-os/devcontainer/issues/49))
 - **`just precommit` recipe** - Run pre-commit through `uv run` to ensure it uses the virtual environment ([#46](https://github.com/vig-os/devcontainer/issues/46))
 - **Pytest test collection** - Exclude `tests/tmp/` directory (integration test workspaces) from test discovery to prevent import errors
 
