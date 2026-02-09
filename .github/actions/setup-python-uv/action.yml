@@ -60,8 +60,8 @@ runs:
           done
 
           # Add to PATH for subsequent steps
-          export PATH="$HOME/.cargo/bin:$PATH"
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
         else
           echo "uv already installed"
         fi
@@ -77,7 +77,7 @@ runs:
         set -euo pipefail
 
         # Ensure uv is in PATH (GITHUB_PATH changes may not be active yet in composite action)
-        export PATH="$HOME/.cargo/bin:$PATH"
+        export PATH="$HOME/.local/bin:$PATH"
 
         # Parse sync-groups input and build uv sync command
         SYNC_GROUPS="${{ inputs.sync-groups }}"
@@ -121,7 +121,7 @@ runs:
         set -euo pipefail
 
         # Ensure uv is in PATH (GITHUB_PATH changes may not be active yet in composite action)
-        export PATH="$HOME/.cargo/bin:$PATH"
+        export PATH="$HOME/.local/bin:$PATH"
 
         echo "Verifying Python environment..."
         uv run python --version
