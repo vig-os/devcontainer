@@ -72,6 +72,12 @@ runs:
         fi
         uv --version
 
+        # Create docker-compose wrapper (devcontainer CLI needs standalone docker-compose;
+        # the runner only has 'docker compose' v2 plugin, not the standalone binary)
+        printf '#!/bin/sh\nexec docker compose "$@"\n' | sudo tee /usr/local/bin/docker-compose > /dev/null
+        sudo chmod +x /usr/local/bin/docker-compose
+        docker-compose version --short
+
         # Install devcontainer CLI
         echo "Installing @devcontainers/cli..."
         npm install -g @devcontainers/cli
