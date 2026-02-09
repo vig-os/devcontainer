@@ -173,15 +173,25 @@ runs:
 
         # Verify socket is accessible
         if [ -S "/run/user/$(id -u)/podman/podman.sock" ]; then
+          SOCK="/run/user/$(id -u)/podman/podman.sock"
           echo "Podman socket started successfully"
-          echo "CONTAINER_SOCKET_PATH=/run/user/$(id -u)/podman/podman.sock" >> $GITHUB_ENV
+          echo "CONTAINER_SOCKET_PATH=$SOCK" >> $GITHUB_ENV
         else
           echo "Warning: Podman socket not found at expected location"
           # Fallback to rootful socket if available
           if [ -S "/run/podman/podman.sock" ]; then
+            SOCK="/run/podman/podman.sock"
             echo "Using rootful podman socket"
-            echo "CONTAINER_SOCKET_PATH=/run/podman/podman.sock" >> $GITHUB_ENV
+            echo "CONTAINER_SOCKET_PATH=$SOCK" >> $GITHUB_ENV
           fi
+        fi
+
+        # Point DOCKER_HOST at the podman socket so that docker-compose
+        # (wrapper around 'docker compose') talks to podman, not dockerd.
+        # Without this, 'docker compose up' cannot find images loaded into podman.
+        if [ -n "${SOCK:-}" ]; then
+          echo "DOCKER_HOST=unix://$SOCK" >> $GITHUB_ENV
+          echo "Docker CLI will use podman socket at: $SOCK"
         fi
 
     - name: Setup SSH agent for tests
