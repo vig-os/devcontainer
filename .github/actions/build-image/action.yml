@@ -1,0 +1,178 @@
+# Composite action to build container images
+#
+# This action handles the complete container image build process:
+# - Prepares build directory with version metadata
+# - Builds architecture-specific container image
+# - Outputs image as tar file or pushes to registry
+#
+# Inputs:
+#   version: Semantic version (e.g., 1.0.0, dev-abc123)
+#   arch: Target architecture (amd64, arm64)
+#   release-date: Release date in YYYY-MM-DD format
+#   release-url: URL to release page
+#   build-timestamp: Build timestamp in ISO 8601 format
+#   vcs-ref: Git commit SHA
+#   registry: Container registry URL (default: ghcr.io/vig-os/devcontainer)
+#   output-type: Output type - "tar" saves to file, "registry" pushes to registry
+#   output-file: Path for tar output (used if output-type=tar)
+#   push: Whether to push to registry (used if output-type=registry)
+#
+# Outputs:
+#   image-tag: Full image tag (e.g., ghcr.io/vig-os/devcontainer:1.0.0-amd64)
+#   tar-file: Path to saved tar file (if output-type=tar)
+#
+# Usage:
+#   - uses: ./.github/actions/build-image
+#     with:
+#       version: '1.0.0'
+#       arch: 'amd64'
+#       release-date: '2026-02-06'
+#       release-url: 'https://github.com/vig-os/devcontainer/releases/tag/v1.0.0'
+#       build-timestamp: '2026-02-06T12:00:00Z'
+#       vcs-ref: ${{ github.sha }}
+
+name: 'Build Container Image'
+description: 'Build architecture-specific container image'
+
+inputs:
+  version:
+    description: 'Semantic version (e.g., 1.0.0, dev-abc123)'
+    required: true
+  arch:
+    description: 'Target architecture (amd64, arm64)'
+    required: true
+  release-date:
+    description: 'Release date in YYYY-MM-DD format'
+    required: true
+  release-url:
+    description: 'URL to release page'
+    required: true
+  build-timestamp:
+    description: 'Build timestamp in ISO 8601 format'
+    required: true
+  vcs-ref:
+    description: 'Git commit SHA'
+    required: true
+  registry:
+    description: 'Container registry URL'
+    required: false
+    default: 'ghcr.io/vig-os/devcontainer'
+  output-type:
+    description: 'Output type: "tar" (save to file) or "registry" (push to registry)'
+    required: false
+    default: 'tar'
+  output-file:
+    description: 'Path for tar output (if output-type=tar)'
+    required: false
+    default: '/tmp/image.tar'
+  push:
+    description: 'Whether to push to registry (if output-type=registry)'
+    required: false
+    default: 'false'
+
+outputs:
+  image-tag:
+    description: 'Full image tag'
+    value: ${{ steps.set-tag.outputs.tag }}
+  tar-file:
+    description: 'Path to tar file (if output-type=tar)'
+    value: ${{ inputs.output-file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3.12.0
+
+    - name: Prepare build directory
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Preparing build directory..."
+        ./scripts/prepare-build.sh "${{ inputs.version }}" "build" "${{ inputs.release-date }}" "${{ inputs.release-url }}"
+        echo "Build directory prepared"
+
+    - name: Set image tag
+      id: set-tag
+      shell: bash
+      run: |
+        TAG="${{ inputs.registry }}:${{ inputs.version }}-${{ inputs.arch }}"
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+        echo "Image tag: $TAG"
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5.10.0
+      with:
+        images: ${{ inputs.registry }}
+        tags: |
+          type=raw,value=${{ inputs.version }}-${{ inputs.arch }}
+        labels: |
+          org.opencontainers.image.title=vigOS development environment
+          org.opencontainers.image.description=Development environment with common tools and utilities
+          org.opencontainers.image.version=${{ inputs.version }}
+          org.opencontainers.image.created=${{ inputs.build-timestamp }}
+          org.opencontainers.image.revision=${{ inputs.vcs-ref }}
+          org.opencontainers.image.source=https://github.com/vig-os/devcontainer
+          org.opencontainers.image.vendor=vigOS
+          org.opencontainers.image.licenses=MIT
+
+    - name: Build image (tar output)
+      if: inputs.output-type == 'tar'
+      uses: docker/build-push-action@v6.18.0
+      with:
+        context: ./build
+        file: ./build/Containerfile
+        platforms: linux/${{ inputs.arch }}
+        push: false
+        outputs: type=docker,dest=${{ inputs.output-file }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          BUILD_DATE=${{ inputs.build-timestamp }}
+          VCS_REF=${{ inputs.vcs-ref }}
+          IMAGE_TAG=${{ inputs.version }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Verify tar output was created
+      if: inputs.output-type == 'tar'
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ ! -f "${{ inputs.output-file }}" ]; then
+          echo "ERROR: Tar file was not created: ${{ inputs.output-file }}"
+          echo "Contents of $(dirname ${{ inputs.output-file }}):"
+          ls -lh "$(dirname ${{ inputs.output-file }})" || true
+          exit 1
+        fi
+
+        # Verify file size is reasonable (at least 100MB for a valid image)
+        FILE_SIZE=$(stat -f%z "${{ inputs.output-file }}" 2>/dev/null || stat -c%s "${{ inputs.output-file }}" 2>/dev/null)
+        MIN_SIZE=$((100 * 1024 * 1024))  # 100 MB
+
+        if [ "$FILE_SIZE" -lt "$MIN_SIZE" ]; then
+          echo "ERROR: Tar file is too small ($FILE_SIZE bytes < $MIN_SIZE bytes)"
+          echo "This likely indicates a failed or incomplete build"
+          exit 1
+        fi
+
+        echo "Tar file created successfully: ${{ inputs.output-file }}"
+        echo "Size: $(numfmt --to=iec-i --suffix=B $FILE_SIZE 2>/dev/null || echo $FILE_SIZE bytes)"
+
+    - name: Build image (registry output)
+      if: inputs.output-type == 'registry'
+      uses: docker/build-push-action@v6.18.0
+      with:
+        context: ./build
+        file: ./build/Containerfile
+        platforms: linux/${{ inputs.arch }}
+        push: ${{ inputs.push }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          BUILD_DATE=${{ inputs.build-timestamp }}
+          VCS_REF=${{ inputs.vcs-ref }}
+          IMAGE_TAG=${{ inputs.version }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max

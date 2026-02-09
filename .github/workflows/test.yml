@@ -1,0 +1,318 @@
+# CI/CD Testing Workflow
+#
+# This workflow runs automated tests and linters to validate code quality.
+# Runs on pull requests to dev, release/**, and main branches as a pre-merge gate.
+#
+# Jobs:
+#   1. build-image - Build container image
+#   2. test-image - Run image tests
+#   3. test-integration - Run integration tests
+#   4. lint - Run pre-commit hooks (ruff, shellcheck, pymarkdown, etc.)
+#   5. validate-changelog - Ensure CHANGELOG.md is properly formatted
+#
+# Note: Standalone Python unit tests (test-python job) will be added in a future update
+#       to test non-container Python code (utils, validation scripts, etc.)
+#
+# Triggers:
+#   - Pull requests to dev, release/**, and main (runs all suites)
+#   - Manual workflow_dispatch (select specific test suite to run)
+
+name: Test
+
+on:  # yamllint disable-line rule:truthy
+  pull_request:
+    branches:
+      - dev
+      - 'release/**'
+      - main
+  workflow_dispatch:
+    inputs:
+      test-suite:
+        description: 'Test suite to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - image
+          - integration
+          - lint
+          - changelog
+
+permissions:
+  contents: read
+
+jobs:
+  build-image:
+    name: Build Container Image
+    runs-on: ubuntu-22.04
+    # Build image once and share via tar artifact to avoid rebuilding in each test job
+    # Trade-off: tar transfer is slower but ensures all tests use identical image
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      inputs.test-suite == 'all' ||
+      inputs.test-suite == 'image' ||
+      inputs.test-suite == 'integration'
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release_date: ${{ steps.version.outputs.release_date }}
+      release_url: ${{ steps.version.outputs.release_url }}
+      build_timestamp: ${{ steps.version.outputs.build_timestamp }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate version for dev build
+        id: version
+        run: |
+          VERSION="dev-$(git rev-parse --short HEAD)"
+          RELEASE_DATE=$(date -u +%Y-%m-%d)
+          BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          RELEASE_URL="https://github.com/vig-os/devcontainer/commit/$(git rev-parse HEAD)"
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
+          echo "build_timestamp=$BUILD_TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
+          echo "Building dev version: $VERSION"
+
+      - name: Build container image
+        uses: ./.github/actions/build-image
+        with:
+          version: ${{ steps.version.outputs.version }}
+          arch: amd64
+          release-date: ${{ steps.version.outputs.release_date }}
+          release-url: ${{ steps.version.outputs.release_url }}
+          build-timestamp: ${{ steps.version.outputs.build_timestamp }}
+          vcs-ref: ${{ github.sha }}
+          output-type: tar
+          output-file: /tmp/image.tar
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-image-${{ steps.version.outputs.version }}-amd64
+          path: /tmp/image.tar
+          retention-days: 1
+          compression-level: 0  # Image is already compressed; avoid double-compression overhead
+
+  test-image:
+    name: Image Tests
+    needs: build-image
+    runs-on: ubuntu-22.04
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      inputs.test-suite == 'all' ||
+      inputs.test-suite == 'image'
+
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: container-image-${{ needs.build-image.outputs.version }}-amd64
+          path: /tmp
+
+      - name: Test container image
+        uses: ./.github/actions/test-image
+        with:
+          image-tag: ${{ needs.build-image.outputs.version }}-amd64
+          image-source: tar
+
+  test-integration:
+    name: Integration Tests
+    needs: build-image
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      inputs.test-suite == 'all' ||
+      inputs.test-suite == 'integration'
+
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: container-image-${{ needs.build-image.outputs.version }}-amd64
+          path: /tmp
+
+      - name: Run integration tests
+        uses: ./.github/actions/test-integration
+        with:
+          image-tag: ${{ needs.build-image.outputs.version }}-amd64
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-artifacts
+          path: |
+            pytest-*.log
+            /tmp/workspace-*
+          retention-days: 7
+          if-no-files-found: ignore
+
+  lint:
+    name: Linters
+    runs-on: ubuntu-22.04
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      inputs.test-suite == 'all' ||
+      inputs.test-suite == 'lint'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python with uv
+        uses: ./.github/actions/setup-python-uv
+        with:
+          sync-groups: 'test,dev'
+
+      - name: Install pre-commit
+        run: |
+          set -euo pipefail
+          # pre-commit should be in dev group, verify it's available
+          if ! uv run pre-commit --version &> /dev/null; then
+            echo "ERROR: pre-commit not found in environment"
+            exit 1
+          fi
+          echo "pre-commit available"
+
+      - name: Cache pre-commit hooks
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            pre-commit-${{ runner.os }}-
+
+      - name: Run pre-commit hooks
+        run: |
+          set -euo pipefail
+          echo "Running pre-commit hooks..."
+
+          # Run all hooks on all files
+          # In CI, we want to check everything, not just changed files
+          uv run pre-commit run --all-files --show-diff-on-failure --color=always
+
+          echo "All linters passed"
+
+  validate-changelog:
+    name: Validate CHANGELOG
+    runs-on: ubuntu-22.04
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && (inputs.test-suite == 'all' || inputs.test-suite == 'changelog'))
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python with uv
+        uses: ./.github/actions/setup-python-uv
+        with:
+          sync-groups: 'test'
+
+      - name: Validate CHANGELOG format
+        run: |
+          set -euo pipefail
+          echo "Validating CHANGELOG.md format..."
+
+          # Check CHANGELOG has Unreleased section
+          if ! grep -q "## Unreleased" CHANGELOG.md; then
+            echo "ERROR: CHANGELOG.md is missing '## Unreleased' section"
+            exit 1
+          fi
+
+          echo "CHANGELOG.md has Unreleased section"
+
+          # Validate CHANGELOG can be parsed by prepare-changelog.py
+          if uv run python scripts/prepare-changelog.py validate CHANGELOG.md; then
+            echo "CHANGELOG.md validation passed"
+          else
+            echo "CHANGELOG.md validation failed"
+            echo ""
+            echo "Please ensure CHANGELOG.md has an Unreleased section with content."
+            echo "See docs/RELEASE_CYCLE.md for CHANGELOG guidelines."
+            exit 1
+          fi
+
+      - name: Check for CHANGELOG updates in PR
+        run: |
+          set -euo pipefail
+          echo "Checking if CHANGELOG.md was updated in this PR..."
+
+          # Fetch base branch to ensure we can compare
+          git fetch origin ${{ github.base_ref }}
+
+          # Get the list of changed files in the PR
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+
+          if echo "$CHANGED_FILES" | grep -q "^CHANGELOG.md$"; then
+            echo "CHANGELOG.md was updated in this PR"
+          else
+            echo "WARNING: CHANGELOG.md was not updated in this PR"
+            echo ""
+            echo "If this PR includes user-facing changes, please update CHANGELOG.md"
+            echo "by adding entries to the Unreleased section."
+            echo ""
+            echo "If this PR has no user-facing changes (e.g., tests, docs, refactoring),"
+            echo "you can safely ignore this warning."
+          fi
+
+  summary:
+    name: Test Summary
+    runs-on: ubuntu-22.04
+    needs: [build-image, test-image, test-integration, lint, validate-changelog]
+    if: always()
+
+    steps:
+      - name: Check test results
+        run: |
+          echo "Test Results Summary"
+          echo "======================="
+          echo ""
+          echo "Build Image: ${{ needs.build-image.result }}"
+          echo "Image Tests: ${{ needs.test-image.result }}"
+          echo "Integration Tests: ${{ needs.test-integration.result }}"
+          echo "Linters: ${{ needs.lint.result }}"
+          echo "CHANGELOG: ${{ needs.validate-changelog.result }}"
+          echo ""
+
+          # Check if any job that ran has failed (skip 'skipped' jobs)
+          FAILED=false
+
+          if [ "${{ needs.build-image.result }}" = "failure" ]; then
+            echo "ERROR: Build image failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.test-image.result }}" = "failure" ]; then
+            echo "ERROR: Image tests failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.test-integration.result }}" = "failure" ]; then
+            echo "ERROR: Integration tests failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.lint.result }}" = "failure" ]; then
+            echo "ERROR: Linters failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.validate-changelog.result }}" = "failure" ]; then
+            echo "WARNING: CHANGELOG validation failed (non-fatal)"
+          fi
+
+          if [ "$FAILED" = "true" ]; then
+            echo ""
+            echo "One or more test suites failed"
+            exit 1
+          fi
+
+          echo ""
+          echo "All executed test suites passed"

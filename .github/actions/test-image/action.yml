@@ -1,0 +1,206 @@
+# Composite action to test container images
+#
+# This action is self-contained and handles the complete test process:
+# - Checks out repository code (self-contained - no workflow checkout needed)
+# - Installs Python/uv and test dependencies
+# - Installs podman for container operations
+# - Loads or pulls container image
+# - Runs pytest tests against the image
+#
+# Inputs:
+#   image-tag: Full image tag to test (e.g., 1.0.0-amd64)
+#   registry: Container registry URL
+#   image-source: Where to get the image - "tar", "registry", or "local"
+#   tar-file: Path to tar file (if image-source=tar)
+#   sync-groups: Python dependency groups to sync
+#   skip-container-check: Set PYTEST_SKIP_CONTAINER_CHECK=1
+#
+# Outputs:
+#   test-result: Test exit code (0=pass, non-zero=fail)
+#
+# Usage:
+#   # Test image from tar file
+#   - uses: ./.github/actions/test-image
+#     with:
+#       image-tag: '1.0.0-amd64'
+#       image-source: 'tar'
+#       tar-file: '/tmp/image.tar'
+#
+#   # Test image from registry
+#   - uses: ./.github/actions/test-image
+#     with:
+#       image-tag: '1.0.0-amd64'
+#       image-source: 'registry'
+#       registry: 'ghcr.io/vig-os/devcontainer'
+
+name: 'Test Container Image'
+description: 'Set up test environment and run container tests'
+
+inputs:
+  image-tag:
+    description: 'Image tag to test (e.g., 1.0.0-amd64)'
+    required: true
+  registry:
+    description: 'Container registry URL'
+    required: false
+    default: 'ghcr.io/vig-os/devcontainer'
+  image-source:
+    description: 'Image source: "tar" (load from file), "registry" (pull), or "local" (already loaded)'
+    required: false
+    default: 'local'
+  tar-file:
+    description: 'Path to tar file (if image-source=tar)'
+    required: false
+    default: '/tmp/image.tar'
+  sync-groups:
+    description: 'Python dependency groups to sync'
+    required: false
+    default: 'test'
+  skip-container-check:
+    description: 'Set PYTEST_SKIP_CONTAINER_CHECK=1'
+    required: false
+    default: 'true'
+
+outputs:
+  test-result:
+    description: 'Test exit code (0=pass, non-zero=fail)'
+    value: ${{ steps.run-image-tests.outputs.result }}
+    # Note: This output is currently unused by workflows but provided for future extensibility
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python with uv
+      uses: ./.github/actions/setup-python-uv
+      with:
+        sync-groups: ${{ inputs.sync-groups }}
+
+    - name: Install podman
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! command -v podman &> /dev/null; then
+          echo "Installing podman..."
+
+          # Retry logic for apt operations (network flakiness)
+          RETRIES=3
+          for i in $(seq 1 $RETRIES); do
+            if sudo apt-get update -qq && sudo apt-get install -y podman; then
+              echo "Installation successful"
+              break
+            else
+              if [ $i -lt $RETRIES ]; then
+                echo "Installation failed, retrying ($i/$RETRIES)..."
+                sleep 2
+              else
+                echo "Installation failed after $RETRIES attempts"
+                exit 1
+              fi
+            fi
+          done
+        else
+          echo "podman already installed"
+        fi
+        podman --version
+
+    - name: Load image from tar
+      if: inputs.image-source == 'tar'
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Loading image from ${{ inputs.tar-file }} into podman..."
+
+        if [ ! -f "${{ inputs.tar-file }}" ]; then
+          echo "ERROR: Tar file not found: ${{ inputs.tar-file }}"
+          exit 1
+        fi
+
+        # Retry logic for podman load (can fail with corrupted downloads)
+        RETRIES=2
+        for i in $(seq 1 $RETRIES); do
+          if LOADED_IMAGE=$(podman load < "${{ inputs.tar-file }}" 2>&1 | grep -oP 'Loaded image.*: \K.*'); then
+            echo "Loaded image: $LOADED_IMAGE"
+
+            # Tag the loaded image with the expected name
+            IMAGE_TAG="${{ inputs.registry }}:${{ inputs.image-tag }}"
+            podman tag "$LOADED_IMAGE" "$IMAGE_TAG"
+            echo "Tagged image as: $IMAGE_TAG"
+
+            # Verify the image is available
+            podman images | grep "${{ inputs.registry }}"
+            echo "Image loaded successfully into podman"
+            break
+          else
+            if [ $i -lt $RETRIES ]; then
+              echo "Image load failed, retrying ($i/$RETRIES)..."
+              sleep 1
+            else
+              echo "Image load failed after $RETRIES attempts"
+              exit 1
+            fi
+          fi
+        done
+
+    - name: Pull image from registry
+      if: inputs.image-source == 'registry'
+      shell: bash
+      run: |
+        set -euo pipefail
+        IMAGE_TAG="${{ inputs.registry }}:${{ inputs.image-tag }}"
+        echo "Pulling image: $IMAGE_TAG"
+
+        # Retry logic for podman pull (network flakiness)
+        RETRIES=3
+        for i in $(seq 1 $RETRIES); do
+          if podman pull "$IMAGE_TAG"; then
+            echo "Image pulled successfully"
+            break
+          else
+            if [ $i -lt $RETRIES ]; then
+              echo "Pull failed, retrying ($i/$RETRIES)..."
+              sleep 3
+            else
+              echo "Pull failed after $RETRIES attempts"
+              exit 1
+            fi
+          fi
+        done
+
+    - name: Verify image is available
+      if: inputs.image-source == 'local'
+      shell: bash
+      run: |
+        set -euo pipefail
+        IMAGE_TAG="${{ inputs.registry }}:${{ inputs.image-tag }}"
+        echo "Verifying image exists locally: $IMAGE_TAG"
+        if ! podman images --format "{{.Repository}}:{{.Tag}}" | grep -q "^$IMAGE_TAG$"; then
+          echo "ERROR: Image not found in local podman: $IMAGE_TAG"
+          echo "Available images:"
+          podman images
+          exit 1
+        fi
+        echo "Image verified"
+
+    - name: Run image tests
+      id: run-image-tests
+      shell: bash
+      run: |
+        set -euo pipefail
+        IMAGE_TAG="${{ inputs.image-tag }}"
+        FULL_TAG="${{ inputs.registry }}:$IMAGE_TAG"
+        echo "Running image tests against image: $FULL_TAG"
+
+        # Set environment variables for tests
+        export TEST_CONTAINER_TAG="$IMAGE_TAG"
+        if [ "${{ inputs.skip-container-check }}" = "true" ]; then
+          export PYTEST_SKIP_CONTAINER_CHECK=1
+        fi
+
+        # Run pytest
+        uv run pytest tests/test_image.py -v --tb=short --color=yes
+
+        echo "result=0" >> $GITHUB_OUTPUT
+        echo "All tests passed"

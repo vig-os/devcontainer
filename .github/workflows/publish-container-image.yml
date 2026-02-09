@@ -5,7 +5,8 @@
 #    - Builds architecture-specific images (amd64, arm64) in parallel
 #    - Each architecture builds on its native runner on ubuntu-22.04
 #    - Images are tagged with version-architecture (e.g., 1.2.3-amd64, 1.2.3-arm)
-#    - Images are pushed directly to registry after verification
+#    - Tests container image properties (labels, entrypoint, user setup, etc.)
+#    - Images are pushed to registry only if tests pass
 #
 # 2. Manifest Job:
 #    - Runs after all build jobs complete successfully
@@ -176,9 +177,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6.0.1
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.12.0
-
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3.6.0
         with:
@@ -186,142 +184,88 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ github.token }}
 
-      - name: Prepare build directory
-        run: |
-          ./scripts/prepare-build.sh "${{ needs.extract-version.outputs.version }}" "build" "${{ needs.extract-version.outputs.release_date }}" "${{ needs.extract-version.outputs.release_url }}"
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5.10.0
-        with:
-          images: ghcr.io/vig-os/devcontainer
-          # Generate architecture-specific tag for this build
-          tags: |
-            type=raw,value=${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}
-          # Generate OCI-standard labels for image metadata
-          labels: |
-            org.opencontainers.image.title=vigOS development environment
-            org.opencontainers.image.description=Development environment with common tools and utilities
-            org.opencontainers.image.version=${{ needs.extract-version.outputs.version }}
-            org.opencontainers.image.created=${{ needs.extract-version.outputs.build_timestamp }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.source=https://github.com/vig-os/devcontainer
-            org.opencontainers.image.vendor=vigOS
-            org.opencontainers.image.licenses=MIT
-
-      - name: Build image
-        # Build architecture-specific image and save it for testing
-        # Tag format: ghcr.io/vig-os/devcontainer:VERSION-ARCH
-        # Example: ghcr.io/vig-os/devcontainer:1.2.3-amd64
-        # We build without pushing first so we can test it before publishing
-        # Using outputs to save image, then load it for testing
+      - name: Build container image
         id: build
-        uses: docker/build-push-action@v6.18.0
+        uses: ./.github/actions/build-image
         with:
-          context: ./build
-          file: ./build/Containerfile
-          platforms: linux/${{ matrix.arch }}
-          push: false
-          outputs: type=docker,dest=/tmp/image.tar
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            BUILD_DATE=${{ needs.extract-version.outputs.build_timestamp }}
-            VCS_REF=${{ github.sha }}
-            IMAGE_TAG=${{ needs.extract-version.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          version: ${{ needs.extract-version.outputs.version }}
+          arch: ${{ matrix.arch }}
+          release-date: ${{ needs.extract-version.outputs.release_date }}
+          release-url: ${{ needs.extract-version.outputs.release_url }}
+          build-timestamp: ${{ needs.extract-version.outputs.build_timestamp }}
+          vcs-ref: ${{ github.sha }}
+          output-type: tar
 
-      - name: Set up test environment
-        # Install dependencies for running tests
-        # Tests require: podman (for container operations), uv (for Python package management)
+      - name: Run image tests
+        uses: ./.github/actions/test-image
+        with:
+          image-tag: ${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}
+          image-source: tar
+
+      - name: Run integration tests
+        uses: ./.github/actions/test-integration
+        with:
+          image-tag: ${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}
+
+      - name: Load tested image into Docker
+        # Load the tar file that was built and tested
+        # This ensures we push the exact image that passed all tests
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true'
         run: |
           set -euo pipefail
-          # Install podman if not available (GitHub runners have docker by default)
-          if ! command -v podman &> /dev/null; then
-            echo "Installing podman..."
-            sudo apt-get update
-            sudo apt-get install -y podman
-          fi
-          podman --version
-          # Install uv (Python package manager)
-          if ! command -v uv &> /dev/null; then
-            echo "Installing uv..."
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-            export PATH="$HOME/.cargo/bin:$PATH"
-          fi
-          uv --version
-          # Install test dependencies
-          echo "Installing test dependencies..."
-          uv sync --group test
-          echo "Test environment ready"
+          TAR_FILE="/tmp/image.tar"
 
-      - name: Load image for testing
-        # Load the built image into podman for testing
-        # Tests use podman, so we need the image in podman's image store
-        run: |
-          set -euo pipefail
-          echo "Loading image from /tmp/image.tar into podman..."
-          if ! command -v podman &> /dev/null; then
-            echo "ERROR: podman not available (should have been installed in previous step)"
+          echo "Loading tested image from $TAR_FILE..."
+
+          if [ ! -f "$TAR_FILE" ]; then
+            echo "ERROR: Tar file not found: $TAR_FILE"
+            ls -lh /tmp/
             exit 1
           fi
 
-          # Load the image and capture the loaded image ID
-          LOADED_IMAGE=$(podman load < /tmp/image.tar | grep -oP 'Loaded image.*: \K.*')
-          echo "Loaded image: $LOADED_IMAGE"
+          # Load the tar file into Docker
+          docker load < "$TAR_FILE"
 
-          # Tag the loaded image with the expected name
-          IMAGE_TAG="ghcr.io/vig-os/devcontainer:${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}"
-          podman tag "$LOADED_IMAGE" "$IMAGE_TAG"
-          echo "Tagged image as: $IMAGE_TAG"
+          echo "Image loaded successfully"
+          docker images
 
-          # Verify the image is available
-          podman images | grep "ghcr.io/vig-os/devcontainer"
-          echo "Image loaded successfully into podman"
-
-      - name: Run tests
-        # Run image tests against the built image before pushing
-        # Tests verify the container image: installed tools, versions, environment variables
-        run: |
-          set -euo pipefail
-          IMAGE_TAG="${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}"
-          echo "Running tests against image: ghcr.io/vig-os/devcontainer:$IMAGE_TAG"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.publish }}" != "true" ]; then
-            echo "TEST MODE: Manual dispatch - tests only, no publish"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.publish }}" = "true" ]; then
-            echo "PUBLISH MODE: Manual dispatch - tests + publish"
-          fi
-          echo "Setting TEST_CONTAINER_TAG=$IMAGE_TAG"
-          export TEST_CONTAINER_TAG="$IMAGE_TAG"
-          export PYTEST_SKIP_CONTAINER_CHECK=1
-          # Run image tests (these test the container itself)
-          uv run pytest tests/test_image.py -v --tb=short
-          echo "All image tests passed"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.publish }}" != "true" ]; then
-            echo "Test mode complete - image not published (manual dispatch)"
-          fi
-
-      - name: Push image
-        # Push the tested image to registry
+      - name: Push tested image to registry
+        # Push the exact image that was tested (not a rebuild)
         # Only runs if tests passed (workflow would have failed otherwise)
         # For workflow_dispatch, push only when inputs.publish=true (default false)
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true'
-        uses: docker/build-push-action@v6.18.0
-        with:
-          context: ./build
-          file: ./build/Containerfile
-          platforms: linux/${{ matrix.arch }}
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            BUILD_DATE=${{ needs.extract-version.outputs.build_timestamp }}
-            VCS_REF=${{ github.sha }}
-            IMAGE_TAG=${{ needs.extract-version.outputs.version }}
-          # Use cache from previous build
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: |
+          set -euo pipefail
+          REGISTRY_TAG="ghcr.io/vig-os/devcontainer:${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}"
+
+          echo "Pushing tested image to registry: $REGISTRY_TAG"
+
+          # Find the loaded image (it has the registry tag already from build-image action)
+          if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^$REGISTRY_TAG$"; then
+            echo "Image found with correct tag: $REGISTRY_TAG"
+          else
+            echo "ERROR: Image not found with expected tag: $REGISTRY_TAG"
+            echo "Available images:"
+            docker images
+            exit 1
+          fi
+
+          # Retry logic for docker push (network issues)
+          RETRIES=3
+          for i in $(seq 1 $RETRIES); do
+            if docker push "$REGISTRY_TAG"; then
+              echo "Image pushed successfully: $REGISTRY_TAG"
+              break
+            else
+              if [ $i -lt $RETRIES ]; then
+                echo "Push failed, retrying ($i/$RETRIES)..."
+                sleep 3
+              else
+                echo "ERROR: Push failed after $RETRIES attempts"
+                exit 1
+              fi
+            fi
+          done
 
       - name: Verify image push
         # Verify that the image was successfully pushed to the registry
@@ -333,22 +277,30 @@ jobs:
           IMAGE_TAG="ghcr.io/vig-os/devcontainer:${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}"
           echo "Verifying image was pushed successfully: $IMAGE_TAG"
 
-          # Verify image exists and is accessible
-          if ! docker buildx imagetools inspect "$IMAGE_TAG" >/dev/null 2>&1; then
-            echo "ERROR: Failed to verify image push - image not found or not accessible"
-            exit 1
-          fi
-
-          # Get and display image digest
-          DIGEST=$(docker buildx imagetools inspect "$IMAGE_TAG" --format '{{.Manifest.Digest}}' 2>&1 || echo "")
-          if [ -n "$DIGEST" ] && [ "$DIGEST" != "null" ]; then
-            echo "Image verified successfully"
-            echo "Digest: $DIGEST"
-          else
-            echo "WARNING: Could not retrieve image digest, but image exists"
-          fi
-
-          echo "Image push verification complete"
+          # Retry logic for image verification (registry may need time to propagate)
+          RETRIES=5
+          for i in $(seq 1 $RETRIES); do
+            if docker buildx imagetools inspect "$IMAGE_TAG" >/dev/null 2>&1; then
+              # Get and display image digest
+              DIGEST=$(docker buildx imagetools inspect "$IMAGE_TAG" --format '{{.Manifest.Digest}}' 2>&1 || echo "")
+              if [ -n "$DIGEST" ] && [ "$DIGEST" != "null" ]; then
+                echo "Image verified successfully"
+                echo "Digest: $DIGEST"
+              else
+                echo "WARNING: Could not retrieve image digest, but image exists"
+              fi
+              echo "Image push verification complete"
+              break
+            else
+              if [ $i -lt $RETRIES ]; then
+                echo "Verification failed, retrying ($i/$RETRIES)..."
+                sleep 5
+              else
+                echo "ERROR: Failed to verify image push after $RETRIES attempts - image not found or not accessible"
+                exit 1
+              fi
+            fi
+          done
 
       - name: Upload build logs
         # Upload build logs for debugging:
@@ -423,54 +375,119 @@ jobs:
           for arch in "${ARCH_ARRAY[@]}"; do
             IMAGE="$REPO:$VERSION-$arch"
             echo "Checking image: $IMAGE"
-            if ! docker buildx imagetools inspect "$IMAGE" >/dev/null 2>&1; then
-              echo "ERROR: $arch image not found: $IMAGE"
+
+            # Retry logic for image verification (registry propagation delay)
+            RETRIES=5
+            VERIFIED=false
+            for i in $(seq 1 $RETRIES); do
+              if docker buildx imagetools inspect "$IMAGE" >/dev/null 2>&1; then
+                echo "✓ Verified $arch image exists"
+                VERIFIED=true
+                break
+              else
+                if [ $i -lt $RETRIES ]; then
+                  echo "Image not found, retrying ($i/$RETRIES)..."
+                  sleep 5
+                fi
+              fi
+            done
+
+            if [ "$VERIFIED" = "false" ]; then
+              echo "ERROR: $arch image not found after $RETRIES attempts: $IMAGE"
               exit 1
             fi
-            echo "✓ Verified $arch image exists"
+
             ARCH_IMAGES+=("$IMAGE")
           done
 
           # Manifest creation phase: Create version manifest
           echo "Creating version manifest: $REPO:$VERSION"
-          if ! docker buildx imagetools create \
-            --tag "$REPO:$VERSION" \
-            "${ARCH_IMAGES[@]}"; then
-            echo "ERROR: Failed to create version manifest"
-            exit 1
-          fi
-          echo "✓ Created version manifest: $REPO:$VERSION"
+
+          # Retry logic for manifest creation (network/registry issues)
+          RETRIES=3
+          for i in $(seq 1 $RETRIES); do
+            if docker buildx imagetools create \
+              --tag "$REPO:$VERSION" \
+              "${ARCH_IMAGES[@]}"; then
+              echo "✓ Created version manifest: $REPO:$VERSION"
+              break
+            else
+              if [ $i -lt $RETRIES ]; then
+                echo "Manifest creation failed, retrying ($i/$RETRIES)..."
+                sleep 3
+              else
+                echo "ERROR: Failed to create version manifest after $RETRIES attempts"
+                exit 1
+              fi
+            fi
+          done
 
           # Create/update latest manifest only for tag pushes with both architectures
           if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "${#ARCH_ARRAY[@]}" -eq 2 ]; then
             echo "Creating/updating latest manifest: $REPO:latest"
-            if ! docker buildx imagetools create \
-              --tag "$REPO:latest" \
-              "${ARCH_IMAGES[@]}"; then
-              echo "ERROR: Failed to create latest manifest"
-              exit 1
-            fi
-            echo "✓ Created/updated latest manifest: $REPO:latest"
+
+            # Retry logic for latest manifest creation
+            RETRIES=3
+            for i in $(seq 1 $RETRIES); do
+              if docker buildx imagetools create \
+                --tag "$REPO:latest" \
+                "${ARCH_IMAGES[@]}"; then
+                echo "✓ Created/updated latest manifest: $REPO:latest"
+                break
+              else
+                if [ $i -lt $RETRIES ]; then
+                  echo "Latest manifest creation failed, retrying ($i/$RETRIES)..."
+                  sleep 3
+                else
+                  echo "ERROR: Failed to create latest manifest after $RETRIES attempts"
+                  exit 1
+                fi
+              fi
+            done
           else
             echo "Skipping 'latest' tag (workflow_dispatch or single architecture build)"
           fi
 
           # Verification phase: Confirm version manifest was created successfully
           echo "Verifying version manifest..."
-          if ! docker buildx imagetools inspect "$REPO:$VERSION" >/dev/null 2>&1; then
-            echo "ERROR: Version manifest verification failed"
-            exit 1
-          fi
-          echo "✓ Version manifest verified"
+
+          # Retry logic for version manifest verification
+          RETRIES=5
+          for i in $(seq 1 $RETRIES); do
+            if docker buildx imagetools inspect "$REPO:$VERSION" >/dev/null 2>&1; then
+              echo "✓ Version manifest verified"
+              break
+            else
+              if [ $i -lt $RETRIES ]; then
+                echo "Verification failed, retrying ($i/$RETRIES)..."
+                sleep 5
+              else
+                echo "ERROR: Version manifest verification failed after $RETRIES attempts"
+                exit 1
+              fi
+            fi
+          done
 
           # Verify latest manifest if it was created
           if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "${#ARCH_ARRAY[@]}" -eq 2 ]; then
             echo "Verifying latest manifest..."
-            if ! docker buildx imagetools inspect "$REPO:latest" >/dev/null 2>&1; then
-              echo "ERROR: Latest manifest verification failed"
-              exit 1
-            fi
-            echo "✓ Latest manifest verified"
+
+            # Retry logic for latest manifest verification
+            RETRIES=5
+            for i in $(seq 1 $RETRIES); do
+              if docker buildx imagetools inspect "$REPO:latest" >/dev/null 2>&1; then
+                echo "✓ Latest manifest verified"
+                break
+              else
+                if [ $i -lt $RETRIES ]; then
+                  echo "Verification failed, retrying ($i/$RETRIES)..."
+                  sleep 5
+                else
+                  echo "ERROR: Latest manifest verification failed after $RETRIES attempts"
+                  exit 1
+                fi
+              fi
+            done
           fi
 
           echo "✓ Successfully created and verified multi-arch manifest(s)"
