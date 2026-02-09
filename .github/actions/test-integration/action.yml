@@ -10,9 +10,8 @@
 # and sidecar containers.
 #
 # Inputs:
-#   image-tag: Full image tag to test (e.g., 1.0.0-amd64)
-#   registry: Container registry URL
-#   sync-groups: Python dependency groups to sync
+#   image-tag: Image tag to test (e.g., 1.0.0-amd64)
+#   registry: Container registry URL (default: ghcr.io/vig-os/devcontainer)
 #
 # Outputs:
 #   test-result: Test exit code (0=pass, non-zero=fail)
@@ -33,10 +32,6 @@ inputs:
     description: 'Container registry URL'
     required: false
     default: 'ghcr.io/vig-os/devcontainer'
-  sync-groups:
-    description: 'Python dependency groups to sync'
-    required: false
-    default: 'test'
 
 outputs:
   test-result:
@@ -50,70 +45,44 @@ runs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Python with uv
-      uses: ./.github/actions/setup-python-uv
-      with:
-        sync-groups: ${{ inputs.sync-groups }}
-
     - name: Install Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20'
 
-    - name: Install devcontainer CLI
+    - name: Set up test environment
       shell: bash
       run: |
         set -euo pipefail
-        echo "Installing @devcontainers/cli..."
+        # Ensure uv install path is on PATH
+        export PATH="$HOME/.local/bin:$PATH"
 
-        # Retry logic for npm install (network flakiness)
-        RETRIES=3
-        for i in $(seq 1 $RETRIES); do
-          if npm install -g @devcontainers/cli; then
-            echo "Installation successful"
-            break
-          else
-            if [ $i -lt $RETRIES ]; then
-              echo "Installation failed, retrying ($i/$RETRIES)..."
-              sleep 2
-            else
-              echo "Installation failed after $RETRIES attempts"
-              exit 1
-            fi
-          fi
-        done
-
-        echo "Verifying installation..."
-        devcontainer --version
-        which devcontainer
-
-    - name: Install podman
-      shell: bash
-      run: |
-        set -euo pipefail
+        # Install podman if not available
         if ! command -v podman &> /dev/null; then
           echo "Installing podman..."
-
-          # Retry logic for apt operations (network flakiness)
-          RETRIES=3
-          for i in $(seq 1 $RETRIES); do
-            if sudo apt-get update -qq && sudo apt-get install -y podman; then
-              echo "Installation successful"
-              break
-            else
-              if [ $i -lt $RETRIES ]; then
-                echo "Installation failed, retrying ($i/$RETRIES)..."
-                sleep 2
-              else
-                echo "Installation failed after $RETRIES attempts"
-                exit 1
-              fi
-            fi
-          done
-        else
-          echo "podman already installed"
+          sudo apt-get update -qq
+          sudo apt-get install -y podman
         fi
         podman --version
+
+        # Install uv (Python package manager)
+        if ! command -v uv &> /dev/null; then
+          echo "Installing uv..."
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+        fi
+        uv --version
+
+        # Install devcontainer CLI
+        echo "Installing @devcontainers/cli..."
+        npm install -g @devcontainers/cli
+        devcontainer --version
+
+        # Persist PATH for subsequent steps
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+        # Install test dependencies
+        uv sync --group test
+        echo "Test environment ready"
 
     - name: Load image from tar
       shell: bash
