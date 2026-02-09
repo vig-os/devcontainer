@@ -116,6 +116,16 @@ runs:
             podman tag "$LOADED_IMAGE" "$IMAGE_TAG"
             echo "Tagged image as: $IMAGE_TAG"
 
+            # Also tag without the arch suffix (e.g. 99.0.1-amd64 -> 99.0.1)
+            # docker-compose.yml inside the workspace uses the base version
+            BASE_TAG="${{ inputs.image-tag }}"
+            BASE_TAG="${BASE_TAG%-*}"  # strip -amd64 / -arm64
+            if [ "$BASE_TAG" != "${{ inputs.image-tag }}" ]; then
+              BASE_IMAGE_TAG="${{ inputs.registry }}:${BASE_TAG}"
+              podman tag "$LOADED_IMAGE" "$BASE_IMAGE_TAG"
+              echo "Tagged image as: $BASE_IMAGE_TAG"
+            fi
+
             # Verify the image is available
             podman images | grep "${{ inputs.registry }}"
             echo "Image loaded successfully into podman"
