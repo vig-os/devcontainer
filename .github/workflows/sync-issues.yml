@@ -26,14 +26,12 @@ on:  # yamllint disable-line rule:truthy
   issues:
     types:
       - opened
-      - edited
       - reopened
       - closed
   # Run on PR creation and closure
   pull_request:
     types:
       - opened
-      - edited
       - closed
 
 jobs:
