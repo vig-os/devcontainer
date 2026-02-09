@@ -52,10 +52,6 @@ inputs:
     description: 'Path to tar file (if image-source=tar)'
     required: false
     default: '/tmp/image.tar'
-  sync-groups:
-    description: 'Python dependency groups to sync'
-    required: false
-    default: 'test'
   skip-container-check:
     description: 'Set PYTEST_SKIP_CONTAINER_CHECK=1'
     required: false
@@ -73,38 +69,36 @@ runs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Python with uv
-      uses: ./.github/actions/setup-python-uv
-      with:
-        sync-groups: ${{ inputs.sync-groups }}
-
-    - name: Install podman
+    - name: Set up test environment
+      # Install dependencies for running tests
+      # Tests require: podman (for container operations), uv (for Python package management)
       shell: bash
       run: |
         set -euo pipefail
+        # Ensure uv install path is on PATH
+        export PATH="$HOME/.local/bin:$PATH"
+
+        # Install podman if not available (GitHub runners have docker by default)
         if ! command -v podman &> /dev/null; then
           echo "Installing podman..."
-
-          # Retry logic for apt operations (network flakiness)
-          RETRIES=3
-          for i in $(seq 1 $RETRIES); do
-            if sudo apt-get update -qq && sudo apt-get install -y podman; then
-              echo "Installation successful"
-              break
-            else
-              if [ $i -lt $RETRIES ]; then
-                echo "Installation failed, retrying ($i/$RETRIES)..."
-                sleep 2
-              else
-                echo "Installation failed after $RETRIES attempts"
-                exit 1
-              fi
-            fi
-          done
-        else
-          echo "podman already installed"
+          sudo apt-get update
+          sudo apt-get install -y podman
         fi
         podman --version
+
+        # Install uv (Python package manager)
+        if ! command -v uv &> /dev/null; then
+          echo "Installing uv..."
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+        fi
+        uv --version
+
+        # Persist PATH for subsequent steps
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+        # Install test dependencies
+        uv sync --group test
+        echo "Test environment ready"
 
     - name: Load image from tar
       if: inputs.image-source == 'tar'
