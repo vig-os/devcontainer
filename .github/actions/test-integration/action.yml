@@ -2,7 +2,7 @@
 #
 # This action is self-contained and handles the complete integration test process:
 # - Checks out repository code (self-contained - no workflow checkout needed)
-# - Sets up the complete integration test environment
+# - Sets up the environment (uv, Python deps, podman, Node.js, devcontainer CLI) via setup-env
 # - Runs devcontainer integration tests
 #
 # Unlike test-image which tests the image properties, this tests the full
@@ -45,50 +45,11 @@ runs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-
     - name: Set up test environment
-      shell: bash
-      run: |
-        set -euo pipefail
-        # Ensure uv install path is on PATH
-        export PATH="$HOME/.local/bin:$PATH"
-
-        # Install podman if not available
-        if ! command -v podman &> /dev/null; then
-          echo "Installing podman..."
-          sudo apt-get update -qq
-          sudo apt-get install -y podman
-        fi
-        podman --version
-
-        # Install uv (Python package manager)
-        if ! command -v uv &> /dev/null; then
-          echo "Installing uv..."
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-        fi
-        uv --version
-
-        # Create docker-compose wrapper (devcontainer CLI needs standalone docker-compose;
-        # the runner only has 'docker compose' v2 plugin, not the standalone binary)
-        printf '#!/bin/sh\nexec docker compose "$@"\n' | sudo tee /usr/local/bin/docker-compose > /dev/null
-        sudo chmod +x /usr/local/bin/docker-compose
-        docker-compose version --short
-
-        # Install devcontainer CLI
-        echo "Installing @devcontainers/cli..."
-        npm install -g @devcontainers/cli
-        devcontainer --version
-
-        # Persist PATH for subsequent steps
-        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-        # Install test dependencies
-        uv sync --group test
-        echo "Test environment ready"
+      uses: ./.github/actions/setup-env
+      with:
+        install-podman: 'true'
+        install-devcontainer-cli: 'true'
 
     - name: Load image from tar
       shell: bash

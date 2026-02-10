@@ -2,8 +2,7 @@
 #
 # This action is self-contained and handles the complete test process:
 # - Checks out repository code (self-contained - no workflow checkout needed)
-# - Installs Python/uv and test dependencies
-# - Installs podman for container operations
+# - Sets up the environment (uv, Python deps, podman) via setup-env
 # - Loads or pulls container image
 # - Runs pytest tests against the image
 #
@@ -12,7 +11,6 @@
 #   registry: Container registry URL
 #   image-source: Where to get the image - "tar", "registry", or "local"
 #   tar-file: Path to tar file (if image-source=tar)
-#   sync-groups: Python dependency groups to sync
 #   skip-container-check: Set PYTEST_SKIP_CONTAINER_CHECK=1
 #
 # Outputs:
@@ -70,35 +68,9 @@ runs:
       uses: actions/checkout@v4
 
     - name: Set up test environment
-      # Install dependencies for running tests
-      # Tests require: podman (for container operations), uv (for Python package management)
-      shell: bash
-      run: |
-        set -euo pipefail
-        # Ensure uv install path is on PATH
-        export PATH="$HOME/.local/bin:$PATH"
-
-        # Install podman if not available (GitHub runners have docker by default)
-        if ! command -v podman &> /dev/null; then
-          echo "Installing podman..."
-          sudo apt-get update
-          sudo apt-get install -y podman
-        fi
-        podman --version
-
-        # Install uv (Python package manager)
-        if ! command -v uv &> /dev/null; then
-          echo "Installing uv..."
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-        fi
-        uv --version
-
-        # Persist PATH for subsequent steps
-        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-        # Install test dependencies
-        uv sync --group test
-        echo "Test environment ready"
+      uses: ./.github/actions/setup-env
+      with:
+        install-podman: 'true'
 
     - name: Load image from tar
       if: inputs.image-source == 'tar'
