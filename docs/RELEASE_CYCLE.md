@@ -391,7 +391,7 @@ git branch -d release/X.Y.Z
 - `0`: Success
 - `1`: Validation error or failure
 
-**Tests:** `tests/test_release_scripts.py::TestPrepareReleaseScript` (11 tests)
+**Tests:** `tests/test_release_cycle.py::TestPrepareReleaseScript` (11 tests)
 
 ### finalize-release.sh
 
@@ -454,7 +454,7 @@ Extract version section for PR body generation.
 uv run python scripts/prepare-changelog.py extract-pr 1.0.0 [CHANGELOG.md]
 ```
 
-**Tests:** `tests/test_prepare_changelog.py` (22 tests)
+**Tests:** `tests/test_release_cycle.py::TestPrepareChangelog` (22 tests)
 
 ### Justfile Recipes
 

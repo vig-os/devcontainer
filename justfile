@@ -11,11 +11,7 @@ import 'justfile.base'
 # ===============================================================================
 # Allow TEST_REGISTRY to override REPO for testing (e.g., localhost:5000/test/)
 
-repo := env_var_or_default("TEST_REGISTRY", "ghcr.io/vig-os/devcontainer")
-
-# Multi-arch support: build for both AMD64 and ARM64
-
-platforms := "linux/amd64,linux/arm64"
+repo := env("TEST_REGISTRY", "ghcr.io/vig-os/devcontainer")
 
 # ===============================================================================
 # INFO
@@ -120,11 +116,11 @@ test-utils:
     #!/usr/bin/env bash
     uv run pytest tests/test_utils.py -v -s --tb=short
 
-# Run version check tests only
+# Run release cycle tests only
 [group('test')]
-test-version-check:
+test-release-cycle:
     #!/usr/bin/env bash
-    uv run pytest tests/test_version_check.py -v -s --tb=short
+    uv run pytest tests/test_release_cycle.py -v -s --tb=short
 
 # Run validate commit msg tests only
 [group('test')]
@@ -237,15 +233,6 @@ clean-test-containers:
     else
         echo "[*] No lingering test containers found"
     fi
-
-# ===============================================================================
-# SIDECAR
-# ===============================================================================
-
-# Convenience alias for test-sidecar (uses generic sidecar recipe)
-[group('sidecar')]
-test-sidecar *args:
-    @just sidecar test-sidecar {{ args }}
 
 # ===============================================================================
 # PODMAN

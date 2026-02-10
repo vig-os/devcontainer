@@ -1,11 +1,13 @@
 """
-Tests for scripts/prepare-changelog.py
+Tests for the release cycle scripts.
 
-These tests verify the CHANGELOG preparation logic:
-- Extracting content from Unreleased section
-- Moving content to versioned section with TBD date
-- Creating fresh Unreleased section
-- Cleaning up empty subsections
+These tests verify:
+- CHANGELOG preparation logic (prepare-changelog.py):
+  extracting Unreleased content, creating versioned sections,
+  cleaning up empty subsections, validation, and reset.
+- Release management scripts (prepare-release.sh, finalize-release.sh):
+  version validation, branch requirements, CHANGELOG requirements,
+  and dry-run mode.
 """
 
 import subprocess
@@ -14,19 +16,12 @@ from pathlib import Path
 
 import pytest
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Test Data Constants
+# ═══════════════════════════════════════════════════════════════════════════════
 
-class TestPrepareChangelog:
-    """Tests for prepare-changelog.py script."""
-
-    @pytest.fixture
-    def script_path(self):
-        """Path to prepare-changelog.py."""
-        return Path(__file__).resolve().parents[1] / "scripts" / "prepare-changelog.py"
-
-    @pytest.fixture
-    def basic_changelog(self):
-        """Basic CHANGELOG with Unreleased content."""
-        return """# Changelog
+BASIC_CHANGELOG = """\
+# Changelog
 
 ## Unreleased
 
@@ -57,10 +52,8 @@ class TestPrepareChangelog:
 - Previous feature
 """
 
-    @pytest.fixture
-    def empty_sections_changelog(self):
-        """CHANGELOG with some empty sections."""
-        return """# Changelog
+EMPTY_SECTIONS_CHANGELOG = """\
+# Changelog
 
 ## Unreleased
 
@@ -85,10 +78,8 @@ class TestPrepareChangelog:
 - Old feature
 """
 
-    @pytest.fixture
-    def minimal_changelog(self):
-        """Minimal CHANGELOG with just one section."""
-        return """# Changelog
+MINIMAL_CHANGELOG = """\
+# Changelog
 
 ## Unreleased
 
@@ -102,6 +93,140 @@ class TestPrepareChangelog:
 
 - Initial release
 """
+
+NO_UNRELEASED_CHANGELOG = """\
+# Changelog
+
+## [0.2.0] - 2026-01-01
+
+### Added
+
+- Old feature
+"""
+
+EMPTY_UNRELEASED_CHANGELOG = """\
+# Changelog
+
+## Unreleased
+
+### Added
+
+### Changed
+
+### Fixed
+
+## [0.2.0] - 2026-01-01
+
+### Added
+
+- Old feature
+"""
+
+MULTILINE_BULLETS_CHANGELOG = """\
+# Changelog
+
+## Unreleased
+
+### Added
+
+- New feature with
+  multiple lines of description
+  and even more details
+
+## [0.1.0] - 2025-01-01
+"""
+
+NESTED_BULLETS_CHANGELOG = """\
+# Changelog
+
+## Unreleased
+
+### Added
+
+- Main feature
+  - Sub-feature A
+  - Sub-feature B
+
+## [0.1.0] - 2025-01-01
+"""
+
+VALIDATE_EMPTY_UNRELEASED_CHANGELOG = """\
+# Changelog
+
+## Unreleased
+
+### Added
+
+### Changed
+
+## [0.2.0] - 2026-01-01
+"""
+
+RELEASED_ONLY_CHANGELOG = """\
+# Changelog
+
+## [1.0.0] - 2026-02-06
+
+### Added
+
+- Released feature
+
+## [0.2.0] - 2026-01-01
+
+### Added
+
+- Old feature
+"""
+
+GIT_REPO_CHANGELOG = """\
+# Changelog
+
+## Unreleased
+
+### Added
+
+- New feature X
+- New feature Y
+
+### Fixed
+
+- Bug fix Z
+
+## [0.2.0] - 2026-01-01
+
+### Added
+
+- Previous feature
+"""
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# prepare-changelog.py Tests
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestPrepareChangelog:
+    """Tests for prepare-changelog.py script."""
+
+    @pytest.fixture
+    def script_path(self):
+        """Path to prepare-changelog.py."""
+        return Path(__file__).resolve().parents[1] / "scripts" / "prepare-changelog.py"
+
+    @pytest.fixture
+    def basic_changelog(self):
+        """Basic CHANGELOG with Unreleased content."""
+        return BASIC_CHANGELOG
+
+    @pytest.fixture
+    def empty_sections_changelog(self):
+        """CHANGELOG with some empty sections."""
+        return EMPTY_SECTIONS_CHANGELOG
+
+    @pytest.fixture
+    def minimal_changelog(self):
+        """Minimal CHANGELOG with just one section."""
+        return MINIMAL_CHANGELOG
 
     # ═══════════════════════════════════════════════════════════════════════════
     # Prepare Action Tests - Basic Functionality
@@ -331,14 +456,7 @@ class TestPrepareChangelog:
     def test_fails_for_missing_unreleased_section(self, script_path, tmp_path):
         """Should fail if no Unreleased section exists."""
         changelog_file = tmp_path / "CHANGELOG.md"
-        changelog_file.write_text("""# Changelog
-
-## [0.2.0] - 2026-01-01
-
-### Added
-
-- Old feature
-""")
+        changelog_file.write_text(NO_UNRELEASED_CHANGELOG)
 
         result = subprocess.run(
             [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
@@ -352,22 +470,7 @@ class TestPrepareChangelog:
     def test_warns_for_empty_unreleased(self, script_path, tmp_path):
         """Should warn but succeed if Unreleased is empty."""
         changelog_file = tmp_path / "CHANGELOG.md"
-        changelog_file.write_text("""# Changelog
-
-## Unreleased
-
-### Added
-
-### Changed
-
-### Fixed
-
-## [0.2.0] - 2026-01-01
-
-### Added
-
-- Old feature
-""")
+        changelog_file.write_text(EMPTY_UNRELEASED_CHANGELOG)
 
         result = subprocess.run(
             [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
@@ -386,20 +489,8 @@ class TestPrepareChangelog:
 
     def test_preserves_multiline_bullets(self, script_path, tmp_path):
         """Should preserve multi-line bullet point formatting."""
-        changelog = """# Changelog
-
-## Unreleased
-
-### Added
-
-- New feature with
-  multiple lines of description
-  and even more details
-
-## [0.1.0] - 2025-01-01
-"""
         changelog_file = tmp_path / "CHANGELOG.md"
-        changelog_file.write_text(changelog)
+        changelog_file.write_text(MULTILINE_BULLETS_CHANGELOG)
 
         subprocess.run(
             [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
@@ -413,20 +504,8 @@ class TestPrepareChangelog:
 
     def test_preserves_nested_bullets(self, script_path, tmp_path):
         """Should preserve nested bullet points."""
-        changelog = """# Changelog
-
-## Unreleased
-
-### Added
-
-- Main feature
-  - Sub-feature A
-  - Sub-feature B
-
-## [0.1.0] - 2025-01-01
-"""
         changelog_file = tmp_path / "CHANGELOG.md"
-        changelog_file.write_text(changelog)
+        changelog_file.write_text(NESTED_BULLETS_CHANGELOG)
 
         subprocess.run(
             [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
@@ -475,6 +554,10 @@ class TestPrepareChangelog:
         assert "1.0.0" in result.stdout
         assert "✓" in result.stdout or "success" in result.stdout.lower()
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Validate Action Tests
+    # ═══════════════════════════════════════════════════════════════════════════
+
     def test_validate_passes_with_unreleased_content(
         self, script_path, basic_changelog, tmp_path
     ):
@@ -494,14 +577,7 @@ class TestPrepareChangelog:
     def test_validate_fails_without_unreleased_section(self, script_path, tmp_path):
         """validate action should fail if no Unreleased section."""
         changelog_file = tmp_path / "CHANGELOG.md"
-        changelog_file.write_text("""# Changelog
-
-## [0.2.0] - 2026-01-01
-
-### Added
-
-- Old feature
-""")
+        changelog_file.write_text(NO_UNRELEASED_CHANGELOG)
 
         result = subprocess.run(
             [sys.executable, str(script_path), "validate", str(changelog_file)],
@@ -515,16 +591,7 @@ class TestPrepareChangelog:
     def test_validate_warns_for_empty_unreleased(self, script_path, tmp_path):
         """validate action should warn if Unreleased is empty."""
         changelog_file = tmp_path / "CHANGELOG.md"
-        changelog_file.write_text("""# Changelog
-
-## Unreleased
-
-### Added
-
-### Changed
-
-## [0.2.0] - 2026-01-01
-""")
+        changelog_file.write_text(VALIDATE_EMPTY_UNRELEASED_CHANGELOG)
 
         result = subprocess.run(
             [sys.executable, str(script_path), "validate", str(changelog_file)],
@@ -544,20 +611,7 @@ class TestPrepareChangelog:
     def test_reset_creates_fresh_unreleased_section(self, script_path, tmp_path):
         """reset action should create fresh Unreleased section."""
         changelog_file = tmp_path / "CHANGELOG.md"
-        changelog_file.write_text("""# Changelog
-
-## [1.0.0] - 2026-02-06
-
-### Added
-
-- Released feature
-
-## [0.2.0] - 2026-01-01
-
-### Added
-
-- Old feature
-""")
+        changelog_file.write_text(RELEASED_ONLY_CHANGELOG)
 
         result = subprocess.run(
             [sys.executable, str(script_path), "reset", str(changelog_file)],
@@ -582,21 +636,7 @@ class TestPrepareChangelog:
     def test_reset_preserves_existing_versions(self, script_path, tmp_path):
         """reset action should not modify existing version sections."""
         changelog_file = tmp_path / "CHANGELOG.md"
-        original = """# Changelog
-
-## [1.0.0] - 2026-02-06
-
-### Added
-
-- Released feature
-
-## [0.2.0] - 2026-01-01
-
-### Added
-
-- Old feature
-"""
-        changelog_file.write_text(original)
+        changelog_file.write_text(RELEASED_ONLY_CHANGELOG)
 
         subprocess.run(
             [sys.executable, str(script_path), "reset", str(changelog_file)],
@@ -628,3 +668,325 @@ class TestPrepareChangelog:
             "already exists" in result.stderr.lower()
             or "unreleased" in result.stderr.lower()
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# prepare-release.sh Tests
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestPrepareReleaseScript:
+    """Tests for scripts/prepare-release.sh - release branch preparation."""
+
+    @pytest.fixture
+    def script_path(self):
+        """Path to prepare-release.sh."""
+        return Path(__file__).resolve().parents[1] / "scripts" / "prepare-release.sh"
+
+    @pytest.fixture
+    def minimal_git_repo(self, tmp_path):
+        """Create a minimal git repository for testing."""
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+
+        # Initialize git repo
+        subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create dev branch
+        subprocess.run(
+            ["git", "checkout", "-b", "dev"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create CHANGELOG.md with Unreleased section
+        changelog = repo / "CHANGELOG.md"
+        changelog.write_text(GIT_REPO_CHANGELOG)
+
+        # Create initial commit
+        subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+
+        return repo
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Version Validation
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_rejects_invalid_semver_format(self, script_path, minimal_git_repo):
+        """Should reject non-semantic version formats."""
+        result = subprocess.run(
+            [str(script_path), "1.2.3.4", "--dry-run"],
+            cwd=minimal_git_repo,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode != 0, "Should fail for invalid semver"
+        assert (
+            "Invalid version format" in result.stdout
+            or "Invalid version format" in result.stderr
+        )
+
+    def test_rejects_version_with_v_prefix(self, script_path, minimal_git_repo):
+        """Should reject versions with 'v' prefix."""
+        result = subprocess.run(
+            [str(script_path), "v1.2.3", "--dry-run"],
+            cwd=minimal_git_repo,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode != 0
+        output = result.stdout + result.stderr
+        assert "Invalid version format" in output or "1.2.3" in output
+
+    def test_rejects_version_with_prerelease_suffix(
+        self, script_path, minimal_git_repo
+    ):
+        """Should reject versions with pre-release suffixes."""
+        result = subprocess.run(
+            [str(script_path), "1.2.3-alpha", "--dry-run"],
+            cwd=minimal_git_repo,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode != 0
+        assert (
+            "Invalid version format" in result.stdout
+            or "Invalid version format" in result.stderr
+        )
+
+    def test_accepts_valid_semver(self, script_path, minimal_git_repo):
+        """Should accept valid semantic versions."""
+        # Test with dry-run to avoid actually creating branches
+        result = subprocess.run(
+            [str(script_path), "1.2.3", "--dry-run"],
+            cwd=minimal_git_repo,
+            capture_output=True,
+            text=True,
+        )
+        # Should not fail on version validation
+        assert "Invalid version format" not in (result.stdout + result.stderr)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Branch Requirements
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_requires_dev_branch(self, script_path, minimal_git_repo):
+        """Should fail if not on dev branch."""
+        # Create and checkout a different branch
+        subprocess.run(
+            ["git", "checkout", "-b", "feature/test"],
+            cwd=minimal_git_repo,
+            check=True,
+            capture_output=True,
+        )
+
+        result = subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=minimal_git_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0, "Should fail when not on dev branch"
+        output = result.stdout + result.stderr
+        assert "dev branch" in output.lower()
+
+    def test_detects_uncommitted_changes(self, script_path, minimal_git_repo):
+        """Should fail if uncommitted changes exist."""
+        # Modify CHANGELOG without committing
+        changelog = minimal_git_repo / "CHANGELOG.md"
+        changelog.write_text(changelog.read_text() + "\n- Uncommitted change\n")
+
+        result = subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=minimal_git_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0, "Should fail with uncommitted changes"
+        output = result.stdout + result.stderr
+        assert "uncommitted" in output.lower() or "changes" in output.lower()
+
+    def test_prevents_duplicate_release_branch(self, script_path, minimal_git_repo):
+        """Should fail if release branch already exists."""
+        # Create a release branch
+        subprocess.run(
+            ["git", "checkout", "-b", "release/1.0.0"],
+            cwd=minimal_git_repo,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "checkout", "dev"],
+            cwd=minimal_git_repo,
+            check=True,
+            capture_output=True,
+        )
+
+        result = subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=minimal_git_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0, "Should fail if release branch exists"
+        output = result.stdout + result.stderr
+        assert "already exists" in output.lower()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # CHANGELOG Requirements
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_requires_unreleased_section(self, script_path, minimal_git_repo):
+        """Should fail if no Unreleased section in CHANGELOG."""
+        # Remove Unreleased section
+        changelog = minimal_git_repo / "CHANGELOG.md"
+        content = changelog.read_text().replace("## Unreleased", "## Old Section")
+        changelog.write_text(content)
+        subprocess.run(
+            ["git", "add", "CHANGELOG.md"],
+            cwd=minimal_git_repo,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "Remove Unreleased"],
+            cwd=minimal_git_repo,
+            check=True,
+            capture_output=True,
+        )
+
+        result = subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=minimal_git_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0, "Should fail without Unreleased section"
+        output = result.stdout + result.stderr
+        assert "unreleased" in output.lower()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Dry-run Mode
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_dry_run_creates_no_branches(self, script_path, minimal_git_repo):
+        """Dry-run should not create any branches."""
+        # Get current branches
+        result_before = subprocess.run(
+            ["git", "branch", "--list"],
+            cwd=minimal_git_repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        branches_before = set(result_before.stdout.strip().split("\n"))
+
+        # Run prepare-release in dry-run mode
+        subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=minimal_git_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        # Check branches after
+        result_after = subprocess.run(
+            ["git", "branch", "--list"],
+            cwd=minimal_git_repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        branches_after = set(result_after.stdout.strip().split("\n"))
+
+        assert branches_before == branches_after, "Dry-run should not create branches"
+
+    def test_dry_run_modifies_no_files(self, script_path, minimal_git_repo):
+        """Dry-run should not modify any files."""
+        # Get current git status
+        result_before = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=minimal_git_repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        # Run prepare-release in dry-run mode
+        subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=minimal_git_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        # Check git status after
+        result_after = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=minimal_git_repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        assert result_before.stdout == result_after.stdout, (
+            "Dry-run should not modify files"
+        )
+
+    def test_dry_run_shows_planned_actions(self, script_path, minimal_git_repo):
+        """Dry-run should display what would be done."""
+        result = subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=minimal_git_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        output = result.stdout + result.stderr
+        assert "dry run" in output.lower() or "would" in output.lower()
+        assert "release/1.0.0" in output
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# finalize-release.sh Tests
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestFinalizeReleaseScript:
+    """Tests for scripts/finalize-release.sh - release finalization.
+
+    These tests will be implemented after prepare-release.sh is working.
+    """
+
+    @pytest.fixture
+    def script_path(self):
+        """Path to finalize-release.sh."""
+        return Path(__file__).resolve().parents[1] / "scripts" / "finalize-release.sh"
+
+    def test_script_exists(self, script_path):
+        """finalize-release.sh should exist (placeholder test)."""
+        # This will fail until we create the script
+        assert script_path.exists(), "finalize-release.sh not yet created"

@@ -168,9 +168,9 @@ Available recipes:
     test-image version="dev"        # Run image tests only
     test-integration version="dev"  # Run integration tests only
     test-pytest *args               # Run tests with pytest
+    test-release-cycle              # Run release cycle tests only
     test-utils                      # Run utils tests only
     test-validate-commit-msg        # Run validate commit msg tests only
-    test-version-check              # Run version check tests only
 
 ```
 
