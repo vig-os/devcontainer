@@ -7,11 +7,7 @@
 #   1. build-image - Build container image
 #   2. test-image - Run image tests
 #   3. test-integration - Run integration tests
-#   4. lint - Run pre-commit hooks (ruff, shellcheck, pymarkdown, etc.)
-#   5. validate-changelog - Ensure CHANGELOG.md is properly formatted
-#
-# Note: Standalone Python unit tests (test-python job) will be added in a future update
-#       to test non-container Python code (utils, validation scripts, etc.)
+#   4. project-checks - Linters, utils, release cycle tests
 #
 # Triggers:
 #   - Pull requests to dev, release/**, and main (runs all suites)
@@ -36,8 +32,7 @@ on:  # yamllint disable-line rule:truthy
           - all
           - image
           - integration
-          - lint
-          - changelog
+          - project
 
 permissions:
   contents: read
@@ -46,6 +41,7 @@ jobs:
   build-image:
     name: Build Container Image
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
     # Build image once and share via tar artifact to avoid rebuilding in each test job
     # Trade-off: tar transfer is slower but ensures all tests use identical image
     if: |
@@ -102,12 +98,16 @@ jobs:
     name: Image Tests
     needs: build-image
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
     if: |
       github.event_name != 'workflow_dispatch' ||
       inputs.test-suite == 'all' ||
       inputs.test-suite == 'image'
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download image artifact
         uses: actions/download-artifact@v4
         with:
@@ -124,7 +124,7 @@ jobs:
     name: Integration Tests
     needs: build-image
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 10
     if: |
       github.event_name != 'workflow_dispatch' ||
       inputs.test-suite == 'all' ||
@@ -153,119 +153,23 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  lint:
-    name: Linters
+  project-checks:
+    name: Project Checks
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
     if: |
       github.event_name != 'workflow_dispatch' ||
       inputs.test-suite == 'all' ||
-      inputs.test-suite == 'lint'
+      inputs.test-suite == 'project'
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Python with uv
-        uses: ./.github/actions/setup-python-uv
-        with:
-          sync-groups: 'test,dev'
-
-      - name: Install pre-commit
-        run: |
-          set -euo pipefail
-          # pre-commit should be in dev group, verify it's available
-          if ! uv run pre-commit --version &> /dev/null; then
-            echo "ERROR: pre-commit not found in environment"
-            exit 1
-          fi
-          echo "pre-commit available"
-
-      - name: Cache pre-commit hooks
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pre-commit
-          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
-          restore-keys: |
-            pre-commit-${{ runner.os }}-
-
-      - name: Run pre-commit hooks
-        run: |
-          set -euo pipefail
-          echo "Running pre-commit hooks..."
-
-          # Run all hooks on all files
-          # In CI, we want to check everything, not just changed files
-          uv run pre-commit run --all-files --show-diff-on-failure --color=always
-
-          echo "All linters passed"
-
-  validate-changelog:
-    name: Validate CHANGELOG
-    runs-on: ubuntu-22.04
-    if: |
-      github.event_name == 'pull_request' ||
-      (github.event_name == 'workflow_dispatch' && (inputs.test-suite == 'all' || inputs.test-suite == 'changelog'))
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Python with uv
-        uses: ./.github/actions/setup-python-uv
-        with:
-          sync-groups: 'test'
-
-      - name: Validate CHANGELOG format
-        run: |
-          set -euo pipefail
-          echo "Validating CHANGELOG.md format..."
-
-          # Check CHANGELOG has Unreleased section
-          if ! grep -q "## Unreleased" CHANGELOG.md; then
-            echo "ERROR: CHANGELOG.md is missing '## Unreleased' section"
-            exit 1
-          fi
-
-          echo "CHANGELOG.md has Unreleased section"
-
-          # Validate CHANGELOG can be parsed by prepare-changelog.py
-          if uv run python scripts/prepare-changelog.py validate CHANGELOG.md; then
-            echo "CHANGELOG.md validation passed"
-          else
-            echo "CHANGELOG.md validation failed"
-            echo ""
-            echo "Please ensure CHANGELOG.md has an Unreleased section with content."
-            echo "See docs/RELEASE_CYCLE.md for CHANGELOG guidelines."
-            exit 1
-          fi
-
-      - name: Check for CHANGELOG updates in PR
-        run: |
-          set -euo pipefail
-          echo "Checking if CHANGELOG.md was updated in this PR..."
-
-          # Fetch base branch to ensure we can compare
-          git fetch origin ${{ github.base_ref }}
-
-          # Get the list of changed files in the PR
-          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
-
-          if echo "$CHANGED_FILES" | grep -q "^CHANGELOG.md$"; then
-            echo "CHANGELOG.md was updated in this PR"
-          else
-            echo "WARNING: CHANGELOG.md was not updated in this PR"
-            echo ""
-            echo "If this PR includes user-facing changes, please update CHANGELOG.md"
-            echo "by adding entries to the Unreleased section."
-            echo ""
-            echo "If this PR has no user-facing changes (e.g., tests, docs, refactoring),"
-            echo "you can safely ignore this warning."
-          fi
+      - name: Run project checks
+        uses: ./.github/actions/test-project
 
   summary:
     name: Test Summary
     runs-on: ubuntu-22.04
-    needs: [build-image, test-image, test-integration, lint, validate-changelog]
+    needs: [build-image, test-image, test-integration, project-checks]
     if: always()
 
     steps:
@@ -277,8 +181,7 @@ jobs:
           echo "Build Image: ${{ needs.build-image.result }}"
           echo "Image Tests: ${{ needs.test-image.result }}"
           echo "Integration Tests: ${{ needs.test-integration.result }}"
-          echo "Linters: ${{ needs.lint.result }}"
-          echo "CHANGELOG: ${{ needs.validate-changelog.result }}"
+          echo "Project Checks: ${{ needs.project-checks.result }}"
           echo ""
 
           # Check if any job that ran has failed (skip 'skipped' jobs)
@@ -299,13 +202,9 @@ jobs:
             FAILED=true
           fi
 
-          if [ "${{ needs.lint.result }}" = "failure" ]; then
-            echo "ERROR: Linters failed"
+          if [ "${{ needs.project-checks.result }}" = "failure" ]; then
+            echo "ERROR: Project checks failed"
             FAILED=true
-          fi
-
-          if [ "${{ needs.validate-changelog.result }}" = "failure" ]; then
-            echo "WARNING: CHANGELOG validation failed (non-fatal)"
           fi
 
           if [ "$FAILED" = "true" ]; then
