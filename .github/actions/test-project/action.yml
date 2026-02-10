@@ -1,0 +1,75 @@
+# Composite action to run project-level checks
+#
+# This action is self-contained and handles:
+# - Checks out repository code
+# - Sets up the environment (uv, Python deps) via setup-env
+# - Runs pre-commit linters (ruff, shellcheck, pymarkdown, etc.)
+# - Runs utility and install script tests
+#
+# Inputs:
+#   suite: Which checks to run (all | lint | utils | release-cycle). Default: 'all'
+#   test-args: Arguments to pass to pytest (default: '-v -s --tb=short')
+#
+# Usage:
+#   # Run all project checks
+#   - uses: ./.github/actions/test-project
+#
+#   # Run only linters
+#   - uses: ./.github/actions/test-project
+#     with:
+#       suite: 'lint'
+
+name: 'Test Project'
+description: 'Run project-level checks: linters, utility tests, install script tests'
+
+inputs:
+  suite:
+    description: 'Which checks to run: all | lint | utils | release-cycle'
+    required: false
+    default: 'all'
+
+  test-args:
+    description: 'Arguments to pass to pytest'
+    required: false
+    default: '-v -s --tb=short'
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up test environment
+      uses: ./.github/actions/setup-env
+
+    - name: Cache pre-commit hooks
+      if: inputs.suite == 'all' || inputs.suite == 'lint'
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pre-commit
+        key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+        restore-keys: |
+          pre-commit-${{ runner.os }}-
+
+    - name: Run pre-commit linters
+      if: inputs.suite == 'all' || inputs.suite == 'lint'
+      shell: bash
+      run: |
+        set -euo pipefail
+        export PATH="$HOME/.local/bin:$PATH"
+
+        # Verify pre-commit is available
+        uv run pre-commit --version
+
+        echo "Running pre-commit hooks on all files..."
+        uv run pre-commit run --all-files --show-diff-on-failure --color=always
+
+    - name: Run utility tests
+      if: inputs.suite == 'all' || inputs.suite == 'utils'
+      shell: bash
+      run: uv run pytest tests/test_utils.py ${{ inputs.test-args }}
+
+    - name: Run release cycle tests
+      if: inputs.suite == 'all' || inputs.suite == 'release-cycle'
+      shell: bash
+      run: uv run pytest tests/test_release_cycle.py ${{ inputs.test-args }}
