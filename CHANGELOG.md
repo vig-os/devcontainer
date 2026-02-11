@@ -52,6 +52,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release cycle documentation** ([#38](https://github.com/vig-os/devcontainer/issues/38), [#48](https://github.com/vig-os/devcontainer/issues/48))
   - `docs/RELEASE_CYCLE.md` with complete release workflow, branching strategy, and CI/CD integration
   - Cursor commands: `after-pr-merge.md`, `submit-pr.md`
+- **GitHub Actions SHA pinning enforcement** ([#50](https://github.com/vig-os/devcontainer/issues/50))
+  - `scripts/check_action_pins.py` pre-commit hook and CI check ensuring all GitHub Actions and Docker actions reference commit SHAs
+  - Comprehensive test suite in `tests/test_check_action_pins.py`
+- **CODEOWNERS** for automated review assignment ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **SECURITY.md** with vulnerability reporting procedures and supported version policy ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **OpenSSF Scorecard workflow** (`scorecard.yml`) for supply chain security scoring ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **CodeQL analysis workflow** (`codeql.yml`) for automated static security analysis ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **Dependabot configuration** for automated dependency update PRs ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **Vulnerability scanning and dependency review** in CI pipeline ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **SBOM generation, container signing, and provenance attestation** in release workflow ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **Edge case tests** for changelog validation, action SHA pinning, and install script ([#50](https://github.com/vig-os/devcontainer/issues/50))
 
 ### Changed
 
@@ -68,6 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Replaced `setup-python-uv` with flexible `setup-env` composite action** supporting optional inputs for podman, Node.js, and devcontainer CLI ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **Reduced `sync-issues` workflow triggers** — removed `edited` event type from issues and pull_request triggers ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **Release workflow pushes tested images** instead of rebuilding after tests pass ([#48](https://github.com/vig-os/devcontainer/issues/48))
+- **Updated CONTRIBUTE.md** release workflow documentation to match automated process ([#50](https://github.com/vig-os/devcontainer/issues/50))
 
 ### Deprecated
 
@@ -86,8 +98,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PR and CI checks enforced as hard gates** (exit 1) in finalize-release workflow instead of soft warnings ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **Sidecar tests in CI** — run via host podman to avoid API version mismatch between host (3.4.4) and container client (4.0.0) ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **CI environment setup** — podman socket handling, base image tagging, docker-compose wrapper for devcontainer CLI compatibility ([#48](https://github.com/vig-os/devcontainer/issues/48))
+- **Pre-commit exclusion pattern** for pymarkdown updated to correct regex ([#50](https://github.com/vig-os/devcontainer/issues/50))
 
 ### Security
+
+- **Digest-pinned base image** and SHA256 checksum verification for all downloaded binaries in Containerfile ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **Minisign signature verification** for cargo-binstall downloads ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **GitHub Actions and Docker actions pinned to commit SHAs** across all workflows ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **Pre-commit hook repos pinned to commit SHAs** ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **Workflow permissions hardened** with least-privilege principle and explicit token scoping ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **Input sanitization** — inline expression interpolation replaced with environment variables in workflow run blocks to prevent injection ([#50](https://github.com/vig-os/devcontainer/issues/50))
 
 ## [0.2.1](https://github.com/vig-os/devcontainer/releases/tag/v0.2.1) - 2026-01-28
 
