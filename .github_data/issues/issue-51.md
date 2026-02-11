@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-02-11T15:21:42Z
-updated: 2026-02-11T15:21:42Z
+updated: 2026-02-11T19:16:03Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/51
@@ -12,7 +12,7 @@ assignees: none
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-11T15:22:02.856Z
+synced: 2026-02-11T19:16:22.065Z
 ---
 
 # [Issue 51]: [[FEATURE] Extract commit validation and action pin check into reusable org-level GitHub Actions](https://github.com/vig-os/devcontainer/issues/51)
@@ -52,7 +52,6 @@ Currently, `validate_commit_msg.py` and `check_action_pins.py` live inside the `
 
 ### Additional Context
 
-- These scripts were introduced in #50 (Harden CI/CD Security)
 - Both scripts are self-contained Python with no external dependencies beyond the standard library
 - Pre-commit hooks can reference remote repos, so the actions could also serve as pre-commit hook sources
 
