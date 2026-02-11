@@ -99,6 +99,16 @@ repos:
         files: ^(pyproject\.toml|uv\.lock|requirements.*\.txt)$
         pass_filenames: false
 
+  # GitHub Actions SHA pinning enforcement
+  - repo: local
+    hooks:
+      - id: check-action-pins
+        name: check-action-pins (verify SHA-pinned actions)
+        entry: uv run python scripts/check_action_pins.py
+        language: system
+        files: ^\.github/(workflows/.*\.ya?ml|actions/.*/action\.ya?ml)$
+        pass_filenames: false
+
   # Commit message validation (commit-msg stage)
   - repo: local
     hooks:

@@ -128,6 +128,12 @@ test-validate-commit-msg:
     #!/usr/bin/env bash
     uv run pytest tests/test_validate_commit_msg.py -v -s --tb=short
 
+# Run check action pins tests only
+[group('test')]
+test-check-action-pins:
+    #!/usr/bin/env bash
+    uv run pytest tests/test_check_action_pins.py -v -s --tb=short
+
 # Clean up lingering containers before running tests
 [private]
 _test-cleanup-check:
