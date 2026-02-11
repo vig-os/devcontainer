@@ -10,6 +10,7 @@ These tests verify:
   and dry-run mode.
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -1796,3 +1797,192 @@ class TestFinalizeReleaseScript:
         assert "git push origin" in output
         assert "gh workflow run sync-issues.yml" in output
         assert 'git tag -s "v1.0.0"' in output
+
+    @pytest.fixture
+    def release_repo_with_mock_gh(self, tmp_path):
+        """Create a repo with remote and mock gh for PR validation tests.
+
+        Sets up:
+        - A bare git repo as origin remote
+        - A release/1.0.0 branch with prepared CHANGELOG
+        - A mock gh script controlled by MOCK_GH_* environment variables
+        """
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        bare = tmp_path / "bare-remote.git"
+
+        # Initialize bare remote
+        subprocess.run(
+            ["git", "init", "--bare", str(bare)], check=True, capture_output=True
+        )
+
+        # Initialize repo
+        subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "remote", "add", "origin", str(bare)],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create dev branch with initial commit
+        subprocess.run(
+            ["git", "checkout", "-b", "dev"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+        changelog = repo / "CHANGELOG.md"
+        changelog.write_text(GIT_REPO_CHANGELOG)
+        subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "push", "-u", "origin", "dev"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create release branch (simulating prepare-release.sh)
+        subprocess.run(
+            ["git", "checkout", "-b", "release/1.0.0"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+        changelog.write_text(PREPARED_CHANGELOG)
+        subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "chore: prepare release 1.0.0\n\nRefs: #48"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "push", "-u", "origin", "release/1.0.0"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create mock gh script
+        mock_bin = tmp_path / "mock-bin"
+        mock_bin.mkdir()
+        mock_gh = mock_bin / "gh"
+        mock_gh.write_text(
+            "#!/bin/bash\n"
+            "# Mock gh CLI for testing finalize-release.sh PR validation\n"
+            'if [[ "$*" == *"pr list"* ]]; then\n'
+            '    echo "${MOCK_GH_PR_JSON:-[]}"\n'
+            "    exit 0\n"
+            'elif [[ "$*" == *"pr checks"* ]]; then\n'
+            '    echo "${MOCK_GH_PR_CHECKS:-pass}"\n'
+            "    exit 0\n"
+            'elif [[ "$*" == *"workflow run"* ]]; then\n'
+            "    exit 0\n"
+            'elif [[ "$*" == *"run list"* ]]; then\n'
+            '    echo ""\n'
+            "    exit 0\n"
+            "else\n"
+            "    exit 1\n"
+            "fi\n"
+        )
+        mock_gh.chmod(0o755)
+
+        return repo, mock_bin
+
+    def _make_env(self, mock_bin, pr_json, pr_checks="pass"):
+        """Create environment with mock gh on PATH."""
+        env = os.environ.copy()
+        env["PATH"] = f"{mock_bin}:{env['PATH']}"
+        env["MOCK_GH_PR_JSON"] = pr_json
+        env["MOCK_GH_PR_CHECKS"] = pr_checks
+        return env
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # PR Validation Enforcement
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_fails_if_pr_is_draft(self, script_path, release_repo_with_mock_gh):
+        """Should fail with exit 1 if PR is still a draft."""
+        repo, mock_bin = release_repo_with_mock_gh
+        env = self._make_env(
+            mock_bin,
+            pr_json='[{"number": 42, "isDraft": true, "reviewDecision": "APPROVED"}]',
+            pr_checks="pass",
+        )
+
+        result = subprocess.run(
+            [str(script_path), "1.0.0"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+
+        assert result.returncode != 0, "Should fail when PR is a draft"
+        output = result.stdout + result.stderr
+        assert "draft" in output.lower()
+
+    def test_fails_if_pr_not_approved(self, script_path, release_repo_with_mock_gh):
+        """Should fail with exit 1 if PR has not been approved."""
+        repo, mock_bin = release_repo_with_mock_gh
+        env = self._make_env(
+            mock_bin,
+            pr_json='[{"number": 42, "isDraft": false, "reviewDecision": "REVIEW_REQUIRED"}]',
+            pr_checks="pass",
+        )
+
+        result = subprocess.run(
+            [str(script_path), "1.0.0"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+
+        assert result.returncode != 0, "Should fail when PR is not approved"
+        output = result.stdout + result.stderr
+        assert "not been approved" in output.lower() or "approved" in output.lower()
+
+    def test_fails_if_ci_checks_failed(self, script_path, release_repo_with_mock_gh):
+        """Should fail with exit 1 if CI checks have failed."""
+        repo, mock_bin = release_repo_with_mock_gh
+        env = self._make_env(
+            mock_bin,
+            pr_json='[{"number": 42, "isDraft": false, "reviewDecision": "APPROVED"}]',
+            pr_checks="fail",
+        )
+
+        result = subprocess.run(
+            [str(script_path), "1.0.0"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+
+        assert result.returncode != 0, "Should fail when CI checks failed"
+        output = result.stdout + result.stderr
+        assert (
+            "ci" in output.lower()
+            or "checks" in output.lower()
+            or "failed" in output.lower()
+        )

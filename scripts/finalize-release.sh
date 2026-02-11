@@ -11,8 +11,8 @@
 # Prerequisites:
 #   - Must be on release/X.Y.Z branch (created by prepare-release.sh)
 #   - CHANGELOG must have ## [X.Y.Z] - TBD entry
-#   - CI checks should have passed
-#   - PR should be reviewed and approved
+#   - CI checks must have passed
+#   - PR must be reviewed and approved
 
 set -euo pipefail
 
@@ -52,8 +52,8 @@ EXAMPLES:
 PREREQUISITES:
     - Must be on release/X.Y.Z branch (created by prepare-release.sh)
     - CHANGELOG must have ## [X.Y.Z] - TBD entry
-    - CI checks should have passed
-    - PR should be reviewed and approved
+    - CI checks must have passed
+    - PR must be reviewed and approved
     - GitHub CLI (gh) and origin remote must be configured
 EOF
 }
@@ -202,29 +202,32 @@ else
 
     info "Found PR #$PR_NUMBER"
 
-    # Check draft status
+    # Check draft status (required)
     if [ "$IS_DRAFT" = "True" ]; then
-        warn "PR #$PR_NUMBER is still a draft"
-        warn "Consider marking it ready: gh pr ready $PR_NUMBER"
-    else
-        success "PR #$PR_NUMBER is ready for review"
+        err "PR #$PR_NUMBER is still a draft"
+        echo "Mark it ready before finalizing: gh pr ready $PR_NUMBER"
+        exit 1
     fi
+    success "PR #$PR_NUMBER is ready for review"
 
-    # Check review status
-    if [ "$REVIEW_DECISION" = "APPROVED" ]; then
-        success "PR #$PR_NUMBER has been approved"
-    else
-        warn "PR #$PR_NUMBER review status: ${REVIEW_DECISION:-none}"
-        warn "Consider getting approval before finalizing"
+    # Check review status (required)
+    if [ "$REVIEW_DECISION" != "APPROVED" ]; then
+        err "PR #$PR_NUMBER has not been approved (review status: ${REVIEW_DECISION:-none})"
+        echo "Get approval before finalizing the release"
+        exit 1
     fi
+    success "PR #$PR_NUMBER has been approved"
 
-    # Check CI status
+    # Check CI status (required)
     CI_STATUS=$(gh pr checks "$PR_NUMBER" --json bucket --jq '.[].bucket' 2>/dev/null || echo "")
     if echo "$CI_STATUS" | grep -q "fail"; then
-        warn "Some CI checks have failed on PR #$PR_NUMBER"
-        warn "Review: gh pr checks $PR_NUMBER"
+        err "CI checks have failed on PR #$PR_NUMBER"
+        echo "Review failures: gh pr checks $PR_NUMBER"
+        exit 1
     elif [ -n "$CI_STATUS" ]; then
-        success "CI checks status verified"
+        success "CI checks passed"
+    else
+        warn "Could not determine CI check status for PR #$PR_NUMBER"
     fi
 fi
 

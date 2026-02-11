@@ -166,7 +166,7 @@ This is the main quality gate. The release branch and draft PR serve as the coor
 
    ```bash
    # Check recent CI runs on release branch
-   gh run list --branch release/1.0.0 --workflow test.yml
+   gh run list --branch release/1.0.0 --workflow ci.yml
 
    # View specific run details
    gh run view <RUN_ID>
@@ -175,7 +175,7 @@ This is the main quality gate. The release branch and draft PR serve as the coor
    gh run watch <RUN_ID>
 
    # Optional: Manually trigger CI if needed
-   gh workflow run test.yml --ref release/1.0.0
+   gh workflow run ci.yml --ref release/1.0.0
    ```
 
 3. **Mark PR as Ready for Review**
@@ -267,9 +267,9 @@ just finalize-release X.Y.Z
 **What happens:**
 1. ✅ Verifies you're on correct release branch
 2. ✅ Checks for uncommitted changes
-3. ✅ Verifies CI checks passed on release branch (required)
-4. ✅ Verifies PR is ready for review (not draft)
-5. ✅ Verifies PR has been approved
+3. ✅ Verifies CI checks passed on release branch
+4. ✅ Verifies PR is not in draft (ready for review)
+5. ✅ Verifies PR has required approvals
 6. ✅ Sets actual release date in CHANGELOG (TBD → YYYY-MM-DD)
 7. ✅ Commits changes: `chore: finalize release X.Y.Z`
 8. ✅ Triggers sync-issues workflow to generate PR doc
@@ -395,7 +395,7 @@ git branch -d release/X.Y.Z
 
 ### finalize-release.sh
 
-**Location:** `scripts/finalize-release.sh` *(planned)*
+**Location:** `scripts/finalize-release.sh`
 
 **Purpose:** Finalize release, create tag, prepare for merge
 
@@ -509,7 +509,6 @@ gh workflow run release.yml \
 #### sync-issues.yml
 
 **Trigger:**
-- Push to `dev` or `release/**` branches
 - Issue/PR events
 - Manual `workflow_dispatch`
 
@@ -532,9 +531,7 @@ on:
 gh workflow run sync-issues.yml --ref release/X.Y.Z
 ```
 
-### Planned Workflows
-
-#### test.yml *(planned)*
+#### ci.yml
 
 **Triggers:**
 - Push to `dev` and `release/**` branches (runs after merges)
@@ -572,7 +569,7 @@ on:
 **Manual trigger (optional):**
 
 ```bash
-gh workflow run test.yml --ref release/X.Y.Z
+gh workflow run ci.yml --ref release/X.Y.Z
 ```
 
 ---
