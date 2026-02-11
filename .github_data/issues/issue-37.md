@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-01-29T09:44:01Z
-updated: 2026-02-06T15:57:57Z
+updated: 2026-02-11T14:24:07Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/37
@@ -12,7 +12,7 @@ assignees: none
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-06T15:58:15.558Z
+synced: 2026-02-11T14:24:32.405Z
 ---
 
 # [Issue 37]: [[FEATURE] Automate and Standardize Repository Setup for Devcontainer Template](https://github.com/vig-os/devcontainer/issues/37)
@@ -70,7 +70,7 @@ Automatically configure new repositories with:
    - Optional: semantic version checks
    - Automatically pinned actions to specific SHA commits
 
-5. **Security Considerations**
+5. **Security Considerations** #50
    - Pin all GitHub Actions to commit SHAs
    - Require review/approval for workflows submitted by external contributors
    - Enforce branch protection for critical branches
