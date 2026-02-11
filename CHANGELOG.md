@@ -37,6 +37,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Virtual environment prompt renaming** ([#34](https://github.com/vig-os/devcontainer/issues/34))
   - Post-create script updates venv prompt from "template-project" to project short name
   - Integration test verifies venv activate script does not contain "template-project"
+- **Automated release cycle** ([#48](https://github.com/vig-os/devcontainer/issues/48))
+  - `prepare-release` and `finalize-release` justfile commands triggering GitHub Actions workflows
+  - `prepare-changelog.py` script with prepare, validate, reset, and finalize commands for CHANGELOG automation
+  - `reset-changelog` justfile command for post-merge CHANGELOG cleanup
+  - `prepare-release.yml` GitHub Actions workflow: validates semantic version, creates release branch, prepares CHANGELOG
+  - Unified `release.yml` pipeline: validate → finalize → build/test → publish → rollback
+  - Comprehensive test suite in `tests/test_release_cycle.py`
+- **CI testing infrastructure** ([#48](https://github.com/vig-os/devcontainer/issues/48))
+  - `ci.yml` workflow replacing `test.yml` with streamlined project checks (lint, changelog validation, utility and release-cycle tests)
+  - Reusable composite actions: `setup-env`, `build-image`, `test-image`, `test-integration`, `test-project`
+  - Artifact transfer between jobs for consistent image testing
+  - Retry logic across all CI operations for transient failure handling
+- **Release cycle documentation** ([#38](https://github.com/vig-os/devcontainer/issues/38), [#48](https://github.com/vig-os/devcontainer/issues/48))
+  - `docs/RELEASE_CYCLE.md` with complete release workflow, branching strategy, and CI/CD integration
+  - Cursor commands: `after-pr-merge.md`, `submit-pr.md`
 
 ### Changed
 
@@ -47,16 +62,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Autofix shellcheck
   - Autofix pymarkdown
   - Add license compliance check
+- **Renamed `publish-container-image.yml` to `release.yml`** and expanded into unified release pipeline ([#48](https://github.com/vig-os/devcontainer/issues/48))
+- **Merged `prepare-build.sh` into `build.sh`** — consolidated directory preparation, asset copying, placeholder replacement, and README updates into a single entry point ([#48](https://github.com/vig-os/devcontainer/issues/48))
+- **Consolidated test files by domain** — reorganized from 6 files to 4 (`test_image.py`, `test_integration.py`, `test_utils.py`, `test_release_cycle.py`) ([#48](https://github.com/vig-os/devcontainer/issues/48))
+- **Replaced `setup-python-uv` with flexible `setup-env` composite action** supporting optional inputs for podman, Node.js, and devcontainer CLI ([#48](https://github.com/vig-os/devcontainer/issues/48))
+- **Reduced `sync-issues` workflow triggers** — removed `edited` event type from issues and pull_request triggers ([#48](https://github.com/vig-os/devcontainer/issues/48))
+- **Release workflow pushes tested images** instead of rebuilding after tests pass ([#48](https://github.com/vig-os/devcontainer/issues/48))
 
 ### Deprecated
 
 ### Removed
+
+- **`scripts/prepare-build.sh`** — merged into `build.sh` ([#48](https://github.com/vig-os/devcontainer/issues/48))
+- **`scripts/sync-prs-issues.sh`** — deprecated sync script ([#48](https://github.com/vig-os/devcontainer/issues/48))
+- **`test.yml` workflow** — replaced by `ci.yml` ([#48](https://github.com/vig-os/devcontainer/issues/48))
 
 ### Fixed
 
 - **Non-ASCII characters in justfiles** - Replaced Unicode box-drawing characters (═, ───) and emojis with ASCII equivalents for just-lsp compatibility ([#49](https://github.com/vig-os/devcontainer/issues/49))
 - **`just precommit` recipe** - Run pre-commit through `uv run` to ensure it uses the virtual environment ([#46](https://github.com/vig-os/devcontainer/issues/46))
 - **Pytest test collection** - Exclude `tests/tmp/` directory (integration test workspaces) from test discovery to prevent import errors
+- **Hardened release workflows** — CI status check validation, eliminated double-push with PR creation as last step ([#48](https://github.com/vig-os/devcontainer/issues/48))
+- **PR and CI checks enforced as hard gates** (exit 1) in finalize-release workflow instead of soft warnings ([#48](https://github.com/vig-os/devcontainer/issues/48))
+- **Sidecar tests in CI** — run via host podman to avoid API version mismatch between host (3.4.4) and container client (4.0.0) ([#48](https://github.com/vig-os/devcontainer/issues/48))
+- **CI environment setup** — podman socket handling, base image tagging, docker-compose wrapper for devcontainer CLI compatibility ([#48](https://github.com/vig-os/devcontainer/issues/48))
 
 ### Security
 
