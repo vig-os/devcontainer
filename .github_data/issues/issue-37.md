@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-01-29T09:44:01Z
-updated: 2026-02-11T14:24:07Z
+updated: 2026-02-11T18:47:18Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/37
@@ -12,7 +12,7 @@ assignees: none
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-11T14:24:32.405Z
+synced: 2026-02-11T18:47:34.704Z
 ---
 
 # [Issue 37]: [[FEATURE] Automate and Standardize Repository Setup for Devcontainer Template](https://github.com/vig-os/devcontainer/issues/37)
@@ -66,7 +66,7 @@ Automatically configure new repositories with:
    - Commit message enforcement
    - Tests / linting
    - Branch naming enforcement
-   - Code coverage
+   - Code coverage #52
    - Optional: semantic version checks
    - Automatically pinned actions to specific SHA commits
 
