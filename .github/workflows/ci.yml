@@ -1,4 +1,4 @@
-# CI/CD Testing Workflow
+# CI Workflow
 #
 # This workflow runs automated tests and linters to validate code quality.
 # Runs on pull requests to dev, release/**, and main branches as a pre-merge gate.
@@ -13,7 +13,7 @@
 #   - Pull requests to dev, release/**, and main (runs all suites)
 #   - Manual workflow_dispatch (select specific test suite to run)
 
-name: Test
+name: CI
 
 on:  # yamllint disable-line rule:truthy
   pull_request:

@@ -244,8 +244,11 @@ def cmd_validate(args):
         sys.exit(1)
 
     if not has_content:
-        print("⚠ Warning: Unreleased section is empty (no changes to release)")
-        sys.exit(0)
+        print(
+            "Error: Unreleased section is empty (no changes to release)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     print("✓ CHANGELOG validation passed")
     print("✓ Unreleased section exists with content")

@@ -172,13 +172,6 @@ jobs:
           git checkout -b "$RELEASE_BRANCH"
           echo "✓ Release branch created"
 
-      - name: Push release branch
-        run: |
-          set -euo pipefail
-          RELEASE_BRANCH="${{ needs.validate.outputs.release_branch }}"
-          git push -u origin "$RELEASE_BRANCH"
-          echo "✓ Release branch pushed"
-
       - name: Prepare CHANGELOG
         run: |
           set -euo pipefail
@@ -202,6 +195,28 @@ jobs:
           CHANGELOG_CONTENT="${CHANGELOG_CONTENT//$'\r'/'%0D'}"
 
           echo "changelog=$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+
+      - name: Create release preparation commit
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.validate.outputs.version }}"
+
+          git add CHANGELOG.md
+          git commit -m "$(cat <<EOF
+          chore: prepare release $VERSION
+
+          Prepare CHANGELOG.md structure for version $VERSION.
+          Release date TBD (set during finalization).
+          EOF
+          )"
+          echo "✓ Preparation commit created"
+
+      - name: Push release branch
+        run: |
+          set -euo pipefail
+          RELEASE_BRANCH="${{ needs.validate.outputs.release_branch }}"
+          git push -u origin "$RELEASE_BRANCH"
+          echo "✓ Release branch pushed"
 
       - name: Create draft PR to main
         id: pr
@@ -252,33 +267,6 @@ jobs:
           echo "✓ Draft PR created: $PR_URL (#$PR_NUMBER)"
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-
-      - name: Create release preparation commit
-        run: |
-          set -euo pipefail
-          VERSION="${{ needs.validate.outputs.version }}"
-          PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
-
-          git add CHANGELOG.md
-          git commit -m "$(cat <<EOF
-          chore: prepare release $VERSION
-
-          - Prepare CHANGELOG.md structure for version $VERSION
-          - Release date TBD (set during finalization)
-
-          Next: Test release, then run finalize-release.
-
-          Refs: #$PR_NUMBER
-          EOF
-          )"
-          echo "✓ Preparation commit created with PR reference #$PR_NUMBER"
-
-      - name: Push release branch with commit
-        run: |
-          set -euo pipefail
-          RELEASE_BRANCH="${{ needs.validate.outputs.release_branch }}"
-          git push -u origin "$RELEASE_BRANCH"
-          echo "✓ Release branch pushed with commit"
 
       - name: Summary
         run: |

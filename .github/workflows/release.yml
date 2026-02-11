@@ -62,7 +62,7 @@ jobs:
       release_date: ${{ steps.vars.outputs.release_date }}
       build_timestamp: ${{ steps.vars.outputs.build_timestamp }}
       release_url: ${{ steps.vars.outputs.release_url }}
-      pre_finalize_sha: ${{ steps.vars.outputs.pre_finalize_sha }}
+      pre_finalize_sha: ${{ steps.pre_sha.outputs.pre_finalize_sha }}
       matrix: ${{ steps.matrix.outputs.matrix }}
       architectures: ${{ steps.matrix.outputs.architectures }}
 
@@ -87,13 +87,11 @@ jobs:
           RELEASE_DATE=$(date -u +%Y-%m-%d)
           BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
-          PRE_FINALIZE_SHA=$(git rev-parse HEAD)
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
           echo "build_timestamp=$BUILD_TIMESTAMP" >> $GITHUB_OUTPUT
           echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
-          echo "pre_finalize_sha=$PRE_FINALIZE_SHA" >> $GITHUB_OUTPUT
           echo "release_branch=$RELEASE_BRANCH" >> $GITHUB_OUTPUT
 
       - name: Checkout release branch
@@ -104,6 +102,13 @@ jobs:
             exit 1
           }
           git checkout origin/release/${{ steps.vars.outputs.version }}
+
+      - name: Record pre-finalization SHA
+        id: pre_sha
+        run: |
+          PRE_FINALIZE_SHA=$(git rev-parse HEAD)
+          echo "pre_finalize_sha=$PRE_FINALIZE_SHA" >> $GITHUB_OUTPUT
+          echo "Pre-finalization SHA: $PRE_FINALIZE_SHA"
 
       - name: Verify CHANGELOG has TBD entry
         run: |
@@ -165,6 +170,24 @@ jobs:
 
           if [ "$REVIEW_DECISION" != "APPROVED" ]; then
             echo "ERROR: PR #$PR_NUMBER does not have approvals (status: $REVIEW_DECISION)"
+            exit 1
+          fi
+
+          # Check CI status
+          STATUS_ROLLUP=$(echo "$PR_JSON" | jq -r '.[0].statusCheckRollup // []')
+          CI_FAILED=$(echo "$STATUS_ROLLUP" | jq '[.[] | select(.conclusion == "FAILURE" or .conclusion == "ERROR")] | length')
+
+          if [ "$CI_FAILED" != "0" ]; then
+            echo "ERROR: PR #$PR_NUMBER has failed CI checks"
+            echo "Fix CI issues before releasing"
+            exit 1
+          fi
+
+          # Check that at least some checks have passed
+          CI_SUCCESS=$(echo "$STATUS_ROLLUP" | jq '[.[] | select(.conclusion == "SUCCESS")] | length')
+          if [ "$CI_SUCCESS" = "0" ]; then
+            echo "ERROR: PR #$PR_NUMBER has no successful CI checks"
+            echo "Ensure CI has run on the release branch"
             exit 1
           fi
 

@@ -14,7 +14,7 @@ When the user asks to create or start work on an issue (e.g. "create branch for 
    - If the issue already has a linked branch, tell the user and offer to checkout that branch locally (`git fetch origin && git checkout <branch_name>`) or stop. Do not create a second linked branch.
 
 2. **Infer branch type**
-   - From issue labels or intent, pick one: `feature` | `bugfix` | `hotfix` | `release` | `docs` | `test` | `refactor`.
+   - From issue labels or intent, pick one: `feature` | `bugfix` | `release`.
    - Ask the user if labels and title are ambiguous.
 
 3. **Set short summary**
@@ -44,11 +44,7 @@ When the user asks to create or start work on an issue (e.g. "create branch for 
 |----------|-------------------------------------------------------------------------|
 | feature  | New functionality, enhancements                                         |
 | bugfix   | Bug fixes (non-urgent)                                                  |
-| hotfix   | Urgent production fixes, often merged outside normal release            |
 | release  | Release preparation, version bumps, release notes                       |
-| docs     | Documentation only                                                      |
-| test     | Tests, CI, or test infrastructure                                       |
-| refactor | Code refactoring, no new behavior                                       |
 
 ## One-off branch name only
 

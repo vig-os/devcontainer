@@ -11,6 +11,8 @@ This document defines the release workflow, branching strategy, and automation f
 - [CI/CD Integration](#cicd-integration)
 - [QMS and Compliance](#qms-and-compliance)
 - [Troubleshooting](#troubleshooting)
+- [Best Practices](#best-practices)
+- [References](#references)
 
 ---
 
@@ -56,7 +58,6 @@ Topic branches follow the pattern: `<type>/<issue-number>-<short-summary>`
 |------|---------|
 | **feature** | New functionality, enhancements |
 | **bugfix** | Bug fixes (non-urgent) |
-| **hotfix** | Urgent production fixes, often merged outside normal release |
 | **release** | Release preparation, version bumps, release notes |
 
 **Examples:**
@@ -68,7 +69,7 @@ Topic branches follow the pattern: `<type>/<issue-number>-<short-summary>`
 When starting work on a GitHub issue:
 
 1. Verify no developer branch is linked yet: `gh issue develop --list <issue_number>`
-2. Pick a branch type from: feature, bugfix, hotfix, release
+2. Pick a branch type from: feature, bugfix, release
 3. Use a kebab-case short summary from the issue title (a few words, omitting prefixes like "Add")
 4. Create and link via GitHub: `gh issue develop <issue_number> --base dev --name <branch_name> --checkout`
 5. Ensure local branch is up to date: `git pull origin <branch_name>`
@@ -145,6 +146,7 @@ The `prepare-release.yml` workflow prepares the release branch:
    - Prepares CHANGELOG using `prepare-changelog.py prepare`
    - Moves Unreleased → `## [X.Y.Z] - TBD`
    - Creates fresh Unreleased section
+   - Extracts CHANGELOG content for PR body
    - Commits changes: `chore: prepare release X.Y.Z`
    - Pushes release branch to origin (via GitHub App token, triggering CI)
    - Creates draft PR to `main` with CHANGELOG content as body
@@ -168,12 +170,12 @@ Next steps:
   6. Run: just finalize-release 1.0.0
 ```
 
-**Key differences from local script:**
+**Key characteristics:**
 
 - **Consistent environment**: Runs on CI runner, not dependent on local tooling
 - **Audit trail**: All actions logged in GitHub Actions
 - **CI triggering**: Push via GitHub App token triggers CI on release branch automatically
-- **No interactive prompts**: Workflow fails if CHANGELOG is empty (no user prompts)
+- **No interactive prompts**: Workflow fails if CHANGELOG Unreleased section is missing or empty (no user prompts)
 - **Reproducible**: Same behavior regardless of developer's local setup
 
 ### Phase 2: Review & Testing
@@ -325,7 +327,7 @@ The `release.yml` workflow performs the entire remaining release process:
    - Logs in to GitHub Container Registry
    - Pushes images to GHCR with architecture-specific tags
    - Creates multi-architecture manifest `ghcr.io/vig-os/devcontainer:X.Y.Z`
-   - Creates/updates `ghcr.io/vig-os/devcontainer:latest` manifest
+   - Creates/updates `ghcr.io/vig-os/devcontainer:latest` manifest (only when both architectures are built)
    - Verifies manifests exist
 
 5. ✅ **Rollback** job (runs if ANY job failed)
@@ -351,7 +353,7 @@ Release Summary:
     - ghcr.io/vig-os/devcontainer:latest
 ```
 
-**Key differences from local script:**
+**Key characteristics:**
 
 - **Earlier validation**: All checks happen at the start in CI
 - **Safer workflow**: Tag is created AFTER successful build/test, not before
@@ -410,65 +412,6 @@ docker buildx imagetools inspect ghcr.io/vig-os/devcontainer:1.0.0
 
 ## Scripts and Tools
 
-### prepare-release.sh
-
-**Location:** `scripts/prepare-release.sh`
-
-**Status:** ⚠️ **SUPERSEDED** - Use `just prepare-release X.Y.Z` instead
-
-This script was used when release preparation ran locally. The functionality is now implemented in the GitHub Actions workflow (`.github/workflows/prepare-release.yml`).
-
-The script is kept for reference and as a fallback, but **the recommended path** is to use the workflow via the justfile recipe, which provides:
-- Consistent CI environment (not dependent on local tools)
-- Audit trail via GitHub Actions logs
-- CI triggering on the new release branch
-
-**For local development/testing only:**
-
-```bash
-./scripts/prepare-release.sh X.Y.Z [--dry-run]
-```
-
-**Recommended approach:** Use the workflow instead for all release preparation.
-
-### finalize-release.sh
-
-**Location:** `scripts/finalize-release.sh`
-
-**Status:** ⚠️ **SUPERSEDED** - Use `just finalize-release X.Y.Z` instead
-
-This script was used when finalization ran locally. The functionality is now implemented in the GitHub Actions workflow (`.github/workflows/release.yml`).
-
-The script is kept for reference and as a fallback, but **the recommended path** is to use the workflow via the justfile recipe.
-
-**For local development/testing only:**
-
-```bash
-./scripts/finalize-release.sh X.Y.Z [--dry-run]
-```
-
-**Note:** This script requires:
-- Local checkout of `release/X.Y.Z` branch
-- GitHub CLI (`gh`) configured and authenticated
-- GPG key configured (for signing tags)
-- Network access to trigger and poll workflows
-
-**Recommended approach:** Use the workflow instead for all production releases.
-
-
-### prepare-build.sh
-
-**Location:** `scripts/prepare-build.sh`
-
-**Purpose:** Prepare build context for container image construction
-
-**Usage:**
-
-```bash
-./scripts/prepare-build.sh VERSION BUILD_DIR DATE RELEASE_URL
-```
-
-Used during local testing (Phase 2) and by the release workflow.
 
 ### prepare-changelog.py
 
@@ -492,7 +435,7 @@ Validate CHANGELOG has Unreleased section with content.
 uv run python scripts/prepare-changelog.py validate [CHANGELOG.md]
 ```
 
-Used by `prepare-release.sh` to ensure there are changes to release.
+Used by the `prepare-release.yml` workflow to ensure there are changes to release.
 
 #### `reset [FILE]`
 Create fresh Unreleased section (for after release merge to dev).
@@ -511,7 +454,7 @@ Replace TBD date with actual release date for a version section.
 uv run python scripts/prepare-changelog.py finalize 1.0.0 2026-02-11 [CHANGELOG.md]
 ```
 
-Used by `finalize-release.sh` to set the actual release date.
+Used by the `release.yml` workflow to set the actual release date.
 
 **Tests:** `tests/test_release_cycle.py::TestPrepareChangelog` (22 tests)
 
@@ -559,9 +502,9 @@ The release process uses four coordinated workflows:
 2. **prepare** (skipped if dry-run) - Creates and prepares release branch
    - Creates `release/X.Y.Z` branch from `dev`
    - Prepares CHANGELOG using `prepare-changelog.py prepare`
+   - Extracts CHANGELOG content for PR body
    - Creates standardized commit: `chore: prepare release X.Y.Z`
    - Pushes release branch to origin (via GitHub App token to trigger CI)
-   - Extracts CHANGELOG content for PR body
    - Creates draft PR to `main` with release content
    - Outputs summary and next steps
 
@@ -661,10 +604,9 @@ gh workflow run release.yml \
 
 **For more details:** See sync-issues workflow documentation
 
-#### ci.yml
+#### ci.yml (CI Workflow)
 
 **Triggers:**
-- Push to `dev` and `release/**` branches
 - Pull requests to `dev`, `release/**`, and `main`
 - Manual `workflow_dispatch`
 
@@ -676,8 +618,8 @@ gh workflow run release.yml \
 - Run integration tests
 - Run project checks (linters, CHANGELOG validation, commit message format)
 
-**Note:** ci.yml runs on each push to release branch. Combined with finalize workflow, this provides multiple validation gates:
-- PR to release branch: ci.yml validates changes
+**Note:** CI runs on pull requests to release branches. Combined with the finalize workflow, this provides multiple validation gates:
+- PR to release branch: CI validates changes before merge
 - finalize workflow: Validates prerequisites before finalization, then rebuilds before publishing
 
 
@@ -918,23 +860,6 @@ git push origin :refs/tags/vX.Y.Z
 # Fix the issue and re-run workflow
 just finalize-release X.Y.Z
 ```
-
-#### Roll Back Published Release
-
-**Caution:** Only for critical issues. Published images are immutable.
-
-```bash
-# Create hotfix branch from previous tag
-git checkout -b hotfix/X.Y.Z+1 vX.Y.Z
-
-# Apply fix
-# ...
-
-# Create a new release with bumped version
-just prepare-release X.Y.(Z+1)
-just finalize-release X.Y.(Z+1)
-```
-
 
 ---
 
