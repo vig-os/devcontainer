@@ -233,8 +233,7 @@ This is the main quality gate. The release branch and draft PR serve as the coor
    just test-all
 
    # Build container locally (optional)
-   ./scripts/prepare-build.sh X.Y.Z build TBD "https://github.com/vig-os/devcontainer/releases/tag/vX.Y.Z"
-   docker build -t test:X.Y.Z ./build
+   ./scripts/build.sh X.Y.Z
    ```
 
 5. **Fix Issues**

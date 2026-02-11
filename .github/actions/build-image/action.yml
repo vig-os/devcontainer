@@ -89,7 +89,7 @@ runs:
       run: |
         set -euo pipefail
         echo "Preparing build directory..."
-        ./scripts/prepare-build.sh "${{ inputs.version }}" "build" "${{ inputs.release-date }}" "${{ inputs.release-url }}"
+        ./scripts/build.sh "${{ inputs.version }}"
         echo "Build directory prepared"
 
     - name: Set image tag

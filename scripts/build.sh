@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Build container image
 # Usage: build.sh <version> [REPO] [NATIVE_PLATFORM]
+#
+# This script builds a container image:
+# - Creates and clears the build directory
+# - Copies Containerfile and assets
+# - Replaces {{IMAGE_TAG}} placeholders in template files
+# - Builds the container image using podman
 
 set -e
 
@@ -50,8 +56,51 @@ echo "🔍 DEBUG: VCS_REF='$VCS_REF'"
 
 echo "Building $REPO:$VERSION..."
 
+# Prepare build directory for container image build
+echo "Preparing build directory..."
+
 # Create and clear build folder
-"$SCRIPT_DIR"/prepare-build.sh "$VERSION" "$BUILD_DIR"
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
+
+# Copy Containerfile and assets to build folder
+cp Containerfile "$BUILD_DIR/"
+cp -r assets "$BUILD_DIR/"
+
+# Replace {{IMAGE_TAG}} placeholders in template files
+if [ -d "$BUILD_DIR/assets/workspace" ]; then
+	echo "Replacing {{IMAGE_TAG}} with $BUILD_VERSION in template files..."
+
+	find "$BUILD_DIR/assets/workspace" -type f -print0 | while IFS= read -r -d '' file; do
+		uv run python "$SCRIPT_DIR/utils.py" sed "s|{{IMAGE_TAG}}|$BUILD_VERSION|g" "$file"
+	done
+
+	# Verify replacements
+	if grep -r "{{IMAGE_TAG}}" "$BUILD_DIR/assets/workspace" 2>/dev/null; then
+		echo "❌ Some {{IMAGE_TAG}} placeholders were not replaced!"
+		exit 1
+	fi
+	echo "✓ All {{IMAGE_TAG}} placeholders replaced"
+fi
+
+# Update devcontainer README with version (if script exists and file exists)
+BUILD_DEVCONTAINER_README="$BUILD_DIR/assets/workspace/.devcontainer/README.md"
+if [ -f "$BUILD_DEVCONTAINER_README" ] && [ -f "scripts/update_readme.py" ] && [ "$BUILD_VERSION" != "dev" ]; then
+	RELEASE_DATE="$(date -u +%Y-%m-%d)"
+	RELEASE_URL=""
+	# Only update README if RELEASE_URL is provided (indicates a versioned release, not dev build)
+	if [ -n "$RELEASE_URL" ]; then
+		echo "Updating devcontainer README with version $BUILD_VERSION..."
+		if uv run python "$SCRIPT_DIR/utils.py" version "$BUILD_DEVCONTAINER_README" "$BUILD_VERSION" "$RELEASE_URL" "$RELEASE_DATE"; then
+			echo "✓ Updated devcontainer README with version $BUILD_VERSION"
+		else
+			echo "❌ Failed to update devcontainer README..."
+			exit 1
+		fi
+	fi
+fi
+
+echo "✓ Build directory prepared: $BUILD_DIR"
 
 # Build the image from build folder
 echo "Building image from build folder..."
