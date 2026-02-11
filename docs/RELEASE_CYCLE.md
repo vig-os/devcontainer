@@ -18,16 +18,16 @@ This document defines the release workflow, branching strategy, and automation f
 
 ### Branch Hierarchy
 
-```
-main          Production releases (tagged)
-  ↑
-  └─ release/X.Y.Z    Release preparation and testing (write-protected)
-       ↑             └─ bugfix/N-description   Fixes during release
-       |
-       └─ dev         Main development branch (default)
-            ↑
-            └─ feature/N-description   Feature development
-            └─ bugfix/N-description    Bug fixes
+```mermaid
+graph LR
+    dev[dev] -->|"fork"| release["release/X.Y.Z"]
+    release -->|"merge"| main[main]
+    dev -->|"fork"| feature["feature/N-desc"]
+    feature -->|"merge"| dev
+    dev -->|"fork"| bugfix_dev["bugfix/N-desc"]
+    bugfix_dev -->|"merge"| dev
+    release -->|"fork"| bugfix_rel["bugfix/N-desc"]
+    bugfix_rel -->|"merge"| release
 ```
 
 ### Branch Types
@@ -70,7 +70,7 @@ graph TB
     D --> E[CI runs automatically]
     E --> F[Mark PR ready for review]
     F --> G{Issues found?}
-    G -->|Yes| H[Fix via feature branch PR]
+    G -->|Yes| H[Fix via bugfix branch PR]
     H --> E
     G -->|No| I[Get PR approvals]
     I --> J[finalize-release X.Y.Z]
@@ -208,11 +208,11 @@ This is the main quality gate. The release branch and draft PR serve as the coor
 
 5. **Fix Issues**
 
-   All fixes must go through feature branches (release branch is write-protected):
+   All fixes must go through bugfix branches (release branch is write-protected):
 
    ```bash
-   # Create feature branch from release
-   git checkout -b fix/N-fix-description release/1.0.0
+   # Create bugfix branch from release
+   git checkout -b bugfix/N-fix-description release/1.0.0
 
    # Make fixes...
    git add .
@@ -225,8 +225,8 @@ This is the main quality gate. The release branch and draft PR serve as the coor
    just test
 
    # Push and create PR to release branch
-   git push origin feature/N-fix-description
-   gh pr create --base release/1.0.0 --head feature/N-fix-description
+   git push origin bugfix/N-fix-description
+   gh pr create --base release/1.0.0 --head bugfix/N-fix-description
 
    # Request review, address feedback
    # After PR is approved and merged:
@@ -275,7 +275,7 @@ just finalize-release X.Y.Z
 8. ✅ Triggers sync-issues workflow to generate PR doc
 9. ✅ Waits for sync-issues completion
 10. ✅ Pulls PR doc changes
-11. ✅ Creates annotated tag `vX.Y.Z`
+11. ✅ Creates signed annotated tag `vX.Y.Z`
 12. ✅ Pushes tag to origin
 13. ✅ Outputs merge instructions
 
@@ -410,13 +410,27 @@ git branch -d release/X.Y.Z
 
 **Prerequisites:**
 - Must be on `release/X.Y.Z` branch
-- CI checks should have passed
-- PR should be reviewed and approved
+- CI checks must have passed
+- PR must be reviewed and approved
 - GitHub CLI (`gh`) and origin remote must be configured
 
 **Exit codes:**
 - `0`: Success
 - `1`: Validation error or failure
+
+### prepare-build.sh
+
+**Location:** `scripts/prepare-build.sh`
+
+**Purpose:** Prepare build context for container image construction
+
+**Usage:**
+
+```bash
+./scripts/prepare-build.sh VERSION BUILD_DIR DATE RELEASE_URL
+```
+
+Used during local testing (Phase 2) and by the release workflow.
 
 ### prepare-changelog.py
 
@@ -451,12 +465,15 @@ uv run python scripts/prepare-changelog.py reset [CHANGELOG.md]
 
 **Safety:** Fails if Unreleased section already exists (prevents accidental data loss).
 
-#### `extract-pr VERSION [FILE]` *(planned)*
-Extract version section for PR body generation.
+#### `finalize VERSION DATE [FILE]`
+
+Replace TBD date with actual release date for a version section.
 
 ```bash
-uv run python scripts/prepare-changelog.py extract-pr 1.0.0 [CHANGELOG.md]
+uv run python scripts/prepare-changelog.py finalize 1.0.0 2026-02-11 [CHANGELOG.md]
 ```
+
+Used by `finalize-release.sh` to set the actual release date.
 
 **Tests:** `tests/test_release_cycle.py::TestPrepareChangelog` (22 tests)
 
@@ -470,7 +487,7 @@ uv run python scripts/prepare-changelog.py extract-pr 1.0.0 [CHANGELOG.md]
 # Prepare release branch
 just prepare-release X.Y.Z
 
-# Finalize release (planned)
+# Finalize release
 just finalize-release X.Y.Z
 
 # Reset CHANGELOG after release
@@ -775,11 +792,3 @@ Follow [Semantic Versioning 2.0.0](https://semver.org/):
 - [Branch Naming Rules](../.cursor/rules/branch-naming.mdc) - Topic branch conventions
 - [IEC 62304](https://www.iso.org/standard/38421.html) - Medical device software lifecycle
 - [Semantic Versioning](https://semver.org/) - Version numbering scheme
-
----
-
-## Document History
-
-| Version | Date | Author | Changes |
-|---------|------|--------|---------|
-| 1.0.0 | 2026-02-06 | Carlos Vigo | Initial documentation of release cycle and branching strategy |

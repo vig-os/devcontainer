@@ -6,7 +6,6 @@
 # - Creates release branch from dev
 # - Validates semantic version format
 # - Prepares CHANGELOG structure (WITHOUT setting release date)
-# - Creates placeholder QMS baseline
 # - Creates standardized commit and draft PR to main
 #
 # After testing/validation, run finalize-release.sh to complete the release.
@@ -180,10 +179,9 @@ if [ "$DRY_RUN" = true ]; then
     echo "Would perform the following actions:"
     echo "  1. Create branch: $RELEASE_BRANCH"
     echo "  2. Prepare CHANGELOG.md (Unreleased → $VERSION, NO date yet)"
-    echo "  3. Create placeholder QMS baseline"
-    echo "  4. Commit changes"
-    echo "  5. Push branch to origin"
-    echo "  6. Create draft PR to main"
+    echo "  3. Commit changes"
+    echo "  4. Push branch to origin"
+    echo "  5. Create draft PR to main"
     echo ""
     echo "After testing, run: ./scripts/finalize-release.sh $VERSION"
     exit 0
@@ -203,52 +201,14 @@ fi
 # Skip documentation regeneration - will be done at finalize
 info "Skipping documentation generation (will be done at finalization)"
 
-# Create placeholder QMS baseline
-info "Creating placeholder QMS baseline..."
-mkdir -p docs/baselines
-
-cat > "docs/baselines/baseline-v$VERSION.md" <<EOF
-# Release Baseline v$VERSION
-
-**Status:** DRAFT - Release in preparation
-**Release Date:** TBD (will be set by finalize-release.sh)
-**Git Tag:** Not yet created
-**Git SHA:** $(git rev-parse HEAD)
-
-## Configuration Identification
-
-- Version: $VERSION
-- Base Branch: dev
-- Release Branch: $RELEASE_BRANCH
-
-## Status
-
-This release is in preparation and testing phase.
-
-## Next Steps
-
-1. Test the release thoroughly
-2. Fix any issues found
-3. When ready, run: ./scripts/finalize-release.sh $VERSION
-
-The finalize script will:
-- Set the actual release date
-- Generate complete QMS baseline documentation
-- Update all version references
-- Create git tag
-- Trigger CI/CD pipeline
-EOF
-
 # Create commit
 info "Creating release preparation commit..."
 git add CHANGELOG.md 2>/dev/null || true
-git add docs/baselines/ 2>/dev/null || true
 
 git commit -m "$(cat <<EOF
 chore: prepare release $VERSION
 
 - Prepare CHANGELOG.md structure for version $VERSION
-- Create placeholder QMS baseline
 - Release date TBD (set during finalization)
 
 Next: Test release, then run finalize-release.sh
@@ -288,7 +248,6 @@ Run: \`./scripts/finalize-release.sh $VERSION\`
 
 This will:
 - Set release date in CHANGELOG
-- Generate complete QMS baseline
 - Update all documentation
 - Create commit and push
 - Tag will trigger CI/CD automatically
