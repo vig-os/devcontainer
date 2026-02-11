@@ -18,3 +18,4 @@ scripts/                        @c-vigo
 .github/dependabot.yml          @c-vigo
 .github/CODEOWNERS              @c-vigo
 SECURITY.md                     @c-vigo
+Containerfile                   @c-vigo

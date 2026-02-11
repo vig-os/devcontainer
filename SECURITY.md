@@ -49,9 +49,19 @@ The following areas are in scope for security reports:
 This repository follows these security practices:
 
 - All GitHub Actions are pinned to commit SHAs (not mutable tags)
+- Pre-commit hook repos are pinned to commit SHAs
+- Docker base image is pinned to digest in the Containerfile
 - Dependabot monitors dependencies for known vulnerabilities
+- Dependency review blocks PRs that introduce vulnerable dependencies
+- Container images are scanned for vulnerabilities (Trivy) in CI and release
+- SBOM (SPDX) is generated and attested for every release
+- Released container images are signed with Sigstore cosign (keyless)
+- SLSA build provenance attestations are attached to released images
 - Workflow permissions follow the principle of least privilege
+- Workflow inputs are bound to environment variables (not interpolated inline)
 - No `pull_request_target` triggers are used (prevents untrusted code execution)
+- OpenSSF Scorecard runs weekly to track security posture
+- CodeQL static analysis scans Python build tooling
 - Branch protection is enforced via GitHub Enterprise
 
 ## Compliance
