@@ -38,6 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     locales \
     ca-certificates \
     nano \
+    minisign \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Generate en_US.UTF-8 locale
@@ -97,11 +98,8 @@ RUN set -eux; \
     rm "$FILE"; \
     just --version;
 
-# Install latest cargo-binstall from release archive (installs to ~/.cargo/bin)
-# Note: cargo-binstall provides .sig (GPG) signatures but not SHA256 checksums.
-# We download directly from the versioned release URL over TLS instead of running
-# an unverified install script from the main branch.
-# The installed binary version is verified against the expected release version.
+# Install latest cargo-binstall from release archive with minisign signature verification
+# cargo-binstall uses minisign for signing releases. Each release has an ephemeral key.
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN set -eux; \
     case "${TARGETARCH}" in \
@@ -112,17 +110,23 @@ RUN set -eux; \
     BINSTALL_VERSION="$(curl -fsSL https://api.github.com/repos/cargo-bins/cargo-binstall/releases/latest | sed -n 's/.*"tag_name": *"v\?\([^"]*\)".*/\1/p')"; \
     URL="https://github.com/cargo-bins/cargo-binstall/releases/download/v${BINSTALL_VERSION}"; \
     FILE="cargo-binstall-${ARCH}.tgz"; \
+    SIG_FILE="${FILE}.sig"; \
+    PUBKEY_FILE="minisign.pub"; \
     curl -fsSL "${URL}/${FILE}" -o "$FILE"; \
+    curl -fsSL "${URL}/${SIG_FILE}" -o "$SIG_FILE"; \
+    curl -fsSL "${URL}/${PUBKEY_FILE}" -o "$PUBKEY_FILE"; \
+    PUBKEY="$(grep -v '^untrusted comment:' "$PUBKEY_FILE")"; \
+    minisign -V -m "$FILE" -x "$SIG_FILE" -P "$PUBKEY"; \
     mkdir -p /root/.cargo/bin; \
     tar -xzf "$FILE" -C /root/.cargo/bin; \
     chmod +x /root/.cargo/bin/cargo-binstall; \
-    rm "$FILE"; \
-    INSTALLED_VERSION="$(cargo-binstall -V | awk '{print $2}')"; \
+    rm "$FILE" "$SIG_FILE" "$PUBKEY_FILE"; \
+    INSTALLED_VERSION="$(cargo-binstall -V | cut -d ' ' -f2)"; \
     if [ "$INSTALLED_VERSION" != "$BINSTALL_VERSION" ]; then \
         echo "Version mismatch: expected ${BINSTALL_VERSION}, got ${INSTALLED_VERSION}"; \
         exit 1; \
     fi; \
-    echo "cargo-binstall ${INSTALLED_VERSION} verified";
+    echo "cargo-binstall ${INSTALLED_VERSION} verified with minisign";
 
 # Install just LSP
 RUN cargo-binstall just-lsp; \
