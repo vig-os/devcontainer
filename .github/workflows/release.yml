@@ -46,10 +46,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write    # commits, tags
-  packages: write    # GHCR image push
-  issues: write      # create rollback issue
-  actions: write     # trigger sync-issues workflow
+  contents: read     # safe default; jobs escalate as needed
 
 jobs:
   validate:
@@ -72,9 +69,11 @@ jobs:
 
       - name: Validate and prepare variables
         id: vars
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${{ github.event.inputs.version }}"
+          VERSION="$INPUT_VERSION"
 
           # Validate semantic version format
           if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
@@ -198,10 +197,12 @@ jobs:
 
       - name: Validate and parse architectures
         id: matrix
+        env:
+          INPUT_ARCHITECTURES: ${{ github.event.inputs.architectures }}
         run: |
           set -euo pipefail
 
-          ARCHS="${{ github.event.inputs.architectures }}"
+          ARCHS="$INPUT_ARCHITECTURES"
           echo "Input architectures: $ARCHS"
 
           # Remove spaces and convert to array
@@ -253,6 +254,9 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     if: ${{ github.event.inputs.dry-run != 'true' }}
+    permissions:
+      contents: write    # push commits to release branch
+      actions: write     # trigger sync-issues workflow
     outputs:
       finalize_sha: ${{ steps.finalize.outputs.finalize_sha }}
 
@@ -272,9 +276,12 @@ jobs:
           persist-credentials: true
 
       - name: Configure git
+        env:
+          GIT_USER_NAME: ${{ github.event.inputs.git-user-name }}
+          GIT_USER_EMAIL: ${{ github.event.inputs.git-user-email }}
         run: |
-          git config user.name "${{ github.event.inputs.git-user-name }}"
-          git config user.email "${{ github.event.inputs.git-user-email }}"
+          git config user.name "$GIT_USER_NAME"
+          git config user.email "$GIT_USER_EMAIL"
 
       - name: Set up Python
         uses: ./.github/actions/setup-env
@@ -429,6 +436,9 @@ jobs:
     needs: [validate, finalize, build-and-test]
     runs-on: ubuntu-22.04
     timeout-minutes: 30
+    permissions:
+      contents: write    # create and push tags
+      packages: write    # push images to GHCR
 
     steps:
       - name: Generate GitHub App Token
@@ -446,9 +456,12 @@ jobs:
           persist-credentials: true
 
       - name: Configure git
+        env:
+          GIT_USER_NAME: ${{ github.event.inputs.git-user-name }}
+          GIT_USER_EMAIL: ${{ github.event.inputs.git-user-email }}
         run: |
-          git config user.name "${{ github.event.inputs.git-user-name }}"
-          git config user.email "${{ github.event.inputs.git-user-email }}"
+          git config user.name "$GIT_USER_NAME"
+          git config user.email "$GIT_USER_EMAIL"
 
       - name: Create annotated tag
         run: |
@@ -660,9 +673,12 @@ jobs:
           persist-credentials: true
 
       - name: Configure git
+        env:
+          GIT_USER_NAME: ${{ github.event.inputs.git-user-name }}
+          GIT_USER_EMAIL: ${{ github.event.inputs.git-user-email }}
         run: |
-          git config user.name "${{ github.event.inputs.git-user-name }}"
-          git config user.email "${{ github.event.inputs.git-user-email }}"
+          git config user.name "$GIT_USER_NAME"
+          git config user.email "$GIT_USER_EMAIL"
 
       - name: Rollback release branch
         continue-on-error: true

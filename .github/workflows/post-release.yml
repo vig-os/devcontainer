@@ -32,14 +32,16 @@ on:  # yamllint disable-line rule:truthy
         type: string
 
 permissions:
-  contents: write
-  actions: write       # trigger sync-issues workflow
+  contents: read       # safe default; sync-dev job escalates as needed
 
 jobs:
   sync-dev:
     name: Sync dev with main
     runs-on: ubuntu-22.04
     timeout-minutes: 10
+    permissions:
+      contents: write    # push merge commit to dev
+      actions: write     # trigger sync-issues workflow
     if: >-
       ${{ github.event_name == 'workflow_dispatch'
        || github.event.pull_request.merged == true }}
@@ -61,9 +63,12 @@ jobs:
           persist-credentials: true
 
       - name: Configure git
+        env:
+          GIT_USER_NAME: ${{ inputs.git-user-name || 'vigOS Release Bot' }}
+          GIT_USER_EMAIL: ${{ inputs.git-user-email || 'release@vig-os.local' }}
         run: |
-          git config user.name "${{ inputs.git-user-name || 'vigOS Release Bot' }}"
-          git config user.email "${{ inputs.git-user-email || 'release@vig-os.local' }}"
+          git config user.name "$GIT_USER_NAME"
+          git config user.email "$GIT_USER_EMAIL"
 
       - name: Merge main into dev
         run: |

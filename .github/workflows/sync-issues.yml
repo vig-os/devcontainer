@@ -34,9 +34,12 @@ on:  # yamllint disable-line rule:truthy
       - opened
       - closed
 
+permissions: {}  # restrict default; job declares its own
+
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # Prevent concurrent runs to avoid race conditions when committing and cache collisions
     concurrency:
       group: sync-issues-${{ github.repository }}
@@ -57,15 +60,20 @@ jobs:
 
       - name: Determine target branch
         id: branch
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TARGET_BRANCH: ${{ github.event.inputs.target-branch }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           # Use manual input if provided (workflow_dispatch), otherwise use automatic detection
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.target-branch }}" ]; then
-            TARGET_BRANCH="${{ github.event.inputs.target-branch }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$INPUT_TARGET_BRANCH" ]; then
+            TARGET_BRANCH="$INPUT_TARGET_BRANCH"
             echo "✓ Using manual target branch: $TARGET_BRANCH"
           # If PR was merged into main, commit to main; otherwise use dev
-          elif [ "${{ github.event_name }}" = "pull_request" ] && \
-               [ "${{ github.event.pull_request.merged }}" = "true" ] && \
-               [ "${{ github.event.pull_request.base.ref }}" = "main" ]; then
+          elif [ "$EVENT_NAME" = "pull_request" ] && \
+               [ "$PR_MERGED" = "true" ] && \
+               [ "$PR_BASE_REF" = "main" ]; then
             TARGET_BRANCH="main"
             echo "✓ PR merged into main - will commit to main"
           else

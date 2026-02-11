@@ -35,8 +35,7 @@ on:  # yamllint disable-line rule:truthy
         type: string
 
 permissions:
-  contents: write         # create branch, push commits
-  pull-requests: write    # create draft PR
+  contents: read          # safe default; prepare job escalates as needed
 
 jobs:
   validate:
@@ -56,9 +55,11 @@ jobs:
 
       - name: Validate and prepare variables
         id: vars
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${{ github.event.inputs.version }}"
+          VERSION="$INPUT_VERSION"
 
           # Validate semantic version format
           if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
@@ -137,6 +138,9 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     if: ${{ github.event.inputs.dry-run != 'true' }}
+    permissions:
+      contents: write         # create branch, push commits
+      pull-requests: write    # create draft PR
 
     steps:
       - name: Generate GitHub App Token
@@ -155,9 +159,12 @@ jobs:
           fetch-depth: 0
 
       - name: Configure git
+        env:
+          GIT_USER_NAME: ${{ github.event.inputs.git-user-name }}
+          GIT_USER_EMAIL: ${{ github.event.inputs.git-user-email }}
         run: |
-          git config user.name "${{ github.event.inputs.git-user-name }}"
-          git config user.email "${{ github.event.inputs.git-user-email }}"
+          git config user.name "$GIT_USER_NAME"
+          git config user.email "$GIT_USER_EMAIL"
 
       - name: Set up Python
         uses: ./.github/actions/setup-env
