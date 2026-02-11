@@ -8,6 +8,8 @@
 #   2. test-image - Run image tests
 #   3. test-integration - Run integration tests
 #   4. project-checks - Linters, utils, release cycle tests
+#   5. security-scan - Container image vulnerability scanning (Trivy)
+#   6. dependency-review - Dependency vulnerability check (PRs only)
 #
 # Triggers:
 #   - Pull requests to dev, release/**, and main (runs all suites)
@@ -166,11 +168,82 @@ jobs:
       - name: Run project checks
         uses: ./.github/actions/test-project
 
+  security-scan:
+    name: Security Scan
+    needs: build-image
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      inputs.test-suite == 'all' ||
+      inputs.test-suite == 'image'
+    permissions:
+      contents: read
+      security-events: write    # upload SARIF results to GitHub Security tab
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Download image artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          name: container-image-${{ needs.build-image.outputs.version }}-amd64
+          path: /tmp
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
+        with:
+          input: /tmp/image.tar
+          format: 'table'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+
+      - name: Generate SARIF report
+        if: always()
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
+        with:
+          input: /tmp/image.tar
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@b5ebac6f4c00c8ccddb7cdcd45fdb248329f808a  # v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: 'container-image'
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Review dependencies for vulnerabilities
+        uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261  # v4
+        with:
+          fail-on-severity: high
+
   summary:
     name: Test Summary
     runs-on: ubuntu-22.04
     timeout-minutes: 5
-    needs: [build-image, test-image, test-integration, project-checks]
+    needs:
+      - build-image
+      - test-image
+      - test-integration
+      - project-checks
+      - security-scan
+      - dependency-review
     if: always()
 
     steps:
@@ -183,6 +256,8 @@ jobs:
           echo "Image Tests: ${{ needs.test-image.result }}"
           echo "Integration Tests: ${{ needs.test-integration.result }}"
           echo "Project Checks: ${{ needs.project-checks.result }}"
+          echo "Security Scan: ${{ needs.security-scan.result }}"
+          echo "Dependency Review: ${{ needs.dependency-review.result }}"
           echo ""
 
           # Check if any job that ran has failed (skip 'skipped' jobs)
@@ -205,6 +280,16 @@ jobs:
 
           if [ "${{ needs.project-checks.result }}" = "failure" ]; then
             echo "ERROR: Project checks failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.security-scan.result }}" = "failure" ]; then
+            echo "ERROR: Security scan failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.dependency-review.result }}" = "failure" ]; then
+            echo "ERROR: Dependency review failed"
             FAILED=true
           fi
 
