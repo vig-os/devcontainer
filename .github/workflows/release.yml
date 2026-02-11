@@ -85,7 +85,7 @@ jobs:
           RELEASE_BRANCH="release/$VERSION"
           RELEASE_DATE=$(date -u +%Y-%m-%d)
           BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
+          RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/tag/v$VERSION"
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
@@ -94,13 +94,15 @@ jobs:
           echo "release_branch=$RELEASE_BRANCH" >> $GITHUB_OUTPUT
 
       - name: Checkout release branch
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
         run: |
-          git fetch origin release/${{ steps.vars.outputs.version }} || {
-            echo "ERROR: Release branch not found: release/${{ steps.vars.outputs.version }}"
-            echo "Did you run: just prepare-release ${{ steps.vars.outputs.version }}"
+          git fetch origin "release/$VERSION" || {
+            echo "ERROR: Release branch not found: release/$VERSION"
+            echo "Did you run: just prepare-release $VERSION"
             exit 1
           }
-          git checkout origin/release/${{ steps.vars.outputs.version }}
+          git checkout "origin/release/$VERSION"
 
       - name: Record pre-finalization SHA
         id: pre_sha
@@ -110,16 +112,20 @@ jobs:
           echo "Pre-finalization SHA: $PRE_FINALIZE_SHA"
 
       - name: Verify CHANGELOG has TBD entry
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
         run: |
-          if ! grep -q "## \[${{ steps.vars.outputs.version }}\] - TBD" CHANGELOG.md; then
-            echo "ERROR: CHANGELOG.md does not contain '## [${{ steps.vars.outputs.version }}] - TBD'"
+          if ! grep -q "## \[$VERSION\] - TBD" CHANGELOG.md; then
+            echo "ERROR: CHANGELOG.md does not contain '## [$VERSION] - TBD'"
             exit 1
           fi
 
       - name: Verify tag does not exist
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
         run: |
-          if git tag -l | grep -q "^v${{ steps.vars.outputs.version }}$"; then
-            echo "ERROR: Tag v${{ steps.vars.outputs.version }} already exists"
+          if git tag -l | grep -q "^v${VERSION}$"; then
+            echo "ERROR: Tag v$VERSION already exists"
             exit 1
           fi
 
@@ -131,9 +137,11 @@ jobs:
 
       - name: Find and verify PR
         id: pr
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.vars.outputs.version }}"
           RELEASE_BRANCH="release/$VERSION"
 
           # Find PR from release branch to main
@@ -192,9 +200,6 @@ jobs:
 
           echo "✓ PR #$PR_NUMBER verified: ready and approved"
 
-        env:
-          GH_TOKEN: ${{ github.token }}
-
       - name: Validate and parse architectures
         id: matrix
         env:
@@ -237,16 +242,22 @@ jobs:
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
       - name: Summary
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          RELEASE_DATE: ${{ steps.vars.outputs.release_date }}
+          ARCHITECTURES: ${{ steps.matrix.outputs.architectures }}
+          DRY_RUN: ${{ github.event.inputs.dry-run }}
         run: |
           echo "✓ All validation checks passed"
           echo ""
           echo "Release Configuration:"
-          echo "  Version: ${{ steps.vars.outputs.version }}"
-          echo "  Release Branch: release/${{ steps.vars.outputs.version }}"
-          echo "  PR: #${{ steps.pr.outputs.pr_number }}"
-          echo "  Release Date: ${{ steps.vars.outputs.release_date }}"
-          echo "  Architectures: ${{ steps.matrix.outputs.architectures }}"
-          echo "  Dry-run: ${{ github.event.inputs.dry-run }}"
+          echo "  Version: $VERSION"
+          echo "  Release Branch: release/$VERSION"
+          echo "  PR: #$PR_NUMBER"
+          echo "  Release Date: $RELEASE_DATE"
+          echo "  Architectures: $ARCHITECTURES"
+          echo "  Dry-run: $DRY_RUN"
 
   finalize:
     name: Finalize Release
@@ -289,36 +300,46 @@ jobs:
           install-podman: 'false'
 
       - name: Set release date in CHANGELOG
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_DATE: ${{ needs.validate.outputs.release_date }}
         run: |
           set -euo pipefail
-          uv run python scripts/prepare-changelog.py finalize "${{ needs.validate.outputs.version }}" "${{ needs.validate.outputs.release_date }}"
+          uv run python scripts/prepare-changelog.py finalize "$VERSION" "$RELEASE_DATE"
           echo "✓ Release date set in CHANGELOG.md"
 
       - name: Commit finalization changes
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_DATE: ${{ needs.validate.outputs.release_date }}
+          PR_NUMBER: ${{ needs.validate.outputs.pr_number }}
         run: |
           set -euo pipefail
           git add CHANGELOG.md
-          git commit -m "chore: finalize release ${{ needs.validate.outputs.version }}
+          git commit -m "chore: finalize release $VERSION
 
-          Set release date to ${{ needs.validate.outputs.release_date }} in CHANGELOG.md
+          Set release date to $RELEASE_DATE in CHANGELOG.md
 
-          Refs: #${{ needs.validate.outputs.pr_number }}"
+          Refs: #$PR_NUMBER"
           echo "✓ Finalization commit created"
 
       - name: Push release branch
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          git push origin release/${{ needs.validate.outputs.version }}
+          git push origin "release/$VERSION"
           echo "✓ Release branch pushed"
 
       - name: Trigger sync-issues workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
           echo "Triggering sync-issues workflow..."
           gh workflow run sync-issues.yml \
-            -f "target-branch=release/${{ needs.validate.outputs.version }}"
+            -f "target-branch=release/$VERSION"
           echo "✓ sync-issues workflow triggered"
-        env:
-          GH_TOKEN: ${{ github.token }}
 
       - name: Wait for sync-issues completion
         run: |
@@ -366,9 +387,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Pull sync-issues changes
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          if git pull origin release/${{ needs.validate.outputs.version }} --no-edit 2>/dev/null; then
+          if git pull origin "release/$VERSION" --no-edit 2>/dev/null; then
             echo "✓ Pulled sync-issues changes"
           fi
 
@@ -419,6 +442,14 @@ jobs:
         with:
           image-tag: ${{ needs.validate.outputs.version }}-${{ matrix.arch }}
 
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
+        with:
+          input: /tmp/image.tar
+          format: 'table'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+
       - name: Upload tested image
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
@@ -429,7 +460,7 @@ jobs:
 
       - name: Summary
         run: |
-          echo "✓ Build and tests passed for ${{ matrix.arch }}"
+          echo "✓ Build, tests, and security scan passed for ${{ matrix.arch }}"
 
   publish:
     name: Publish Release
@@ -437,8 +468,10 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     permissions:
-      contents: write    # create and push tags
-      packages: write    # push images to GHCR
+      contents: write       # create and push tags
+      packages: write       # push images to GHCR
+      id-token: write       # keyless cosign signing via OIDC
+      attestations: write   # build provenance attestations
 
     steps:
       - name: Generate GitHub App Token
@@ -464,16 +497,22 @@ jobs:
           git config user.email "$GIT_USER_EMAIL"
 
       - name: Create annotated tag
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          git tag -a "v${{ needs.validate.outputs.version }}" \
-            -m "Release ${{ needs.validate.outputs.version }}"
-          echo "✓ Tag created: v${{ needs.validate.outputs.version }}"
+          git tag -a "v$VERSION" -m "Release $VERSION"
+          echo "✓ Tag created: v$VERSION"
 
       - name: Push tag
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          git push origin "v${{ needs.validate.outputs.version }}"
+          git push origin "v$VERSION"
           echo "✓ Tag pushed"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad  # v4
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
@@ -489,11 +528,12 @@ jobs:
           pattern: container-image-${{ needs.validate.outputs.version }}-*
 
       - name: Load and push images
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          ARCHS: ${{ needs.validate.outputs.architectures }}
         run: |
           set -euo pipefail
           REPO="ghcr.io/vig-os/devcontainer"
-          VERSION="${{ needs.validate.outputs.version }}"
-          ARCHS="${{ needs.validate.outputs.architectures }}"
 
           IFS=' ' read -ra ARCH_ARRAY <<< "$ARCHS"
 
@@ -530,11 +570,12 @@ jobs:
           done
 
       - name: Create multi-arch manifest
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          ARCHS: ${{ needs.validate.outputs.architectures }}
         run: |
           set -euo pipefail
           REPO="ghcr.io/vig-os/devcontainer"
-          VERSION="${{ needs.validate.outputs.version }}"
-          ARCHS="${{ needs.validate.outputs.architectures }}"
 
           IFS=' ' read -ra ARCH_ARRAY <<< "$ARCHS"
 
@@ -590,11 +631,12 @@ jobs:
           fi
 
       - name: Verify manifests
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          ARCHS: ${{ needs.validate.outputs.architectures }}
         run: |
           set -euo pipefail
           REPO="ghcr.io/vig-os/devcontainer"
-          VERSION="${{ needs.validate.outputs.version }}"
-          ARCHS="${{ needs.validate.outputs.architectures }}"
 
           IFS=' ' read -ra ARCH_ARRAY <<< "$ARCHS"
 
@@ -634,16 +676,77 @@ jobs:
             done
           fi
 
+      - name: Generate SBOM
+        uses: anchore/sbom-action@28d71544de8eaf1b958d335707167c5f783590ad  # v0.22.2
+        with:
+          image: ghcr.io/vig-os/devcontainer:${{ needs.validate.outputs.version }}
+          artifact-name: sbom-${{ needs.validate.outputs.version }}.spdx.json
+          output-file: /tmp/sbom.spdx.json
+          format: spdx-json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: sbom-${{ needs.validate.outputs.version }}
+          path: /tmp/sbom.spdx.json
+          retention-days: 90
+
+      - name: Sign container image with cosign
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          REPO="ghcr.io/vig-os/devcontainer"
+
+          # Get the digest for the multi-arch manifest
+          DIGEST=$(docker buildx imagetools inspect "$REPO:$VERSION" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          echo "Signing image: $REPO@$DIGEST"
+
+          # Keyless signing using GitHub Actions OIDC identity
+          cosign sign --yes "$REPO@$DIGEST"
+          echo "✓ Image signed with cosign (keyless)"
+
+      - name: Capture image digest for attestation
+        id: digest
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          REPO="ghcr.io/vig-os/devcontainer"
+          DIGEST=$(docker buildx imagetools inspect "$REPO:$VERSION" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+          echo "Image digest: $DIGEST"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f  # v3
+        with:
+          subject-name: ghcr.io/vig-os/devcontainer
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest SBOM
+        uses: actions/attest-sbom@4651f806c01d8637787e274ac3bdf724ef169f34  # v3
+        with:
+          subject-name: ghcr.io/vig-os/devcontainer
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          sbom-path: /tmp/sbom.spdx.json
+          push-to-registry: true
+
       - name: Summary
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           echo "✓ Release published successfully!"
           echo ""
           echo "Release Summary:"
-          echo "  Version: ${{ needs.validate.outputs.version }}"
-          echo "  Tag: v${{ needs.validate.outputs.version }}"
+          echo "  Version: $VERSION"
+          echo "  Tag: v$VERSION"
           echo "  Images:"
-          echo "    - ghcr.io/vig-os/devcontainer:${{ needs.validate.outputs.version }}"
+          echo "    - ghcr.io/vig-os/devcontainer:$VERSION"
           echo "    - ghcr.io/vig-os/devcontainer:latest"
+          echo "  Security:"
+          echo "    - Cosign signature attached"
+          echo "    - SLSA build provenance attested"
+          echo "    - SBOM (SPDX) generated and attested"
           echo ""
           echo "Next steps:"
           echo "  1. Merge release PR to main (triggers post-release workflow automatically)"
@@ -682,16 +785,17 @@ jobs:
 
       - name: Rollback release branch
         continue-on-error: true
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          PRE_SHA: ${{ needs.validate.outputs.pre_finalize_sha }}
         run: |
           set -euo pipefail
-          VERSION="${{ needs.validate.outputs.version }}"
-          PRE_SHA="${{ needs.validate.outputs.pre_finalize_sha }}"
 
           echo "Rolling back release branch to pre-finalization state..."
-          git fetch origin release/$VERSION
+          git fetch origin "release/$VERSION"
 
           if git reset --hard "$PRE_SHA" 2>/dev/null; then
-            if git push --force-with-lease origin release/$VERSION; then
+            if git push --force-with-lease origin "release/$VERSION"; then
               echo "✓ Release branch rolled back"
             else
               echo "⚠ Warning: Could not push rollback (branch may already be reset)"
@@ -700,9 +804,11 @@ jobs:
 
       - name: Delete tag if created
         continue-on-error: true
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          TAG="v${{ needs.validate.outputs.version }}"
+          TAG="v$VERSION"
 
           if git ls-remote origin "refs/tags/$TAG" | grep -q "$TAG"; then
             echo "Deleting remote tag: $TAG"
