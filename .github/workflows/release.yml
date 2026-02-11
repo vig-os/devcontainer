@@ -29,6 +29,16 @@ on:  # yamllint disable-line rule:truthy
         required: false
         default: false
         type: boolean
+      git-user-name:
+        description: 'Git user name for commits'
+        required: false
+        default: 'vigOS Release Bot'
+        type: string
+      git-user-email:
+        description: 'Git user email for commits'
+        required: false
+        default: 'release@vig-os.local'
+        type: string
 
 concurrency:
   # Prevent multiple releases from running simultaneously (race conditions on tags/manifests)
@@ -240,8 +250,8 @@ jobs:
 
       - name: Configure git
         run: |
-          git config user.name "vigOS Release Bot"
-          git config user.email "release@vig-os.local"
+          git config user.name "${{ github.event.inputs.git-user-name }}"
+          git config user.email "${{ github.event.inputs.git-user-email }}"
 
       - name: Set up Python
         uses: ./.github/actions/setup-env
@@ -414,8 +424,8 @@ jobs:
 
       - name: Configure git
         run: |
-          git config user.name "vigOS Release Bot"
-          git config user.email "release@vig-os.local"
+          git config user.name "${{ github.event.inputs.git-user-name }}"
+          git config user.email "${{ github.event.inputs.git-user-email }}"
 
       - name: Create annotated tag
         run: |
@@ -630,8 +640,8 @@ jobs:
 
       - name: Configure git
         run: |
-          git config user.name "vigOS Release Bot"
-          git config user.email "release@vig-os.local"
+          git config user.name "${{ github.event.inputs.git-user-name }}"
+          git config user.email "${{ github.event.inputs.git-user-email }}"
 
       - name: Rollback release branch
         continue-on-error: true

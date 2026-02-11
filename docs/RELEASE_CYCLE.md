@@ -81,9 +81,9 @@ When starting work on a GitHub issue:
 
 ```mermaid
 graph TB
-    A["Development on dev"] --> B["just prepare-release X.Y.Z"]
-    B --> C["Create release/X.Y.Z branch"]
-    C --> D["Create draft PR to main"]
+    A["Development on dev"] --> B["just prepare-release X.Y.Z<br/>(triggers workflow)"]
+    B --> C["Workflow: Create release/X.Y.Z branch"]
+    C --> D["Workflow: Create draft PR to main"]
     D --> E["Review & Test Release"]
     E --> F{Issues found?}
     F -->|Yes| G["Fix via bugfix PRs"]
@@ -122,45 +122,59 @@ graph TB
 **Execute:**
 
 ```bash
-# Ensure you're on dev and up to date
-git checkout dev
-git pull origin dev
-
-# Prepare the release
+# Trigger the prepare-release workflow via GitHub Actions
 just prepare-release X.Y.Z
 
-# Or directly:
-./scripts/prepare-release.sh X.Y.Z
+# Or directly via GitHub CLI:
+gh workflow run prepare-release.yml -f "version=X.Y.Z"
 ```
 
-**What happens:**
-1. ✅ Validates semantic version format (X.Y.Z)
-2. ✅ Checks you're on `dev` branch
-3. ✅ Verifies no uncommitted changes
-4. ✅ Validates CHANGELOG has Unreleased content
-5. ✅ Creates `release/X.Y.Z` branch from `dev`
-6. ✅ Updates CHANGELOG:
+**What the workflow does (automatically):**
+
+The `prepare-release.yml` workflow prepares the release branch:
+
+1. ✅ **Validate** job (runs first)
+   - Validates semantic version format (X.Y.Z)
+   - Verifies release branch `release/X.Y.Z` doesn't exist (local or remote)
+   - Verifies tag `vX.Y.Z` doesn't already exist
+   - Verifies CHANGELOG has `## Unreleased` section with content
+   - Confirms dev branch is checked out
+
+2. ✅ **Prepare** job (skipped if --dry-run)
+   - Creates `release/X.Y.Z` branch from `dev`
+   - Prepares CHANGELOG using `prepare-changelog.py prepare`
    - Moves Unreleased → `## [X.Y.Z] - TBD`
    - Creates fresh Unreleased section
-7. ✅ Commits changes: `chore: prepare release X.Y.Z`
-8. ✅ Pushes release branch to origin
-9. ✅ Creates draft PR to `main` with CHANGELOG content as body
-10. ✅ Outputs PR URL for tracking
+   - Commits changes: `chore: prepare release X.Y.Z`
+   - Pushes release branch to origin (via GitHub App token, triggering CI)
+   - Creates draft PR to `main` with CHANGELOG content as body
+   - Outputs PR URL and next steps
 
 **Output example:**
 
 ```
-✓ Created release branch: release/1.0.0
-✓ Updated CHANGELOG.md
-✓ Pushed branch to origin
-✓ Created draft PR #123 to main
+✓ Release branch prepared successfully!
+
+Release Summary:
+  Version: 1.0.0
+  Branch: release/1.0.0
 
 Next steps:
-  1. Review PR: https://github.com/vig-os/devcontainer/pull/123
-  2. Monitor CI (runs automatically): gh run list --branch release/1.0.0
-  3. Fix any issues via feature branch PRs to release/1.0.0
-  4. When ready: just finalize-release 1.0.0
+  1. Test release: git checkout release/1.0.0
+  2. Review draft PR and monitor CI
+  3. Fix any issues via bugfix PRs to release/1.0.0
+  4. Mark PR as ready for review (gh pr ready <PR_NUMBER>)
+  5. Get PR approval from reviewer
+  6. Run: just finalize-release 1.0.0
 ```
+
+**Key differences from local script:**
+
+- **Consistent environment**: Runs on CI runner, not dependent on local tooling
+- **Audit trail**: All actions logged in GitHub Actions
+- **CI triggering**: Push via GitHub App token triggers CI on release branch automatically
+- **No interactive prompts**: Workflow fails if CHANGELOG is empty (no user prompts)
+- **Reproducible**: Same behavior regardless of developer's local setup
 
 ### Phase 2: Review & Testing
 
@@ -401,22 +415,22 @@ docker buildx imagetools inspect ghcr.io/vig-os/devcontainer:1.0.0
 
 **Location:** `scripts/prepare-release.sh`
 
-**Purpose:** Create and prepare a release branch
+**Status:** ⚠️ **SUPERSEDED** - Use `just prepare-release X.Y.Z` instead
 
-**Usage:**
+This script was used when release preparation ran locally. The functionality is now implemented in the GitHub Actions workflow (`.github/workflows/prepare-release.yml`).
+
+The script is kept for reference and as a fallback, but **the recommended path** is to use the workflow via the justfile recipe, which provides:
+- Consistent CI environment (not dependent on local tools)
+- Audit trail via GitHub Actions logs
+- CI triggering on the new release branch
+
+**For local development/testing only:**
 
 ```bash
 ./scripts/prepare-release.sh X.Y.Z [--dry-run]
 ```
 
-**Options:**
-- `--dry-run`: Preview actions without making changes
-
-**Exit codes:**
-- `0`: Success
-- `1`: Validation error or failure
-
-**Tests:** `tests/test_release_cycle.py::TestPrepareReleaseScript` (11 tests)
+**Recommended approach:** Use the workflow instead for all release preparation.
 
 ### finalize-release.sh
 
@@ -525,7 +539,47 @@ just reset-changelog
 
 ### Workflow Architecture
 
-The release process uses three coordinated workflows:
+The release process uses four coordinated workflows:
+
+#### prepare-release.yml (Release Preparation Workflow)
+
+**Trigger:** `workflow_dispatch` (manual trigger via `just prepare-release X.Y.Z`)
+
+**Purpose:** Create and prepare release branch for testing
+
+**Jobs (sequential):**
+
+1. **validate** - Checks all prerequisites before creating branch
+   - Validates semantic version format
+   - Verifies release branch does not exist (local or remote)
+   - Confirms tag doesn't already exist
+   - Verifies CHANGELOG has `## Unreleased` section with content
+   - Confirms dev branch is checked out
+   - Outputs: version, release_branch
+
+2. **prepare** (skipped if dry-run) - Creates and prepares release branch
+   - Creates `release/X.Y.Z` branch from `dev`
+   - Prepares CHANGELOG using `prepare-changelog.py prepare`
+   - Creates standardized commit: `chore: prepare release X.Y.Z`
+   - Pushes release branch to origin (via GitHub App token to trigger CI)
+   - Extracts CHANGELOG content for PR body
+   - Creates draft PR to `main` with release content
+   - Outputs summary and next steps
+
+**Manual trigger (for testing):**
+
+```bash
+gh workflow run prepare-release.yml -f "version=1.0.0" -f "dry-run=false"
+
+# Dry-run mode (validates without making changes)
+gh workflow run prepare-release.yml -f "version=1.0.0" -f "dry-run=true"
+```
+
+**Key characteristics:**
+- Provides consistent, reproducible release preparation
+- Push via GitHub App token ensures CI runs on new release branch
+- Audit trail in GitHub Actions logs
+- No dependency on local developer environment
 
 #### release.yml (Unified Release Workflow)
 

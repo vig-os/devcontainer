@@ -170,7 +170,14 @@ test version="dev":
 # Prepare release branch for testing (step 1)
 [group('release')]
 prepare-release version *flags:
-    ./scripts/prepare-release.sh {{ version }} {{ flags }}
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Trigger the prepare-release workflow via GitHub Actions
+    # The workflow handles: validate inputs, create release branch, prepare CHANGELOG, create draft PR
+    gh workflow run prepare-release.yml -f "version={{ version }}" {{ flags }}
+    echo ""
+    echo "✓ Release preparation workflow triggered for version {{ version }}"
+    echo "Monitor progress: gh run list --workflow prepare-release.yml"
 
 # Finalize and publish release via GitHub Actions workflow (step 3, after testing)
 [group('release')]
