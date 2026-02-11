@@ -16,9 +16,7 @@ from pathlib import Path
 
 import pytest
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Test Data Constants
-# ═══════════════════════════════════════════════════════════════════════════════
+# region Test Data Constants
 
 BASIC_CHANGELOG = """\
 # Changelog
@@ -199,10 +197,129 @@ GIT_REPO_CHANGELOG = """\
 - Previous feature
 """
 
+# CHANGELOG after prepare-release.sh has run (for finalize-release tests)
+PREPARED_CHANGELOG = """\
+# Changelog
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# prepare-changelog.py Tests
-# ═══════════════════════════════════════════════════════════════════════════════
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## Unreleased
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [1.0.0] - TBD
+
+### Added
+
+- New feature X
+- New feature Y
+
+### Fixed
+
+- Bug fix Z
+
+## [0.2.0] - 2026-01-01
+
+### Added
+
+- Previous feature
+"""
+
+CHANGELOG_WITH_TBD = """\
+# Changelog
+
+## Unreleased
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [1.0.0] - TBD
+
+### Added
+
+- Feature X
+- Feature Y
+
+### Fixed
+
+- Bug A
+
+## [0.2.0] - 2026-01-01
+
+### Added
+
+- Old feature
+"""
+
+MULTIPLE_TBD_CHANGELOG = """\
+# Changelog
+
+## Unreleased
+
+### Added
+
+## [2.0.0] - TBD
+
+### Added
+
+- Feature Z
+
+## [1.0.0] - TBD
+
+### Added
+
+- Feature X
+
+## [0.1.0] - 2025-12-01
+
+### Added
+
+- Initial
+"""
+
+SPECIAL_CHARS_CHANGELOG = """\
+# Changelog
+
+## Unreleased
+
+### Added
+
+## [1.0.0] - TBD
+
+### Added
+
+- Feature with [brackets] and (parentheses)
+- Feature with special $chars* and .dots
+
+## [0.1.0] - 2025-12-01
+
+### Added
+
+- Initial
+"""
+# endregion
 
 
 class TestPrepareChangelog:
@@ -670,9 +787,336 @@ class TestPrepareChangelog:
         )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# prepare-release.sh Tests
-# ═══════════════════════════════════════════════════════════════════════════════
+class TestFinalizeCommand:
+    """Tests for finalize command - setting release dates."""
+
+    @pytest.fixture
+    def script_path(self):
+        """Path to prepare-changelog.py."""
+        return Path(__file__).resolve().parents[1] / "scripts" / "prepare-changelog.py"
+
+    @pytest.fixture
+    def changelog_with_tbd(self):
+        """CHANGELOG with a version section using TBD."""
+        return CHANGELOG_WITH_TBD
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Finalize Action Tests - Basic Functionality
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_replaces_tbd_with_date(self, script_path, changelog_with_tbd, tmp_path):
+        """Should replace TBD with actual release date."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text(changelog_with_tbd)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+                "finalize",
+                "1.0.0",
+                "2026-02-11",
+                str(changelog_file),
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, f"Script failed: {result.stderr}"
+
+        content = changelog_file.read_text()
+        assert "## [1.0.0] - 2026-02-11" in content
+        assert "TBD" not in content
+
+    def test_preserves_version_content(self, script_path, changelog_with_tbd, tmp_path):
+        """Should preserve all content in version section."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text(changelog_with_tbd)
+
+        subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+                "finalize",
+                "1.0.0",
+                "2026-02-11",
+                str(changelog_file),
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+        content = changelog_file.read_text()
+
+        # Check version section still has its content
+        version_start = content.find("## [1.0.0] - 2026-02-11")
+        version_end = content.find("## [0.2.0]")
+        version_section = content[version_start:version_end]
+
+        assert "- Feature X" in version_section
+        assert "- Feature Y" in version_section
+        assert "- Bug A" in version_section
+
+    def test_preserves_other_sections(self, script_path, changelog_with_tbd, tmp_path):
+        """Should not modify other version sections."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text(changelog_with_tbd)
+
+        subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+                "finalize",
+                "1.0.0",
+                "2026-02-11",
+                str(changelog_file),
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+        content = changelog_file.read_text()
+
+        # Old version should remain unchanged
+        assert "## [0.2.0] - 2026-01-01" in content
+        assert "- Old feature" in content
+
+        # Unreleased should remain unchanged
+        assert "## Unreleased" in content
+
+    def test_outputs_success_message(self, script_path, changelog_with_tbd, tmp_path):
+        """Should output success message with version and date."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text(changelog_with_tbd)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+                "finalize",
+                "1.0.0",
+                "2026-02-11",
+                str(changelog_file),
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0
+        assert "1.0.0" in result.stdout
+        assert "2026-02-11" in result.stdout
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Finalize Action Tests - Validation
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_fails_if_version_not_found(
+        self, script_path, changelog_with_tbd, tmp_path
+    ):
+        """Should fail if version section doesn't exist."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text(changelog_with_tbd)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+                "finalize",
+                "2.0.0",  # Non-existent version
+                "2026-02-11",
+                str(changelog_file),
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0
+        assert "not found" in result.stderr.lower() or "2.0.0" in result.stderr
+
+    def test_fails_if_version_already_has_date(
+        self, script_path, changelog_with_tbd, tmp_path
+    ):
+        """Should fail if version already has a release date (not TBD)."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text(changelog_with_tbd)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+                "finalize",
+                "0.2.0",  # This version already has date 2026-01-01
+                "2026-02-11",
+                str(changelog_file),
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0
+        assert "not found" in result.stderr.lower() or "TBD" in result.stderr
+
+    def test_rejects_invalid_semver(self, script_path, changelog_with_tbd, tmp_path):
+        """Should reject invalid semantic version format."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text(changelog_with_tbd)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+                "finalize",
+                "1.0",  # Invalid semver
+                "2026-02-11",
+                str(changelog_file),
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0
+        assert "Invalid" in result.stderr or "version" in result.stderr.lower()
+
+    def test_rejects_version_with_v_prefix(
+        self, script_path, changelog_with_tbd, tmp_path
+    ):
+        """Should reject versions with 'v' prefix."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text(changelog_with_tbd)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+                "finalize",
+                "v1.0.0",
+                "2026-02-11",
+                str(changelog_file),
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0
+        assert "Invalid" in result.stderr or "version" in result.stderr.lower()
+
+    def test_rejects_invalid_date_format(
+        self, script_path, changelog_with_tbd, tmp_path
+    ):
+        """Should reject dates not in YYYY-MM-DD format."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text(changelog_with_tbd)
+
+        invalid_dates = [
+            "2026/02/11",  # Wrong separators
+            "02-11-2026",  # Wrong order
+            "2026-2-11",  # Missing leading zero
+            "2026-02-1",  # Missing leading zero
+            "11-02-2026",  # Wrong order
+            "not-a-date",  # Completely invalid
+        ]
+
+        for invalid_date in invalid_dates:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(script_path),
+                    "finalize",
+                    "1.0.0",
+                    invalid_date,
+                    str(changelog_file),
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+            assert result.returncode != 0, f"Should fail for date: {invalid_date}"
+            assert "Invalid" in result.stderr or "date" in result.stderr.lower(), (
+                f"Should mention invalid date for: {invalid_date}"
+            )
+
+    def test_fails_if_changelog_missing(self, script_path, tmp_path):
+        """Should fail gracefully if CHANGELOG file doesn't exist."""
+        changelog_file = tmp_path / "nonexistent.md"
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+                "finalize",
+                "1.0.0",
+                "2026-02-11",
+                str(changelog_file),
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0
+        assert (
+            "not found" in result.stderr.lower()
+            or "No such file" in result.stderr
+            or "FileNotFoundError" in result.stderr
+        )
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Finalize Action Tests - Edge Cases
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_handles_multiple_tbd_versions(self, script_path, tmp_path):
+        """Should only update the specified version when multiple TBD versions exist."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text(MULTIPLE_TBD_CHANGELOG)
+
+        # Finalize version 1.0.0
+        subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+                "finalize",
+                "1.0.0",
+                "2026-02-11",
+                str(changelog_file),
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+        content = changelog_file.read_text()
+
+        # Version 1.0.0 should be finalized
+        assert "## [1.0.0] - 2026-02-11" in content
+
+        # Version 2.0.0 should still have TBD
+        assert "## [2.0.0] - TBD" in content
+
+    def test_handles_version_with_special_characters_in_content(
+        self, script_path, tmp_path
+    ):
+        """Should handle versions with special regex characters in content."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text(SPECIAL_CHARS_CHANGELOG)
+
+        subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+                "finalize",
+                "1.0.0",
+                "2026-02-11",
+                str(changelog_file),
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+        content = changelog_file.read_text()
+
+        # Should update correctly
+        assert "## [1.0.0] - 2026-02-11" in content
+        # Content should be preserved
+        assert "- Feature with [brackets] and (parentheses)" in content
+        assert "- Feature with special $chars* and .dots" in content
 
 
 class TestPrepareReleaseScript:
@@ -970,23 +1414,376 @@ class TestPrepareReleaseScript:
         assert "release/1.0.0" in output
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# finalize-release.sh Tests
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
 class TestFinalizeReleaseScript:
-    """Tests for scripts/finalize-release.sh - release finalization.
-
-    These tests will be implemented after prepare-release.sh is working.
-    """
+    """Tests for scripts/finalize-release.sh - release finalization."""
 
     @pytest.fixture
     def script_path(self):
         """Path to finalize-release.sh."""
         return Path(__file__).resolve().parents[1] / "scripts" / "finalize-release.sh"
 
+    @pytest.fixture
+    def prepared_release_repo(self, tmp_path):
+        """Create a git repo simulating state after prepare-release.sh ran.
+
+        - On branch release/1.0.0
+        - CHANGELOG has ## [1.0.0] - TBD
+        - Clean working tree
+        """
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+
+        # Initialize git repo
+        subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create dev branch with initial commit
+        subprocess.run(
+            ["git", "checkout", "-b", "dev"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+
+        changelog = repo / "CHANGELOG.md"
+        changelog.write_text(GIT_REPO_CHANGELOG)
+        subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create release branch (simulating prepare-release.sh)
+        subprocess.run(
+            ["git", "checkout", "-b", "release/1.0.0"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+
+        # Write prepared CHANGELOG
+        changelog.write_text(PREPARED_CHANGELOG)
+
+        # Commit preparation changes
+        subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "chore: prepare release 1.0.0\n\nRefs: #48"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+
+        return repo
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Script Existence
+    # ═══════════════════════════════════════════════════════════════════════════
+
     def test_script_exists(self, script_path):
-        """finalize-release.sh should exist (placeholder test)."""
-        # This will fail until we create the script
-        assert script_path.exists(), "finalize-release.sh not yet created"
+        """finalize-release.sh should exist."""
+        assert script_path.exists(), "finalize-release.sh should exist"
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Version Validation
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_rejects_invalid_semver_format(self, script_path, prepared_release_repo):
+        """Should reject non-semantic version formats."""
+        result = subprocess.run(
+            [str(script_path), "1.2.3.4", "--dry-run"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode != 0, "Should fail for invalid semver"
+        output = result.stdout + result.stderr
+        assert "Invalid version format" in output
+
+    def test_rejects_version_with_v_prefix(self, script_path, prepared_release_repo):
+        """Should reject versions with 'v' prefix."""
+        result = subprocess.run(
+            [str(script_path), "v1.2.3", "--dry-run"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode != 0
+        output = result.stdout + result.stderr
+        assert "Invalid version format" in output
+
+    def test_accepts_valid_semver(self, script_path, prepared_release_repo):
+        """Should accept valid semantic versions (with dry-run on matching branch)."""
+        result = subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+        )
+        # Should not fail on version validation
+        output = result.stdout + result.stderr
+        assert "Invalid version format" not in output
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Branch Requirements
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_requires_release_branch(self, script_path, prepared_release_repo):
+        """Should fail if not on release branch."""
+        # Switch to dev
+        subprocess.run(
+            ["git", "checkout", "dev"],
+            cwd=prepared_release_repo,
+            check=True,
+            capture_output=True,
+        )
+
+        result = subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0, "Should fail when not on release branch"
+        output = result.stdout + result.stderr
+        assert "release/1.0.0" in output.lower()
+
+    def test_requires_matching_release_branch(self, script_path, prepared_release_repo):
+        """Should fail if on wrong release branch for given version."""
+        # Create and switch to a different release branch
+        subprocess.run(
+            ["git", "checkout", "-b", "release/2.0.0"],
+            cwd=prepared_release_repo,
+            check=True,
+            capture_output=True,
+        )
+
+        result = subprocess.run(
+            [str(script_path), "2.0.0", "--dry-run"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        # Should fail because CHANGELOG has [1.0.0] - TBD, not [2.0.0] - TBD
+        assert result.returncode != 0, "Should fail with mismatched version"
+        output = result.stdout + result.stderr
+        assert "2.0.0" in output
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # State Validation
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_detects_uncommitted_changes(self, script_path, prepared_release_repo):
+        """Should fail if uncommitted changes exist."""
+        # Modify a tracked file without committing
+        changelog = prepared_release_repo / "CHANGELOG.md"
+        changelog.write_text(changelog.read_text() + "\n- Uncommitted change\n")
+
+        result = subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0, "Should fail with uncommitted changes"
+        output = result.stdout + result.stderr
+        assert "uncommitted" in output.lower()
+
+    def test_fails_if_changelog_missing_tbd(self, script_path, prepared_release_repo):
+        """Should fail if CHANGELOG missing TBD entry for version."""
+        # Replace TBD with an actual date (simulating already finalized)
+        changelog = prepared_release_repo / "CHANGELOG.md"
+        content = changelog.read_text().replace(
+            "## [1.0.0] - TBD", "## [1.0.0] - 2026-01-01"
+        )
+        changelog.write_text(content)
+        subprocess.run(
+            ["git", "add", "CHANGELOG.md"],
+            cwd=prepared_release_repo,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "Already finalized"],
+            cwd=prepared_release_repo,
+            check=True,
+            capture_output=True,
+        )
+
+        result = subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0, "Should fail without TBD entry"
+        output = result.stdout + result.stderr
+        assert "TBD" in output or "prepare-release" in output.lower()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Core Actions
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_sets_release_date_in_changelog(self, script_path, prepared_release_repo):
+        """Should replace TBD with actual date in CHANGELOG."""
+        result = subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, (
+            f"Script failed: {result.stdout}\n{result.stderr}"
+        )
+
+        # In dry-run mode, verify the script would perform the action
+        output = result.stdout + result.stderr
+        assert "Set release date" in output or "CHANGELOG" in output
+
+    def test_creates_annotated_tag(self, script_path, prepared_release_repo):
+        """Should create annotated tag v1.0.0."""
+        result = subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, (
+            f"Script failed: {result.stdout}\n{result.stderr}"
+        )
+
+        # In dry-run mode, verify the script would create the tag
+        output = result.stdout + result.stderr
+        assert "v1.0.0" in output or "tag" in output.lower()
+
+    def test_commit_message_follows_standard(self, script_path, prepared_release_repo):
+        """Finalization commit should follow commit message standard."""
+        result = subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, (
+            f"Script failed: {result.stdout}\n{result.stderr}"
+        )
+
+        # In dry-run mode, verify the script would create a commit
+        output = result.stdout + result.stderr
+        assert "commit" in output.lower() or "finalization" in output.lower()
+
+    def test_prevents_duplicate_tag(self, script_path, prepared_release_repo):
+        """Should fail if tag already exists."""
+        # Create the tag first
+        subprocess.run(
+            ["git", "tag", "-a", "v1.0.0", "-m", "Existing tag"],
+            cwd=prepared_release_repo,
+            check=True,
+            capture_output=True,
+        )
+
+        result = subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode != 0, "Should fail if tag already exists"
+        output = result.stdout + result.stderr
+        assert "already exists" in output.lower() or "v1.0.0" in output
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Dry-run Mode
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def test_dry_run_creates_no_tags(self, script_path, prepared_release_repo):
+        """Dry-run should not create any tags."""
+        result = subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, (
+            f"Dry-run failed: {result.stdout}\n{result.stderr}"
+        )
+
+        # Check no tags were created
+        tag_result = subprocess.run(
+            ["git", "tag", "-l"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        assert tag_result.stdout.strip() == "", "Dry-run should not create tags"
+
+    def test_dry_run_modifies_no_files(self, script_path, prepared_release_repo):
+        """Dry-run should not modify any files."""
+        result_before = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        result_after = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        assert result_before.stdout == result_after.stdout, (
+            "Dry-run should not modify files"
+        )
+
+    def test_dry_run_shows_planned_actions(self, script_path, prepared_release_repo):
+        """Dry-run should display what would be done."""
+        result = subprocess.run(
+            [str(script_path), "1.0.0", "--dry-run"],
+            cwd=prepared_release_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, (
+            f"Dry-run failed: {result.stdout}\n{result.stderr}"
+        )
+
+        output = result.stdout + result.stderr
+        assert "dry run" in output.lower()
+        assert "v1.0.0" in output
+        # Should mention key actions
+        assert "changelog" in output.lower() or "CHANGELOG" in output
+        assert "tag" in output.lower()

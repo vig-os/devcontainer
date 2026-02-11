@@ -147,7 +147,6 @@ Available recipes:
     [sidecar]
     sidecar name *args              # just sidecar redis flush
     sidecars                        # List available sidecar containers
-    test-sidecar *args              # Convenience alias for test-sidecar (uses generic sidecar recipe)
 
     [test]
     test version="dev"              # Run all test suites

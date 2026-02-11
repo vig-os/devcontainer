@@ -402,13 +402,17 @@ git branch -d release/X.Y.Z
 **Usage:**
 
 ```bash
-./scripts/finalize-release.sh X.Y.Z
+./scripts/finalize-release.sh X.Y.Z [--dry-run]
 ```
+
+**Options:**
+- `--dry-run`: Show what would be done without executing
 
 **Prerequisites:**
 - Must be on `release/X.Y.Z` branch
 - CI checks should have passed
 - PR should be reviewed and approved
+- GitHub CLI (`gh`) and origin remote must be configured
 
 **Exit codes:**
 - `0`: Success

@@ -259,6 +259,58 @@ def cmd_reset(args):
     print("✓ Created fresh empty section for next release")
 
 
+def finalize_release_date(version, release_date, filepath="CHANGELOG.md"):
+    """
+    Replace TBD date with actual release date for a version.
+
+    Args:
+        version: Semantic version (e.g., "1.0.0")
+        release_date: Release date in ISO format (YYYY-MM-DD)
+        filepath: Path to CHANGELOG.md
+
+    Raises:
+        ValueError: If version format is invalid, date format is invalid,
+                   or version section with TBD not found
+        FileNotFoundError: If CHANGELOG file doesn't exist
+    """
+    # Validate version format
+    if not re.match(r"^\d+\.\d+\.\d+$", version):
+        raise ValueError(f"Invalid semantic version: {version}")
+
+    # Validate date format
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", release_date):
+        raise ValueError(f"Invalid date format: {release_date} (expected YYYY-MM-DD)")
+
+    # Read CHANGELOG
+    path = Path(filepath)
+    if not path.exists():
+        raise FileNotFoundError(f"CHANGELOG not found: {filepath}")
+
+    content = path.read_text()
+
+    # Check if version with TBD exists
+    version_pattern = rf"## \[{re.escape(version)}\] - TBD"
+    if not re.search(version_pattern, content):
+        raise ValueError(
+            f"Version section '## [{version}] - TBD' not found in CHANGELOG"
+        )
+
+    # Replace TBD with release date
+    replacement = f"## [{version}] - {release_date}"
+    new_content = re.sub(version_pattern, replacement, content)
+
+    # Write back
+    path.write_text(new_content)
+
+
+def cmd_finalize(args):
+    """Handle finalize command."""
+    finalize_release_date(args.version, args.date, args.file)
+
+    print(f"✓ Set release date for version {args.version}")
+    print(f"✓ Date: {args.date}")
+
+
 def main():
     """CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -271,6 +323,9 @@ Examples:
 
   # Validate CHANGELOG has unreleased changes
   %(prog)s validate
+
+  # Set release date for version 1.0.0
+  %(prog)s finalize 1.0.0 2026-02-11
 
   # Reset Unreleased section after release merge
   %(prog)s reset
@@ -326,6 +381,27 @@ Examples:
         help="Path to CHANGELOG file (default: CHANGELOG.md)",
     )
     reset_parser.set_defaults(func=cmd_reset)
+
+    # finalize command
+    finalize_parser = subparsers.add_parser(
+        "finalize",
+        help="Set release date (replace TBD with actual date)",
+    )
+    finalize_parser.add_argument(
+        "version",
+        help="Semantic version (e.g., 1.0.0)",
+    )
+    finalize_parser.add_argument(
+        "date",
+        help="Release date in ISO format (YYYY-MM-DD)",
+    )
+    finalize_parser.add_argument(
+        "file",
+        nargs="?",
+        default="CHANGELOG.md",
+        help="Path to CHANGELOG file (default: CHANGELOG.md)",
+    )
+    finalize_parser.set_defaults(func=cmd_finalize)
 
     # Parse and execute
     args = parser.parse_args()
