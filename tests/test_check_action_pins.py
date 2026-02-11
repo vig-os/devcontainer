@@ -685,3 +685,20 @@ class TestEdgeCases:
         )
         errors = check_file(workflow_file)
         assert errors == []
+
+    def test_non_utf8_file(self, tmp_path):
+        """Test that a file with non-UTF-8 bytes raises an error or is handled."""
+        workflow_file = tmp_path / "workflow.yml"
+        # Write raw bytes including invalid UTF-8 sequence
+        workflow_file.write_bytes(
+            b"jobs:\n"
+            b"  test:\n"
+            b"    steps:\n"
+            b"      - name: Checkout \xff\xfe\n"
+            b"        uses: actions/checkout@v4\n"
+        )
+        # Should raise UnicodeDecodeError since we now use encoding="utf-8"
+        import pytest as _pytest
+
+        with _pytest.raises(UnicodeDecodeError):
+            check_file(workflow_file)

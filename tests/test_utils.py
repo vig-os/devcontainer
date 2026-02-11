@@ -628,6 +628,19 @@ class TestInstallScriptIntegration:
         githooks_dir = install_workspace / ".githooks"
         assert githooks_dir.exists(), ".githooks directory not created"
 
+    def test_install_replaces_org_name_placeholder(self, install_workspace):
+        """Test {{ORG_NAME}} placeholder is replaced everywhere."""
+        for file_path in install_workspace.rglob("*"):
+            if file_path.is_file():
+                try:
+                    content = file_path.read_text()
+                    assert "{{ORG_NAME}}" not in content, (
+                        f"{{{{ORG_NAME}}}} placeholder not replaced in {file_path}"
+                    )
+                except UnicodeDecodeError:
+                    # Skip binary files
+                    continue
+
     def test_install_creates_pre_commit_config(self, install_workspace):
         """Test .pre-commit-config.yaml is created."""
         precommit_config = install_workspace / ".pre-commit-config.yaml"

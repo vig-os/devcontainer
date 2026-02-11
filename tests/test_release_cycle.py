@@ -157,6 +157,20 @@ VALIDATE_EMPTY_UNRELEASED_CHANGELOG = """\
 ## [0.2.0] - 2026-01-01
 """
 
+UNRELEASED_ONLY_CHANGELOG = """\
+# Changelog
+
+## Unreleased
+
+### Added
+
+- Brand new feature
+
+### Fixed
+
+- Important bugfix
+"""
+
 RELEASED_ONLY_CHANGELOG = """\
 # Changelog
 
@@ -631,6 +645,30 @@ class TestPrepareChangelog:
         assert "- Main feature" in content
         assert "- Sub-feature A" in content
         assert "- Sub-feature B" in content
+
+    def test_prepare_changelog_with_only_unreleased(self, script_path, tmp_path):
+        """Should succeed when CHANGELOG has only Unreleased and no prior versions."""
+        changelog_file = tmp_path / "CHANGELOG.md"
+        changelog_file.write_text(UNRELEASED_ONLY_CHANGELOG)
+
+        result = subprocess.run(
+            [sys.executable, str(script_path), "prepare", "1.0.0", str(changelog_file)],
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, f"Script failed: {result.stderr}"
+
+        content = changelog_file.read_text()
+        # Should have the new version section
+        assert "## [1.0.0] - TBD" in content
+        # Content should be moved
+        assert "- Brand new feature" in content
+        assert "- Important bugfix" in content
+        # Fresh Unreleased section should exist
+        assert "## Unreleased" in content
+        # Unreleased should come before the version
+        assert content.index("## Unreleased") < content.index("## [1.0.0] - TBD")
 
     # ═══════════════════════════════════════════════════════════════════════════
     # Prepare Action Tests - Output Messages
