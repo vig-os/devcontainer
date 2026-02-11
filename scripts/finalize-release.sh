@@ -159,67 +159,73 @@ if command -v gh &> /dev/null; then
     HAS_GH=true
 fi
 
-# PR validation is mandatory for actual releases
-if [ "$HAS_REMOTE" = false ]; then
-    err "No origin remote configured"
-    echo "Production releases require a GitHub remote"
-    exit 1
-fi
-
-if [ "$HAS_GH" = false ]; then
-    err "GitHub CLI (gh) not installed"
-    echo "Production releases require gh CLI. Install: https://cli.github.com"
-    exit 1
-fi
-
-info "Checking PR and CI status..."
-
-# Find the PR for this release branch
-PR_JSON=$(gh pr list --head "$RELEASE_BRANCH" --base main --json number,isDraft,reviewDecision --limit 1 2>/dev/null || echo "[]")
-PR_COUNT=$(echo "$PR_JSON" | uv run python -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
-
-if [ "$PR_COUNT" != "1" ]; then
-    if [ "$PR_COUNT" = "0" ]; then
-        err "No PR found from $RELEASE_BRANCH to main"
-        echo "Production releases must have a PR. Create one first:"
-        echo "  gh pr create --base main --head $RELEASE_BRANCH"
-    else
-        err "Multiple PRs found from $RELEASE_BRANCH to main (found: $PR_COUNT)"
-        echo "There must be exactly one open PR. Review existing PRs:"
-        echo "  gh pr list --head $RELEASE_BRANCH --base main"
+# In dry-run mode, skip GitHub validation but use placeholder values
+if [ "$DRY_RUN" = true ]; then
+    info "Dry-run mode: skipping GitHub/PR validation"
+    PR_NUMBER="999"  # Placeholder for dry-run output
+else
+    # PR validation is mandatory for actual releases
+    if [ "$HAS_REMOTE" = false ]; then
+        err "No origin remote configured"
+        echo "Production releases require a GitHub remote"
+        exit 1
     fi
-    exit 1
-fi
 
-PR_NUMBER=$(echo "$PR_JSON" | uv run python -c "import sys,json; print(json.load(sys.stdin)[0]['number'])" 2>/dev/null || echo "")
-IS_DRAFT=$(echo "$PR_JSON" | uv run python -c "import sys,json; print(json.load(sys.stdin)[0]['isDraft'])" 2>/dev/null || echo "")
-REVIEW_DECISION=$(echo "$PR_JSON" | uv run python -c "import sys,json; print(json.load(sys.stdin)[0]['reviewDecision'])" 2>/dev/null || echo "")
+    if [ "$HAS_GH" = false ]; then
+        err "GitHub CLI (gh) not installed"
+        echo "Production releases require gh CLI. Install: https://cli.github.com"
+        exit 1
+    fi
 
-info "Found PR #$PR_NUMBER"
+    info "Checking PR and CI status..."
 
-# Check draft status
-if [ "$IS_DRAFT" = "True" ]; then
-    warn "PR #$PR_NUMBER is still a draft"
-    warn "Consider marking it ready: gh pr ready $PR_NUMBER"
-else
-    success "PR #$PR_NUMBER is ready for review"
-fi
+    # Find the PR for this release branch
+    PR_JSON=$(gh pr list --head "$RELEASE_BRANCH" --base main --json number,isDraft,reviewDecision --limit 1 2>/dev/null || echo "[]")
+    PR_COUNT=$(echo "$PR_JSON" | uv run python -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
 
-# Check review status
-if [ "$REVIEW_DECISION" = "APPROVED" ]; then
-    success "PR #$PR_NUMBER has been approved"
-else
-    warn "PR #$PR_NUMBER review status: ${REVIEW_DECISION:-none}"
-    warn "Consider getting approval before finalizing"
-fi
+    if [ "$PR_COUNT" != "1" ]; then
+        if [ "$PR_COUNT" = "0" ]; then
+            err "No PR found from $RELEASE_BRANCH to main"
+            echo "Production releases must have a PR. Create one first:"
+            echo "  gh pr create --base main --head $RELEASE_BRANCH"
+        else
+            err "Multiple PRs found from $RELEASE_BRANCH to main (found: $PR_COUNT)"
+            echo "There must be exactly one open PR. Review existing PRs:"
+            echo "  gh pr list --head $RELEASE_BRANCH --base main"
+        fi
+        exit 1
+    fi
 
-# Check CI status
-CI_STATUS=$(gh pr checks "$PR_NUMBER" --json bucket --jq '.[].bucket' 2>/dev/null || echo "")
-if echo "$CI_STATUS" | grep -q "fail"; then
-    warn "Some CI checks have failed on PR #$PR_NUMBER"
-    warn "Review: gh pr checks $PR_NUMBER"
-elif [ -n "$CI_STATUS" ]; then
-    success "CI checks status verified"
+    PR_NUMBER=$(echo "$PR_JSON" | uv run python -c "import sys,json; print(json.load(sys.stdin)[0]['number'])" 2>/dev/null || echo "")
+    IS_DRAFT=$(echo "$PR_JSON" | uv run python -c "import sys,json; print(json.load(sys.stdin)[0]['isDraft'])" 2>/dev/null || echo "")
+    REVIEW_DECISION=$(echo "$PR_JSON" | uv run python -c "import sys,json; print(json.load(sys.stdin)[0]['reviewDecision'])" 2>/dev/null || echo "")
+
+    info "Found PR #$PR_NUMBER"
+
+    # Check draft status
+    if [ "$IS_DRAFT" = "True" ]; then
+        warn "PR #$PR_NUMBER is still a draft"
+        warn "Consider marking it ready: gh pr ready $PR_NUMBER"
+    else
+        success "PR #$PR_NUMBER is ready for review"
+    fi
+
+    # Check review status
+    if [ "$REVIEW_DECISION" = "APPROVED" ]; then
+        success "PR #$PR_NUMBER has been approved"
+    else
+        warn "PR #$PR_NUMBER review status: ${REVIEW_DECISION:-none}"
+        warn "Consider getting approval before finalizing"
+    fi
+
+    # Check CI status
+    CI_STATUS=$(gh pr checks "$PR_NUMBER" --json bucket --jq '.[].bucket' 2>/dev/null || echo "")
+    if echo "$CI_STATUS" | grep -q "fail"; then
+        warn "Some CI checks have failed on PR #$PR_NUMBER"
+        warn "Review: gh pr checks $PR_NUMBER"
+    elif [ -n "$CI_STATUS" ]; then
+        success "CI checks status verified"
+    fi
 fi
 
 success "All validation checks passed"
@@ -232,17 +238,38 @@ if [ "$DRY_RUN" = true ]; then
     info "DRY RUN MODE - No changes will be made"
     echo ""
     echo "Would perform the following actions:"
-    echo "  1. Set release date in CHANGELOG.md: TBD -> $RELEASE_DATE"
-    echo "  2. Commit finalization changes"
-    echo "  3. Push release branch to origin"
-    echo "  4. Trigger sync-issues workflow"
-    echo "  5. Create annotated tag: $TAG_NAME"
-    echo "  6. Push tag to origin"
+    echo ""
+    echo "1. Set release date in CHANGELOG.md:"
+    echo "   uv run python scripts/prepare-changelog.py finalize \"$VERSION\" \"$RELEASE_DATE\""
+    echo ""
+    echo "2. Commit finalization changes:"
+    echo "   git add CHANGELOG.md"
+    echo "   git commit -m \"chore: finalize release $VERSION"
+    echo ""
+    echo "Set release date to $RELEASE_DATE in CHANGELOG.md"
+    echo ""
+    echo "Refs: #$PR_NUMBER\""
+    echo ""
+    echo "3. Push release branch:"
+    echo "   git push origin \"$RELEASE_BRANCH\""
+    echo ""
+    echo "4. Trigger sync-issues workflow:"
+    echo "   gh workflow run sync-issues.yml -f \"target-branch=$RELEASE_BRANCH\""
+    echo "   (wait for completion and pull changes)"
+    echo ""
+    echo "5. Create annotated tag:"
+    echo "   git tag -s \"$TAG_NAME\" -m \"Release $VERSION\""
+    echo ""
+    echo "6. Push tag:"
+    echo "   git push origin \"$TAG_NAME\""
+    echo ""
+    echo "7. Verify release workflow triggers"
     echo ""
     echo "Current state:"
     echo "  Branch: $CURRENT_BRANCH"
     echo "  Version: $VERSION"
     echo "  Release date: $RELEASE_DATE"
+    echo "  Tag: $TAG_NAME"
     if [ -n "$PR_NUMBER" ]; then
         echo "  PR: #$PR_NUMBER"
     fi

@@ -1787,3 +1787,12 @@ class TestFinalizeReleaseScript:
         # Should mention key actions
         assert "changelog" in output.lower() or "CHANGELOG" in output
         assert "tag" in output.lower()
+
+        # Verify specific commands are shown
+        assert "uv run python scripts/prepare-changelog.py finalize" in output
+        assert "git add CHANGELOG.md" in output
+        assert 'git commit -m "chore: finalize release 1.0.0' in output
+        assert "Refs: #999" in output  # Placeholder PR number
+        assert "git push origin" in output
+        assert "gh workflow run sync-issues.yml" in output
+        assert 'git tag -s "v1.0.0"' in output
