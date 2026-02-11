@@ -58,7 +58,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
       - name: Generate version for dev build
         id: version
@@ -87,12 +87,12 @@ jobs:
           output-file: /tmp/image.tar
 
       - name: Upload image artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: container-image-${{ steps.version.outputs.version }}-amd64
           path: /tmp/image.tar
           retention-days: 1
-          compression-level: 0  # Image is already compressed; avoid double-compression overhead
+          compression-level: 0   # Image is already compressed; avoid double-compression overhead
 
   test-image:
     name: Image Tests
@@ -106,10 +106,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
       - name: Download image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
           name: container-image-${{ needs.build-image.outputs.version }}-amd64
           path: /tmp
@@ -132,7 +132,7 @@ jobs:
 
     steps:
       - name: Download image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
           name: container-image-${{ needs.build-image.outputs.version }}-amd64
           path: /tmp
@@ -144,7 +144,7 @@ jobs:
 
       - name: Upload test artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: integration-test-artifacts
           path: |

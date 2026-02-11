@@ -1,0 +1,49 @@
+# Dependabot configuration
+# Keeps dependencies up to date via automated pull requests.
+# Docs: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+
+version: 2
+
+updates:
+  # GitHub Actions — keep SHA-pinned actions current
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    target-branch: "dev"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    groups:
+      actions-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Python (pip) — monitor pyproject.toml / uv.lock
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    target-branch: "dev"
+    commit-message:
+      prefix: "build"
+      include: "scope"
+    groups:
+      python-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Docker — monitor Containerfile base images
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    target-branch: "dev"
+    commit-message:
+      prefix: "build"
+      include: "scope"

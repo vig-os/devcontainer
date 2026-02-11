@@ -68,7 +68,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
       - name: Validate and prepare variables
         id: vars
@@ -259,13 +259,13 @@ jobs:
     steps:
       - name: Generate GitHub App Token
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547  # v1
         with:
           app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
           private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
 
       - name: Checkout release branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           ref: release/${{ needs.validate.outputs.version }}
           token: ${{ steps.app-token.outputs.token }}
@@ -383,7 +383,7 @@ jobs:
 
     steps:
       - name: Checkout release commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           ref: ${{ needs.finalize.outputs.finalize_sha }}
 
@@ -413,7 +413,7 @@ jobs:
           image-tag: ${{ needs.validate.outputs.version }}-${{ matrix.arch }}
 
       - name: Upload tested image
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: container-image-${{ needs.validate.outputs.version }}-${{ matrix.arch }}
           path: /tmp/image.tar
@@ -433,13 +433,13 @@ jobs:
     steps:
       - name: Generate GitHub App Token
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547  # v1
         with:
           app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
           private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
 
       - name: Checkout release commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           ref: ${{ needs.finalize.outputs.finalize_sha }}
           token: ${{ steps.app-token.outputs.token }}
@@ -463,14 +463,14 @@ jobs:
           echo "✓ Tag pushed"
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ github.token }}
 
       - name: Download image artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
           path: /tmp/images
           pattern: container-image-${{ needs.validate.outputs.version }}-*
@@ -648,13 +648,13 @@ jobs:
     steps:
       - name: Generate GitHub App Token
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547  # v1
         with:
           app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
           private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
 
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           token: ${{ steps.app-token.outputs.token }}
           persist-credentials: true
@@ -700,7 +700,7 @@ jobs:
           fi
 
       - name: Create failure issue
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b  # v7
         with:
           script: |
             const version = '${{ needs.validate.outputs.version }}';
