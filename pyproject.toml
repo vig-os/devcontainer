@@ -88,10 +88,10 @@ omit = [
 show_missing = true
 skip_empty = true
 # Minimum coverage threshold — CI will fail if total drops below this value.
-# Currently 40% because prepare-changelog.py and docs/generate.py are invoked
-# via subprocess in tests, so pytest-cov cannot instrument them.
-# Adjust upward as subprocess-invoked scripts are refactored to use imports.
-fail_under = 40
+# Currently 50% because some modules (prepare-changelog.py CLI functions,
+# docs/generate.py workflow coordination) are harder to instrument.
+# Unit tests added for core functions; subprocess tests validate CLI.
+fail_under = 50
 
 [tool.coverage.xml]
 output = "coverage.xml"

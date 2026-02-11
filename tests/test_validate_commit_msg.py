@@ -157,6 +157,13 @@ class TestValidateCommitMessage:
         assert valid is False
         assert "Only one Refs line" in err
 
+    def test_invalid_empty_whitespace_only(self):
+        """Test commit message with only whitespace."""
+        msg = "\n\n   \n"
+        valid, err = validate_commit_message(msg)
+        assert valid is False
+        assert "empty" in err.lower()
+
 
 class TestValidateCommitMsgMain:
     """Test main() entry point with file path."""
@@ -187,5 +194,29 @@ class TestValidateCommitMsgMain:
         try:
             sys.argv = ["validate_commit_msg.py", "/nonexistent/path/msg"]
             assert main() == 2
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_wrong_arg_count_no_args(self, capsys):
+        """Test main() called with no file argument."""
+        orig_argv = sys.argv
+        try:
+            sys.argv = ["validate_commit_msg.py"]
+            assert main() == 2
+            captured = capsys.readouterr()
+            # Message goes to stderr
+            assert "usage" in (captured.out + captured.err).lower()
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_wrong_arg_count_too_many(self, capsys):
+        """Test main() called with too many arguments."""
+        orig_argv = sys.argv
+        try:
+            sys.argv = ["validate_commit_msg.py", "arg1", "arg2"]
+            assert main() == 2
+            captured = capsys.readouterr()
+            # Message goes to stderr
+            assert "usage" in (captured.out + captured.err).lower()
         finally:
             sys.argv = orig_argv
