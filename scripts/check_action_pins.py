@@ -62,7 +62,7 @@ def check_file(filepath: Path, verbose: bool = False) -> list[str]:
     """
     errors: list[str] = []
 
-    with filepath.open() as f:
+    with filepath.open(encoding="utf-8") as f:
         for line_num, line in enumerate(f, start=1):
             match = USES_PATTERN.match(line)
             if not match:

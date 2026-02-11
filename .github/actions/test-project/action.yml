@@ -67,9 +67,13 @@ runs:
     - name: Run utility tests
       if: inputs.suite == 'all' || inputs.suite == 'utils'
       shell: bash
-      run: uv run pytest tests/test_utils.py ${{ inputs.test-args }}
+      env:
+        TEST_ARGS: ${{ inputs.test-args }}
+      run: uv run pytest tests/test_utils.py $TEST_ARGS
 
     - name: Run release cycle tests
       if: inputs.suite == 'all' || inputs.suite == 'release-cycle'
       shell: bash
-      run: uv run pytest tests/test_release_cycle.py ${{ inputs.test-args }}
+      env:
+        TEST_ARGS: ${{ inputs.test-args }}
+      run: uv run pytest tests/test_release_cycle.py $TEST_ARGS
