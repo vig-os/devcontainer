@@ -6,7 +6,7 @@ exclude: ^\.github_data/
 repos:
   # General Pre-commit Hooks (Fixes formatting issues)
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b  # v5.0.0
     hooks:
       # Enforce topic branch naming: <type>/<issue_number>-<short_summary>
       # Allows main, dev, and branches matching the convention.
@@ -33,7 +33,7 @@ repos:
 
   # Python Linting and Formatting (Ruff)
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.3
+    rev: aad66557af3b56ba6d4d69cd1b6cba87cef50cbb  # v0.14.3
     hooks:
       - id: ruff
         args: [--fix]
@@ -41,14 +41,14 @@ repos:
 
   # YAML Linting
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.35.1
+    rev: 81e9f98ffd059efe8aa9c1b1a42e5cce61b640c6  # v1.35.1
     hooks:
       - id: yamllint
         args: ["--format", "parsable", "--strict"]
 
   # Shellcheck
   - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.10.0.1
+    rev: a23f6b85d0fdd5bb9d564e2579e678033debbdff  # v0.10.0.1
     hooks:
       - id: shellcheck
         name: shellcheck
@@ -56,7 +56,7 @@ repos:
 
   # Markdown Linting (excludes auto-generated docs)
   - repo: https://github.com/jackdewinter/pymarkdown
-    rev: v0.9.23
+    rev: f93643d339dfee2a1022e7b05e8b5a281bfac553  # v0.9.23
     hooks:
       - id: pymarkdown
         name: pymarkdown
@@ -85,7 +85,7 @@ repos:
 
   # Typo Linting
   - repo: https://github.com/crate-ci/typos
-    rev: v1.39.0
+    rev: 07d900b8fa1097806b8adb6391b0d3e0ac2fdea7  # v1.39.0
     hooks:
       - id: typos
 
