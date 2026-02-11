@@ -25,6 +25,7 @@ lint = [
 ]
 test = [
     "pytest>=8.4.1",
+    "pytest-cov>=6.0",
     "pytest-testinfra>=10.2.2",
     "pytest-docker>=3.2.3",
     "pexpect>=4.8.0",
@@ -69,3 +70,28 @@ filterwarnings = [
 ]
 # Do not collect tests from tests/tmp (integration-test workspace dirs with template tests)
 norecursedirs = "tmp"
+
+# ---------------------------------------------------------------------------
+# Coverage (pytest-cov / coverage.py)
+# ---------------------------------------------------------------------------
+# Coverage targets project-level Python code (scripts/, docs/).
+# Image and integration tests run inside containers and are not instrumented.
+
+[tool.coverage.run]
+source = ["scripts", "docs"]
+omit = [
+    "tests/*",
+    "assets/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+# Minimum coverage threshold — CI will fail if total drops below this value.
+# Currently 40% because prepare-changelog.py and docs/generate.py are invoked
+# via subprocess in tests, so pytest-cov cannot instrument them.
+# Adjust upward as subprocess-invoked scripts are refactored to use imports.
+fail_under = 40
+
+[tool.coverage.xml]
+output = "coverage.xml"
