@@ -139,7 +139,7 @@ Available recipes:
     precommit                       # Run pre-commit hooks on all files
 
     [release]
-    finalize-release version *flags # Finalize and publish release (step 3, after testing)
+    finalize-release version *flags # Finalize and publish release via GitHub Actions workflow (step 3, after testing)
     prepare-release version *flags  # Prepare release branch for testing (step 1)
     pull version="latest"           # Pull image from registry (default: latest)
     reset-changelog                 # Reset CHANGELOG Unreleased section (after merging release to dev)

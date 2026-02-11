@@ -1,127 +1,174 @@
-# Release workflow - builds and publishes multi-architecture container images to GitHub Container Registry.
+# Release Workflow - Finalize, Build, Test, and Publish
 #
-# Workflow Overview:
-# 1. Build Job (matrix strategy):
-#    - Builds architecture-specific images (amd64, arm64) in parallel
-#    - Each architecture builds on its native runner on ubuntu-22.04
-#    - Images are tagged with version-architecture (e.g., 1.2.3-amd64, 1.2.3-arm)
-#    - Tests container image properties (labels, entrypoint, user setup, etc.)
-#    - Images are pushed to registry only if tests pass
+# Unified release workflow that handles the complete release process:
+# 1. Validate: Check all prerequisites (PR status, CI passed, CHANGELOG ready)
+# 2. Finalize: Set release date in CHANGELOG, trigger PR doc sync
+# 3. Build & Test: Build and test images for all architectures
+# 4. Publish: Create tag and publish images only if all tests pass
+# 5. Rollback (on failure): Revert changes and create issue
 #
-# 2. Manifest Job:
-#    - Runs after all build jobs complete successfully
-#    - Creates multi-architecture manifests combining amd64 and arm64 images
-#    - Creates two manifests:
-#      a) Version-specific: ghcr.io/vig-os/devcontainer:1.2.3 (points to both architectures)
-#      b) Latest: ghcr.io/vig-os/devcontainer:latest (always points to latest release)
-#
-# Design Decisions:
-# - Separate architecture builds: Better performance (native builds) and clearer failure isolation
-# - Architecture-specific tags: Allows users to pull specific architecture if needed
-# - Multi-arch manifests: Provides automatic architecture selection for users
-# - Latest tag: Always updated to newest release for convenience
-# - Concurrency control: Prevents race conditions when multiple tags are pushed simultaneously
-#
-# Trigger: Pushes to tags matching semantic versioning (vX.Y.Z)
+# Design: Everything happens in one workflow dispatch before creating the tag.
+# This ensures no broken releases are tagged.
 
 name: Release
 
 on:  # yamllint disable-line rule:truthy
-  push:
-    tags:
-      # Only trigger on semantic version tags (e.g., v1.2.3)
-      # Pattern ensures we only build on valid version tags
-      - 'v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to build (e.g., 1.2.3-test)'
-        required: false
-        default: '99.0.1'
+        description: 'Semantic version to release (e.g., 1.2.3)'
+        required: true
         type: string
-      publish:
-        description: 'Publish images to the registry'
-        required: false
-        default: false
-        type: boolean
       architectures:
         description: 'Architectures to build (comma-separated: amd64,arm64)'
         required: false
         default: 'amd64,arm64'
         type: string
+      dry-run:
+        description: 'Validate without making changes'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
-  # Prevent multiple workflows from running simultaneously
-  # This avoids race conditions in manifest creation
+  # Prevent multiple releases from running simultaneously (race conditions on tags/manifests)
   group: publish-image
-  cancel-in-progress: false  # Queue instead of cancel to ensure all releases are published
+  cancel-in-progress: false
 
 permissions:
-  contents: read   # Read repository contents for checkout
-  packages: write  # Write access to GitHub Container Registry
+  contents: write    # commits, tags
+  packages: write    # GHCR image push
+  issues: write      # create rollback issue
+  actions: write     # trigger sync-issues workflow
 
 jobs:
-  extract-version:
-    # Extract version information once for reuse by all jobs
-    # This avoids duplicating the version extraction logic
+  validate:
+    name: Validate Release
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
     outputs:
-      version: ${{ steps.version.outputs.version }}
-      release_url: ${{ steps.version.outputs.release_url }}
-      release_date: ${{ steps.version.outputs.release_date }}
-      build_timestamp: ${{ steps.version.outputs.build_timestamp }}
+      version: ${{ steps.vars.outputs.version }}
+      pr_number: ${{ steps.pr.outputs.pr_number }}
+      release_date: ${{ steps.vars.outputs.release_date }}
+      build_timestamp: ${{ steps.vars.outputs.build_timestamp }}
+      release_url: ${{ steps.vars.outputs.release_url }}
+      pre_finalize_sha: ${{ steps.vars.outputs.pre_finalize_sha }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      architectures: ${{ steps.matrix.outputs.architectures }}
+
     steps:
-      - name: Extract version from tag
-        id: version
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate and prepare variables
+        id: vars
         run: |
-          # Handle both tag push and manual workflow_dispatch
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-            # For manual dispatch, allow more flexible version formats (e.g., 1.2.3-test)
-            if [ -z "$VERSION" ]; then
-              echo "ERROR: Version is required for manual dispatch"
+          set -euo pipefail
+          VERSION="${{ github.event.inputs.version }}"
+
+          # Validate semantic version format
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "ERROR: Invalid version format '$VERSION'"
+            echo "Version must follow semantic versioning format: MAJOR.MINOR.PATCH (e.g., 1.2.3)"
+            exit 1
+          fi
+
+          RELEASE_BRANCH="release/$VERSION"
+          RELEASE_DATE=$(date -u +%Y-%m-%d)
+          BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
+          PRE_FINALIZE_SHA=$(git rev-parse HEAD)
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
+          echo "build_timestamp=$BUILD_TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
+          echo "pre_finalize_sha=$PRE_FINALIZE_SHA" >> $GITHUB_OUTPUT
+          echo "release_branch=$RELEASE_BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Checkout release branch
+        run: |
+          git fetch origin release/${{ steps.vars.outputs.version }} || {
+            echo "ERROR: Release branch not found: release/${{ steps.vars.outputs.version }}"
+            echo "Did you run: just prepare-release ${{ steps.vars.outputs.version }}"
+            exit 1
+          }
+          git checkout origin/release/${{ steps.vars.outputs.version }}
+
+      - name: Verify CHANGELOG has TBD entry
+        run: |
+          if ! grep -q "## \[${{ steps.vars.outputs.version }}\] - TBD" CHANGELOG.md; then
+            echo "ERROR: CHANGELOG.md does not contain '## [${{ steps.vars.outputs.version }}] - TBD'"
+            exit 1
+          fi
+
+      - name: Verify tag does not exist
+        run: |
+          if git tag -l | grep -q "^v${{ steps.vars.outputs.version }}$"; then
+            echo "ERROR: Tag v${{ steps.vars.outputs.version }} already exists"
+            exit 1
+          fi
+
+      - name: Set up GitHub CLI
+        run: |
+          gh version
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Find and verify PR
+        id: pr
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.vars.outputs.version }}"
+          RELEASE_BRANCH="release/$VERSION"
+
+          # Find PR from release branch to main
+          PR_JSON=$(gh pr list \
+            --head "$RELEASE_BRANCH" \
+            --base main \
+            --json number,isDraft,reviewDecision,statusCheckRollup \
+            --limit 1)
+
+          PR_COUNT=$(echo "$PR_JSON" | jq 'length')
+
+          if [ "$PR_COUNT" != "1" ]; then
+            if [ "$PR_COUNT" = "0" ]; then
+              echo "ERROR: No PR found from $RELEASE_BRANCH to main"
               exit 1
-            fi
-          else
-            # Extract from tag (e.g., refs/tags/v1.2.3 -> 1.2.3)
-            VERSION=${GITHUB_REF#refs/tags/v}
-            # Validate semantic version format for tag pushes
-            if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-              echo "ERROR: Invalid version format '$VERSION'"
-              echo "Version must follow semantic versioning format X.Y.Z"
+            else
+              echo "ERROR: Multiple PRs found from $RELEASE_BRANCH to main"
               exit 1
             fi
           fi
-          RELEASE_URL="https://github.com/vig-os/devcontainer/releases/tag/v$VERSION"
-          RELEASE_DATE=$(date -u +%Y-%m-%d)
-          BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
-          echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
-          echo "build_timestamp=$BUILD_TIMESTAMP" >> $GITHUB_OUTPUT
-          echo "Extracted version: $VERSION"
 
-  validate-architectures:
-    # Validate and parse architecture inputs
-    # Ensures only valid architectures (amd64, arm64) are specified
-    runs-on: ubuntu-22.04
-    outputs:
-      architectures: ${{ steps.parse.outputs.architectures }}
-      matrix: ${{ steps.parse.outputs.matrix }}
-    steps:
-      - name: Parse and validate architectures
-        id: parse
+          PR_NUMBER=$(echo "$PR_JSON" | jq -r '.[0].number')
+          IS_DRAFT=$(echo "$PR_JSON" | jq -r '.[0].isDraft')
+          REVIEW_DECISION=$(echo "$PR_JSON" | jq -r '.[0].reviewDecision')
+
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+
+          if [ "$IS_DRAFT" = "true" ]; then
+            echo "ERROR: PR #$PR_NUMBER is still in draft status"
+            echo "Mark it ready for review first: gh pr ready $PR_NUMBER"
+            exit 1
+          fi
+
+          if [ "$REVIEW_DECISION" != "APPROVED" ]; then
+            echo "ERROR: PR #$PR_NUMBER does not have approvals (status: $REVIEW_DECISION)"
+            exit 1
+          fi
+
+          echo "✓ PR #$PR_NUMBER verified: ready and approved"
+
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Validate and parse architectures
+        id: matrix
         run: |
           set -euo pipefail
 
-          # Get architectures input (default to both for tag pushes)
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            ARCHS="${{ github.event.inputs.architectures }}"
-          else
-            # For tag pushes, always build both architectures
-            ARCHS="amd64,arm64"
-          fi
-
+          ARCHS="${{ github.event.inputs.architectures }}"
           echo "Input architectures: $ARCHS"
 
           # Remove spaces and convert to array
@@ -138,7 +185,6 @@ jobs:
               echo "✓ Valid architecture: $arch"
             else
               echo "ERROR: Invalid architecture '$arch'"
-              echo "Valid architectures are: amd64, arm64"
               exit 1
             fi
           done
@@ -153,257 +199,307 @@ jobs:
           # Generate matrix JSON
           MATRIX_JSON=$(printf '%s\n' "${VALIDATED_ARCHS[@]}" | jq -R . | jq -s -c '{arch: .}')
 
-          echo "Validated architectures: ${VALIDATED_ARCHS[*]}"
-          echo "Matrix JSON: $MATRIX_JSON"
-
-          # Output for other jobs
           echo "architectures=${VALIDATED_ARCHS[*]}" >> $GITHUB_OUTPUT
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
-  build:
-    # Build architecture-specific images in parallel
-    # Each architecture builds on its native runner for optimal performance
-    needs: [extract-version, validate-architectures]
-    timeout-minutes: 60  # Prevent stuck builds from consuming excessive resources
-    permissions:
-      contents: read
-      packages: write
+      - name: Summary
+        run: |
+          echo "✓ All validation checks passed"
+          echo ""
+          echo "Release Configuration:"
+          echo "  Version: ${{ steps.vars.outputs.version }}"
+          echo "  Release Branch: release/${{ steps.vars.outputs.version }}"
+          echo "  PR: #${{ steps.pr.outputs.pr_number }}"
+          echo "  Release Date: ${{ steps.vars.outputs.release_date }}"
+          echo "  Architectures: ${{ steps.matrix.outputs.architectures }}"
+          echo "  Dry-run: ${{ github.event.inputs.dry-run }}"
 
-    strategy:
-      matrix: ${{ fromJson(needs.validate-architectures.outputs.matrix) }}
+  finalize:
+    name: Finalize Release
+    needs: validate
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    if: ${{ github.event.inputs.dry-run != 'true' }}
+    outputs:
+      finalize_sha: ${{ steps.finalize.outputs.finalize_sha }}
 
-    runs-on: ${{ matrix.arch == 'amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6.0.1
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3.6.0
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
         with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ github.token }}
+          app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
+          private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
+
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/${{ needs.validate.outputs.version }}
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+
+      - name: Configure git
+        run: |
+          git config user.name "vigOS Release Bot"
+          git config user.email "release@vig-os.local"
+
+      - name: Set up Python
+        uses: ./.github/actions/setup-env
+        with:
+          install-podman: 'false'
+
+      - name: Set release date in CHANGELOG
+        run: |
+          set -euo pipefail
+          uv run python scripts/prepare-changelog.py finalize "${{ needs.validate.outputs.version }}" "${{ needs.validate.outputs.release_date }}"
+          echo "✓ Release date set in CHANGELOG.md"
+
+      - name: Commit finalization changes
+        run: |
+          set -euo pipefail
+          git add CHANGELOG.md
+          git commit -m "chore: finalize release ${{ needs.validate.outputs.version }}
+
+          Set release date to ${{ needs.validate.outputs.release_date }} in CHANGELOG.md
+
+          Refs: #${{ needs.validate.outputs.pr_number }}"
+          echo "✓ Finalization commit created"
+
+      - name: Push release branch
+        run: |
+          git push origin release/${{ needs.validate.outputs.version }}
+          echo "✓ Release branch pushed"
+
+      - name: Trigger sync-issues workflow
+        run: |
+          set -euo pipefail
+          echo "Triggering sync-issues workflow..."
+          gh workflow run sync-issues.yml \
+            -f "target-branch=release/${{ needs.validate.outputs.version }}"
+          echo "✓ sync-issues workflow triggered"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Wait for sync-issues completion
+        run: |
+          set -euo pipefail
+          TIMEOUT=120
+          ELAPSED=0
+          INTERVAL=10
+
+          sleep 5
+          ELAPSED=5
+
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            RUN_STATUS=$(gh run list \
+              --workflow sync-issues.yml \
+              --limit 1 \
+              --json status,conclusion \
+              --jq '.[0].status' 2>/dev/null || echo "unknown")
+
+            if [ "$RUN_STATUS" = "completed" ]; then
+              RUN_CONCLUSION=$(gh run list \
+                --workflow sync-issues.yml \
+                --limit 1 \
+                --json conclusion \
+                --jq '.[0].conclusion' 2>/dev/null || echo "unknown")
+
+              if [ "$RUN_CONCLUSION" = "success" ]; then
+                echo "✓ sync-issues workflow completed successfully"
+              else
+                echo "⚠ sync-issues workflow completed with status: $RUN_CONCLUSION"
+              fi
+              break
+            fi
+
+            sleep "$INTERVAL"
+            ELAPSED=$((ELAPSED + INTERVAL))
+            echo "Waiting for sync-issues... (${ELAPSED}s / ${TIMEOUT}s)"
+          done
+
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            echo "⚠ Timed out waiting for sync-issues workflow"
+            echo "The release may continue, but PR documentation may not be synced"
+          fi
+
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Pull sync-issues changes
+        run: |
+          set -euo pipefail
+          if git pull origin release/${{ needs.validate.outputs.version }} --no-edit 2>/dev/null; then
+            echo "✓ Pulled sync-issues changes"
+          fi
+
+      - name: Output finalize SHA
+        id: finalize
+        run: |
+          FINALIZE_SHA=$(git rev-parse HEAD)
+          echo "finalize_sha=$FINALIZE_SHA" >> $GITHUB_OUTPUT
+          echo "Finalized at commit: $FINALIZE_SHA"
+
+  build-and-test:
+    name: Build and Test (${{ matrix.arch }})
+    needs: [validate, finalize]
+    runs-on: ${{ matrix.arch == 'amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
+    timeout-minutes: 60
+    strategy:
+      matrix: ${{ fromJson(needs.validate.outputs.matrix) }}
+      fail-fast: true
+
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.finalize.outputs.finalize_sha }}
 
       - name: Build container image
         id: build
         uses: ./.github/actions/build-image
         with:
-          version: ${{ needs.extract-version.outputs.version }}
+          version: ${{ needs.validate.outputs.version }}
           arch: ${{ matrix.arch }}
-          release-date: ${{ needs.extract-version.outputs.release_date }}
-          release-url: ${{ needs.extract-version.outputs.release_url }}
-          build-timestamp: ${{ needs.extract-version.outputs.build_timestamp }}
+          release-date: ${{ needs.validate.outputs.release_date }}
+          release-url: ${{ needs.validate.outputs.release_url }}
+          build-timestamp: ${{ needs.validate.outputs.build_timestamp }}
           vcs-ref: ${{ github.sha }}
           output-type: tar
+          output-file: /tmp/image.tar
 
       - name: Run image tests
         uses: ./.github/actions/test-image
         with:
-          image-tag: ${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}
+          image-tag: ${{ needs.validate.outputs.version }}-${{ matrix.arch }}
           image-source: tar
+          tar-file: /tmp/image.tar
 
       - name: Run integration tests
         uses: ./.github/actions/test-integration
         with:
-          image-tag: ${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}
+          image-tag: ${{ needs.validate.outputs.version }}-${{ matrix.arch }}
 
-      - name: Load tested image into Docker
-        # Load the tar file that was built and tested
-        # This ensures we push the exact image that passed all tests
-        if: github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true'
-        run: |
-          set -euo pipefail
-          TAR_FILE="/tmp/image.tar"
-
-          echo "Loading tested image from $TAR_FILE..."
-
-          if [ ! -f "$TAR_FILE" ]; then
-            echo "ERROR: Tar file not found: $TAR_FILE"
-            ls -lh /tmp/
-            exit 1
-          fi
-
-          # Load the tar file into Docker
-          docker load < "$TAR_FILE"
-
-          echo "Image loaded successfully"
-          docker images
-
-      - name: Push tested image to registry
-        # Push the exact image that was tested (not a rebuild)
-        # Only runs if tests passed (workflow would have failed otherwise)
-        # For workflow_dispatch, push only when inputs.publish=true (default false)
-        if: github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true'
-        run: |
-          set -euo pipefail
-          REGISTRY_TAG="ghcr.io/vig-os/devcontainer:${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}"
-
-          echo "Pushing tested image to registry: $REGISTRY_TAG"
-
-          # Find the loaded image (it has the registry tag already from build-image action)
-          if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^$REGISTRY_TAG$"; then
-            echo "Image found with correct tag: $REGISTRY_TAG"
-          else
-            echo "ERROR: Image not found with expected tag: $REGISTRY_TAG"
-            echo "Available images:"
-            docker images
-            exit 1
-          fi
-
-          # Retry logic for docker push (network issues)
-          RETRIES=3
-          for i in $(seq 1 $RETRIES); do
-            if docker push "$REGISTRY_TAG"; then
-              echo "Image pushed successfully: $REGISTRY_TAG"
-              break
-            else
-              if [ $i -lt $RETRIES ]; then
-                echo "Push failed, retrying ($i/$RETRIES)..."
-                sleep 3
-              else
-                echo "ERROR: Push failed after $RETRIES attempts"
-                exit 1
-              fi
-            fi
-          done
-
-      - name: Verify image push
-        # Verify that the image was successfully pushed to the registry
-        # This catches silent push failures that might not be detected otherwise
-        # For workflow_dispatch, verify only when inputs.publish=true (default false)
-        if: github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true'
-        run: |
-          set -euo pipefail
-          IMAGE_TAG="ghcr.io/vig-os/devcontainer:${{ needs.extract-version.outputs.version }}-${{ matrix.arch }}"
-          echo "Verifying image was pushed successfully: $IMAGE_TAG"
-
-          # Retry logic for image verification (registry may need time to propagate)
-          RETRIES=5
-          for i in $(seq 1 $RETRIES); do
-            if docker buildx imagetools inspect "$IMAGE_TAG" >/dev/null 2>&1; then
-              # Get and display image digest
-              DIGEST=$(docker buildx imagetools inspect "$IMAGE_TAG" --format '{{.Manifest.Digest}}' 2>&1 || echo "")
-              if [ -n "$DIGEST" ] && [ "$DIGEST" != "null" ]; then
-                echo "Image verified successfully"
-                echo "Digest: $DIGEST"
-              else
-                echo "WARNING: Could not retrieve image digest, but image exists"
-              fi
-              echo "Image push verification complete"
-              break
-            else
-              if [ $i -lt $RETRIES ]; then
-                echo "Verification failed, retrying ($i/$RETRIES)..."
-                sleep 5
-              else
-                echo "ERROR: Failed to verify image push after $RETRIES attempts - image not found or not accessible"
-                exit 1
-              fi
-            fi
-          done
-
-      - name: Upload build logs
-        # Upload build logs for debugging:
-        # - On failure (for production tag pushes)
-        # - Always for manual dispatch (test mode - useful for debugging test runs)
-        # Retention: 7 days (sufficient for post-mortem analysis)
-        if: failure() || github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v6.0.0
+      - name: Upload tested image
+        uses: actions/upload-artifact@v4
         with:
-          name: build-logs-${{ matrix.arch }}-${{ needs.extract-version.outputs.version }}
-          path: |
-            **/*.log
-          retention-days: 7
+          name: container-image-${{ needs.validate.outputs.version }}-${{ matrix.arch }}
+          path: /tmp/image.tar
+          retention-days: 1
+          compression-level: 0
 
-  manifest:
-    # Multi-Architecture Manifest Creation
-    #
-    # After architecture-specific images are built and pushed, this job creates
-    # multi-architecture manifests that allow users to pull images without
-    # specifying an architecture. Docker/Podman automatically selects the
-    # correct architecture based on the user's platform.
-    #
-    # Why separate job?
-    # - Build jobs run in parallel on different runners (amd64 vs arm64)
-    # - Manifest creation requires all images to exist
-    # - Separating concerns makes failure isolation clearer
-    #
-    # Why verify before creating?
-    # - Prevents creating incomplete manifests if one architecture build failed
-    # - Provides clear error messages if images are missing
-    # - Catches registry push failures early
-    needs: [extract-version, validate-architectures, build]
-    # For workflow_dispatch, run only when inputs.publish=true (default false)
-    if: needs.build.result == 'success' && (github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true')
-    timeout-minutes: 10  # Manifest operations are fast, short timeout prevents hangs
-    runs-on: ubuntu-22.04  # Can run on any runner, no architecture-specific code
-    permissions:
-      contents: read
-      packages: write
+      - name: Summary
+        run: |
+          echo "✓ Build and tests passed for ${{ matrix.arch }}"
+
+  publish:
+    name: Publish Release
+    needs: [validate, finalize, build-and-test]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
     steps:
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.12.0
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
+          private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
+
+      - name: Checkout release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.finalize.outputs.finalize_sha }}
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+
+      - name: Configure git
+        run: |
+          git config user.name "vigOS Release Bot"
+          git config user.email "release@vig-os.local"
+
+      - name: Create annotated tag
+        run: |
+          set -euo pipefail
+          git tag -a "v${{ needs.validate.outputs.version }}" \
+            -m "Release ${{ needs.validate.outputs.version }}"
+          echo "✓ Tag created: v${{ needs.validate.outputs.version }}"
+
+      - name: Push tag
+        run: |
+          git push origin "v${{ needs.validate.outputs.version }}"
+          echo "✓ Tag pushed"
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3.6.0
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ github.token }}
 
-      - name: Create and push multi-arch manifest
-        # Creates two manifests:
-        # 1. Version-specific: ghcr.io/vig-os/devcontainer:VERSION
-        # 2. Latest: ghcr.io/vig-os/devcontainer:latest (only for tag pushes)
-        # Both point to the architecture-specific images that were built,
-        # allowing Docker to automatically select the correct architecture
+      - name: Download image artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/images
+          pattern: container-image-${{ needs.validate.outputs.version }}-*
+
+      - name: Load and push images
         run: |
-          set -euo pipefail  # Exit on error, undefined vars, pipe failures
-          VERSION="${{ needs.extract-version.outputs.version }}"
+          set -euo pipefail
           REPO="ghcr.io/vig-os/devcontainer"
-          ARCHS="${{ needs.validate-architectures.outputs.architectures }}"
+          VERSION="${{ needs.validate.outputs.version }}"
+          ARCHS="${{ needs.validate.outputs.architectures }}"
 
-          echo "Building manifest for architectures: $ARCHS"
-
-          # Convert space-separated list to array
           IFS=' ' read -ra ARCH_ARRAY <<< "$ARCHS"
 
-          # Verification phase: Ensure all architecture images exist
-          # This prevents creating incomplete manifests
-          echo "Verifying architecture-specific images exist..."
-          ARCH_IMAGES=()
           for arch in "${ARCH_ARRAY[@]}"; do
-            IMAGE="$REPO:$VERSION-$arch"
-            echo "Checking image: $IMAGE"
+            ARTIFACT_PATH="/tmp/images/container-image-${VERSION}-${arch}"
 
-            # Retry logic for image verification (registry propagation delay)
-            RETRIES=5
-            VERIFIED=false
-            for i in $(seq 1 $RETRIES); do
-              if docker buildx imagetools inspect "$IMAGE" >/dev/null 2>&1; then
-                echo "✓ Verified $arch image exists"
-                VERIFIED=true
-                break
-              else
-                if [ $i -lt $RETRIES ]; then
-                  echo "Image not found, retrying ($i/$RETRIES)..."
-                  sleep 5
-                fi
-              fi
-            done
-
-            if [ "$VERIFIED" = "false" ]; then
-              echo "ERROR: $arch image not found after $RETRIES attempts: $IMAGE"
+            if [ ! -f "$ARTIFACT_PATH/image.tar" ]; then
+              echo "ERROR: Artifact not found: $ARTIFACT_PATH/image.tar"
+              ls -lh /tmp/images/
               exit 1
             fi
 
-            ARCH_IMAGES+=("$IMAGE")
+            echo "Loading $arch image..."
+            docker load < "$ARTIFACT_PATH/image.tar"
+
+            IMAGE_TAG="$REPO:$VERSION-$arch"
+            echo "Pushing $arch image: $IMAGE_TAG"
+
+            RETRIES=3
+            for i in $(seq 1 $RETRIES); do
+              if docker push "$IMAGE_TAG"; then
+                echo "✓ Pushed: $IMAGE_TAG"
+                break
+              else
+                if [ $i -lt $RETRIES ]; then
+                  echo "Push failed, retrying ($i/$RETRIES)..."
+                  sleep 3
+                else
+                  echo "ERROR: Failed to push after $RETRIES attempts"
+                  exit 1
+                fi
+              fi
+            done
           done
 
-          # Manifest creation phase: Create version manifest
-          echo "Creating version manifest: $REPO:$VERSION"
+      - name: Create multi-arch manifest
+        run: |
+          set -euo pipefail
+          REPO="ghcr.io/vig-os/devcontainer"
+          VERSION="${{ needs.validate.outputs.version }}"
+          ARCHS="${{ needs.validate.outputs.architectures }}"
 
-          # Retry logic for manifest creation (network/registry issues)
+          IFS=' ' read -ra ARCH_ARRAY <<< "$ARCHS"
+
+          # Build image list for manifest
+          ARCH_IMAGES=()
+          for arch in "${ARCH_ARRAY[@]}"; do
+            ARCH_IMAGES+=("$REPO:$VERSION-$arch")
+            echo "Including in manifest: $REPO:$VERSION-$arch"
+          done
+
+          echo "Creating version manifest: $REPO:$VERSION"
           RETRIES=3
           for i in $(seq 1 $RETRIES); do
             if docker buildx imagetools create \
@@ -416,17 +512,16 @@ jobs:
                 echo "Manifest creation failed, retrying ($i/$RETRIES)..."
                 sleep 3
               else
-                echo "ERROR: Failed to create version manifest after $RETRIES attempts"
+                echo "ERROR: Failed to create version manifest"
                 exit 1
               fi
             fi
           done
 
-          # Create/update latest manifest only for tag pushes with both architectures
-          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "${#ARCH_ARRAY[@]}" -eq 2 ]; then
+          # Update latest manifest only if building both architectures
+          if [ ${#ARCH_ARRAY[@]} -eq 2 ]; then
             echo "Creating/updating latest manifest: $REPO:latest"
 
-            # Retry logic for latest manifest creation
             RETRIES=3
             for i in $(seq 1 $RETRIES); do
               if docker buildx imagetools create \
@@ -439,19 +534,25 @@ jobs:
                   echo "Latest manifest creation failed, retrying ($i/$RETRIES)..."
                   sleep 3
                 else
-                  echo "ERROR: Failed to create latest manifest after $RETRIES attempts"
+                  echo "ERROR: Failed to create latest manifest"
                   exit 1
                 fi
               fi
             done
           else
-            echo "Skipping 'latest' tag (workflow_dispatch or single architecture build)"
+            echo "Skipping 'latest' manifest (single architecture or limited build)"
           fi
 
-          # Verification phase: Confirm version manifest was created successfully
-          echo "Verifying version manifest..."
+      - name: Verify manifests
+        run: |
+          set -euo pipefail
+          REPO="ghcr.io/vig-os/devcontainer"
+          VERSION="${{ needs.validate.outputs.version }}"
+          ARCHS="${{ needs.validate.outputs.architectures }}"
 
-          # Retry logic for version manifest verification
+          IFS=' ' read -ra ARCH_ARRAY <<< "$ARCHS"
+
+          echo "Verifying version manifest: $REPO:$VERSION"
           RETRIES=5
           for i in $(seq 1 $RETRIES); do
             if docker buildx imagetools inspect "$REPO:$VERSION" >/dev/null 2>&1; then
@@ -462,17 +563,14 @@ jobs:
                 echo "Verification failed, retrying ($i/$RETRIES)..."
                 sleep 5
               else
-                echo "ERROR: Version manifest verification failed after $RETRIES attempts"
+                echo "ERROR: Version manifest verification failed"
                 exit 1
               fi
             fi
           done
 
-          # Verify latest manifest if it was created
-          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "${#ARCH_ARRAY[@]}" -eq 2 ]; then
-            echo "Verifying latest manifest..."
-
-            # Retry logic for latest manifest verification
+          if [ ${#ARCH_ARRAY[@]} -eq 2 ]; then
+            echo "Verifying latest manifest: $REPO:latest"
             RETRIES=5
             for i in $(seq 1 $RETRIES); do
               if docker buildx imagetools inspect "$REPO:latest" >/dev/null 2>&1; then
@@ -483,11 +581,147 @@ jobs:
                   echo "Verification failed, retrying ($i/$RETRIES)..."
                   sleep 5
                 else
-                  echo "ERROR: Latest manifest verification failed after $RETRIES attempts"
+                  echo "ERROR: Latest manifest verification failed"
                   exit 1
                 fi
               fi
             done
           fi
 
-          echo "✓ Successfully created and verified multi-arch manifest(s)"
+      - name: Summary
+        run: |
+          echo "✓ Release published successfully!"
+          echo ""
+          echo "Release Summary:"
+          echo "  Version: ${{ needs.validate.outputs.version }}"
+          echo "  Tag: v${{ needs.validate.outputs.version }}"
+          echo "  Images:"
+          echo "    - ghcr.io/vig-os/devcontainer:${{ needs.validate.outputs.version }}"
+          echo "    - ghcr.io/vig-os/devcontainer:latest"
+          echo ""
+          echo "Next steps:"
+          echo "  1. Merge release PR to main"
+          echo "  2. Merge main back to dev"
+          echo "  3. Reset CHANGELOG: just reset-changelog"
+
+  rollback:
+    name: Rollback on Failure
+    needs: [validate, finalize, build-and-test, publish]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    if: failure()
+    permissions:
+      contents: write
+      issues: write
+
+    steps:
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
+          private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+
+      - name: Configure git
+        run: |
+          git config user.name "vigOS Release Bot"
+          git config user.email "release@vig-os.local"
+
+      - name: Rollback release branch
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.validate.outputs.version }}"
+          PRE_SHA="${{ needs.validate.outputs.pre_finalize_sha }}"
+
+          echo "Rolling back release branch to pre-finalization state..."
+          git fetch origin release/$VERSION
+
+          if git reset --hard "$PRE_SHA" 2>/dev/null; then
+            if git push --force-with-lease origin release/$VERSION; then
+              echo "✓ Release branch rolled back"
+            else
+              echo "⚠ Warning: Could not push rollback (branch may already be reset)"
+            fi
+          fi
+
+      - name: Delete tag if created
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          TAG="v${{ needs.validate.outputs.version }}"
+
+          if git ls-remote origin "refs/tags/$TAG" | grep -q "$TAG"; then
+            echo "Deleting remote tag: $TAG"
+            if git push origin ":refs/tags/$TAG"; then
+              echo "✓ Tag deleted"
+            else
+              echo "⚠ Warning: Could not delete tag"
+            fi
+          else
+            echo "Tag does not exist on remote (not created)"
+          fi
+
+      - name: Create failure issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ needs.validate.outputs.version }}';
+            const workflowUrl = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            const prNumber = ${{ needs.validate.outputs.pr_number || 'null' }};
+
+            let failedJobs = [];
+            if ('${{ needs.validate.result }}' !== 'success') failedJobs.push('validate');
+            if ('${{ needs.finalize.result }}' !== 'success') failedJobs.push('finalize');
+            if ('${{ needs.build-and-test.result }}' !== 'success') failedJobs.push('build-and-test');
+            if ('${{ needs.publish.result }}' !== 'success') failedJobs.push('publish');
+
+            const title = `Release ${version} failed -- automatic rollback`;
+            const body = `
+            Release ${version} encountered an error during the automated release workflow.
+
+            **Failed Jobs:** ${failedJobs.join(', ')}
+
+            **Workflow Run:** [View logs](${workflowUrl})
+
+            **Release PR:** #${prNumber}
+
+            **Actions Taken:**
+            - Release branch rolled back to pre-finalization state
+            - Release tag deleted (if created)
+            - This issue created for investigation
+
+            **Next Steps:**
+            1. Review the workflow logs to identify the root cause
+            2. Fix the issue on the release branch
+            3. Re-run the workflow when ready
+
+            For details, check the workflow run linked above.
+            `;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['bug', 'release']
+            });
+
+            console.log(`Created issue: ${title}`);
+
+      - name: Summary
+        run: |
+          echo "✗ Release workflow failed"
+          echo ""
+          echo "Automatic rollback completed:"
+          echo "  - Release branch reset to pre-finalization state"
+          echo "  - Release tag deleted (if created)"
+          echo "  - GitHub issue created for investigation"
+          echo ""
+          echo "Check the workflow logs and issue for details"

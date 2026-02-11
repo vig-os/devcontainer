@@ -148,23 +148,23 @@ test version="dev":
 # ===============================================================================
 # RELEASE MANAGEMENT
 # ===============================================================================
-# Release process is now handled by GitHub Actions workflow.
-# Pushing a semantic version tag (e.g., v1.2.3) triggers the CI/CD pipeline:
-#   .github/workflows/release.yml
+# Unified release workflow via GitHub Actions (.github/workflows/release.yml)
 #
-# Manual release process:
-#   1. Ensure on dev branch and up to date
-#   2. Run tests: just test
-#   3. Update CHANGELOG.md (move Unreleased to version section)
-#   4. Commit changes
-#   5. Create and push tag: git tag -a vX.Y.Z -m "Release X.Y.Z" && git push origin vX.Y.Z
-#   6. GitHub Actions will build, test, and publish the image
-#   7. Create PR from dev to main after release completes
-#
-# Automated release workflow (issue #48):
-#   1. just prepare-release X.Y.Z  - Create branch, prepare structure
-#   2. Test and fix bugs on release branch
-#   3. just finalize-release X.Y.Z - Set date, tag, publish
+# Process:
+#   1. just prepare-release X.Y.Z    - Create release/X.Y.Z branch, draft PR
+#   2. Test release branch, fix bugs as needed via PRs to release branch
+#   3. Mark PR ready for review (gh pr ready PR_NUMBER)
+#   4. Get PR approval from reviewer
+#   5. just finalize-release X.Y.Z   - Triggers GitHub Actions workflow that:
+#      - Validates PR status and all prerequisites
+#      - Sets release date in CHANGELOG, syncs PR docs
+#      - Builds and tests container images
+#      - Creates vX.Y.Z tag
+#      - Publishes images to GHCR
+#      - On failure: automatic rollback and issue creation
+#   6. Merge release PR to main
+#   7. Merge main back to dev
+#   8. just reset-changelog           - Reset CHANGELOG for next cycle
 # ===============================================================================
 
 # Prepare release branch for testing (step 1)
@@ -172,10 +172,17 @@ test version="dev":
 prepare-release version *flags:
     ./scripts/prepare-release.sh {{ version }} {{ flags }}
 
-# Finalize and publish release (step 3, after testing)
+# Finalize and publish release via GitHub Actions workflow (step 3, after testing)
 [group('release')]
 finalize-release version *flags:
-    ./scripts/finalize-release.sh {{ version }} {{ flags }}
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Trigger the release workflow via GitHub Actions
+    # The workflow handles: finalize CHANGELOG, build/test images, create tag, publish
+    gh workflow run release.yml -f "version={{ version }}" {{ flags }}
+    echo ""
+    echo "✓ Release workflow triggered for version {{ version }}"
+    echo "Monitor progress: gh run list --workflow release.yml"
 
 # Reset CHANGELOG Unreleased section (after merging release to dev)
 [group('release')]

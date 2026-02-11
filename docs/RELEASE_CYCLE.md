@@ -42,19 +42,36 @@ graph LR
 
 ### Branch Protection Rules
 
-- **main**: Requires PR with two approvals, all CI checks must pass
-- **dev**: Requires PR with one approval
-- **release/X.Y.Z**: Requires PR with one approval
+- **main**: Requires PR with approval, all CI checks must pass
+- **dev**: Requires PR
+- **release/X.Y.Z**: Requires PR
 
-### Topic Branch Naming
+### Topic Branch Naming and Workflow
 
-Topic branches (feature/bugfix/hotfix) follow the pattern: `<type>/<issue-number>-<short-summary>`
+Topic branches follow the pattern: `<type>/<issue-number>-<short-summary>`
+
+**Branch Types:**
+
+| Type | Use for |
+|------|---------|
+| **feature** | New functionality, enhancements |
+| **bugfix** | Bug fixes (non-urgent) |
+| **hotfix** | Urgent production fixes, often merged outside normal release |
+| **release** | Release preparation, version bumps, release notes |
 
 **Examples:**
 - `feature/48-release-automation`
 - `bugfix/52-fix-changelog-parsing`
 
-See [.cursor/rules/branch-naming.mdc](.cursor/rules/branch-naming.mdc) for the complete branching workflow including GitHub issue integration.
+**Creating a Development Branch:**
+
+When starting work on a GitHub issue:
+
+1. Verify no developer branch is linked yet: `gh issue develop --list <issue_number>`
+2. Pick a branch type from: feature, bugfix, hotfix, release
+3. Use a kebab-case short summary from the issue title (a few words, omitting prefixes like "Add")
+4. Create and link via GitHub: `gh issue develop <issue_number> --base dev --name <branch_name> --checkout`
+5. Ensure local branch is up to date: `git pull origin <branch_name>`
 
 ---
 
@@ -64,32 +81,32 @@ See [.cursor/rules/branch-naming.mdc](.cursor/rules/branch-naming.mdc) for the c
 
 ```mermaid
 graph TB
-    A[Development on dev] --> B[prepare-release X.Y.Z]
-    B --> C[Create release/X.Y.Z branch]
-    C --> D[Create draft PR to main]
-    D --> E[CI runs automatically]
-    E --> F[Mark PR ready for review]
-    F --> G{Issues found?}
-    G -->|Yes| H[Fix via bugfix branch PR]
-    H --> E
-    G -->|No| I[Get PR approvals]
-    I --> J[finalize-release X.Y.Z]
-    J --> K[Set date & commit]
-    K --> L[Sync PR doc]
-    L --> M[Create tag vX.Y.Z]
-    M --> N[Merge PR to main]
-    N --> O[Tag triggers publish workflow]
-    O --> P[Merge main to dev]
-    P --> Q[Reset CHANGELOG Unreleased]
+    A["Development on dev"] --> B["just prepare-release X.Y.Z"]
+    B --> C["Create release/X.Y.Z branch"]
+    C --> D["Create draft PR to main"]
+    D --> E["Review & Test Release"]
+    E --> F{Issues found?}
+    F -->|Yes| G["Fix via bugfix PRs"]
+    G --> E
+    F -->|No| H["Mark PR ready<br/>Get approval"]
+    H --> I["just finalize-release X.Y.Z<br/>(triggers workflow)"]
+    I --> J["Workflow: validate<br/>prerequisites"]
+    J --> K["Workflow: finalize CHANGELOG<br/>sync PR docs"]
+    K --> L["Workflow: build & test<br/>all architectures"]
+    L --> M{Tests pass?}
+    M -->|No| N["Automatic rollback<br/>+ issue creation"]
+    M -->|Yes| O["Workflow: create tag<br/>publish images"]
+    O --> P["Manual: Merge PR to main"]
+    P --> Q["Manual: Merge main to dev<br/>Reset CHANGELOG"]
 ```
 
 ### Release Phases
 
 1. **Preparation** (`prepare-release`): Create release branch, prepare CHANGELOG, open draft PR
 2. **Review & Testing**: CI validation, mark PR ready, fix issues, get approvals
-3. **Finalization** (`finalize-release`): Set release date, sync PR doc, create tag
-4. **Publication**: Merge to main, trigger container image publication
-5. **Post-Release**: Merge back to dev, reset CHANGELOG for next cycle
+3. **Finalization** (GitHub Actions workflow): Validate, finalize CHANGELOG, build/test, tag, publish
+4. **Post-Release**: Merge to main, merge back to dev, reset CHANGELOG for next cycle
+
 
 ---
 
@@ -243,130 +260,138 @@ This is the main quality gate. The release branch and draft PR serve as the coor
 
 **Iteration:** Repeat steps 4-6 until all checks pass and reviewers approve.
 
-### Phase 3: Finalization
+### Phase 3: Finalization (GitHub Actions Workflow)
 
 **Prerequisites:**
 - All CI checks passed on `release/X.Y.Z`
 - PR marked as ready for review (not draft)
-- All PR reviews approved
-- Ready to create release tag and merge
+- PR has required approvals
+- No uncommitted changes
 
 **Execute:**
 
 ```bash
-# Ensure you're on the release branch
-git checkout release/X.Y.Z
-
-# Finalize the release
+# Trigger the finalize-release workflow
 just finalize-release X.Y.Z
 
-# Or directly:
-./scripts/finalize-release.sh X.Y.Z
+# Monitor progress
+gh run list --workflow release.yml
 ```
 
-**What happens:**
-1. ✅ Verifies you're on correct release branch
-2. ✅ Checks for uncommitted changes
-3. ✅ Verifies CI checks passed on release branch
-4. ✅ Verifies PR is not in draft (ready for review)
-5. ✅ Verifies PR has required approvals
-6. ✅ Sets actual release date in CHANGELOG (TBD → YYYY-MM-DD)
-7. ✅ Commits changes: `chore: finalize release X.Y.Z`
-8. ✅ Triggers sync-issues workflow to generate PR doc
-9. ✅ Waits for sync-issues completion
-10. ✅ Pulls PR doc changes
-11. ✅ Creates signed annotated tag `vX.Y.Z`
-12. ✅ Pushes tag to origin
-13. ✅ Outputs merge instructions
+**What the workflow does (automatically):**
 
-**Important:** The tag `vX.Y.Z` points to a commit that includes:
-- Final CHANGELOG with actual release date
-- Generated PR documentation
-- All release content
+The `release.yml` workflow performs the entire remaining release process:
+
+1. ✅ **Validate** job (runs first)
+   - Validates semantic version format
+   - Checks release branch exists
+   - Verifies CHANGELOG has `## [X.Y.Z] - TBD`
+   - Verifies tag doesn't already exist
+   - Confirms PR exists, is not draft, is approved, and CI passed
+   - Records pre-finalization commit for rollback
+
+2. ✅ **Finalize** job (skipped if --dry-run)
+   - Sets actual release date in CHANGELOG (TBD → YYYY-MM-DD)
+   - Commits: `chore: finalize release X.Y.Z`
+   - Pushes release branch
+   - Triggers sync-issues workflow to generate PR documentation
+   - Waits for sync-issues completion (120s timeout)
+   - Pulls PR docs into the release branch
+
+3. ✅ **Build & Test** jobs (per-architecture, runs in parallel)
+   - Builds container image as tar file
+   - Runs image tests
+   - Runs integration tests
+   - Uploads tested image as artifact
+   - If ANY test fails: entire workflow stops and triggers rollback
+
+4. ✅ **Publish** job (runs only if all builds/tests pass)
+   - Creates annotated tag `vX.Y.Z`
+   - Pushes tag to origin
+   - Downloads tested images from artifacts
+   - Logs in to GitHub Container Registry
+   - Pushes images to GHCR with architecture-specific tags
+   - Creates multi-architecture manifest `ghcr.io/vig-os/devcontainer:X.Y.Z`
+   - Creates/updates `ghcr.io/vig-os/devcontainer:latest` manifest
+   - Verifies manifests exist
+
+5. ✅ **Rollback** job (runs if ANY job failed)
+   - Resets release branch to pre-finalization state
+   - Deletes tag if it was created
+   - Creates GitHub issue with failure details for investigation
 
 **Output example:**
 
 ```
-✓ Verified CI checks passed
-✓ Verified PR #123 is ready and approved
-✓ Set release date: 2026-02-06
-✓ Committed finalization changes
-✓ Triggered sync-issues workflow
-✓ Waiting for PR doc generation...
-✓ PR doc synced: .github_data/pull-requests/pr-123.md
-✓ Created tag: v1.0.0
-✓ Pushed tag to origin
+✓ Release workflow triggered for version 1.0.0
+Monitor progress: gh run list --workflow release.yml
 
-Next steps:
-  1. Merge PR #123: https://github.com/vig-os/devcontainer/pull/123
-  2. Tag v1.0.0 will trigger release workflow automatically
-  3. Monitor release: gh run list --workflow release.yml
+[Workflow runs...]
+
+✓ Release published successfully!
+
+Release Summary:
+  Version: 1.0.0
+  Tag: v1.0.0
+  Images:
+    - ghcr.io/vig-os/devcontainer:1.0.0
+    - ghcr.io/vig-os/devcontainer:latest
 ```
 
-### Phase 4: Publication
+**Key differences from local script:**
 
-**Execute in GitHub UI:**
+- **Earlier validation**: All checks happen at the start in CI
+- **Safer workflow**: Tag is created AFTER successful build/test, not before
+- **Automatic rollback**: Failed releases are automatically cleaned up
+- **Audit trail**: All steps are recorded in GitHub Actions logs with actor information
+- **Reproducible**: Uses consistent CI environment, not dependent on local tooling
 
-1. Navigate to the PR
-2. Verify all checks passed
-3. Click "Merge pull request"
-4. Confirm merge
+### Phase 4: Post-Release Cleanup
 
-**What happens automatically:**
+**Manual steps after workflow completes successfully:**
 
-1. ✅ PR merged to `main`
-2. ✅ Tag `vX.Y.Z` triggers `release.yml` workflow
-3. ✅ Workflow builds multi-architecture container images
-4. ✅ Runs container tests
-5. ✅ Publishes to GitHub Container Registry
-6. ✅ Creates multi-arch manifests
-7. ✅ Updates `latest` tag
+1. **Merge PR to main**
 
-**Monitor publication:**
+   ```bash
+   # Verify workflow succeeded
+   gh run list --workflow release.yml --limit 1
+
+   # Merge PR
+   gh pr merge <PR_NUMBER> --merge
+   ```
+
+2. **Merge main back to dev**
+
+   ```bash
+   git checkout dev
+   git pull origin dev
+   git merge main
+   git push origin dev
+   ```
+
+3. **Reset CHANGELOG for next cycle**
+
+   ```bash
+   just reset-changelog
+   git add CHANGELOG.md
+   git commit -m "chore: reset CHANGELOG after release X.Y.Z
+   Refs: #N"
+   git push origin dev
+   ```
+
+**Verify release is published:**
 
 ```bash
-# Watch the release workflow
-gh run list --workflow release.yml
+# List the tag
+git tag | grep v1.0.0
 
-# View specific run
-gh run view <RUN_ID>
-
-# Verify image published
-docker pull ghcr.io/vig-os/devcontainer:X.Y.Z
+# Verify images in registry
+docker pull ghcr.io/vig-os/devcontainer:1.0.0
 docker pull ghcr.io/vig-os/devcontainer:latest
+
+# Check manifests
+docker buildx imagetools inspect ghcr.io/vig-os/devcontainer:1.0.0
 ```
-
-### Phase 5: Post-Release Cleanup
-
-**Execute:**
-
-```bash
-# Merge main back to dev
-git checkout dev
-git pull origin dev
-git merge main
-git push origin dev
-
-# Reset CHANGELOG Unreleased section
-just reset-changelog
-
-# Commit the reset
-git add CHANGELOG.md
-git commit -m "chore: reset CHANGELOG after release X.Y.Z
-
-Refs: #N"
-git push origin dev
-
-# Optional: Delete local release branch
-git branch -d release/X.Y.Z
-```
-
-**What this achieves:**
-- `dev` gets all changes from `main` (including any last-minute fixes)
-- CHANGELOG Unreleased section recreated with all standard subsections
-- Ready for next development cycle
-
-**Note:** The release branch `release/X.Y.Z` remains on the remote for reference and future hotfixes.
 
 ---
 
@@ -397,26 +422,26 @@ git branch -d release/X.Y.Z
 
 **Location:** `scripts/finalize-release.sh`
 
-**Purpose:** Finalize release, create tag, prepare for merge
+**Status:** ⚠️ **SUPERSEDED** - Use `just finalize-release X.Y.Z` instead
 
-**Usage:**
+This script was used when finalization ran locally. The functionality is now implemented in the GitHub Actions workflow (`.github/workflows/release.yml`).
+
+The script is kept for reference and as a fallback, but **the recommended path** is to use the workflow via the justfile recipe.
+
+**For local development/testing only:**
 
 ```bash
 ./scripts/finalize-release.sh X.Y.Z [--dry-run]
 ```
 
-**Options:**
-- `--dry-run`: Show what would be done without executing
+**Note:** This script requires:
+- Local checkout of `release/X.Y.Z` branch
+- GitHub CLI (`gh`) configured and authenticated
+- GPG key configured (for signing tags)
+- Network access to trigger and poll workflows
 
-**Prerequisites:**
-- Must be on `release/X.Y.Z` branch
-- CI checks must have passed
-- PR must be reviewed and approved
-- GitHub CLI (`gh`) and origin remote must be configured
+**Recommended approach:** Use the workflow instead for all production releases.
 
-**Exit codes:**
-- `0`: Success
-- `1`: Validation error or failure
 
 ### prepare-build.sh
 
@@ -498,96 +523,110 @@ just reset-changelog
 
 ## CI/CD Integration
 
-### Current Workflows
+### Workflow Architecture
 
-#### release.yml
+The release process uses three coordinated workflows:
 
-**Trigger:** Push to tags matching `v[0-9]+.[0-9]+.[0-9]+`
+#### release.yml (Unified Release Workflow)
 
-**Purpose:** Build, test, and publish multi-architecture container images
+**Trigger:** `workflow_dispatch` (manual trigger via `just finalize-release`)
 
-**Process:**
-1. Extract version from tag
-2. Build amd64 and arm64 images in parallel
-3. Run container tests on each architecture
-4. Push images to GHCR
-5. Create multi-arch manifests
-6. Update `latest` tag
+**Purpose:** Complete release workflow - finalize, build, test, publish, with rollback on failure
 
-**Manual trigger:**
+**Jobs (sequential):**
+
+1. **validate** - Checks all prerequisites before mutations
+   - Validates semantic version format
+   - Verifies release branch exists
+   - Checks CHANGELOG has `[X.Y.Z] - TBD`
+   - Confirms tag doesn't exist
+   - Verifies PR: not draft, approved, CI passed
+   - Records pre-finalization commit for rollback
+   - Outputs: PR number, release date, pre-finalization SHA
+
+2. **finalize** (skipped if dry-run) - Updates release branch
+   - Sets release date in CHANGELOG
+   - Creates finalization commit
+   - Pushes to release branch
+   - Triggers sync-issues workflow
+   - Waits for sync-issues completion (120s timeout)
+   - Outputs: finalization commit SHA
+
+3. **build-and-test** (matrix: amd64, arm64) - Builds and validates images
+   - Builds container image for architecture
+   - Runs image tests
+   - Runs integration tests
+   - Uploads tested image as artifact
+   - Fails workflow if any test fails
+
+4. **publish** (runs if all builds/tests pass) - Creates tag and publishes
+   - Creates annotated tag `vX.Y.Z`
+   - Pushes tag
+   - Downloads tested images from artifacts
+   - Pushes images to GHCR
+   - Creates multi-architecture manifests
+   - Verifies manifests exist
+
+5. **rollback** (runs if any job failed) - Cleans up partial state
+   - Resets release branch to pre-finalization state
+   - Deletes tag if it was created
+   - Creates GitHub issue with failure details
+
+**Manual trigger (for testing):**
 
 ```bash
 gh workflow run release.yml \
-  -f version=1.0.0-test \
-  -f publish=false \
-  -f architectures=amd64
+  -f "version=1.0.0" \
+  -f "architectures=amd64,arm64" \
+  -f "dry-run=false"
+
+# Dry-run mode (validates without making changes)
+gh workflow run release.yml \
+  -f "version=1.0.0" \
+  -f "dry-run=true"
 ```
+
+**Key characteristics:**
+- Tag created AFTER successful build/test (safer than before)
+- Automatic rollback on failure
+- All in one workflow for atomic operation
+- Audit trail in GitHub Actions logs
 
 #### sync-issues.yml
 
 **Trigger:**
-- Issue/PR events
-- Manual `workflow_dispatch`
+- Scheduled: Daily at midnight UTC
+- Manual: `workflow_dispatch`
+- Events: Issue/PR creation, update, or closure
 
-**Purpose:** Sync GitHub issues and PRs to markdown files
+**Purpose:** Sync GitHub issues and PRs to markdown files in `.github_data/`
 
-**Configuration for releases:**
+**Usage in release:**
+- Automatically triggered by finalize workflow
+- Generates PR documentation at release time
+- Output files are committed to release branch
 
-```yaml
-on:
-  push:
-    branches:
-      - dev
-      - 'release/**'  # Enabled for release branches
-      # NOT main - explicitly excluded
-```
-
-**Manual trigger:**
-
-```bash
-gh workflow run sync-issues.yml --ref release/X.Y.Z
-```
+**For more details:** See sync-issues workflow documentation
 
 #### ci.yml
 
 **Triggers:**
-- Push to `dev` and `release/**` branches (runs after merges)
+- Push to `dev` and `release/**` branches
 - Pull requests to `dev`, `release/**`, and `main`
 - Manual `workflow_dispatch`
 
-**Purpose:** Run automated tests and linters
-
-**Configuration:**
-
-```yaml
-on:
-  push:
-    branches:
-      - dev
-      - 'release/**'
-  pull_request:
-    branches:
-      - dev
-      - 'release/**'
-      - main
-  workflow_dispatch:
-```
+**Purpose:** Validate code quality, run tests, check commit messages
 
 **Jobs:**
-- Run pytest test suite
-- Run linters (ruff, pre-commit)
-- Validate CHANGELOG format
-- Check commit message format
+- Build container image
+- Run image tests
+- Run integration tests
+- Run project checks (linters, CHANGELOG validation, commit message format)
 
-**Why both push and PR triggers?**
-- **PR trigger:** Validates changes before merge (gate)
-- **Push trigger:** Runs after merge to detect integration issues
+**Note:** ci.yml runs on each push to release branch. Combined with finalize workflow, this provides multiple validation gates:
+- PR to release branch: ci.yml validates changes
+- finalize workflow: Validates prerequisites before finalization, then rebuilds before publishing
 
-**Manual trigger (optional):**
-
-```bash
-gh workflow run ci.yml --ref release/X.Y.Z
-```
 
 ---
 
@@ -631,9 +670,9 @@ The release process provides the necessary artifacts for QMS documentation:
 
 ### Common Issues
 
-#### "CHANGELOG validation failed"
+#### "CHANGELOG validation failed" (in validate job)
 
-**Cause:** No Unreleased section or it's empty
+**Cause:** No Unreleased section or it's empty in CHANGELOG.md
 
 **Solution:**
 
@@ -641,68 +680,125 @@ The release process provides the necessary artifacts for QMS documentation:
 # Add changes to CHANGELOG Unreleased section
 vim CHANGELOG.md
 
-# Verify
+# Verify locally
 uv run python scripts/prepare-changelog.py validate CHANGELOG.md
 ```
 
-#### "Release branch already exists"
+#### "Release branch not found"
 
-**Cause:** Previous release attempt wasn't completed or cleaned up
+**Cause:** You need to run `just prepare-release X.Y.Z` first
 
 **Solution:**
 
 ```bash
-# Check existing release branches
-git branch -r | grep release/
+# Create the release branch
+just prepare-release X.Y.Z
 
-# Delete old release branch if safe
-git push origin --delete release/X.Y.Z
-git branch -D release/X.Y.Z
+# Review and test the release
+git checkout release/X.Y.Z
+
+# Then trigger finalization
+just finalize-release X.Y.Z
 ```
 
-#### "Not up to date with origin/dev"
+#### "PR is still in draft status"
 
-**Cause:** Local dev branch is behind remote
+**Cause:** Release PR hasn't been marked as ready for review
 
 **Solution:**
 
 ```bash
-git checkout dev
-git pull origin dev
+# Mark PR as ready
+gh pr ready <PR_NUMBER>
+
+# Or manually via GitHub UI
+# Navigate to PR → Click "Ready for review" button
 ```
 
-#### "Sync-issues timeout"
+#### "PR has not been approved"
 
-**Cause:** Workflow took longer than expected or failed
+**Cause:** PR needs at least one approval
 
 **Solution:**
 
 ```bash
-# Check workflow status
-gh run list --workflow sync-issues.yml --branch release/X.Y.Z
+# Add reviewers to the PR
+gh pr edit <PR_NUMBER> --add-reviewer <USERNAME>
 
-# View specific run
-gh run view <RUN_ID>
-
-# Re-trigger if needed
-gh workflow run sync-issues.yml --ref release/X.Y.Z
+# Wait for approval
 ```
 
-#### "Container publish failed"
+#### "CI checks have failed"
 
-**Cause:** Tests failed or registry authentication issue
+**Cause:** Tests failed on the release branch
 
 **Solution:**
 
 ```bash
-# Check release workflow
-gh run list --workflow release.yml
+# Check CI status
+gh pr checks <PR_NUMBER>
 
-# View logs
+# View workflow details
+gh run list --branch release/X.Y.Z
+
+# Fix issues via bugfix branches
+git checkout -b bugfix/N-fix-description release/X.Y.Z
+# make fixes...
+git push origin bugfix/N-fix-description
+gh pr create --base release/X.Y.Z --head bugfix/N-fix-description
+```
+
+#### "Release workflow failed - automatic rollback created"
+
+**Cause:** Build, test, or publish job failed during the workflow
+
+**Solution:**
+
+```bash
+# Review the failure
+gh run list --workflow release.yml --limit 1
 gh run view <RUN_ID> --log
 
-# Re-run if transient failure
-gh run rerun <RUN_ID>
+# Check the automatic rollback issue
+gh issue list --label release
+
+# Fix the issue on the release branch
+git checkout release/X.Y.Z
+git pull origin release/X.Y.Z
+# make fixes...
+git push origin release/X.Y.Z
+
+# Re-run the workflow
+just finalize-release X.Y.Z
+```
+
+#### "Sync-issues workflow timed out"
+
+**Cause:** sync-issues didn't complete within 120 seconds
+
+**Solution:**
+
+```bash
+# Check sync-issues status
+gh run list --workflow sync-issues.yml --limit 1
+gh run view <RUN_ID>
+
+# If it completed successfully, the next finalize-release attempt should work
+# If it failed, check the sync-issues workflow logs and fix the issue
+```
+
+#### "Tag already exists"
+
+**Cause:** A previous release attempt didn't clean up the tag
+
+**Solution:**
+
+```bash
+# Delete the old tag
+git push origin :refs/tags/v<VERSION>
+
+# Try again
+just finalize-release <VERSION>
 ```
 
 ### Recovery Procedures
@@ -718,22 +814,56 @@ git branch -D release/X.Y.Z
 gh pr close <PR_NUMBER>
 ```
 
-#### Fix Issues After finalize-release
+#### If Release Workflow Fails (Automatic Rollback)
 
-If tag was created but something went wrong:
+The workflow automatically performs rollback on failure:
 
 ```bash
-# Delete tag locally and remotely
-git tag -d vX.Y.Z
-git push origin :refs/tags/vX.Y.Z
+# 1. Check the failure
+gh run list --workflow release.yml --limit 1
+gh run view <RUN_ID> --log
 
-# Fix issues on release branch
+# 2. Find the created issue
+gh issue list --label release
+
+# 3. Examine what was rolled back (issue will document this)
+# The workflow automatically:
+#   - Reset release branch to pre-finalization state
+#   - Deleted any tag that was created
+#   - Created this issue for investigation
+
+# 4. Fix the underlying issue on the release branch
 git checkout release/X.Y.Z
-# Make fixes...
+git pull origin release/X.Y.Z
+
+# Make necessary fixes...
+git add .
+git commit -m "fix: address release issue
+
+Refs: #<ISSUE_NUMBER>"
 git push origin release/X.Y.Z
 
-# Re-run finalize-release
-./scripts/finalize-release.sh X.Y.Z
+# 5. Re-run the workflow
+just finalize-release X.Y.Z
+```
+
+#### Manual Rollback (If Needed)
+
+In rare cases where the automatic rollback didn't work:
+
+```bash
+# Reset release branch to pre-finalization state
+PRE_SHA="<pre_finalize_sha>"  # From workflow logs
+git fetch origin
+git checkout release/X.Y.Z
+git reset --hard $PRE_SHA
+git push --force-with-lease origin release/X.Y.Z
+
+# Delete tag if it exists
+git push origin :refs/tags/vX.Y.Z
+
+# Fix the issue and re-run workflow
+just finalize-release X.Y.Z
 ```
 
 #### Roll Back Published Release
@@ -742,13 +872,16 @@ git push origin release/X.Y.Z
 
 ```bash
 # Create hotfix branch from previous tag
-git checkout -b hotfix/X.Y.Z-1 vX.Y.Z-1
+git checkout -b hotfix/X.Y.Z+1 vX.Y.Z
 
 # Apply fix
 # ...
 
-# Follow hotfix release process
+# Create a new release with bumped version
+just prepare-release X.Y.(Z+1)
+just finalize-release X.Y.(Z+1)
 ```
+
 
 ---
 
