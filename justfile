@@ -150,7 +150,7 @@ test version="dev":
 # ===============================================================================
 # Release process is now handled by GitHub Actions workflow.
 # Pushing a semantic version tag (e.g., v1.2.3) triggers the CI/CD pipeline:
-#   .github/workflows/publish-container-image.yml
+#   .github/workflows/release.yml
 #
 # Manual release process:
 #   1. Ensure on dev branch and up to date

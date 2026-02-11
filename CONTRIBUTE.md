@@ -208,7 +208,7 @@ When releasing a new version of the devcontainer image, follow these steps:
 
 4. **Create and push the version tag to trigger the release workflow**
 
-   Releases are published by the [GitHub Actions workflow](.github/workflows/publish-container-image.yml) when a version tag (e.g. `v1.0.0`) is pushed.
+   Releases are published by the [GitHub Actions workflow](.github/workflows/release.yml) when a version tag (e.g. `v1.0.0`) is pushed.
 
    ```bash
    # Replace X.Y.Z with the semantic version (e.g. 1.0.0, 1.1.0, 2.0.0)

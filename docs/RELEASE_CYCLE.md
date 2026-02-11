@@ -299,8 +299,8 @@ just finalize-release X.Y.Z
 
 Next steps:
   1. Merge PR #123: https://github.com/vig-os/devcontainer/pull/123
-  2. Tag v1.0.0 will trigger publish workflow automatically
-  3. Monitor publish: gh run list --workflow publish-container-image.yml
+  2. Tag v1.0.0 will trigger release workflow automatically
+  3. Monitor release: gh run list --workflow release.yml
 ```
 
 ### Phase 4: Publication
@@ -315,7 +315,7 @@ Next steps:
 **What happens automatically:**
 
 1. ✅ PR merged to `main`
-2. ✅ Tag `vX.Y.Z` triggers `publish-container-image.yml` workflow
+2. ✅ Tag `vX.Y.Z` triggers `release.yml` workflow
 3. ✅ Workflow builds multi-architecture container images
 4. ✅ Runs container tests
 5. ✅ Publishes to GitHub Container Registry
@@ -325,8 +325,8 @@ Next steps:
 **Monitor publication:**
 
 ```bash
-# Watch the publish workflow
-gh run list --workflow publish-container-image.yml
+# Watch the release workflow
+gh run list --workflow release.yml
 
 # View specific run
 gh run view <RUN_ID>
@@ -483,7 +483,7 @@ just reset-changelog
 
 ### Current Workflows
 
-#### publish-container-image.yml
+#### release.yml
 
 **Trigger:** Push to tags matching `v[0-9]+.[0-9]+.[0-9]+`
 
@@ -500,7 +500,7 @@ just reset-changelog
 **Manual trigger:**
 
 ```bash
-gh workflow run publish-container-image.yml \
+gh workflow run release.yml \
   -f version=1.0.0-test \
   -f publish=false \
   -f architectures=amd64
@@ -681,8 +681,8 @@ gh workflow run sync-issues.yml --ref release/X.Y.Z
 **Solution:**
 
 ```bash
-# Check publish workflow
-gh run list --workflow publish-container-image.yml
+# Check release workflow
+gh run list --workflow release.yml
 
 # View logs
 gh run view <RUN_ID> --log

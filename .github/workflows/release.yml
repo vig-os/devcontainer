@@ -1,4 +1,4 @@
-# This workflow builds and publishes multi-architecture container images to GitHub Container Registry.
+# Release workflow - builds and publishes multi-architecture container images to GitHub Container Registry.
 #
 # Workflow Overview:
 # 1. Build Job (matrix strategy):
@@ -24,7 +24,7 @@
 #
 # Trigger: Pushes to tags matching semantic versioning (vX.Y.Z)
 
-name: Publish Container Image
+name: Release
 
 on:  # yamllint disable-line rule:truthy
   push:

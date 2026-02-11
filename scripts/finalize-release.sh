@@ -355,12 +355,12 @@ PUBLISH_ELAPSED=5
 
 PUBLISH_TRIGGERED=false
 while [ $PUBLISH_ELAPSED -lt $PUBLISH_TIMEOUT ]; do
-    # Check for recent publish-container-image workflow runs triggered by tag push
-    RECENT_RUN=$(gh run list --workflow publish-container-image.yml --limit 5 --json event,status,headBranch --jq ".[] | select(.event == \"push\" or .event == \"workflow_dispatch\")" 2>/dev/null || echo "")
+    # Check for recent release workflow runs triggered by tag push
+    RECENT_RUN=$(gh run list --workflow release.yml --limit 5 --json event,status,headBranch --jq ".[] | select(.event == \"push\" or .event == \"workflow_dispatch\")" 2>/dev/null || echo "")
 
     if [ -n "$RECENT_RUN" ]; then
-        success "Publish workflow triggered successfully"
-        info "Monitor progress: gh run list --workflow publish-container-image.yml"
+        success "Release workflow triggered successfully"
+        info "Monitor progress: gh run list --workflow release.yml"
         PUBLISH_TRIGGERED=true
         break
     fi
@@ -371,8 +371,8 @@ while [ $PUBLISH_ELAPSED -lt $PUBLISH_TIMEOUT ]; do
 done
 
 if [ "$PUBLISH_TRIGGERED" = false ]; then
-    warn "Timed out waiting for publish workflow to trigger"
-    warn "Verify manually: gh run list --workflow publish-container-image.yml"
+    warn "Timed out waiting for release workflow to trigger"
+    warn "Verify manually: gh run list --workflow release.yml"
     warn "The workflow should start automatically from the tag push"
 fi
 
@@ -389,8 +389,8 @@ if [ -n "$PR_NUMBER" ]; then
 else
     echo "  1. Merge the release PR to main"
 fi
-echo "  2. Tag $TAG_NAME will trigger publish workflow automatically"
-echo "  3. Monitor publish: gh run list --workflow publish-container-image.yml"
+echo "  2. Tag $TAG_NAME will trigger release workflow automatically"
+echo "  3. Monitor release: gh run list --workflow release.yml"
 echo ""
 echo "After merge to main:"
 echo "  4. Merge main back to dev: git checkout dev && git merge main && git push origin dev"

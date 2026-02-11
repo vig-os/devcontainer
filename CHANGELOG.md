@@ -78,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added installation of the latest version of `just` (1.46.0) in the Containerfile
   - Added tests to verify `just` installation and version in `test_image.py`
   - Added integration tests for `just` recipes (`test_just_default`, `test_just_help`, `test_just_info`, `test_just_pytest`)
-- **GitHub Actions workflow for multi-architecture container image publishing** (`.github/workflows/publish-container-image.yml`)
+- **GitHub Actions workflow for multi-architecture container image publishing** (`.github/workflows/release.yml`)
   - Automated build and publish workflow triggered on semantic version tags (vX.Y.Z)
   - Multi-architecture support (amd64, arm64) with parallel builds on native runners
   - Image testing before push: runs `pytest tests/test_image.py` against built images
