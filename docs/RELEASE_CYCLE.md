@@ -97,8 +97,8 @@ graph TB
     L --> M{Tests pass?}
     M -->|No| N["Automatic rollback<br/>+ issue creation"]
     M -->|Yes| O["Workflow: create tag<br/>publish images"]
-    O --> P["Manual: Merge PR to main"]
-    P --> Q["Manual: Merge main to dev<br/>Reset CHANGELOG"]
+    O --> P["Merge PR to main"]
+    P --> Q["Workflow: post-release<br/>Sync dev, reset CHANGELOG"]
 ```
 
 ### Release Phases
@@ -106,7 +106,7 @@ graph TB
 1. **Preparation** (`prepare-release`): Create release branch, prepare CHANGELOG, open draft PR
 2. **Review & Testing**: CI validation, mark PR ready, fix issues, get approvals
 3. **Finalization** (GitHub Actions workflow): Validate, finalize CHANGELOG, build/test, tag, publish
-4. **Post-Release**: Merge to main, merge back to dev, reset CHANGELOG for next cycle
+4. **Post-Release**: Merge PR to main (manual), then automated: sync dev with main, reset CHANGELOG
 
 
 ---
@@ -191,9 +191,9 @@ This is the main quality gate. The release branch and draft PR serve as the coor
 
 2. **CI Testing**
 
-   CI runs automatically on these events:
-   - When release branch is created (initial push by `prepare-release`)
-   - After each PR merge to the release branch
+   CI runs automatically on these `pull_request` events:
+   - When the draft PR from the release branch to `main` is created (by `prepare-release`)
+   - When new commits land on the release branch (e.g., merged bugfix PRs), which synchronize the open PR
 
    Monitor CI status:
 
@@ -232,10 +232,10 @@ This is the main quality gate. The release branch and draft PR serve as the coor
    git checkout release/1.0.0
 
    # Run tests locally
-   just test-all
+   just test
 
    # Build container locally (optional)
-   ./scripts/build.sh X.Y.Z
+   just build
    ```
 
 5. **Fix Issues**
@@ -363,36 +363,24 @@ Release Summary:
 
 ### Phase 4: Post-Release Cleanup
 
-**Manual steps after workflow completes successfully:**
+**Manual step:** Merge the release PR to main.
 
-1. **Merge PR to main**
+```bash
+# Verify release workflow succeeded
+gh run list --workflow release.yml --limit 1
 
-   ```bash
-   # Verify workflow succeeded
-   gh run list --workflow release.yml --limit 1
+# Merge PR
+gh pr merge <PR_NUMBER> --merge
+```
 
-   # Merge PR
-   gh pr merge <PR_NUMBER> --merge
-   ```
+**What the `post-release.yml` workflow does (automatically on merge):**
 
-2. **Merge main back to dev**
+Merging any PR to `main` triggers the `post-release.yml` workflow, which:
 
-   ```bash
-   git checkout dev
-   git pull origin dev
-   git merge main
-   git push origin dev
-   ```
-
-3. **Reset CHANGELOG for next cycle**
-
-   ```bash
-   just reset-changelog
-   git add CHANGELOG.md
-   git commit -m "chore: reset CHANGELOG after release X.Y.Z
-   Refs: #N"
-   git push origin dev
-   ```
+1. ✅ **Merges main into dev** -- keeps dev in sync with main
+2. ✅ **Resets CHANGELOG** -- creates fresh Unreleased section for next cycle (skipped gracefully if Unreleased already exists, e.g. for non-release merges)
+3. ✅ **Commits and pushes** -- only if there are actual changes
+4. ✅ **Triggers sync-issues** -- updates issue/PR documentation on dev
 
 **Verify release is published:**
 
@@ -456,7 +444,7 @@ uv run python scripts/prepare-changelog.py finalize 1.0.0 2026-02-11 [CHANGELOG.
 
 Used by the `release.yml` workflow to set the actual release date.
 
-**Tests:** `tests/test_release_cycle.py::TestPrepareChangelog` (22 tests)
+**Tests:** `tests/test_release_cycle.py::TestPrepareChangelog`
 
 ### Justfile Recipes
 
@@ -481,7 +469,7 @@ just reset-changelog
 
 ### Workflow Architecture
 
-The release process uses four coordinated workflows:
+The release process uses five coordinated workflows:
 
 #### prepare-release.yml (Release Preparation Workflow)
 
@@ -603,6 +591,24 @@ gh workflow run release.yml \
 - Output files are committed to release branch
 
 **For more details:** See sync-issues workflow documentation
+
+#### post-release.yml (Post-Release Workflow)
+
+**Trigger:** `pull_request` closed event on `main` branch (runs when any PR is merged to main)
+
+**Purpose:** Keep dev in sync with main after merge. After a release, also resets CHANGELOG for next cycle.
+
+**Job: sync-dev** (single job, skipped if PR was closed without merging)
+
+1. Merges `main` into `dev`
+2. Resets CHANGELOG Unreleased section (`continue-on-error` -- succeeds after releases, skipped for non-release merges)
+3. Commits and pushes to `dev` (only if there are changes)
+4. Triggers `sync-issues.yml` targeting `dev`
+
+**Key characteristics:**
+- Fires automatically on any PR merge to `main` -- no manual trigger needed
+- Works for both release merges and non-release merges (e.g., hotfixes)
+- CHANGELOG reset is graceful: succeeds when Unreleased section was consumed (release), harmlessly fails when it already exists (non-release)
 
 #### ci.yml (CI Workflow)
 

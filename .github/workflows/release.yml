@@ -633,9 +633,7 @@ jobs:
           echo "    - ghcr.io/vig-os/devcontainer:latest"
           echo ""
           echo "Next steps:"
-          echo "  1. Merge release PR to main"
-          echo "  2. Merge main back to dev"
-          echo "  3. Reset CHANGELOG: just reset-changelog"
+          echo "  1. Merge release PR to main (triggers post-release workflow automatically)"
 
   rollback:
     name: Rollback on Failure

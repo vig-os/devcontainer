@@ -162,9 +162,10 @@ test version="dev":
 #      - Creates vX.Y.Z tag
 #      - Publishes images to GHCR
 #      - On failure: automatic rollback and issue creation
-#   6. Merge release PR to main
-#   7. Merge main back to dev
-#   8. just reset-changelog           - Reset CHANGELOG for next cycle
+#   6. Merge release PR to main       - Triggers post-release.yml automatically:
+#      - Merges main back into dev
+#      - Resets CHANGELOG for next cycle
+#      - Deletes release branch
 # ===============================================================================
 
 # Prepare release branch for testing (step 1)
