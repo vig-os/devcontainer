@@ -1,5 +1,6 @@
-# Use Python 3.12 as base image
-FROM python:3.12-slim-trixie
+# Use Python 3.12 as base image (pinned to digest for supply chain integrity)
+# Dependabot (docker ecosystem) will propose digest updates automatically
+FROM python:3.12-slim-trixie@sha256:9e01bf1ae5db7649a236da7be1e94ffbbbdd7a93f867dd0d8d5720d9e1f89fab
 
 # Add metadata
 # By default, we build the dev version unless specified as an argument
@@ -78,15 +79,43 @@ RUN set -eux; \
     rm -rf "gh_${GH_VERSION}_${ARCH}" "$FILE"; \
     gh --version;
 
-# Install latest just
+# Install latest just with checksum verification
 RUN set -eux; \
-    curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin; \
+    case "${TARGETARCH}" in \
+        amd64) ARCH=x86_64-unknown-linux-musl ;; \
+        arm64) ARCH=aarch64-unknown-linux-musl ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    JUST_VERSION="$(curl -fsSL https://api.github.com/repos/casey/just/releases/latest | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')"; \
+    URL="https://github.com/casey/just/releases/download/${JUST_VERSION}"; \
+    FILE="just-${JUST_VERSION}-${ARCH}.tar.gz"; \
+    curl -fsSL "${URL}/${FILE}" -o "$FILE"; \
+    CHECKSUM=$(curl -fsSL "${URL}/SHA256SUMS" | grep "${FILE}" | awk '{print $1}'); \
+    echo "${CHECKSUM}  ${FILE}" | sha256sum -c -; \
+    tar -xzf "$FILE" -C /usr/local/bin just; \
+    chmod +x /usr/local/bin/just; \
+    rm "$FILE"; \
     just --version;
 
-# Install latest cargo-binstall (installs to ~/.cargo/bin)
+# Install latest cargo-binstall from release archive (installs to ~/.cargo/bin)
+# Note: cargo-binstall provides .sig (GPG) signatures but not SHA256 checksums.
+# We download directly from the versioned release URL over TLS instead of running
+# an unverified install script from the main branch.
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN set -eux; \
-    curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash; \
+    case "${TARGETARCH}" in \
+        amd64) ARCH=x86_64-unknown-linux-musl ;; \
+        arm64) ARCH=aarch64-unknown-linux-musl ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    BINSTALL_VERSION="$(curl -fsSL https://api.github.com/repos/cargo-bins/cargo-binstall/releases/latest | sed -n 's/.*"tag_name": *"v\?\([^"]*\)".*/\1/p')"; \
+    URL="https://github.com/cargo-bins/cargo-binstall/releases/download/v${BINSTALL_VERSION}"; \
+    FILE="cargo-binstall-${ARCH}.tgz"; \
+    curl -fsSL "${URL}/${FILE}" -o "$FILE"; \
+    mkdir -p /root/.cargo/bin; \
+    tar -xzf "$FILE" -C /root/.cargo/bin; \
+    chmod +x /root/.cargo/bin/cargo-binstall; \
+    rm "$FILE"; \
     cargo-binstall -V;
 
 # Install just LSP
