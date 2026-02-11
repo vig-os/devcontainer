@@ -101,6 +101,7 @@ RUN set -eux; \
 # Note: cargo-binstall provides .sig (GPG) signatures but not SHA256 checksums.
 # We download directly from the versioned release URL over TLS instead of running
 # an unverified install script from the main branch.
+# The installed binary version is verified against the expected release version.
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN set -eux; \
     case "${TARGETARCH}" in \
@@ -116,7 +117,12 @@ RUN set -eux; \
     tar -xzf "$FILE" -C /root/.cargo/bin; \
     chmod +x /root/.cargo/bin/cargo-binstall; \
     rm "$FILE"; \
-    cargo-binstall -V;
+    INSTALLED_VERSION="$(cargo-binstall -V | awk '{print $2}')"; \
+    if [ "$INSTALLED_VERSION" != "$BINSTALL_VERSION" ]; then \
+        echo "Version mismatch: expected ${BINSTALL_VERSION}, got ${INSTALLED_VERSION}"; \
+        exit 1; \
+    fi; \
+    echo "cargo-binstall ${INSTALLED_VERSION} verified";
 
 # Install just LSP
 RUN cargo-binstall just-lsp; \
