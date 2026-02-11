@@ -127,8 +127,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Summary
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CHANGELOG_RESET: ${{ steps.reset-changelog.outcome }}
         run: |
           echo "✓ Post-release sync complete"
           echo ""
-          echo "Trigger: ${{ github.event_name }}"
-          echo "CHANGELOG reset: ${{ steps.reset-changelog.outcome }}"
+          echo "Trigger: $EVENT_NAME"
+          echo "CHANGELOG reset: $CHANGELOG_RESET"

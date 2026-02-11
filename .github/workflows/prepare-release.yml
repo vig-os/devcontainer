@@ -74,9 +74,10 @@ jobs:
           echo "✓ Version format validated: $VERSION"
 
       - name: Verify release branch does not exist
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.vars.outputs.version }}"
           RELEASE_BRANCH="release/$VERSION"
 
           if git show-ref --verify --quiet "refs/heads/$RELEASE_BRANCH"; then
@@ -92,9 +93,10 @@ jobs:
           echo "✓ Release branch does not exist: $RELEASE_BRANCH"
 
       - name: Verify tag does not exist
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.vars.outputs.version }}"
 
           if git tag -l | grep -q "^v$VERSION$"; then
             echo "ERROR: Tag v$VERSION already exists"
@@ -124,13 +126,17 @@ jobs:
           echo "✓ Checked out dev branch"
 
       - name: Summary
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+          RELEASE_BRANCH: ${{ steps.vars.outputs.release_branch }}
+          DRY_RUN: ${{ github.event.inputs.dry-run }}
         run: |
           echo "✓ All validation checks passed"
           echo ""
           echo "Release Preparation Configuration:"
-          echo "  Version: ${{ steps.vars.outputs.version }}"
-          echo "  Release Branch: ${{ steps.vars.outputs.release_branch }}"
-          echo "  Dry-run: ${{ github.event.inputs.dry-run }}"
+          echo "  Version: $VERSION"
+          echo "  Release Branch: $RELEASE_BRANCH"
+          echo "  Dry-run: $DRY_RUN"
 
   prepare:
     name: Prepare Release Branch
@@ -172,26 +178,29 @@ jobs:
           install-podman: 'false'
 
       - name: Create release branch
+        env:
+          RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
         run: |
           set -euo pipefail
-          RELEASE_BRANCH="${{ needs.validate.outputs.release_branch }}"
           echo "Creating release branch: $RELEASE_BRANCH"
           git checkout -b "$RELEASE_BRANCH"
           echo "✓ Release branch created"
 
       - name: Prepare CHANGELOG
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${{ needs.validate.outputs.version }}"
           echo "Preparing CHANGELOG for version $VERSION..."
           uv run python scripts/prepare-changelog.py prepare "$VERSION" CHANGELOG.md
           echo "✓ CHANGELOG prepared"
 
       - name: Extract CHANGELOG content for PR body
         id: changelog
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${{ needs.validate.outputs.version }}"
 
           # Extract the version section from CHANGELOG (between ## [VERSION] and next ## [)
           CHANGELOG_CONTENT=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$d')
@@ -204,9 +213,10 @@ jobs:
           echo "changelog=$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
 
       - name: Create release preparation commit
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${{ needs.validate.outputs.version }}"
 
           git add CHANGELOG.md
           git commit -m "$(cat <<EOF
@@ -219,18 +229,22 @@ jobs:
           echo "✓ Preparation commit created"
 
       - name: Push release branch
+        env:
+          RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
         run: |
           set -euo pipefail
-          RELEASE_BRANCH="${{ needs.validate.outputs.release_branch }}"
           git push -u origin "$RELEASE_BRANCH"
           echo "✓ Release branch pushed"
 
       - name: Create draft PR to main
         id: pr
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
+          CHANGELOG_CONTENT: ${{ steps.changelog.outputs.changelog }}
         run: |
           set -euo pipefail
-          VERSION="${{ needs.validate.outputs.version }}"
-          RELEASE_BRANCH="${{ needs.validate.outputs.release_branch }}"
 
           PR_BODY="## Release v$VERSION
 
@@ -238,7 +252,7 @@ jobs:
 
           ### Release Content
 
-          ${{ steps.changelog.outputs.changelog }}
+          $CHANGELOG_CONTENT
 
           ### Testing Checklist
           - [ ] All tests pass (\`just test\`)
@@ -272,21 +286,22 @@ jobs:
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
           echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
           echo "✓ Draft PR created: $PR_URL (#$PR_NUMBER)"
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Summary
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
         run: |
           echo "✓ Release branch prepared successfully!"
           echo ""
           echo "Release Summary:"
-          echo "  Version: ${{ needs.validate.outputs.version }}"
-          echo "  Branch: ${{ needs.validate.outputs.release_branch }}"
+          echo "  Version: $VERSION"
+          echo "  Branch: $RELEASE_BRANCH"
           echo ""
           echo "Next steps:"
-          echo "  1. Test release: git checkout ${{ needs.validate.outputs.release_branch }}"
+          echo "  1. Test release: git checkout $RELEASE_BRANCH"
           echo "  2. Review draft PR and monitor CI"
-          echo "  3. Fix any issues via bugfix PRs to ${{ needs.validate.outputs.release_branch }}"
+          echo "  3. Fix any issues via bugfix PRs to $RELEASE_BRANCH"
           echo "  4. Mark PR as ready for review (gh pr ready <PR_NUMBER>)"
           echo "  5. Get PR approval from reviewer"
-          echo "  6. Run: just finalize-release ${{ needs.validate.outputs.version }}"
+          echo "  6. Run: just finalize-release $VERSION"
