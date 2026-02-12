@@ -29,6 +29,9 @@ APPROVED_TYPES = frozenset[str](
     }
 )
 
+# Types where the Refs line is optional (maintenance commits that may not relate to an issue)
+REFS_OPTIONAL_TYPES = frozenset[str]({"chore"})
+
 # First line: type(scope)!: short description
 # - type: one of APPROVED_TYPES
 # - scope: optional, alphanumeric and hyphens in parentheses
@@ -81,7 +84,10 @@ def validate_commit_message(content: str) -> tuple[bool, str | None]:
         )
 
     # Require at least one blank line between subject and body/Refs
+    # For types with optional Refs, a subject-only message is valid
     if len(lines) < 2:
+        if type_part in REFS_OPTIONAL_TYPES:
+            return True, None
         return False, "Missing blank line and 'Refs: <IDs>' after the subject line."
     if lines[1].strip():
         return (
@@ -107,6 +113,8 @@ def validate_commit_message(content: str) -> tuple[bool, str | None]:
             )
 
     if refs_line is None:
+        if type_part in REFS_OPTIONAL_TYPES:
+            return True, None
         return False, "Missing mandatory 'Refs: <IDs>' line (e.g. Refs: #36)."
 
     if not REF_PATTERN.match(refs_line.strip()):
