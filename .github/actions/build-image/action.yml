@@ -75,8 +75,8 @@ outputs:
     description: 'Full image tag'
     value: ${{ steps.set-tag.outputs.tag }}
   tar-file:
-    description: 'Path to tar file (if output-type=tar)'
-    value: ${{ inputs.output-file }}
+    description: 'Path to tar file (only set when output-type=tar)'
+    value: ${{ steps.tar-output.outputs.tar-file }}
 
 runs:
   using: composite
@@ -159,6 +159,12 @@ runs:
 
         echo "Tar file created successfully: ${{ inputs.output-file }}"
         echo "Size: $(numfmt --to=iec-i --suffix=B $FILE_SIZE 2>/dev/null || echo $FILE_SIZE bytes)"
+
+    - name: Set tar-file output
+      id: tar-output
+      if: inputs.output-type == 'tar'
+      shell: bash
+      run: echo "tar-file=${{ inputs.output-file }}" >> $GITHUB_OUTPUT
 
     - name: Build image (registry output)
       if: inputs.output-type == 'registry'

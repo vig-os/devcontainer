@@ -35,9 +35,8 @@ inputs:
 
 outputs:
   test-result:
-    description: 'Test exit code (0=pass, non-zero=fail)'
-    value: ${{ steps.run-tests.outputs.result }}
-    # Note: This output is currently unused by workflows but provided for future extensibility
+    description: 'Test exit code (0=pass, 1=fail)'
+    value: ${{ steps.set-result.outputs.result }}
 
 runs:
   using: composite
@@ -213,8 +212,18 @@ runs:
           --maxfail=5 \
           -x
 
-        echo "result=0" >> $GITHUB_OUTPUT
         echo "All integration tests passed"
+
+    - name: Set test result
+      id: set-result
+      if: always()
+      shell: bash
+      run: |
+        if [ "${{ steps.run-tests.outcome }}" = "success" ]; then
+          echo "result=0" >> $GITHUB_OUTPUT
+        else
+          echo "result=1" >> $GITHUB_OUTPUT
+        fi
 
     - name: Cleanup test containers
       if: always()
