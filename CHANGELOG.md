@@ -63,6 +63,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Vulnerability scanning and dependency review** in CI pipeline ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **SBOM generation, container signing, and provenance attestation** in release workflow ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Edge case tests** for changelog validation, action SHA pinning, and install script ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **Code coverage reporting in CI** ([#52](https://github.com/vig-os/devcontainer/issues/52))
+  - Code coverage measurement integrated into test action workflow
+  - Coverage threshold raised to 50% for unit tests
+  - Expanded unit tests to improve overall test coverage
 
 ### Changed
 
