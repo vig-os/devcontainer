@@ -274,7 +274,7 @@ jobs:
     steps:
       - name: Generate GitHub App Token
         id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547  # v1
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
         with:
           app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
           private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
@@ -476,7 +476,7 @@ jobs:
     steps:
       - name: Generate GitHub App Token
         id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547  # v1
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
         with:
           app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
           private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
@@ -764,7 +764,7 @@ jobs:
     steps:
       - name: Generate GitHub App Token
         id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547  # v1
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
         with:
           app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
           private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
@@ -784,6 +784,7 @@ jobs:
           git config user.email "$GIT_USER_EMAIL"
 
       - name: Rollback release branch
+        id: rollback-branch
         continue-on-error: true
         env:
           VERSION: ${{ needs.validate.outputs.version }}
@@ -803,6 +804,7 @@ jobs:
           fi
 
       - name: Delete tag if created
+        id: rollback-tag
         continue-on-error: true
         env:
           VERSION: ${{ needs.validate.outputs.version }}
@@ -835,6 +837,9 @@ jobs:
             if ('${{ needs.build-and-test.result }}' !== 'success') failedJobs.push('build-and-test');
             if ('${{ needs.publish.result }}' !== 'success') failedJobs.push('publish');
 
+            const rollbackBranch = '${{ steps.rollback-branch.outcome }}';
+            const rollbackTag = '${{ steps.rollback-tag.outcome }}';
+
             const title = `Release ${version} failed -- automatic rollback`;
             const body = `
             Release ${version} encountered an error during the automated release workflow.
@@ -845,15 +850,23 @@ jobs:
 
             **Release PR:** #${prNumber}
 
+            **Rollback Results:**
+            - Branch rollback: ${rollbackBranch}
+            - Tag deletion: ${rollbackTag}
+
             **Actions Taken:**
             - Release branch rolled back to pre-finalization state
             - Release tag deleted (if created)
             - This issue created for investigation
 
+            **Manual Cleanup May Be Needed:**
+            - If images were pushed to GHCR before the failure, they are **not** automatically deleted. Check \`ghcr.io/vig-os/devcontainer:${version}-*\` and remove any orphaned images manually.
+
             **Next Steps:**
             1. Review the workflow logs to identify the root cause
-            2. Fix the issue on the release branch
-            3. Re-run the workflow when ready
+            2. Check rollback results above; fix any partial rollback manually
+            3. Fix the issue on the release branch
+            4. Re-run the workflow when ready
 
             For details, check the workflow run linked above.
             `;

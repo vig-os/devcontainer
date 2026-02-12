@@ -15,6 +15,9 @@
 name: Post-Release
 
 on:  # yamllint disable-line rule:truthy
+  # NOTE: GitHub Actions does not support a "merged" filter on pull_request triggers.
+  # This fires on every closed PR targeting main; the job-level `if` condition
+  # below correctly skips runs where the PR was closed without merging.
   pull_request:
     types: [closed]
     branches: [main]
@@ -49,7 +52,7 @@ jobs:
     steps:
       - name: Generate GitHub App Token
         id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547  # v1
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
         with:
           app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
           private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
@@ -96,7 +99,9 @@ jobs:
 
       - name: Reset CHANGELOG for next cycle
         id: reset-changelog
-        continue-on-error: true
+        # Only reset after a release merge (release/X.Y.Z -> main).
+        # Hotfix merges already have the Unreleased section; reset would fail.
+        if: startsWith(github.event.pull_request.head.ref, 'release/')
         run: |
           set -euo pipefail
           uv run python scripts/prepare-changelog.py reset CHANGELOG.md
@@ -104,6 +109,8 @@ jobs:
           echo "reset=true" >> $GITHUB_OUTPUT
 
       - name: Commit and push changes
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
 
@@ -111,7 +118,13 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit (dev already in sync)"
           else
-            git commit -m "chore: sync dev with main after merge" --no-verify
+            COMMIT_MSG="chore: sync dev with main after merge"
+            if [ -n "$PR_NUMBER" ]; then
+              COMMIT_MSG="$COMMIT_MSG
+
+          Refs: #$PR_NUMBER"
+            fi
+            git commit -m "$COMMIT_MSG" --no-verify
             git push origin dev
             echo "✓ Changes committed and pushed to dev"
           fi

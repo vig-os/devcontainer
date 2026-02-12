@@ -151,7 +151,7 @@ jobs:
     steps:
       - name: Generate GitHub App Token
         id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547  # v1
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
         with:
           app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
           private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
@@ -205,12 +205,12 @@ jobs:
           # Extract the version section from CHANGELOG (between ## [VERSION] and next ## [)
           CHANGELOG_CONTENT=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$d')
 
-          # Escape newlines for output
-          CHANGELOG_CONTENT="${CHANGELOG_CONTENT//'%'/'%25'}"
-          CHANGELOG_CONTENT="${CHANGELOG_CONTENT//$'\n'/'%0A'}"
-          CHANGELOG_CONTENT="${CHANGELOG_CONTENT//$'\r'/'%0D'}"
-
-          echo "changelog=$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+          # Use heredoc delimiter for multiline output
+          {
+            echo "changelog<<CHANGELOGEOF"
+            echo "$CHANGELOG_CONTENT"
+            echo "CHANGELOGEOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create release preparation commit
         env:
@@ -219,13 +219,11 @@ jobs:
           set -euo pipefail
 
           git add CHANGELOG.md
-          git commit -m "$(cat <<EOF
-          chore: prepare release $VERSION
+          COMMIT_MSG="chore: prepare release $VERSION
 
           Prepare CHANGELOG.md structure for version $VERSION.
-          Release date TBD (set during finalization).
-          EOF
-          )"
+          Release date TBD (set during finalization)."
+          git commit -m "$COMMIT_MSG"
           echo "✓ Preparation commit created"
 
       - name: Push release branch
