@@ -119,5 +119,5 @@ runs:
 
         # Install devcontainer CLI
         echo "Installing @devcontainers/cli..."
-        npm install -g @devcontainers/cli
+        npm install -g @devcontainers/cli@0.81.1
         echo "devcontainer $(devcontainer --version)"
