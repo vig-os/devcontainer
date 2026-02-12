@@ -38,7 +38,7 @@ permissions: {}  # restrict default; job declares its own
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 10
     # Prevent concurrent runs to avoid race conditions when committing and cache collisions
     concurrency:
@@ -68,6 +68,12 @@ jobs:
         run: |
           # Use manual input if provided (workflow_dispatch), otherwise use automatic detection
           if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$INPUT_TARGET_BRANCH" ]; then
+            # Validate target branch against allowed patterns
+            if [[ ! "$INPUT_TARGET_BRANCH" =~ ^(dev|main|release/.+)$ ]]; then
+              echo "ERROR: Invalid target branch: $INPUT_TARGET_BRANCH"
+              echo "Allowed branches: dev, main, release/*"
+              exit 1
+            fi
             TARGET_BRANCH="$INPUT_TARGET_BRANCH"
             echo "✓ Using manual target branch: $TARGET_BRANCH"
           # If PR was merged into main, commit to main; otherwise use dev
@@ -97,7 +103,6 @@ jobs:
           key: sync-issues-state-${{ github.repository }}
           restore-keys: |
             sync-issues-state-${{ github.repository }}
-            sync-issues-state-
 
       - name: Delete old cache to free key for this run
         if: always()
