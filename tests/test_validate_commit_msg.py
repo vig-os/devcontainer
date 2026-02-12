@@ -19,6 +19,7 @@ validate_spec.loader.exec_module(validate_module)
 validate_commit_message = validate_module.validate_commit_message
 main = validate_module.main
 APPROVED_TYPES = validate_module.APPROVED_TYPES
+REFS_OPTIONAL_TYPES = validate_module.REFS_OPTIONAL_TYPES
 
 
 class TestValidateCommitMessage:
@@ -163,6 +164,67 @@ class TestValidateCommitMessage:
         valid, err = validate_commit_message(msg)
         assert valid is False
         assert "empty" in err.lower()
+
+
+class TestChoreRefsExemption:
+    """Test that chore commits may omit the Refs line."""
+
+    def test_chore_valid_without_refs(self):
+        """chore commits are valid without a Refs line."""
+        msg = "chore: sync dev with main after merge\n\n"
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+    def test_chore_valid_without_refs_with_body(self):
+        """chore commits with a body but no Refs are valid."""
+        msg = "chore: maintenance task\n\nSome body explaining what happened.\n"
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+    def test_chore_valid_with_refs(self):
+        """chore commits with a Refs line are also valid."""
+        msg = "chore: sync dev with main\n\nRefs: #42\n"
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+    def test_chore_valid_with_scope_without_refs(self):
+        """chore(scope) commits are valid without Refs."""
+        msg = "chore(deps): bump pre-commit\n\n"
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+    def test_chore_invalid_malformed_refs_still_rejected(self):
+        """chore commits with a malformed Refs line are still invalid."""
+        msg = "chore: do something\n\nRefs: abc\n"
+        valid, err = validate_commit_message(msg)
+        assert valid is False
+        assert "Refs" in err or "reference" in err.lower()
+
+    def test_chore_still_needs_blank_line(self):
+        """chore commits still require a blank line after the subject."""
+        msg = "chore: do something\nRefs: #36\n"
+        valid, err = validate_commit_message(msg)
+        assert valid is False
+        assert "blank line" in err.lower()
+
+    def test_non_chore_types_still_require_refs(self):
+        """All non-chore types still require a Refs line."""
+        for ctype in sorted(APPROVED_TYPES - REFS_OPTIONAL_TYPES):
+            msg = f"{ctype}: do something\n\n"
+            valid, err = validate_commit_message(msg)
+            assert valid is False, f"Type {ctype} should require Refs but passed"
+            assert "Refs" in err
+
+    def test_chore_subject_only_with_blank_line(self):
+        """Minimal chore commit: subject + blank line only."""
+        msg = "chore: update dependencies\n\n"
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
 
 
 class TestValidateCommitMsgMain:
