@@ -7,8 +7,8 @@ These tests run locally (pytest); they do not require the devcontainer CLI.
 import sys
 
 from vig_utils.validate_commit_msg import (
-    APPROVED_TYPES,
-    REFS_OPTIONAL_TYPES,
+    DEFAULT_APPROVED_TYPES,
+    DEFAULT_REFS_OPTIONAL_TYPES,
     main,
     validate_commit_message,
 )
@@ -42,7 +42,7 @@ class TestValidateCommitMessage:
         assert err is None
 
     def test_valid_all_approved_types(self):
-        for ctype in sorted(APPROVED_TYPES):
+        for ctype in sorted(DEFAULT_APPROVED_TYPES):
             msg = f"{ctype}: do something\n\nRefs: #1\n"
             valid, err = validate_commit_message(msg)
             assert valid is True, f"Type {ctype} should be valid: {err}"
@@ -205,7 +205,7 @@ class TestChoreRefsExemption:
 
     def test_non_chore_types_still_require_refs(self):
         """All non-chore types still require a Refs line."""
-        for ctype in sorted(APPROVED_TYPES - REFS_OPTIONAL_TYPES):
+        for ctype in sorted(DEFAULT_APPROVED_TYPES - DEFAULT_REFS_OPTIONAL_TYPES):
             msg = f"{ctype}: do something\n\n"
             valid, err = validate_commit_message(msg)
             assert valid is False, f"Type {ctype} should require Refs but passed"
@@ -217,6 +217,246 @@ class TestChoreRefsExemption:
         valid, err = validate_commit_message(msg)
         assert valid is True
         assert err is None
+
+
+class TestCustomApprovedTypes:
+    """Test validate_commit_message() with custom approved types."""
+
+    def test_custom_types_valid_with_custom_type(self):
+        """Custom types override defaults."""
+        custom_types = frozenset({"mytype", "othertype"})
+        msg = "mytype: do something\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, approved_types=custom_types)
+        assert valid is True
+        assert err is None
+
+    def test_custom_types_reject_default_type(self):
+        """Default types are rejected when custom types are used."""
+        custom_types = frozenset({"mytype", "othertype"})
+        msg = "feat: add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, approved_types=custom_types)
+        assert valid is False
+        assert "Unknown commit type" in err
+        assert "feat" in err
+
+    def test_custom_types_allows_all_custom(self):
+        """All custom types are accepted."""
+        custom_types = frozenset({"alpha", "beta", "gamma"})
+        for ctype in custom_types:
+            msg = f"{ctype}: do something\n\nRefs: #1\n"
+            valid, err = validate_commit_message(msg, approved_types=custom_types)
+            assert valid is True, f"Type {ctype} should be valid: {err}"
+
+    def test_custom_types_empty_set_rejects_all(self):
+        """Empty custom types set rejects all types."""
+        custom_types = frozenset()
+        msg = "feat: add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, approved_types=custom_types)
+        assert valid is False
+        assert "Unknown commit type" in err
+
+    def test_custom_types_single_type(self):
+        """Single custom type works."""
+        custom_types = frozenset({"only"})
+        msg = "only: do something\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, approved_types=custom_types)
+        assert valid is True
+        assert err is None
+
+
+class TestCustomRefsOptionalTypes:
+    """Test validate_commit_message() with custom refs-optional types."""
+
+    def test_custom_refs_optional_types_makes_type_optional(self):
+        """Custom refs-optional-types makes specified types not require Refs."""
+        custom_optional = frozenset({"feat", "build"})
+        msg = "feat: add feature\n\n"
+        valid, err = validate_commit_message(msg, refs_optional_types=custom_optional)
+        assert valid is True
+        assert err is None
+
+    def test_custom_refs_optional_types_preserves_others(self):
+        """Types not in refs-optional still require Refs."""
+        custom_optional = frozenset({"chore"})
+        msg = "fix: fix bug\n\n"
+        valid, err = validate_commit_message(msg, refs_optional_types=custom_optional)
+        assert valid is False
+        assert "Refs" in err
+
+    def test_custom_refs_optional_types_empty_all_require_refs(self):
+        """Empty refs-optional-types makes all types require Refs."""
+        custom_optional = frozenset()
+        msg = "chore: do something\n\n"
+        valid, err = validate_commit_message(msg, refs_optional_types=custom_optional)
+        assert valid is False
+        assert "Refs" in err
+
+    def test_custom_refs_optional_types_multiple(self):
+        """Multiple custom refs-optional types work together."""
+        custom_optional = frozenset({"chore", "build", "ci"})
+        for ctype in custom_optional:
+            msg = f"{ctype}: do something\n\n"
+            valid, err = validate_commit_message(
+                msg, refs_optional_types=custom_optional
+            )
+            assert valid is True, f"Type {ctype} should be optional: {err}"
+
+    def test_custom_refs_optional_with_refs_still_valid(self):
+        """Custom refs-optional types with Refs are still valid."""
+        custom_optional = frozenset({"feat"})
+        msg = "feat: add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, refs_optional_types=custom_optional)
+        assert valid is True
+        assert err is None
+
+
+class TestCustomApprovedAndOptionalTypes:
+    """Test combining custom approved types and custom refs-optional types."""
+
+    def test_combined_custom_types(self):
+        """Custom approved types with custom refs-optional types."""
+        custom_types = frozenset({"task", "hotfix", "release"})
+        custom_optional = frozenset({"release"})
+        msg = "release: prepare v1.0\n\n"
+        valid, err = validate_commit_message(
+            msg, approved_types=custom_types, refs_optional_types=custom_optional
+        )
+        assert valid is True
+        assert err is None
+
+    def test_combined_custom_types_with_refs(self):
+        """Custom types with Refs when not required."""
+        custom_types = frozenset({"task", "hotfix", "release"})
+        custom_optional = frozenset({"release"})
+        msg = "release: prepare v1.0\n\nRefs: #50\n"
+        valid, err = validate_commit_message(
+            msg, approved_types=custom_types, refs_optional_types=custom_optional
+        )
+        assert valid is True
+        assert err is None
+
+    def test_combined_custom_types_required_refs(self):
+        """Custom types that require Refs still do."""
+        custom_types = frozenset({"task", "hotfix", "release"})
+        custom_optional = frozenset({"release"})
+        msg = "task: fix something\n\n"
+        valid, err = validate_commit_message(
+            msg, approved_types=custom_types, refs_optional_types=custom_optional
+        )
+        assert valid is False
+        assert "Refs" in err
+
+    def test_combined_custom_types_rejects_non_custom(self):
+        """Non-custom types are rejected."""
+        custom_types = frozenset({"task", "hotfix"})
+        custom_optional = frozenset({"task"})
+        msg = "feat: add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(
+            msg, approved_types=custom_types, refs_optional_types=custom_optional
+        )
+        assert valid is False
+        assert "Unknown commit type" in err
+
+
+class TestCustomScopes:
+    """Test validate_commit_message() with custom approved scopes."""
+
+    def test_scopes_not_enforced_by_default(self):
+        """Scopes are not enforced when not provided."""
+        msg = "feat(any-scope): add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+    def test_scopes_not_enforced_empty_set(self):
+        """Empty scopes set means no scope enforcement."""
+        custom_scopes = frozenset()
+        msg = "feat(random-scope): add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, approved_scopes=custom_scopes)
+        assert valid is True
+        assert err is None
+
+    def test_valid_with_enforced_scopes(self):
+        """Valid commit with enforced scopes."""
+        custom_scopes = frozenset({"api", "cli", "utils"})
+        msg = "feat(api): add endpoint\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, approved_scopes=custom_scopes)
+        assert valid is True
+        assert err is None
+
+    def test_invalid_scope_not_in_list(self):
+        """Reject commit with scope not in approved list."""
+        custom_scopes = frozenset({"api", "cli", "utils"})
+        msg = "feat(database): add migration\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, approved_scopes=custom_scopes)
+        assert valid is False
+        assert "Unknown scope" in err
+        assert "database" in err
+
+    def test_scope_required_when_enforced(self):
+        """When scopes are enforced, they must be provided."""
+        custom_scopes = frozenset({"api", "cli"})
+        msg = "feat: add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, approved_scopes=custom_scopes)
+        assert valid is False
+        assert "Scope is required" in err
+
+    def test_all_enforced_scopes_valid(self):
+        """All enforced scopes are accepted."""
+        custom_scopes = frozenset({"api", "cli", "utils"})
+        for scope in custom_scopes:
+            msg = f"feat({scope}): do something\n\nRefs: #1\n"
+            valid, err = validate_commit_message(msg, approved_scopes=custom_scopes)
+            assert valid is True, f"Scope {scope} should be valid: {err}"
+
+    def test_scope_with_hyphens(self):
+        """Scopes can contain hyphens."""
+        custom_scopes = frozenset({"api-v2", "cli-tool", "db-utils"})
+        msg = "feat(api-v2): add endpoint\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, approved_scopes=custom_scopes)
+        assert valid is True
+        assert err is None
+
+    def test_scope_case_sensitive(self):
+        """Scope matching is case-sensitive."""
+        custom_scopes = frozenset({"api", "cli"})
+        msg = "feat(API): add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, approved_scopes=custom_scopes)
+        assert valid is False
+        assert "Unknown scope" in err
+
+    def test_combined_types_and_scopes(self):
+        """Use custom types with custom scopes."""
+        custom_types = frozenset({"feature", "bugfix"})
+        custom_scopes = frozenset({"backend", "frontend"})
+        msg = "feature(backend): add API\n\nRefs: #1\n"
+        valid, err = validate_commit_message(
+            msg, approved_types=custom_types, approved_scopes=custom_scopes
+        )
+        assert valid is True
+        assert err is None
+
+    def test_combined_types_and_scopes_invalid_type(self):
+        """Invalid type rejected even with valid scope."""
+        custom_types = frozenset({"feature", "bugfix"})
+        custom_scopes = frozenset({"backend", "frontend"})
+        msg = "feat(backend): add API\n\nRefs: #1\n"
+        valid, err = validate_commit_message(
+            msg, approved_types=custom_types, approved_scopes=custom_scopes
+        )
+        assert valid is False
+        assert "Unknown commit type" in err
+
+    def test_combined_types_and_scopes_invalid_scope(self):
+        """Invalid scope rejected even with valid type."""
+        custom_types = frozenset({"feature", "bugfix"})
+        custom_scopes = frozenset({"backend", "frontend"})
+        msg = "feature(mobile): add app\n\nRefs: #1\n"
+        valid, err = validate_commit_message(
+            msg, approved_types=custom_types, approved_scopes=custom_scopes
+        )
+        assert valid is False
+        assert "Unknown scope" in err
 
 
 class TestValidateCommitMsgMain:
@@ -253,10 +493,14 @@ class TestValidateCommitMsgMain:
 
     def test_main_wrong_arg_count_no_args(self, capsys):
         """Test main() called with no file argument."""
+        import pytest
+
         orig_argv = sys.argv
         try:
             sys.argv = ["validate_commit_msg.py"]
-            assert main() == 2
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 2
             captured = capsys.readouterr()
             # Message goes to stderr
             assert "usage" in (captured.out + captured.err).lower()
@@ -265,12 +509,273 @@ class TestValidateCommitMsgMain:
 
     def test_main_wrong_arg_count_too_many(self, capsys):
         """Test main() called with too many arguments."""
+        import pytest
+
         orig_argv = sys.argv
         try:
             sys.argv = ["validate_commit_msg.py", "arg1", "arg2"]
-            assert main() == 2
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 2
             captured = capsys.readouterr()
             # Message goes to stderr
             assert "usage" in (captured.out + captured.err).lower()
+        finally:
+            sys.argv = orig_argv
+
+
+class TestMainWithCustomTypes:
+    """Test main() CLI with --types and --refs-optional-types arguments."""
+
+    def test_main_with_custom_types(self, tmp_path):
+        """Test main() with --types argument."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("custom: do something\n\nRefs: #1\n")
+        orig_argv = sys.argv
+        try:
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--types",
+                "custom,other",
+            ]
+            assert main() == 0
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_with_custom_types_rejects_default_type(self, tmp_path):
+        """Test main() with --types rejects default types."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("feat: add feature\n\nRefs: #1\n")
+        orig_argv = sys.argv
+        try:
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--types",
+                "custom,other",
+            ]
+            assert main() == 1
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_with_custom_refs_optional_types(self, tmp_path):
+        """Test main() with --refs-optional-types argument."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("custom: do something\n\n")
+        orig_argv = sys.argv
+        try:
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--types",
+                "custom,other",
+                "--refs-optional-types",
+                "custom",
+            ]
+            assert main() == 0
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_with_custom_refs_optional_types_still_enforces_others(self, tmp_path):
+        """Test main() --refs-optional-types still enforces Refs for other types."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("other: do something\n\n")
+        orig_argv = sys.argv
+        try:
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--types",
+                "custom,other",
+                "--refs-optional-types",
+                "custom",
+            ]
+            assert main() == 1
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_with_comma_separated_types(self, tmp_path):
+        """Test main() with comma-separated type list."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("feat: add feature\n\nRefs: #1\n")
+        orig_argv = sys.argv
+        try:
+            # Include 'feat' in custom types
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--types",
+                "feat,fix,docs",
+            ]
+            assert main() == 0
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_with_spaces_in_comma_separated_types(self, tmp_path):
+        """Test main() handles spaces in comma-separated types."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("feat: add feature\n\nRefs: #1\n")
+        orig_argv = sys.argv
+        try:
+            # Types with spaces around commas should be parsed correctly
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--types",
+                "feat , fix , docs",
+            ]
+            assert main() == 0
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_with_comma_separated_refs_optional_types(self, tmp_path):
+        """Test main() with comma-separated refs-optional-types."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("chore: do something\n\n")
+        orig_argv = sys.argv
+        try:
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--refs-optional-types",
+                "chore,build",
+            ]
+            assert main() == 0
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_pre_commit_hook_simulation(self, tmp_path):
+        """Simulate pre-commit hook with custom configuration."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("workflow: update CI\n\n")
+        orig_argv = sys.argv
+        try:
+            # Simulate pre-commit hook configuration
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--types",
+                "feat,fix,workflow",
+                "--refs-optional-types",
+                "workflow",
+            ]
+            assert main() == 0
+        finally:
+            sys.argv = orig_argv
+
+
+class TestMainWithCustomScopes:
+    """Test main() CLI with --scopes argument."""
+
+    def test_main_with_custom_scopes(self, tmp_path):
+        """Test main() with --scopes argument."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("feat(api): add endpoint\n\nRefs: #1\n")
+        orig_argv = sys.argv
+        try:
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--scopes",
+                "api,cli,utils",
+            ]
+            assert main() == 0
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_with_custom_scopes_rejects_invalid(self, tmp_path):
+        """Test main() with --scopes rejects invalid scopes."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("feat(invalid): add something\n\nRefs: #1\n")
+        orig_argv = sys.argv
+        try:
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--scopes",
+                "api,cli,utils",
+            ]
+            assert main() == 1
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_without_scopes_no_enforcement(self, tmp_path):
+        """Test main() without --scopes allows any scope."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("feat(anything): add feature\n\nRefs: #1\n")
+        orig_argv = sys.argv
+        try:
+            sys.argv = ["validate_commit_msg.py", str(msg_file)]
+            assert main() == 0
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_with_scopes_requires_scope_when_enforced(self, tmp_path):
+        """Test main() with --scopes requires scope in commits."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("feat: add feature\n\nRefs: #1\n")
+        orig_argv = sys.argv
+        try:
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--scopes",
+                "api,cli",
+            ]
+            assert main() == 1
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_with_all_options(self, tmp_path):
+        """Test main() with all custom options together."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("task(backend): implement feature\n\nRefs: #51\n")
+        orig_argv = sys.argv
+        try:
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--types",
+                "task,bugfix",
+                "--scopes",
+                "backend,frontend",
+                "--refs-optional-types",
+                "task",
+            ]
+            assert main() == 0
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_with_comma_separated_scopes(self, tmp_path):
+        """Test main() with comma-separated scopes."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("feat(utils): add helper\n\nRefs: #1\n")
+        orig_argv = sys.argv
+        try:
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--scopes",
+                "api,utils,cli",
+            ]
+            assert main() == 0
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_with_spaces_in_scopes(self, tmp_path):
+        """Test main() handles spaces in comma-separated scopes."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("feat(api): add endpoint\n\nRefs: #1\n")
+        orig_argv = sys.argv
+        try:
+            # Scopes with spaces around commas should be parsed correctly
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--scopes",
+                "api , cli , utils",
+            ]
+            assert main() == 0
         finally:
             sys.argv = orig_argv

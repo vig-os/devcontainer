@@ -127,3 +127,8 @@ repos:
         entry: uv run validate-commit-msg
         language: system
         stages: [commit-msg]
+        args: [
+          "--types", "feat,fix,docs,chore,refactor,test,ci,build,revert,style",
+          "--scopes", "setup,image,vigutils",
+          "--refs-optional-types", "chore",
+        ]

@@ -5,16 +5,27 @@ Reads the commit message from a file path (as provided by Git's commit-msg hook)
 and exits 0 if the message complies, non-zero with an error on stderr otherwise.
 
 See docs/COMMIT_MESSAGE_STANDARD.md for the full standard.
+
+Usage:
+    validate-commit-msg <path-to-commit-message-file> [--types TYPE,TYPE,...] [--scopes SCOPE,SCOPE,...] [--refs-optional-types TYPE,TYPE,...]
+
+Examples:
+    validate-commit-msg .git/COMMIT_EDITMSG
+    validate-commit-msg .git/COMMIT_EDITMSG --types feat,fix,docs
+    validate-commit-msg .git/COMMIT_EDITMSG --scopes api,cli,utils
+    validate-commit-msg .git/COMMIT_EDITMSG --refs-optional-types chore,build
+    validate-commit-msg .git/COMMIT_EDITMSG --types feat,fix --scopes api,cli --refs-optional-types chore
 """
 
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 from pathlib import Path
 
-# Approved commit types (single source of truth; keep in sync with COMMIT_MESSAGE_STANDARD.md)
-APPROVED_TYPES = frozenset[str](
+# Default approved commit types (single source of truth; keep in sync with COMMIT_MESSAGE_STANDARD.md)
+DEFAULT_APPROVED_TYPES = frozenset[str](
     {
         "feat",
         "fix",
@@ -29,36 +40,69 @@ APPROVED_TYPES = frozenset[str](
     }
 )
 
-# Types where the Refs line is optional (maintenance commits that may not relate to an issue)
-REFS_OPTIONAL_TYPES = frozenset[str]({"chore"})
-
-# First line: type(scope)!: short description
-# - type: one of APPROVED_TYPES
-# - scope: optional, alphanumeric and hyphens in parentheses
-# - !: optional, breaking change
-# - short description: rest of line
-SUBJECT_PATTERN = re.compile(r"^([a-z]+)(\([a-zA-Z0-9-]+\))?!?: .+$")
-
-# Refs line: Refs: followed by at least one reference (must include at least one issue)
-# Issue refs must use # (e.g. #36). Other refs: REQ-..., RISK-..., SOP-...
-REF_PATTERN = re.compile(
-    r"^Refs:\s+"
-    r"(?:(?:#\d+)|(?:REQ-[a-zA-Z0-9-]+)|(?:RISK-[a-zA-Z0-9-]+)|(?:SOP-[a-zA-Z0-9-]+))"
-    r"(?:\s*,\s*"
-    r"(?:(?:#\d+)|(?:REQ-[a-zA-Z0-9-]+)|(?:RISK-[a-zA-Z0-9-]+)|(?:SOP-[a-zA-Z0-9-]+))"
-    r")*\s*$"
-)
-# At least one GitHub issue with # (e.g. #36) must be present
-ISSUE_REF_PATTERN = re.compile(r"#\d+")
+# Default types where the Refs line is optional (maintenance commits that may not relate to an issue)
+DEFAULT_REFS_OPTIONAL_TYPES = frozenset[str]({"chore"})
 
 
-def validate_commit_message(content: str) -> tuple[bool, str | None]:
+# Build regex patterns dynamically based on approved types and optional refs types
+def _build_patterns(
+    approved_types: frozenset[str],
+) -> tuple[re.Pattern[str], re.Pattern[str], re.Pattern[str]]:
+    """Build regex patterns based on approved types.
+
+    Returns:
+        (subject_pattern, ref_pattern, issue_ref_pattern)
+    """
+    # First line: type(scope)!: short description
+    # - type: one of approved_types
+    # - scope: optional, alphanumeric and hyphens in parentheses
+    # - !: optional, breaking change
+    # - short description: rest of line
+    subject_pattern = re.compile(r"^([a-z]+)(\([a-zA-Z0-9-]+\))?!?: .+$")
+
+    # Refs line: Refs: followed by at least one reference (must include at least one issue)
+    # Issue refs must use # (e.g. #36). Other refs: REQ-..., RISK-..., SOP-...
+    ref_pattern = re.compile(
+        r"^Refs:\s+"
+        r"(?:(?:#\d+)|(?:REQ-[a-zA-Z0-9-]+)|(?:RISK-[a-zA-Z0-9-]+)|(?:SOP-[a-zA-Z0-9-]+))"
+        r"(?:\s*,\s*"
+        r"(?:(?:#\d+)|(?:REQ-[a-zA-Z0-9-]+)|(?:RISK-[a-zA-Z0-9-]+)|(?:SOP-[a-zA-Z0-9-]+))"
+        r")*\s*$"
+    )
+    # At least one GitHub issue with # (e.g. #36) must be present
+    issue_ref_pattern = re.compile(r"#\d+")
+
+    return subject_pattern, ref_pattern, issue_ref_pattern
+
+
+def validate_commit_message(
+    content: str,
+    approved_types: frozenset[str] | None = None,
+    approved_scopes: frozenset[str] | None = None,
+    refs_optional_types: frozenset[str] | None = None,
+) -> tuple[bool, str | None]:
     """Validate a commit message string.
+
+    Args:
+        content: The commit message content to validate.
+        approved_types: Set of allowed commit types. Defaults to DEFAULT_APPROVED_TYPES.
+        approved_scopes: Set of allowed scopes. If None or empty, scopes are not enforced.
+        refs_optional_types: Set of commit types where Refs line is optional. Defaults to DEFAULT_REFS_OPTIONAL_TYPES.
 
     Returns:
         (True, None) if valid.
         (False, error_message) if invalid.
     """
+    if approved_types is None:
+        approved_types = DEFAULT_APPROVED_TYPES
+    if refs_optional_types is None:
+        refs_optional_types = DEFAULT_REFS_OPTIONAL_TYPES
+    # Scopes are optional - if not provided or empty, don't enforce them
+    if approved_scopes is None:
+        approved_scopes = frozenset()
+
+    subject_pattern, ref_pattern, issue_ref_pattern = _build_patterns(approved_types)
+
     if not content:
         return False, "Commit message is empty."
 
@@ -68,7 +112,7 @@ def validate_commit_message(content: str) -> tuple[bool, str | None]:
 
     # First line: type(scope): short description
     first = lines[0]
-    match = SUBJECT_PATTERN.match(first)
+    match = subject_pattern.match(first)
     if not match:
         return (
             False,
@@ -76,17 +120,35 @@ def validate_commit_message(content: str) -> tuple[bool, str | None]:
             "Example: feat: add new feature",
         )
     type_part = match.group(1)
-    if type_part not in APPROVED_TYPES:
+    if type_part not in approved_types:
         return (
             False,
             f"Unknown commit type '{type_part}'. "
-            f"Allowed types: {', '.join(sorted(APPROVED_TYPES))}",
+            f"Allowed types: {', '.join(sorted(approved_types))}",
+        )
+
+    # Validate scope if scopes are configured to be enforced
+    scope_part = match.group(2)  # Will be like "(scope)" or None
+    if approved_scopes and scope_part is not None:
+        # Remove the parentheses to get the scope name
+        scope_name = scope_part[1:-1]
+        if scope_name not in approved_scopes:
+            return (
+                False,
+                f"Unknown scope '{scope_name}'. "
+                f"Allowed scopes: {', '.join(sorted(approved_scopes))}",
+            )
+    elif approved_scopes and scope_part is None:
+        # Scopes are required but none was provided
+        return (
+            False,
+            f"Scope is required. Allowed scopes: {', '.join(sorted(approved_scopes))}",
         )
 
     # Require at least one blank line between subject and body/Refs
     # For types with optional Refs, a subject-only message is valid
     if len(lines) < 2:
-        if type_part in REFS_OPTIONAL_TYPES:
+        if type_part in refs_optional_types:
             return True, None
         return False, "Missing blank line and 'Refs: <IDs>' after the subject line."
     if lines[1].strip():
@@ -113,11 +175,11 @@ def validate_commit_message(content: str) -> tuple[bool, str | None]:
             )
 
     if refs_line is None:
-        if type_part in REFS_OPTIONAL_TYPES:
+        if type_part in refs_optional_types:
             return True, None
         return False, "Missing mandatory 'Refs: <IDs>' line (e.g. Refs: #36)."
 
-    if not REF_PATTERN.match(refs_line.strip()):
+    if not ref_pattern.match(refs_line.strip()):
         return (
             False,
             "Refs line must contain at least one reference. "
@@ -125,7 +187,7 @@ def validate_commit_message(content: str) -> tuple[bool, str | None]:
         )
 
     # At least one GitHub issue reference is required
-    if not ISSUE_REF_PATTERN.search(refs_line):
+    if not issue_ref_pattern.search(refs_line):
         return (
             False,
             "Refs line must include at least one GitHub issue (e.g. #36).",
@@ -135,21 +197,73 @@ def validate_commit_message(content: str) -> tuple[bool, str | None]:
 
 
 def main() -> int:
-    """Entry point for Git commit-msg hook and CLI."""
-    if len(sys.argv) != 2:
-        print(
-            "Usage: validate_commit_msg.py <path-to-commit-message-file>",
-            file=sys.stderr,
-        )
-        return 2
+    """Entry point for Git commit-msg hook and CLI.
 
-    path = Path(sys.argv[1])
+    Supports both traditional positional arguments and optional configuration arguments
+    that can be provided via CLI or pre-commit hook configuration.
+    """
+    parser = argparse.ArgumentParser(
+        prog="validate-commit-msg",
+        description="Validate commit messages against the project's commit message standard.",
+    )
+    parser.add_argument(
+        "message_file",
+        help="Path to commit message file (typically .git/COMMIT_EDITMSG from Git hook)",
+    )
+    parser.add_argument(
+        "--types",
+        type=str,
+        default=None,
+        help="Comma-separated list of allowed commit types (default: feat,fix,docs,chore,refactor,test,ci,build,revert,style)",
+    )
+    parser.add_argument(
+        "--scopes",
+        type=str,
+        default=None,
+        help="Comma-separated list of allowed scopes. If not provided, scopes are not enforced (default: none)",
+    )
+    parser.add_argument(
+        "--refs-optional-types",
+        type=str,
+        default=None,
+        help="Comma-separated list of commit types where Refs line is optional (default: chore)",
+    )
+
+    args = parser.parse_args()
+
+    # Parse custom types if provided
+    approved_types = DEFAULT_APPROVED_TYPES
+    if args.types:
+        approved_types = frozenset(
+            t.strip() for t in args.types.split(",") if t.strip()
+        )
+
+    # Parse custom scopes if provided
+    approved_scopes = frozenset()  # Empty by default (no scope enforcement)
+    if args.scopes:
+        approved_scopes = frozenset(
+            s.strip() for s in args.scopes.split(",") if s.strip()
+        )
+
+    # Parse custom refs-optional types if provided
+    refs_optional_types = DEFAULT_REFS_OPTIONAL_TYPES
+    if args.refs_optional_types:
+        refs_optional_types = frozenset(
+            t.strip() for t in args.refs_optional_types.split(",") if t.strip()
+        )
+
+    path = Path(args.message_file)
     if not path.exists():
         print(f"File not found: {path}", file=sys.stderr)
         return 2
 
     content = path.read_text(encoding="utf-8", errors="replace")
-    valid, error = validate_commit_message(content)
+    valid, error = validate_commit_message(
+        content,
+        approved_types=approved_types,
+        approved_scopes=approved_scopes,
+        refs_optional_types=refs_optional_types,
+    )
     if valid:
         return 0
     print(error, file=sys.stderr)
