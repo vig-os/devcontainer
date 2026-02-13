@@ -23,6 +23,7 @@ EXPECTED_VERSIONS = {
     "just": "1.46.",  # Minor version check (manually installed from latest release)
     "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),
     "typstyle": "0.14.",  # Minor version check (installed from latest release)
+    "vig_utils": "0.1.",  # Minor version check (installed via uv pip)
 }
 
 
@@ -257,6 +258,23 @@ class TestDevelopmentTools:
         expected = EXPECTED_VERSIONS["pip_licenses"]
         assert expected in result.stdout, (
             f"Expected pip-licenses {expected}, got: {result.stdout}"
+        )
+
+    def test_vig_utils_installed(self, host):
+        """Test that vig-utils is installed and importable."""
+        result = host.run("python3 -c 'import vig_utils; print(\"OK\")'")
+        assert result.rc == 0, (
+            f"vig-utils is not installed or not importable: {result.stderr}"
+        )
+        assert "OK" in result.stdout, "Failed to import vig_utils"
+
+    def test_vig_utils_version(self, host):
+        """Test that vig-utils version is correct."""
+        result = host.run("python3 -c 'import vig_utils; print(vig_utils.__version__)'")
+        assert result.rc == 0, "Failed to get vig-utils version"
+        expected = EXPECTED_VERSIONS["vig_utils"]
+        assert expected in result.stdout, (
+            f"Expected vig-utils {expected}x, got: {result.stdout}"
         )
 
 
