@@ -61,15 +61,13 @@ def _build_patterns(
     subject_pattern = re.compile(r"^([a-z]+)(\([a-zA-Z0-9-]+\))?!?: .+$")
 
     # Refs line: Refs: followed by at least one reference (must include at least one issue)
-    # Issue refs must use # (e.g. #36). Other refs: REQ-..., RISK-..., SOP-...
-    ref_pattern = re.compile(
-        r"^Refs:\s+"
-        r"(?:(?:#\d+)|(?:REQ-[a-zA-Z0-9-]+)|(?:RISK-[a-zA-Z0-9-]+)|(?:SOP-[a-zA-Z0-9-]+))"
-        r"(?:\s*,\s*"
-        r"(?:(?:#\d+)|(?:REQ-[a-zA-Z0-9-]+)|(?:RISK-[a-zA-Z0-9-]+)|(?:SOP-[a-zA-Z0-9-]+))"
-        r")*\s*$"
-    )
-    # At least one GitHub issue with # (e.g. #36) must be present
+    # Issue refs: #36 or [#36](URL) (GitHub auto-linked format after push).
+    # Other refs: REQ-..., RISK-..., SOP-...
+    _issue = r"(?:#\d+|\[#\d+\]\([^)]+\))"
+    _other = r"(?:REQ-[a-zA-Z0-9-]+|RISK-[a-zA-Z0-9-]+|SOP-[a-zA-Z0-9-]+)"
+    _token = rf"(?:{_issue}|{_other})"
+    ref_pattern = re.compile(rf"^Refs:\s+{_token}(?:\s*,\s*{_token})*\s*$")
+    # At least one GitHub issue ref (plain #N or linked [#N](URL)) must be present
     issue_ref_pattern = re.compile(r"#\d+")
 
     return subject_pattern, ref_pattern, issue_ref_pattern

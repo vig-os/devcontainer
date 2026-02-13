@@ -665,6 +665,86 @@ class TestMainWithCustomTypes:
             sys.argv = orig_argv
 
 
+class TestGitHubLinkedRefs:
+    """Test that Refs line accepts GitHub auto-linked issue format [#N](URL).
+
+    After pushing, GitHub rewrites '#31' to '[#31](https://github.com/…/issues/31)'.
+    The validator must accept both plain and linked formats.
+    """
+
+    def test_valid_single_linked_issue(self):
+        msg = (
+            "feat: add feature\n\nRefs: [#31](https://github.com/org/repo/issues/31)\n"
+        )
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+    def test_valid_multiple_linked_issues(self):
+        msg = (
+            "fix: fix bug\n\n"
+            "Refs: [#31](https://github.com/org/repo/issues/31), "
+            "[#32](https://github.com/org/repo/issues/32)\n"
+        )
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+    def test_valid_mixed_plain_and_linked_issue(self):
+        msg = (
+            "feat: add feature\n\n"
+            "Refs: #10, [#31](https://github.com/org/repo/issues/31)\n"
+        )
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+    def test_valid_linked_issue_with_other_ref_types(self):
+        msg = (
+            "docs: update docs\n\n"
+            "Refs: [#31](https://github.com/org/repo/issues/31), REQ-DOC-01, RISK-H-02\n"
+        )
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+    def test_valid_linked_issue_with_body(self):
+        msg = (
+            "feat: add feature\n\n"
+            "Some body text explaining the change.\n\n"
+            "Refs: [#31](https://github.com/org/repo/issues/31)\n"
+        )
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+    def test_valid_linked_issue_without_trailing_newline(self):
+        msg = "feat: add x\n\nRefs: [#31](https://github.com/org/repo/issues/31)"
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+    def test_valid_linked_issue_pull_url(self):
+        """GitHub may link to /pull/ instead of /issues/."""
+        msg = "feat: add feature\n\nRefs: [#31](https://github.com/org/repo/pull/31)\n"
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+    def test_invalid_linked_ref_without_issue(self):
+        """Linked REQ/RISK/SOP alone (no issue) is still rejected."""
+        msg = "feat: add feature\n\nRefs: REQ-123\n"
+        valid, err = validate_commit_message(msg)
+        assert valid is False
+        assert "issue" in err.lower()
+
+    def test_valid_chore_with_linked_issue(self):
+        msg = "chore: sync dev\n\nRefs: [#42](https://github.com/org/repo/issues/42)\n"
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+
 class TestMainWithCustomScopes:
     """Test main() CLI with --scopes argument."""
 
