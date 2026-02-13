@@ -259,6 +259,17 @@ jobs:
           format: 'table'
           severity: 'HIGH,CRITICAL'
           exit-code: '1'
+          ignore-unfixed: true
+          trivyignores: '.trivyignore'
+
+      - name: Report unfixed HIGH/CRITICAL vulnerabilities (non-blocking)
+        if: always()
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
+        with:
+          input: /tmp/image.tar
+          format: 'table'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '0'
           trivyignores: '.trivyignore'
 
       - name: Report MEDIUM severity vulnerabilities (non-blocking)

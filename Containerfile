@@ -156,10 +156,12 @@ RUN set -eux; \
     rm "$FILE";
 
 # Install Python development tools directly into system using uv
+# and upgrade pip to fix CVE-2025-8869 (symbolic link extraction vulnerability)
 RUN uv pip install --system \
     pre-commit \
     ruff \
-    pip-licenses
+    pip-licenses && \
+    uv pip install --system --upgrade pip
 
 # Copy assets into container image
 COPY assets /root/assets

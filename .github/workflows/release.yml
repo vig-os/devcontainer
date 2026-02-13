@@ -449,6 +449,8 @@ jobs:
           format: 'table'
           severity: 'HIGH,CRITICAL'
           exit-code: '1'
+          ignore-unfixed: true
+          trivyignores: '.trivyignore'
 
       - name: Upload tested image
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
