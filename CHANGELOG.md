@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+- **CodeQL Action v3 → v4 upgrade**
+  - Updated all CodeQL Action references from v3 (deprecated Dec 2026) to v4.32.2
+  - Updated in `.github/workflows/codeql.yml`, `security-scan.yml`, and `ci.yml`
+  - Uses commit hash `45cbd0c69e560cd9e7cd7f8c32362050c9b7ded2` for integrity
+
 ### Added
 
 - **`--org` flag for install script** ([#33](https://github.com/vig-os/devcontainer/issues/33))
