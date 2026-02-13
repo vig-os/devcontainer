@@ -49,6 +49,10 @@ inputs:
     description: 'Install @devcontainers/cli and docker-compose wrapper (requires Node.js)'
     required: false
     default: 'false'
+  install-just:
+    description: 'Install just command runner for Justfile support'
+    required: false
+    default: 'true'
 
 outputs:
   uv-version:
@@ -102,6 +106,12 @@ runs:
       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
       with:
         node-version: ${{ inputs.node-version }}
+
+    # ── Just (task runner) ──────────────────────────────────────────────
+    - name: Install just
+      uses: taiki-e/install-action@3035223527de4d6eb6207d7b9f901df966359a8e  # just
+      with:
+        tool: just
 
     # ── Devcontainer CLI + docker-compose wrapper ───────────────────────
     # Requires Node.js (automatically installed above when this flag is set)
