@@ -63,14 +63,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SECURITY.md** with vulnerability reporting procedures and supported version policy ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **OpenSSF Scorecard workflow** (`scorecard.yml`) for supply chain security scoring ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **CodeQL analysis workflow** (`codeql.yml`) for automated static security analysis ([#50](https://github.com/vig-os/devcontainer/issues/50))
-- **Dependabot configuration** for automated dependency update PRs ([#50](https://github.com/vig-os/devcontainer/issues/50))
-- **Vulnerability scanning and dependency review** in CI pipeline ([#50](https://github.com/vig-os/devcontainer/issues/50))
-- **SBOM generation, container signing, and provenance attestation** in release workflow ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **Dependabot configuration** for automated dependency update PRs with license compliance monitoring ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **Vulnerability scanning and dependency review** in CI pipeline with non-blocking MEDIUM severity reporting ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **SBOM generation, container signing, and provenance attestation** in release and CI pipelines ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Edge case tests** for changelog validation, action SHA pinning, and install script ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Code coverage reporting in CI** ([#52](https://github.com/vig-os/devcontainer/issues/52))
   - Code coverage measurement integrated into test action workflow
   - Coverage threshold raised to 50% for unit tests
   - Expanded unit tests to improve overall test coverage
+- **Bandit and Safety security scanning** ([#37](https://github.com/vig-os/devcontainer/issues/37), [#50](https://github.com/vig-os/devcontainer/issues/50))
+  - Bandit pre-commit hook for medium/high/critical severity Python code analysis
+  - CI pipeline job with Bandit static analysis and Safety dependency vulnerability scanning
+  - Reports uploaded as artifacts (30-day retention) with job summary integration
 
 ### Changed
 
@@ -114,7 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- **Digest-pinned base image** and SHA256 checksum verification for all downloaded binaries in Containerfile ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **Digest-pinned base image** (`python:3.12-slim-bookworm`) with SHA256 checksum verification for all downloaded binaries and `.trivyignore` risk-assessment policy in Containerfile ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Minisign signature verification** for cargo-binstall downloads ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **GitHub Actions and Docker actions pinned to commit SHAs** across all workflows ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Pre-commit hook repos pinned to commit SHAs** ([#50](https://github.com/vig-os/devcontainer/issues/50))
