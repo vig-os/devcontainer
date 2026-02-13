@@ -55,10 +55,12 @@ def _build_patterns(
     """
     # First line: type(scope)!: short description
     # - type: one of approved_types
-    # - scope: optional, alphanumeric and hyphens in parentheses
+    # - scope: optional, alphanumeric and hyphens in parentheses; multiple scopes comma-separated
     # - !: optional, breaking change
     # - short description: rest of line
-    subject_pattern = re.compile(r"^([a-z]+)(\([a-zA-Z0-9-]+\))?!?: .+$")
+    subject_pattern = re.compile(
+        r"^([a-z]+)(\([a-zA-Z0-9-]+(?:\s*,\s*[a-zA-Z0-9-]+)*\))?!?: .+$"
+    )
 
     # Refs line: Refs: followed by at least one reference (must include at least one issue)
     # Issue refs: #36 or [#36](URL) (GitHub auto-linked format after push).
@@ -125,23 +127,22 @@ def validate_commit_message(
             f"Allowed types: {', '.join(sorted(approved_types))}",
         )
 
-    # Validate scope if scopes are configured to be enforced
-    scope_part = match.group(2)  # Will be like "(scope)" or None
-    if approved_scopes and scope_part is not None:
-        # Remove the parentheses to get the scope name
-        scope_name = scope_part[1:-1]
-        if scope_name not in approved_scopes:
+    # Validate scope if provided and scopes are configured
+    scope_part = match.group(2)  # Will be like "(scope)" or "(scope1, scope2)" or None
+    if scope_part is not None and approved_scopes:
+        # Scope is provided and scopes are configured; validate each scope is in the approved list
+        # Remove the parentheses to get the scope content
+        scope_content = scope_part[1:-1]
+        # Split by comma and strip whitespace
+        scope_names = [s.strip() for s in scope_content.split(",")]
+        # Validate each scope is in the approved list
+        invalid_scopes = [s for s in scope_names if s not in approved_scopes]
+        if invalid_scopes:
             return (
                 False,
-                f"Unknown scope '{scope_name}'. "
+                f"Unknown scope(s): {', '.join(invalid_scopes)}. "
                 f"Allowed scopes: {', '.join(sorted(approved_scopes))}",
             )
-    elif approved_scopes and scope_part is None:
-        # Scopes are required but none was provided
-        return (
-            False,
-            f"Scope is required. Allowed scopes: {', '.join(sorted(approved_scopes))}",
-        )
 
     # Require at least one blank line between subject and body/Refs
     # For types with optional Refs, a subject-only message is valid

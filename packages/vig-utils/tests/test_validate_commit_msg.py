@@ -393,13 +393,13 @@ class TestCustomScopes:
         assert "Unknown scope" in err
         assert "database" in err
 
-    def test_scope_required_when_enforced(self):
-        """When scopes are enforced, they must be provided."""
+    def test_scope_optional_when_enforced(self):
+        """When scopes are enforced, they are still optional if not provided."""
         custom_scopes = frozenset({"api", "cli"})
         msg = "feat: add feature\n\nRefs: #1\n"
         valid, err = validate_commit_message(msg, approved_scopes=custom_scopes)
-        assert valid is False
-        assert "Scope is required" in err
+        assert valid is True, f"Scope should be optional: {err}"
+        assert err is None
 
     def test_all_enforced_scopes_valid(self):
         """All enforced scopes are accepted."""
@@ -421,6 +421,39 @@ class TestCustomScopes:
         """Scope matching is case-sensitive."""
         custom_scopes = frozenset({"api", "cli"})
         msg = "feat(API): add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, approved_scopes=custom_scopes)
+        assert valid is False
+        assert "Unknown scope" in err
+
+    def test_multiple_scopes_comma_separated(self):
+        """Multiple scopes can be provided, comma-separated."""
+        custom_scopes = frozenset({"api", "cli", "utils"})
+        msg = "feat(api, cli): add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, approved_scopes=custom_scopes)
+        assert valid is True
+        assert err is None
+
+    def test_multiple_scopes_with_spaces(self):
+        """Multiple scopes with spaces around commas."""
+        custom_scopes = frozenset({"api", "cli", "utils"})
+        msg = "feat(api , cli , utils): add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, approved_scopes=custom_scopes)
+        assert valid is True
+        assert err is None
+
+    def test_multiple_scopes_invalid_scope(self):
+        """Reject if any scope in the list is invalid."""
+        custom_scopes = frozenset({"api", "cli"})
+        msg = "feat(api, invalid, cli): add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, approved_scopes=custom_scopes)
+        assert valid is False
+        assert "Unknown scope" in err
+        assert "invalid" in err
+
+    def test_multiple_scopes_all_invalid(self):
+        """Reject if all scopes are invalid."""
+        custom_scopes = frozenset({"api", "cli"})
+        msg = "feat(invalid1, invalid2): add feature\n\nRefs: #1\n"
         valid, err = validate_commit_message(msg, approved_scopes=custom_scopes)
         assert valid is False
         assert "Unknown scope" in err
@@ -744,6 +777,46 @@ class TestGitHubLinkedRefs:
         assert valid is True
         assert err is None
 
+    def test_valid_linked_pr_url(self):
+        """Linked PRs are accepted (GitHub may link to /pull/ instead of /issues/)."""
+        msg = "feat: add feature\n\nRefs: [#42](https://github.com/org/repo/pull/42)\n"
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+    def test_valid_mixed_linked_issue_and_pr(self):
+        """Both linked issues and PRs are accepted in the same Refs line."""
+        msg = (
+            "fix: fix bug\n\n"
+            "Refs: [#31](https://github.com/org/repo/issues/31), "
+            "[#42](https://github.com/org/repo/pull/42)\n"
+        )
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+    def test_valid_cross_repo_issue_link(self):
+        """Linked issues from different repos are accepted."""
+        msg = (
+            "feat: add feature\n\n"
+            "Refs: [#100](https://github.com/different-org/different-repo/issues/100)\n"
+        )
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
+    def test_valid_mixed_same_and_cross_repo_links(self):
+        """Mix of same-repo and cross-repo issue links are accepted."""
+        msg = (
+            "fix: fix bug\n\n"
+            "Refs: [#31](https://github.com/org/repo/issues/31), "
+            "[#99](https://github.com/another-org/other-repo/issues/99), "
+            "REQ-FEATURE-01\n"
+        )
+        valid, err = validate_commit_message(msg)
+        assert valid is True
+        assert err is None
+
 
 class TestMainWithCustomScopes:
     """Test main() CLI with --scopes argument."""
@@ -791,8 +864,8 @@ class TestMainWithCustomScopes:
         finally:
             sys.argv = orig_argv
 
-    def test_main_with_scopes_requires_scope_when_enforced(self, tmp_path):
-        """Test main() with --scopes requires scope in commits."""
+    def test_main_with_scopes_scope_optional_when_enforced(self, tmp_path):
+        """Test main() with --scopes allows commits without scope (scope is optional)."""
         msg_file = tmp_path / "msg"
         msg_file.write_text("feat: add feature\n\nRefs: #1\n")
         orig_argv = sys.argv
@@ -803,7 +876,7 @@ class TestMainWithCustomScopes:
                 "--scopes",
                 "api,cli",
             ]
-            assert main() == 1
+            assert main() == 0
         finally:
             sys.argv = orig_argv
 
