@@ -63,9 +63,10 @@ echo "Preparing build directory..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-# Copy Containerfile and assets to build folder
+# Copy Containerfile, assets, and vig-utils package to build folder
 cp Containerfile "$BUILD_DIR/"
 cp -r assets "$BUILD_DIR/"
+cp -r packages "$BUILD_DIR/"
 
 # Replace {{IMAGE_TAG}} placeholders in template files
 if [ -d "$BUILD_DIR/assets/workspace" ]; then
