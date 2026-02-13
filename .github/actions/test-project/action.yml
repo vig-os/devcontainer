@@ -4,11 +4,11 @@
 # - Checks out repository code
 # - Sets up the environment (uv, Python deps) via setup-env
 # - Runs pre-commit linters (ruff, shellcheck, pymarkdown, etc.)
-# - Runs project-level tests (utils, release-cycle, commit-msg, action-pins)
+# - Runs project-level tests (utils, commit-msg, action-pins)
 # - Generates code coverage report and GitHub Actions job summary (suite: all)
 #
 # Inputs:
-#   suite: Which checks to run (all | lint | utils | release-cycle). Default: 'all'
+#   suite: Which checks to run (all | lint | utils). Default: 'all'
 #   test-args: Arguments to pass to pytest (default: '-v -s --tb=short')
 #
 # Usage:
@@ -25,7 +25,7 @@ description: 'Run project-level checks: linters, tests, code coverage'
 
 inputs:
   suite:
-    description: 'Which checks to run: all | lint | utils | release-cycle'
+    description: 'Which checks to run: all | lint | utils'
     required: false
     default: 'all'
 
@@ -74,13 +74,6 @@ runs:
         TEST_ARGS: ${{ inputs.test-args }}
       run: uv run pytest tests/test_utils.py $TEST_ARGS
 
-    - name: Run release cycle tests
-      if: inputs.suite == 'release-cycle'
-      shell: bash
-      env:
-        TEST_ARGS: ${{ inputs.test-args }}
-      run: uv run pytest tests/test_release_cycle.py $TEST_ARGS
-
     # --- Combined run with coverage (suite: all) ----------------------------
 
     - name: Run project tests with coverage
@@ -91,7 +84,6 @@ runs:
       run: |
         uv run pytest \
           tests/test_utils.py \
-          tests/test_release_cycle.py \
           tests/test_validate_commit_msg.py \
           tests/test_check_action_pins.py \
           --cov --cov-report=term-missing --cov-report=xml \
