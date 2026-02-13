@@ -4,7 +4,7 @@
 # - Checks out repository code
 # - Sets up the environment (uv, Python deps) via setup-env
 # - Runs pre-commit linters (ruff, shellcheck, pymarkdown, etc.)
-# - Runs project-level tests (utils, commit-msg, action-pins)
+# - Runs project-level tests (utils, commit-msg, action-pins, prepare-changelog)
 # - Generates code coverage report and GitHub Actions job summary (suite: all)
 #
 # Inputs:
@@ -86,6 +86,7 @@ runs:
           tests/test_utils.py \
           tests/test_validate_commit_msg.py \
           tests/test_check_action_pins.py \
+          tests/test_prepare_changelog.py \
           --cov --cov-report=term-missing --cov-report=xml \
           $TEST_ARGS
 

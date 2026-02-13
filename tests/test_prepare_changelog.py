@@ -1,7 +1,12 @@
 """
 Tests for prepare-changelog.py.
 
-Covers all functions (import-based unit tests) and CLI commands (subprocess integration).
+Comprehensive coverage including:
+- Unit tests for all functions (import-based, direct function calls)
+- CLI command handler tests (stdout/exit behavior)
+- Subprocess integration tests (end-to-end CLI verification)
+- Edge cases, validation, and error handling
+
 Tests are organized by function under test, from low-level helpers up to the CLI layer.
 """
 
