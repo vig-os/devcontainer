@@ -1,0 +1,99 @@
+# Trivy Vulnerability Ignore Policy
+# This file documents known vulnerabilities that are either:
+# 1. Not exploitable in container context
+# 2. Fixed in the latest patches but may lag in Trivy DB
+# 3. Have acceptable risk for devcontainer usage
+
+# CVE-2026-0861: glibc integer overflow in memalign
+# Risk Assessment: LOW
+# - Requires specific malloc patterns not triggered by normal Python/tool usage
+# - No known public exploits targeting memalign in containerized environments
+# - System library; cannot be removed without breaking core functionality
+# - Patched upstream; awaiting propagation to stable Debian releases
+# Mitigation: Image updated to latest Debian stable with available patches
+Expiration: 2026-06-01
+CVE-2026-0861
+
+# CVE-2025-14831: GnuTLS DoS via certificate verification
+# Risk Assessment: LOW
+# - Requires attacker control of certificate chain during connection
+# - Devcontainer uses GnuTLS only for SSH/TLS connections to known hosts
+# - Impact is denial of service only, not code execution
+# - Will be patched in Debian stable updates
+Expiration: 2026-05-15
+CVE-2025-14831
+
+# CVE-2025-59375: libexpat DoS via crafted file
+# Risk Assessment: LOW
+# - Requires attacker to provide malicious XML files
+# - Used indirectly by system tools; not directly exposed in devcontainer
+# - No user-controlled XML parsing in primary workflows
+Expiration: 2026-05-15
+CVE-2025-59375
+
+# CVE-2025-7709: SQLite integer overflow in FTS5
+# Risk Assessment: LOW
+# - Requires specific FTS5 query patterns
+# - SQLite in container used only for pre-commit and build caching
+# - No direct user input to SQLite databases
+# - Impact would be denial of service, not code execution
+Expiration: 2026-05-15
+CVE-2025-7709
+
+# CVE-2023-50495: ncurses segmentation fault
+# Risk Assessment: LOW
+# - Requires specific terminal control sequences
+# - Terminal environment is controlled by container operator
+# - No public exploits known
+Expiration: 2026-05-15
+CVE-2023-50495
+
+# CVE-2025-68121: crypto/tls unexpected session resumption
+# Risk Assessment: LOW
+# - CRITICAL severity in Go stdlib v1.25.5 embedded in gh (GitHub CLI) binary
+# - Requires specific TLS 1.3 session resumption patterns
+# - gh connects only to GitHub APIs; no user-facing TLS server in devcontainer
+# - Impact would be session hijacking in TLS connections, unlikely in dev context
+# - Source: gh CLI binary (Go stdlib v1.25.5, statically linked)
+# - Fixed in Go 1.25.7, 1.24.13, 1.26.0-rc.3; awaiting upstream gh release
+Expiration: 2026-05-15
+CVE-2025-68121
+
+# CVE-2025-61726: net/url memory exhaustion via query parameter parsing
+# Risk Assessment: LOW
+# - HIGH severity in Go stdlib v1.25.5 embedded in gh binary
+# - Requires attacker-controlled URLs with crafted query parameters
+# - gh parses URLs from GitHub API responses and user input (issues, PRs)
+# - Exploitation requires deliberate attack via malicious GitHub content
+# - Low risk in devcontainer where gh is used with trusted GitHub accounts
+# - Source: gh CLI binary (Go stdlib v1.25.5, statically linked)
+# - Fixed in Go 1.25.6, 1.24.12; awaiting upstream gh release
+Expiration: 2026-05-15
+CVE-2025-61726
+
+# CVE-2025-61728: archive/zip excessive CPU consumption
+# Risk Assessment: LOW
+# - HIGH severity in Go stdlib v1.25.5 embedded in gh binary
+# - Requires attacker to craft malicious ZIP archives with pathological indices
+# - gh does not extract or process user-supplied zip archives in normal devcontainer usage
+# - Would trigger only during release artifact handling with untrusted zips
+# - Impact is denial of service (CPU spike), not code execution
+# - Source: gh CLI binary (Go stdlib v1.25.5, statically linked)
+# - Fixed in Go 1.25.7; awaiting upstream gh release
+Expiration: 2026-05-15
+CVE-2025-61728
+
+# CVE-2025-61730: TLS 1.3 handshake message handling
+# Risk Assessment: LOW
+# - HIGH severity in Go stdlib v1.25.5 embedded in gh binary
+# - Requires multiple TLS records sent in specific sequence during handshake
+# - gh connects only to GitHub APIs; no user-facing TLS server in devcontainer
+# - Attack surface limited to client-side TLS handshakes with untrusted servers
+# - Low likelihood in dev context with trusted infrastructure
+# - Source: gh CLI binary (Go stdlib v1.25.5, statically linked)
+# - Fixed in Go 1.25.7; awaiting upstream gh release
+Expiration: 2026-05-15
+CVE-2025-61730
+
+# Tracking: https://github.com/vig-os/devcontainer/issues/37
+# Upstream: https://github.com/aquasecurity/trivy/

@@ -1,13 +1,13 @@
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # DEVCONTAINER BASE RECIPES - DO NOT EDIT
 # Managed by vigOS devcontainer. Customizations go in root justfile.
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-# ───────────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------------
 # CODE QUALITY
-# ───────────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------------
 
 # Run all linters
 [group('quality')]
@@ -22,11 +22,11 @@ format:
 # Run pre-commit hooks on all files
 [group('quality')]
 precommit:
-    pre-commit run --all-files
+    uv run pre-commit run --all-files
 
-# ───────────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------------
 # TESTING
-# ───────────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------------
 
 # Run tests with pytest
 [group('test')]
@@ -38,9 +38,9 @@ test-pytest *args:
 test-cov *args:
     uv run pytest --cov --cov-report=term-missing {{args}}
 
-# ───────────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------------
 # DEPENDENCIES
-# ───────────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------------
 
 # Sync dependencies from pyproject.toml
 [group('deps')]
@@ -53,9 +53,9 @@ update:
     uv lock --upgrade
     uv sync
 
-# ───────────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------------
 # BUILD
-# ───────────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------------
 
 # Clean build artifacts
 [group('build')]
@@ -63,9 +63,9 @@ clean-artifacts:
     rm -rf .pytest_cache .ruff_cache .coverage htmlcov dist build *.egg-info
     find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
-# ───────────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------------
 # SIDECAR
-# ───────────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------------
 
 # List available sidecar containers
 [group('sidecar')]
@@ -79,7 +79,7 @@ sidecars:
     RUNNING=$(podman ps --format "$FORMAT" 2>/dev/null | grep -v "^devcontainer$" || true)
     if [ -n "$RUNNING" ]; then
         echo "$RUNNING" | while read -r name; do
-            echo "  ✓ $name (running)"
+            echo "  [OK] $name (running)"
         done
     else
         echo "  (no sidecars currently running)"
@@ -100,7 +100,7 @@ sidecar name *args:
 
     # Check if container exists (running or stopped)
     if ! podman ps -a --format "$FORMAT" 2>/dev/null | grep -q "^{{name}}$"; then
-        echo "❌ Sidecar container '{{name}}' not found"
+        echo "[ERROR] Sidecar container '{{name}}' not found"
         echo ""
         echo "Available sidecars:"
         RUNNING=$(podman ps --format "$FORMAT" 2>/dev/null | grep -v "^devcontainer$" || true)
@@ -119,10 +119,10 @@ sidecar name *args:
 
     # Check if container is running
     if ! podman ps --format "$FORMAT" 2>/dev/null | grep -q "^{{name}}$"; then
-        echo "⚠️  Sidecar container '{{name}}' exists but is not running"
+        echo "[!]  Sidecar container '{{name}}' exists but is not running"
         echo "Starting container..."
         podman start {{name}} || {
-            echo "❌ Failed to start container '{{name}}'"
+            echo "[ERROR] Failed to start container '{{name}}'"
             exit 1
         }
         # Wait a moment for container to be ready

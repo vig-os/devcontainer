@@ -1,0 +1,120 @@
+# Scheduled Security Scan
+#
+# Runs a comprehensive container security scan on a weekly schedule to catch
+# newly published vulnerabilities between pull requests. This workflow builds
+# the image from the dev branch and performs Trivy scanning with full severity
+# reporting for awareness.
+#
+# Triggers:
+#   - Weekly schedule: Monday 06:00 UTC
+#
+# Jobs:
+#   1. build-image - Build container image for dev branch
+#   2. security-scan - Full Trivy vulnerability scan (non-blocking)
+#
+# Artifacts:
+#   - SBOM (CycloneDX) with all packages
+#   - SARIF report uploaded to GitHub Security tab
+
+name: Scheduled Security Scan
+
+on:  # yamllint disable-line rule:truthy
+  schedule:
+    # Weekly scan: Monday 06:00 UTC (catches new CVEs between PRs)
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  build-image:
+    name: Build Container Image
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          ref: dev
+
+      - name: Generate version string
+        id: version
+        run: |
+          # Version format: scheduled-YYYY-MM-DD-<commit_short>
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+          VERSION="scheduled-$(date -u +'%Y-%m-%d')-${COMMIT_SHORT}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Generated version: ${VERSION}"
+
+      - name: Build container image
+        uses: ./.github/actions/build-image
+        with:
+          version: ${{ steps.version.outputs.version }}
+          arch: 'amd64'
+          release-date: ${{ steps.version.outputs.release_date }}
+          release-url: 'https://github.com/vig-os/devcontainer'
+          build-timestamp: ${{ steps.version.outputs.build_timestamp }}
+          vcs-ref: ${{ github.sha }}
+          output-type: tar
+          output-file: /tmp/image.tar
+
+  security-scan:
+    name: Security Scan
+    needs: build-image
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write    # upload SARIF results to GitHub Security tab
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Download image artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          name: container-image-${{ needs.build-image.outputs.version }}-amd64
+          path: /tmp
+
+      - name: Scan image for all vulnerabilities
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
+        with:
+          input: /tmp/image.tar
+          format: 'table'
+          severity: 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL'
+          exit-code: '0'  # Non-blocking: for awareness only
+          trivyignores: '.trivyignore'
+
+      - name: Generate container SBOM (CycloneDX)
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
+        with:
+          input: /tmp/image.tar
+          format: 'cyclonedx'
+          output: 'sbom-cyclonedx.json'
+
+      - name: Generate SARIF report
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
+        with:
+          input: /tmp/image.tar
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL'
+          trivyignores: '.trivyignore'
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: sbom-${{ needs.build-image.outputs.version }}-amd64
+          path: sbom-cyclonedx.json
+          retention-days: 90
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@45cbd0c69e560cd9e7cd7f8c32362050c9b7ded2  # v4
+        with:
+          sarif_file: trivy-results.sarif
+          category: 'container-image-scheduled'

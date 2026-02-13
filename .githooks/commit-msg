@@ -1,0 +1,6 @@
+#!/bin/bash
+# Set error handling, fail on any error during script execution
+set -euo pipefail
+
+# Run pre-commit commit-msg hooks (validates commit message format)
+uv run pre-commit run --hook-stage commit-msg --commit-msg-filename "$1"

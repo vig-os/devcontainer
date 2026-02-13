@@ -20,9 +20,8 @@ tests/
 ├── conftest.py              # Shared fixtures for all tests
 ├── test_image.py            # Container image verification tests
 ├── test_integration.py      # Devcontainer integration tests (incl. sidecar)
-├── test_install_script.py   # Install script tests
-├── test_utils.py            # Utility function tests
-└── test_version_check.py    # Version-check feature tests
+├── test_release_cycle.py    # Release cycle script tests (changelog, release)
+└── test_utils.py            # Utility and install script tests
 ```
 
 ### Image Tests

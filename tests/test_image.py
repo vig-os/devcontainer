@@ -15,13 +15,15 @@ EXPECTED_VERSIONS = {
     "git": "2.",  # Major version check (from apt package)
     "curl": "8.",  # Major version check (from apt package)
     "gh": "2.86.",  # Minor version check (GitHub CLI (manually installed from latest release)
-    "uv": "0.9.",  # Minor version check (manually installed from latest release)
+    "uv": "0.10.",  # Minor version check (manually installed from latest release)
     "python": "3.12",  # Python (from base image)
     "pre_commit": "4.5.",  # Minor version check (installed via uv pip)
-    "ruff": "0.14.",  # Minor version check (installed via uv pip)
+    "ruff": "0.15.",  # Minor version check (installed via uv pip)
+    "pip_licenses": "5.",  # Major version check (installed via uv pip)
     "just": "1.46.",  # Minor version check (manually installed from latest release)
     "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),
     "typstyle": "0.14.",  # Minor version check (installed from latest release)
+    "vig_utils": "0.1.",  # Minor version check (installed via uv pip)
 }
 
 
@@ -61,6 +63,10 @@ class TestSystemTools:
         assert host.package("openssh-client").is_installed, (
             "openssh-client is not installed"
         )
+
+    def test_nano_installed(self, host):
+        """Test that nano is installed."""
+        assert host.package("nano").is_installed, "nano is not installed"
 
     def test_gh_installed(self, host):
         """Test that GitHub CLI (gh) is installed."""
@@ -110,6 +116,14 @@ class TestSystemTools:
         expected = EXPECTED_VERSIONS["typstyle"]
         assert expected in result.stdout, (
             f"Expected typstyle {expected}, got: {result.stdout}"
+        )
+
+    def test_just_lsp_installed(self, host):
+        """Test that just-lsp is installed."""
+        result = host.run("just-lsp --version")
+        assert result.rc == 0, "just-lsp --version failed"
+        assert "just-lsp" in result.stdout.lower(), (
+            f"Expected just-lsp version output, got: {result.stdout}"
         )
 
 
@@ -234,6 +248,33 @@ class TestDevelopmentTools:
         expected = EXPECTED_VERSIONS["ruff"]
         assert expected in result.stdout, (
             f"Expected ruff {expected}, got: {result.stdout}"
+        )
+
+    def test_pip_licenses_installed(self, host):
+        """Test that pip-licenses is installed."""
+        result = host.run("pip-licenses --version")
+        assert result.rc == 0, "pip-licenses --version failed"
+        assert "pip-licenses" in result.stdout.lower()
+        expected = EXPECTED_VERSIONS["pip_licenses"]
+        assert expected in result.stdout, (
+            f"Expected pip-licenses {expected}, got: {result.stdout}"
+        )
+
+    def test_vig_utils_installed(self, host):
+        """Test that vig-utils is installed and importable."""
+        result = host.run("python3 -c 'import vig_utils; print(\"OK\")'")
+        assert result.rc == 0, (
+            f"vig-utils is not installed or not importable: {result.stderr}"
+        )
+        assert "OK" in result.stdout, "Failed to import vig_utils"
+
+    def test_vig_utils_version(self, host):
+        """Test that vig-utils version is correct."""
+        result = host.run("python3 -c 'import vig_utils; print(vig_utils.__version__)'")
+        assert result.rc == 0, "Failed to get vig-utils version"
+        expected = EXPECTED_VERSIONS["vig_utils"]
+        assert expected in result.stdout, (
+            f"Expected vig-utils {expected}x, got: {result.stdout}"
         )
 
 
