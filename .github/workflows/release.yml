@@ -305,7 +305,7 @@ jobs:
           RELEASE_DATE: ${{ needs.validate.outputs.release_date }}
         run: |
           set -euo pipefail
-          uv run python scripts/prepare-changelog.py finalize "$VERSION" "$RELEASE_DATE"
+          uv run prepare-changelog finalize "$VERSION" "$RELEASE_DATE"
           echo "✓ Release date set in CHANGELOG.md"
 
       - name: Commit finalization changes

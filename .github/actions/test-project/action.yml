@@ -84,9 +84,7 @@ runs:
       run: |
         uv run pytest \
           tests/test_utils.py \
-          tests/test_validate_commit_msg.py \
-          tests/test_check_action_pins.py \
-          tests/test_prepare_changelog.py \
+          packages/vig-utils/tests \
           --cov --cov-report=term-missing --cov-report=xml \
           $TEST_ARGS
 

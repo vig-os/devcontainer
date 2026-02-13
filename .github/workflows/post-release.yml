@@ -104,7 +104,7 @@ jobs:
         if: startsWith(github.event.pull_request.head.ref, 'release/')
         run: |
           set -euo pipefail
-          uv run python scripts/prepare-changelog.py reset CHANGELOG.md
+          uv run prepare-changelog reset CHANGELOG.md
           echo "✓ CHANGELOG Unreleased section reset"
           echo "reset=true" >> $GITHUB_OUTPUT
 

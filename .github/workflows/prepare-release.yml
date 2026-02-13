@@ -113,7 +113,7 @@ jobs:
       - name: Verify CHANGELOG has Unreleased section with content
         run: |
           set -euo pipefail
-          uv run python scripts/prepare-changelog.py validate CHANGELOG.md
+          uv run prepare-changelog validate CHANGELOG.md
 
       - name: Verify dev branch is checked out
         run: |
@@ -192,7 +192,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "Preparing CHANGELOG for version $VERSION..."
-          uv run python scripts/prepare-changelog.py prepare "$VERSION" CHANGELOG.md
+          uv run prepare-changelog prepare "$VERSION" CHANGELOG.md
           echo "✓ CHANGELOG prepared"
 
       - name: Extract CHANGELOG content for PR body
