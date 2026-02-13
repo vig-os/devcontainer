@@ -180,6 +180,10 @@ RUN uv pip install --system \
     pip-licenses && \
     uv pip install --system --upgrade pip
 
+# Copy vig-utils package and install system-wide
+COPY packages/vig-utils /root/packages/vig-utils
+RUN uv pip install --system /root/packages/vig-utils
+
 # Copy assets into container image
 COPY assets /root/assets
 
