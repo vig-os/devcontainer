@@ -7,15 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-### Changed
-
-- **CodeQL Action v3 → v4 upgrade**
-  - Updated all CodeQL Action references from v3 (deprecated Dec 2026) to v4.32.2
-  - Updated in `.github/workflows/codeql.yml`, `security-scan.yml`, and `ci.yml`
-  - Uses commit hash `45cbd0c69e560cd9e7cd7f8c32362050c9b7ded2` for integrity
-
 ### Added
 
+- **`vig-utils` reusable CLI utilities package** ([#51](https://github.com/vig-os/devcontainer/issues/51))
+  - Python package in `packages/vig-utils/` for shared validation and build utilities
+  - `validate_commit_msg` module: enforces commit message format and references standards
+    - Configurable commit scopes validation: scope list can be customized per project
+    - Scopes are optional by default; if used, must be in the approved list
+    - Support for multiple scopes, comma-separated (e.g., `feat(api, cli): add feature`)
+    - Support for GitHub auto-linked issue references (e.g., PR cross-repo links)
+    - Comprehensive test suite with edge case coverage for PR and cross-repo issue links
+  - `prepare_changelog` module: CHANGELOG management and validation
+  - `check_action_pins` module: GitHub Actions SHA pinning enforcement
+  - Integrated into CI/CD pipeline and pre-commit hooks as standard Python package
+  - Package version tests verify installation and correct versioning
 - **`--org` flag for install script** ([#33](https://github.com/vig-os/devcontainer/issues/33))
   - Allows overriding the default organization name (default: `vigOS`)
   - Passes `ORG_NAME` as environment variable to the container
@@ -94,6 +99,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 6-month expiration dates enforce periodic re-evaluation
 
 ### Changed
+
+- **CodeQL Action v3 → v4 upgrade**
+  - Updated all CodeQL Action references from v3 (deprecated Dec 2026) to v4.32.2
+  - Updated in `.github/workflows/codeql.yml`, `security-scan.yml`, and `ci.yml`
+  - Uses commit hash `45cbd0c69e560cd9e7cd7f8c32362050c9b7ded2` for integrity
 
 - **Commit message guidelines** - updated documentation ([#36](https://github.com/vig-os/devcontainer/issues/37))
 - **Expected version checks** - updated ruff and pre-commit versions in test suite ([#37](https://github.com/vig-os/devcontainer/issues/37))
