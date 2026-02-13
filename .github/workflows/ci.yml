@@ -206,6 +206,15 @@ jobs:
           exit-code: '1'
           trivyignores: '.trivyignore'
 
+      - name: Report MEDIUM severity vulnerabilities (non-blocking)
+        if: always()
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
+        with:
+          input: /tmp/image.tar
+          format: 'table'
+          severity: 'MEDIUM'
+          exit-code: '0'  # Non-blocking report
+
       - name: Generate SARIF report
         if: always()
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
