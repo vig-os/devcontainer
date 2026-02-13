@@ -22,6 +22,7 @@ updates:
           - "patch"
 
   # Python (pip) — monitor pyproject.toml / uv.lock
+  # Includes security updates and dependency vulnerability alerts
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
@@ -36,6 +37,14 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    # Dependabot alerts: requires GitHub organization with security features
+    # Configures automatic alerts for:
+    # - Version updates with vulnerability fixes
+    # - License compliance issues (if enabled in GitHub settings)
+    # - Dependency conflicts
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
 
   # Docker — monitor Containerfile base images
   - package-ecosystem: "docker"
