@@ -116,12 +116,6 @@ test-utils:
     #!/usr/bin/env bash
     uv run pytest tests/test_utils.py -v -s --tb=short
 
-# Run release cycle tests only
-[group('test')]
-test-release-cycle:
-    #!/usr/bin/env bash
-    uv run pytest tests/test_release_cycle.py -v -s --tb=short
-
 # Run validate commit msg tests only
 [group('test')]
 test-validate-commit-msg:

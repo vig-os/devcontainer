@@ -163,14 +163,13 @@ Available recipes:
 
     [test]
     test version="dev"              # Run all test suites
-    test-check-action-pins          # Run check action pins tests only
     test-cov *args                  # Run tests with coverage
     test-image version="dev"        # Run image tests only
     test-integration version="dev"  # Run integration tests only
     test-pytest *args               # Run tests with pytest
-    test-release-cycle              # Run release cycle tests only
     test-utils                      # Run utils tests only
     test-validate-commit-msg        # Run validate commit msg tests only
+    test-vig-utils                  # Run check action pins tests only
 
 ```
 
