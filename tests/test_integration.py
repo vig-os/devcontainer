@@ -541,7 +541,8 @@ class TestDevContainerDockerCompose:
 
         # Verify the docker-compose.yml image matches the container_image fixture
         # Normalize arch suffix if present (e.g., :X.Y or :X.Y-amd64 -> :X.Y)
-        expected_image = re.sub(r"-[^:]+$", "", container_image)
+        # Only remove known architecture suffixes (-amd64, -arm64) at the very end
+        expected_image = re.sub(r"-(amd64|arm64)$", "", container_image)
         assert service["image"] == expected_image, (
             f"Expected image to be {expected_image}, got: {service['image']}"
         )
