@@ -89,6 +89,7 @@ source = ["packages/vig-utils/src/vig_utils", "scripts", "docs"]
 omit = [
     "tests/*",
     "assets/*",
+    "**/__init__.py",
 ]
 
 [tool.coverage.report]
