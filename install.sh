@@ -332,19 +332,6 @@ info "Using $RUNTIME with image $IMAGE"
 info "Target directory: $PROJECT_PATH"
 info "Project name: $PROJECT_NAME"
 
-# Check if terminal is interactive (needed for init-workspace.sh prompts)
-# When piped via curl, stdin is the script - use /dev/tty for user input
-if [ ! -t 0 ]; then
-    if [ ! -e /dev/tty ]; then
-        err "This script requires an interactive terminal"
-        echo ""
-        echo "Try running directly instead of piping:"
-        echo "  curl -sSf https://vig-os.github.io/devcontainer/install.sh -o install.sh"
-        echo "  bash install.sh $PROJECT_PATH"
-        exit 1
-    fi
-fi
-
 # Build the command
 # Use --rm to cleanup container after run; no -it since we use --no-prompts (non-interactive)
 # Pass SHORT_NAME and ORG_NAME as environment variables to the container
@@ -354,6 +341,20 @@ if [ "$DRY_RUN" = true ]; then
     info "Would execute:"
     echo "  $CMD"
     exit 0
+fi
+
+# Check if terminal is interactive (needed for init-workspace.sh prompts)
+# When piped via curl, stdin is the script - use /dev/tty for user input
+# Only check this when actually running (not in dry-run mode)
+if [ ! -t 0 ]; then
+    if [ ! -e /dev/tty ]; then
+        err "This script requires an interactive terminal"
+        echo ""
+        echo "Try running directly instead of piping:"
+        echo "  curl -sSf https://vig-os.github.io/devcontainer/install.sh -o install.sh"
+        echo "  bash install.sh $PROJECT_PATH"
+        exit 1
+    fi
 fi
 
 # Pull image first (better UX - shows progress separately)
