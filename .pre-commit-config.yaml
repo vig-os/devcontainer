@@ -109,6 +109,16 @@ repos:
         files: ^\.github/(workflows/.*\.ya?ml|actions/.*/action\.ya?ml)$
         pass_filenames: false
 
+  # Python Security (Bandit)
+  - repo: local
+    hooks:
+      - id: bandit
+        name: bandit (Python security linting)
+        entry: uv run bandit -r scripts/ assets/workspace/ -ll
+        language: system
+        types: [python]
+        pass_filenames: false
+
   # Commit message validation (commit-msg stage)
   - repo: local
     hooks:
