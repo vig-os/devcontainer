@@ -15,6 +15,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "vig-utils",
     {include-group = "lint"},
     {include-group = "test"},
 ]
@@ -33,6 +34,9 @@ test = [
     "testcontainers>=4.9.0",
     "bcrypt>=5.0.0",
 ]
+
+[tool.uv.sources]
+vig-utils = { path = "packages/vig-utils", editable = true }
 
 [tool.ruff]
 # Black-compatible line length
@@ -69,17 +73,19 @@ indent-style = "space"
 filterwarnings = [
     "ignore::DeprecationWarning:testcontainers",
 ]
+# Discover tests in both root tests/ and vig-utils package tests
+testpaths = ["tests", "packages/vig-utils/tests"]
 # Do not collect tests from tests/tmp (integration-test workspace dirs with template tests)
 norecursedirs = "tmp"
 
 # ---------------------------------------------------------------------------
 # Coverage (pytest-cov / coverage.py)
 # ---------------------------------------------------------------------------
-# Coverage targets project-level Python code (scripts/, docs/).
+# Coverage targets project-level Python code (vig_utils, scripts/, docs/).
 # Image and integration tests run inside containers and are not instrumented.
 
 [tool.coverage.run]
-source = ["scripts", "docs"]
+source = ["packages/vig-utils/src/vig_utils", "scripts", "docs"]
 omit = [
     "tests/*",
     "assets/*",

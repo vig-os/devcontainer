@@ -167,6 +167,7 @@ dev = [
     { name = "pytest-testinfra" },
     { name = "ruff" },
     { name = "testcontainers" },
+    { name = "vig-utils" },
 ]
 lint = [
     { name = "bandit" },
@@ -208,6 +209,7 @@ dev = [
     { name = "pytest-testinfra", specifier = ">=10.2.2" },
     { name = "ruff", specifier = ">=0.14.3" },
     { name = "testcontainers", specifier = ">=4.9.0" },
+    { name = "vig-utils", editable = "packages/vig-utils" },
 ]
 lint = [
     { name = "bandit", extras = ["toml"], specifier = ">=1.7.5" },
@@ -651,6 +653,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/15/22/9ee70a2574a4f4599
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a7/c2/fe1e52489ae3122415c51f387e221dd0773709bad6c6cdaa599e8a2c5185/urllib3-2.5.0-py3-none-any.whl", hash = "sha256:e6b01673c0fa6a13e374b50871808eb3bf7046c4b125b216f6bf1cc604cff0dc", size = 129795, upload-time = "2025-06-18T14:07:40.39Z" },
 ]
+
+[[package]]
+name = "vig-utils"
+version = "0.1.0"
+source = { editable = "packages/vig-utils" }
 
 [[package]]
 name = "virtualenv"

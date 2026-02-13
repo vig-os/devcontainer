@@ -104,7 +104,7 @@ repos:
     hooks:
       - id: check-action-pins
         name: check-action-pins (verify SHA-pinned actions)
-        entry: uv run python scripts/check_action_pins.py
+        entry: uv run check-action-pins
         language: system
         files: ^\.github/(workflows/.*\.ya?ml|actions/.*/action\.ya?ml)$
         pass_filenames: false
@@ -114,7 +114,7 @@ repos:
     hooks:
       - id: bandit
         name: bandit (Python security linting)
-        entry: uv run bandit -r scripts/ assets/workspace/ -ll
+        entry: uv run bandit -r packages/vig-utils/src/ scripts/ assets/workspace/ -ll
         language: system
         types: [python]
         pass_filenames: false
@@ -124,6 +124,6 @@ repos:
     hooks:
       - id: validate-commit-msg
         name: validate commit message
-        entry: uv run python scripts/validate_commit_msg.py
+        entry: uv run validate-commit-msg
         language: system
         stages: [commit-msg]

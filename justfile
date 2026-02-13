@@ -130,9 +130,9 @@ test-validate-commit-msg:
 
 # Run check action pins tests only
 [group('test')]
-test-check-action-pins:
+test-vig-utils:
     #!/usr/bin/env bash
-    uv run pytest tests/test_check_action_pins.py -v -s --tb=short
+    uv run pytest packages/vig-utils/tests -v -s --tb=short
 
 # Clean up lingering containers before running tests
 [private]
@@ -201,7 +201,7 @@ finalize-release version *flags:
 # Reset CHANGELOG Unreleased section (after merging release to dev)
 [group('release')]
 reset-changelog:
-    uv run python scripts/prepare-changelog.py reset CHANGELOG.md
+    uv run prepare-changelog reset CHANGELOG.md
 
 # Pull image from registry (default: latest)
 [group('release')]
