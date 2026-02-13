@@ -1,23 +1,8 @@
 # Trivy Vulnerability Ignore Policy
-#
 # This file documents known vulnerabilities that are either:
-# 1. Not exploitable in the container context
+# 1. Not exploitable in container context
 # 2. Fixed in the latest patches but may lag in Trivy DB
-# 3. Have acceptable risk for devcontainer usage (development environment only)
-#
-# This is a formal vulnerability acceptance register for medtech compliance
-# (IEC 62304 / ISO 13485). Each entry includes:
-# - Risk assessment in devcontainer context
-# - Exploitability justification
-# - Fix status and mitigation
-# - Expiration date (forces periodic review)
-#
-# All entries expire 2026-08-13 (6 months) for re-evaluation.
-# Refs: https://github.com/vig-os/devcontainer/issues/37
-
-# ============================================================================
-# GLIBC - Integer Overflow in memalign (continued from previous cycle)
-# ============================================================================
+# 3. Have acceptable risk for devcontainer usage
 
 # CVE-2026-0861: glibc integer overflow in memalign
 # Risk Assessment: LOW
@@ -26,133 +11,42 @@
 # - System library; cannot be removed without breaking core functionality
 # - Patched upstream; awaiting propagation to stable Debian releases
 # Mitigation: Image updated to latest Debian stable with available patches
-# Status: No fix available in Debian 12 stable yet
-Expiration: 2026-08-13
+Expiration: 2026-06-01
 CVE-2026-0861
 
-# ============================================================================
-# GIT - Arbitrary Code Execution and File Writes
-# ============================================================================
-
-# CVE-2025-48384: git arbitrary code execution via malicious repository
-# Risk Assessment: MEDIUM
-# - Attack vector requires developer to clone a malicious Git repository
-# - In devcontainer context, developers control which repos are cloned
-# - No automated git operations against untrusted sources
-# - Standard practice: code review before cloning unknown repos
-# Status: No fix available in Debian 12 stable; git update requires manual rebuild
-# Fix Available: Yes (via Git project), but not in Debian stable yet
-Expiration: 2026-08-13
-CVE-2025-48384
-
-# CVE-2025-48385: git arbitrary file writes via malicious repository
-# Risk Assessment: MEDIUM
-# - Similar to CVE-2025-48384; requires malicious repo checkout
-# - Mitigated by same controls: developer vetting of repositories
-# - Impact limited to checked-out files within repository tree
-# Status: No fix available in Debian 12 stable
-# Fix Available: Yes (via Git project), but not in Debian stable yet
-Expiration: 2026-08-13
-CVE-2025-48385
-
-# ============================================================================
-# PODMAN/CONTAINERS - Build and Deployment Issues
-# ============================================================================
-
-# CVE-2024-9341: Podman/Buildah/CRI-O FIPS Crypto-Policy directory mount
+# CVE-2025-14831: GnuTLS DoS via certificate verification
 # Risk Assessment: LOW
-# - Affects FIPS mode enforcement on systems with crypto-policy restrictions
-# - Devcontainer does not enforce FIPS mode
-# - Attack requires host-level FIPS configuration + specific build patterns
-# - Used only for DooD (Docker-out-of-Docker) pattern, not exposed to untrusted input
-# Status: No fix available in Debian 12 stable (podman 4.3.1)
-# Mitigation: Podman used only for local development image builds
-Expiration: 2026-08-13
-CVE-2024-9341
+# - Requires attacker control of certificate chain during connection
+# - Devcontainer uses GnuTLS only for SSH/TLS connections to known hosts
+# - Impact is denial of service only, not code execution
+# - Will be patched in Debian stable updates
+Expiration: 2026-05-15
+CVE-2025-14831
 
-# CVE-2024-3727: containers/image digest type validation bypass
+# CVE-2025-59375: libexpat DoS via crafted file
 # Risk Assessment: LOW
-# - Digest type confusion in image manifest parsing
-# - Attack requires pushing crafted image to registry
-# - Devcontainer pulls only official Python base image (digest-pinned)
-# - No untrusted image pulls from arbitrary registries
-# Status: No fix available in Debian 12 stable (golang-github-containers-image 5.23.1)
-# Mitigation: Explicit digest pin for base image; Dependabot tracks updates
-Expiration: 2026-08-13
-CVE-2024-3727
+# - Requires attacker to provide malicious XML files
+# - Used indirectly by system tools; not directly exposed in devcontainer
+# - No user-controlled XML parsing in primary workflows
+Expiration: 2026-05-15
+CVE-2025-59375
 
-# CVE-2025-4953: Podman build context bind mount escape
-# Risk Assessment: MEDIUM
-# - Bind mount escape during podman build context processing
-# - Requires attacker control of build context or Dockerfile
-# - Devcontainer used only for internal development builds
-# - Build context is always local, under developer control
-# Status: No fix available in Debian 12 stable (podman 4.3.1)
-# Mitigation: Build context always controlled by developers; no external input
-Expiration: 2026-08-13
-CVE-2025-4953
-
-# CVE-2025-9566: Podman kube play command overwrites host files
+# CVE-2025-7709: SQLite integer overflow in FTS5
 # Risk Assessment: LOW
-# - Affects podman kube play command for Kubernetes manifest deployment
-# - Devcontainer does not use podman kube play; only standard podman build/run
-# - Pod orchestration handled externally, not in devcontainer
-# Status: No fix available in Debian 12 stable
-# Mitigation: kube play feature not used in devcontainer
-Expiration: 2026-08-13
-CVE-2025-9566
+# - Requires specific FTS5 query patterns
+# - SQLite in container used only for pre-commit and build caching
+# - No direct user input to SQLite databases
+# - Impact would be denial of service, not code execution
+Expiration: 2026-05-15
+CVE-2025-7709
 
-# ============================================================================
-# ZLIB - Integer Overflow in minizip (will_not_fix)
-# ============================================================================
-
-# CVE-2023-45853: zlib integer overflow in zipOpenNewFileInZip4_6
+# CVE-2023-50495: ncurses segmentation fault
 # Risk Assessment: LOW
-# - Severity: CRITICAL (but context-dependent)
-# - Affects minizip library for ZIP file creation with large headers
-# - Integer overflow in specific API path (zipOpenNewFileInZip4_6)
-# - No known exploits in zlib compression operations (only in minizip wrapper)
-# - Devcontainer does not create ZIP files programmatically
-# Status: will_not_fix by Debian (marked as not exploitable in runtime context)
-# Mitigation: ZIP functionality not used; system library cannot be removed
-# Context: This vulnerability is in the minizip extension API, not core zlib
-Expiration: 2026-08-13
-CVE-2023-45853
+# - Requires specific terminal control sequences
+# - Terminal environment is controlled by container operator
+# - No public exploits known
+Expiration: 2026-05-15
+CVE-2023-50495
 
-# ============================================================================
-# LDAP - Null Pointer Dereference (will_not_fix)
-# ============================================================================
-
-# CVE-2023-2953: openldap null pointer dereference in ber_memalloc_x
-# Risk Assessment: LOW
-# - Affects libldap during BER parsing of malformed LDAP protocol messages
-# - Devcontainer does not perform LDAP authentication or LDAP client operations
-# - libldap included as transitive dependency of other packages
-# - No direct LDAP connectivity from devcontainer
-# Status: No fix available in Debian 12 stable (marked as not exploitable)
-# Mitigation: LDAP features not used; library cannot be removed as transitive dep
-Expiration: 2026-08-13
-CVE-2023-2953
-
-# ============================================================================
-# SQLITE - Integer Overflow (no fix available)
-# ============================================================================
-
-# CVE-2025-7458: SQLite integer overflow in FTS5 module
-# Risk Assessment: MEDIUM
-# - Affects SQLite full-text search (FTS5) when processing large documents
-# - Requires attacker to inject crafted FTS5 queries into indexed data
-# - SQLite used internally by Python and third-party tools
-# - Indexed data sources are only internal tool databases (not user-controlled)
-# - No direct SQL injection vector in devcontainer
-# Status: No fix available in Debian 12 stable (libsqlite3-0 version 3.40.1)
-# Fix Available: Yes (via SQLite upstream), but not propagated to Debian stable yet
-# Mitigation: SQLite used for internal metadata only; no untrusted query sources
-Expiration: 2026-08-13
-CVE-2025-7458
-
-# ============================================================================
-# End of Vulnerability Acceptance Register
-# ============================================================================
-# For questions or to propose CVE removal/addition, see:
-# Tracking issue: https://github.com/vig-os/devcontainer/issues/37
+# Tracking: https://github.com/vig-os/devcontainer/issues/37
+# Upstream: https://github.com/aquasecurity/trivy/

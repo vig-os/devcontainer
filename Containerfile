@@ -31,8 +31,25 @@ LABEL org.opencontainers.image.ref.name="${IMAGE_TAG}"
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Security patching strategy: we do NOT run blanket apt-get upgrade/dist-upgrade.
+# The base image digest pin (line 4) guarantees reproducible builds. A blanket
+# upgrade silently changes packages between builds, defeating that guarantee.
+#
+# Instead we rely on:
+#   1. Dependabot proposing base-image digest updates (covers most CVEs).
+#   2. Weekly Trivy scans (.github/workflows/security-scan.yml) for visibility.
+#   3. Targeted --only-upgrade for HIGH/CRITICAL CVEs that cannot wait for a
+#      new base image rebuild. Each entry must reference a CVE.
+#
+# See docs/CONTAINER_SECURITY.md for the full policy.
+#
+# Uncomment and add packages below when a critical CVE needs an immediate fix.
+# Remove entries once the base image digest is updated to include the patch.
+# RUN apt-get update && apt-get install -y --only-upgrade \
+#     <package>=<version> \  # CVE-XXXX-XXXXX
+#     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Install minimal system dependencies
-# NOTE: Explicitly avoid gnupg/dirmngr packages which have known vulns and aren't needed
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
