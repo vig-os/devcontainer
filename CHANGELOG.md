@@ -75,6 +75,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Bandit pre-commit hook for medium/high/critical severity Python code analysis
   - CI pipeline job with Bandit static analysis and Safety dependency vulnerability scanning
   - Reports uploaded as artifacts (30-day retention) with job summary integration
+- **Scheduled weekly security scan workflow** (`security-scan.yml`) ([#37](https://github.com/vig-os/devcontainer/issues/37))
+  - Full Trivy vulnerability scan (all severities) against `dev` branch every Monday 06:00 UTC
+  - SBOM generation (CycloneDX) and SARIF upload to GitHub Security tab
+  - Non-blocking: catches newly published CVEs between pull requests
+- **Non-blocking unfixed vulnerability reporting in CI** ([#37](https://github.com/vig-os/devcontainer/issues/37))
+  - Additional CI scan step reports unfixed HIGH/CRITICAL CVEs for awareness without blocking the pipeline
+- **Comprehensive `.trivyignore` vulnerability acceptance register** ([#37](https://github.com/vig-os/devcontainer/issues/37))
+  - Formal medtech-compliant register (IEC 62304 / ISO 13485) documenting 10 accepted CVEs
+  - Each entry includes risk assessment, exploitability justification, fix status, and mitigation
+  - 6-month expiration dates enforce periodic re-evaluation
 
 ### Changed
 
@@ -94,6 +104,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Updated CONTRIBUTE.md** release workflow documentation to match automated process ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Bumped `actions/create-github-app-token`** from v1 to v2 across workflows with updated SHA pins ([#37](https://github.com/vig-os/devcontainer/issues/37))
 - **Pinned `@devcontainers/cli`** to version 0.81.1 in CI for consistent behavior ([#37](https://github.com/vig-os/devcontainer/issues/37))
+- **CI and release Trivy scans gate on fixable CVEs only** ([#37](https://github.com/vig-os/devcontainer/issues/37))
+  - Added `ignore-unfixed: true` to blocking scan steps in `ci.yml` and `release.yml`
+  - Unfixable CVEs no longer block the pipeline; documented in `.trivyignore` with risk assessments
 
 ### Deprecated
 
@@ -125,6 +138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-commit hook repos pinned to commit SHAs** ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Workflow permissions hardened** with least-privilege principle and explicit token scoping ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Input sanitization** — inline expression interpolation replaced with environment variables in workflow run blocks to prevent injection ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **Upgraded pip** in Containerfile to fix CVE-2025-8869 (symbolic link extraction vulnerability) ([#37](https://github.com/vig-os/devcontainer/issues/37))
 
 ## [0.2.1](https://github.com/vig-os/devcontainer/releases/tag/v0.2.1) - 2026-01-28
 
