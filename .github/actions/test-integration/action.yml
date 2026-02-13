@@ -205,7 +205,7 @@ runs:
         echo "Test image: ${{ inputs.registry }}:$TEST_CONTAINER_TAG"
 
         # Run integration tests with verbose output
-        uv run pytest tests/test_integration.py \
+        uv run pytest tests/test_integration.py tests/test_install_script.py \
           -v \
           --tb=short \
           --color=yes \
