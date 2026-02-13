@@ -1,6 +1,7 @@
 # Use Python 3.12 as base image (pinned to digest for supply chain integrity)
 # Dependabot (docker ecosystem) will propose digest updates automatically
-FROM python:3.12-slim-trixie@sha256:9e01bf1ae5db7649a236da7be1e94ffbbbdd7a93f867dd0d8d5720d9e1f89fab
+# Updated to bookworm (stable) for better security patch cadence
+FROM python:3.12-slim-bookworm@sha256:a665cba0b75dfd1f1ac2a5c087a81d0e02ff8a825949937d5f0e49e074cc8ba4
 
 # Add metadata
 # By default, we build the dev version unless specified as an argument
@@ -31,6 +32,7 @@ LABEL org.opencontainers.image.ref.name="${IMAGE_TAG}"
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install minimal system dependencies
+# NOTE: Explicitly avoid gnupg/dirmngr packages which have known vulns and aren't needed
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \

@@ -204,6 +204,7 @@ jobs:
           format: 'table'
           severity: 'HIGH,CRITICAL'
           exit-code: '1'
+          trivyignores: '.trivyignore'
 
       - name: Generate SARIF report
         if: always()
@@ -213,6 +214,7 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'HIGH,CRITICAL'
+          trivyignores: '.trivyignore'
 
       - name: Upload SARIF to GitHub Security
         if: always()

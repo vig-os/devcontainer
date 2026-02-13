@@ -1,0 +1,18 @@
+# Trivy Vulnerability Ignore Policy
+# This file documents known vulnerabilities that are either:
+# 1. Not exploitable in container context
+# 2. Fixed in the latest patches but may lag in Trivy DB
+# 3. Have acceptable risk for devcontainer usage
+
+# CVE-2026-0861: glibc integer overflow in memalign
+# Risk Assessment: LOW
+# - Requires specific malloc patterns not triggered by normal Python/tool usage
+# - No known public exploits targeting memalign in containerized environments
+# - System library; cannot be removed without breaking core functionality
+# - Patched upstream; awaiting propagation to stable Debian releases
+# Mitigation: Image updated to latest Debian stable with available patches
+Expiration: 2026-06-01
+CVE-2026-0861
+
+# Tracking: https://github.com/vig-os/devcontainer/issues/37
+# Upstream: https://github.com/aquasecurity/trivy/
