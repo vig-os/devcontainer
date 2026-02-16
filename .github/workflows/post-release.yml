@@ -92,10 +92,10 @@ jobs:
             exit 1
           fi
 
-      - name: Set up Python
+      - name: Set up environment
         uses: ./.github/actions/setup-env
         with:
-          install-podman: 'false'
+          sync-dependencies: 'true'
 
       - name: Reset CHANGELOG for next cycle
         id: reset-changelog

@@ -86,6 +86,8 @@ runs:
 
     - name: Set up environment
       uses: ./.github/actions/setup-env
+      with:
+        sync-dependencies: 'true'
 
     - name: Prepare build directory
       shell: bash

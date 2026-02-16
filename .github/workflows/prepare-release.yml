@@ -105,10 +105,10 @@ jobs:
 
           echo "✓ Tag does not exist: v$VERSION"
 
-      - name: Set up Python
+      - name: Set up environment
         uses: ./.github/actions/setup-env
         with:
-          install-podman: 'false'
+          sync-dependencies: 'true'
 
       - name: Verify CHANGELOG has Unreleased section with content
         run: |
@@ -145,7 +145,7 @@ jobs:
     timeout-minutes: 15
     if: ${{ github.event.inputs.dry-run != 'true' }}
     permissions:
-      contents: write         # create branch, push commits
+      contents: read          # checkout dev branch
       pull-requests: write    # create draft PR
 
     steps:
@@ -160,31 +160,12 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           ref: dev
-          token: ${{ steps.app-token.outputs.token }}
-          persist-credentials: true
           fetch-depth: 0
 
-      - name: Configure git
-        env:
-          GIT_USER_NAME: ${{ github.event.inputs.git-user-name }}
-          GIT_USER_EMAIL: ${{ github.event.inputs.git-user-email }}
-        run: |
-          git config user.name "$GIT_USER_NAME"
-          git config user.email "$GIT_USER_EMAIL"
-
-      - name: Set up Python
+      - name: Set up environment
         uses: ./.github/actions/setup-env
         with:
-          install-podman: 'false'
-
-      - name: Create release branch
-        env:
-          RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
-        run: |
-          set -euo pipefail
-          echo "Creating release branch: $RELEASE_BRANCH"
-          git checkout -b "$RELEASE_BRANCH"
-          echo "✓ Release branch created"
+          sync-dependencies: 'true'
 
       - name: Prepare CHANGELOG
         env:
@@ -212,27 +193,31 @@ jobs:
             echo "CHANGELOGEOF"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Create release preparation commit
+      - name: Create release branch via API
         env:
-          VERSION: ${{ needs.validate.outputs.version }}
-        run: |
-          set -euo pipefail
-
-          git add CHANGELOG.md
-          COMMIT_MSG="chore: prepare release $VERSION
-
-          Prepare CHANGELOG.md structure for version $VERSION.
-          Release date TBD (set during finalization)."
-          git commit -m "$COMMIT_MSG"
-          echo "✓ Preparation commit created"
-
-      - name: Push release branch
-        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
         run: |
           set -euo pipefail
-          git push -u origin "$RELEASE_BRANCH"
-          echo "✓ Release branch pushed"
+          DEV_SHA=$(git rev-parse HEAD)
+          echo "Creating branch $RELEASE_BRANCH from dev at $DEV_SHA..."
+          gh api "repos/${{ github.repository }}/git/refs" \
+            -f ref="refs/heads/$RELEASE_BRANCH" \
+            -f sha="$DEV_SHA"
+          echo "✓ Release branch created on remote"
+
+      - name: Commit release preparation via API
+        uses: vig-os/commit-action@b70c2d87acd0f146c40e8d88a9bda40b76c084b5  # v0.1.3
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TARGET_BRANCH: refs/heads/${{ needs.validate.outputs.release_branch }}
+          COMMIT_MESSAGE: |-
+            chore: prepare release ${{ needs.validate.outputs.version }}
+
+            Prepare CHANGELOG.md structure for version ${{ needs.validate.outputs.version }}.
+            Release date TBD (set during finalization).
+          FILE_PATHS: CHANGELOG.md
 
       - name: Create draft PR to main
         id: pr

@@ -47,6 +47,7 @@ runs:
     - name: Set up test environment
       uses: ./.github/actions/setup-env
       with:
+        sync-dependencies: 'true'
         install-podman: 'true'
         install-devcontainer-cli: 'true'
 

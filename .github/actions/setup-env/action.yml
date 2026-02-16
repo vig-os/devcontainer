@@ -1,11 +1,16 @@
 # Composite action to set up the CI environment
 #
-# Installs uv, syncs Python dependencies, and optionally installs:
+# Installs Python, uv, and optionally syncs project dependencies and installs:
 # - Podman (for container operations)
 # - Node.js (for JS tooling)
 # - Devcontainer CLI + docker-compose wrapper (for integration tests)
 #
+# IMPORTANT: The caller must checkout the repository before using this action.
+# This action does NOT checkout code, allowing callers to control ref, token,
+# persist-credentials, and other checkout options.
+#
 # Inputs:
+#   sync-dependencies:        Run uv sync to install project deps (default: false)
 #   install-podman:           Install podman (default: false)
 #   install-node:             Install Node.js (default: false)
 #   node-version:             Node.js version (default: '20')
@@ -15,24 +20,32 @@
 #   uv-version: The version of uv that was installed
 #
 # Usage:
-#   # Minimal (uv + Python + project dependencies)
+#   # Minimal (Python + uv only)
+#   - uses: actions/checkout@v4
 #   - uses: ./.github/actions/setup-env
 #
-#   # Image tests (add podman)
+#   # With project dependencies
+#   - uses: actions/checkout@v4
 #   - uses: ./.github/actions/setup-env
 #     with:
-#       install-podman: 'true'
+#       sync-dependencies: 'true'
 #
-#   # Integration tests (full stack)
+#   # All tools
+#   - uses: actions/checkout@v4
 #   - uses: ./.github/actions/setup-env
 #     with:
+#       sync-dependencies: 'true'
 #       install-podman: 'true'
 #       install-devcontainer-cli: 'true'
 
 name: 'Setup Environment'
-description: 'Set up CI environment with uv, Python deps, and optional tools (podman, Node.js, devcontainer CLI)'
+description: 'Set up CI environment with Python, uv, and optional tools (podman, Node.js, devcontainer CLI)'
 
 inputs:
+  sync-dependencies:
+    description: 'Run uv sync to install project dependencies'
+    required: false
+    default: 'false'
   install-podman:
     description: 'Install podman for container operations'
     required: false
@@ -62,10 +75,6 @@ outputs:
 runs:
   using: composite
   steps:
-    # ── Code checkout ───────────────────────────────────────────────────
-    - name: Checkout code
-      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
-
     # ── Python ───────────────────────────────────────────────────────────
     - name: "Set up Python"
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
@@ -83,6 +92,7 @@ runs:
 
     # ── Python dependencies ───────────────────────────────────────────────
     - name: Sync Python dependencies
+      if: inputs.sync-dependencies == 'true'
       shell: bash
       run: uv sync --frozen --all-extras
 
