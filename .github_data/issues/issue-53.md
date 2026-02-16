@@ -1,18 +1,18 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-12T20:16:22Z
-updated: 2026-02-16T10:57:25Z
+updated: 2026-02-16T21:55:06Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/53
-comments: 0
+comments: 1
 labels: feature
 assignees: none
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-16T10:57:44.929Z
+synced: 2026-02-16T21:55:23.624Z
 ---
 
 # [Issue 53]: [[FEATURE] Reduce file duplication and package Python scripts as installable module](https://github.com/vig-os/devcontainer/issues/53)
@@ -90,3 +90,11 @@ The `setup-env` action would then read the version from `package.json` instead o
 - Reduces risk of silent drift between repo and workspace template
 - Enables Dependabot to track the `@devcontainers/cli` version automatically
 - Packaging Python scripts as a module enables proper testing, versioning, and reuse across the org
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on February 16, 2026 at 09:55 PM_
+
+Completed. Changes merged into feature/37-automate-standardize-repository-setup.
+
