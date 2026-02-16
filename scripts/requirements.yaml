@@ -128,7 +128,7 @@ dependencies:
 
   # DevContainer CLI (auto-installed by setup.sh)
   - name: devcontainer
-    version: "0.80.1"
+    version: "0.81.1"
     purpose: DevContainer CLI for testing devcontainer functionality
     required: true
     check:

@@ -46,6 +46,17 @@ updates:
       - dependency-type: "direct"
       - dependency-type: "indirect"
 
+  # npm — track dependencies in package.json
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    target-branch: "dev"
+    commit-message:
+      prefix: "build"
+      include: "scope"
+
   # Docker — monitor Containerfile base images
   - package-ecosystem: "docker"
     directory: "/"

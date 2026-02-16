@@ -127,7 +127,8 @@ runs:
         sudo chmod +x /usr/local/bin/docker-compose
         echo "docker-compose wrapper: $(docker-compose version --short)"
 
-        # Install devcontainer CLI
-        echo "Installing @devcontainers/cli..."
-        npm install -g @devcontainers/cli@0.81.1
+        # Install devcontainer CLI (version from package.json)
+        DEVCONTAINER_VERSION=$(node -p "require('./package.json').dependencies['@devcontainers/cli']")
+        echo "Installing @devcontainers/cli@${DEVCONTAINER_VERSION}..."
+        npm install -g "@devcontainers/cli@${DEVCONTAINER_VERSION}"
         echo "devcontainer $(devcontainer --version)"

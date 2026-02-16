@@ -1,0 +1,8 @@
+{
+  "name": "devcontainer-ci-deps",
+  "private": true,
+  "description": "CI-only npm dependencies tracked by Dependabot",
+  "dependencies": {
+    "@devcontainers/cli": "0.81.1"
+  }
+}

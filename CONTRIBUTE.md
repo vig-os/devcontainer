@@ -17,7 +17,7 @@ This guide explains how to develop, build, test, and release the vigOS developme
 | **gh** | latest | GitHub CLI for repository and PR/issue management |
 | **npm** | latest | Node.js package manager (for DevContainer CLI) |
 | **uv** | >=0.8 | Python package and project manager |
-| **devcontainer** | 0.80.1 | DevContainer CLI for testing devcontainer functionality |
+| **devcontainer** | 0.81.1 | DevContainer CLI for testing devcontainer functionality |
 
 **Ubuntu/Debian:**
 
