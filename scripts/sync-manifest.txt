@@ -4,3 +4,26 @@
 # If -> is omitted, destination defaults to the same path as the source.
 # Supports both files and directories.
 # Blank lines and lines starting with # are ignored.
+
+# Docs
+# Eventually these files should be defined by the QMS and pulled from there
+docs/COMMIT_MESSAGE_STANDARD.md
+
+# Cursor
+.cursor
+
+# Project config
+.gitmessage
+.yamllint
+.pymarkdown
+.pymarkdown.config.md
+.hadolint.yaml
+
+# GitHub
+.github/pull_request_template.md
+.github/ISSUE_TEMPLATE
+.github/actions/setup-env
+.github/dependabot.yml
+.github/workflows/scorecard.yml
+.github/workflows/sync-issues.yml
+.github/workflows/codeql.yml
