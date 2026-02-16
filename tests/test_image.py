@@ -9,6 +9,47 @@ Derived containers can inherit from these test classes to verify that
 base functionality is preserved in their containers.
 """
 
+import hashlib
+from pathlib import Path
+
+
+def verify_file_identity(host, src_rel, dest_path):
+    """
+    Verify that a file in the project is identical to its image counterpart.
+
+    Uses SHA-256 checksums for comparison, which works reliably for both
+    text and binary files across the local/container boundary.
+
+    Args:
+        host: testinfra host object
+        src_rel: Source path relative to project root
+        dest_path: Full destination path in image
+
+    Raises:
+        AssertionError: If files are not identical
+    """
+    # Local file
+    project_root = Path(__file__).parent.parent
+    local_src_path = project_root / src_rel
+    assert local_src_path.exists(), f"Source path not found: {src_rel}"
+    assert local_src_path.is_file(), f"Source path is not a file: {src_rel}"
+    local_sha = hashlib.sha256(local_src_path.read_bytes()).hexdigest()
+
+    # Remote file
+    assert host.file(dest_path).exists, f"Manifest file not found at {dest_path}"
+    assert host.file(dest_path).is_file, f"Path is not a regular file: {dest_path}"
+    result = host.run(f"sha256sum {dest_path}")
+    assert result.rc == 0, f"sha256sum failed on {dest_path}: {result.stderr}"
+    remote_sha = result.stdout.split()[0]
+
+    # Verify that the local and remote files are identical
+    assert local_sha == remote_sha, (
+        f"Manifest file checksum mismatch: {dest_path}\n"
+        f"Source: {src_rel} (sha256: {local_sha})\n"
+        f"Destination: {dest_path} (sha256: {remote_sha})"
+    )
+
+
 # Expected versions for installed tools
 # These should be updated when the Containerfile is updated
 EXPECTED_VERSIONS = {
@@ -411,6 +452,29 @@ class TestFileStructure:
         assert result.rc == 0, (
             "Pre-commit cache directory is empty - hooks were not initialized"
         )
+
+    def test_manifest_files(self, host, parse_manifest):
+        """Test that all files in manifest are copied and identical.
+
+        Directory entries are expanded into individual files so that each
+        file is verified via SHA-256 checksum comparison.
+        """
+        manifest_entries = parse_manifest()
+        project_root = Path(__file__).parent.parent
+        workspace_base = "/root/assets/workspace"
+
+        for src_rel, dest_rel in manifest_entries:
+            src_path = project_root / src_rel
+            if src_path.is_file():
+                verify_file_identity(host, src_rel, f"{workspace_base}/{dest_rel}")
+            elif src_path.is_dir():
+                files = sorted(f for f in src_path.rglob("*") if f.is_file())
+                assert files, f"Manifest local directory is empty: {src_rel}"
+                for file_path in files:
+                    rel = file_path.relative_to(project_root)
+                    dest_file_rel = f"{dest_rel}/{file_path.relative_to(src_path)}"
+                    dest_file_path = f"{workspace_base}/{dest_file_rel}"
+                    verify_file_identity(host, str(rel), dest_file_path)
 
 
 class TestPlaceholders:

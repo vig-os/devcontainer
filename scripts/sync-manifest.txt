@@ -1,0 +1,6 @@
+# Files and directories that must be identical between repo and workspace template.
+# Format: <source> -> <destination>  or just  <source>
+# Source is relative to project root. Destination is relative to assets/workspace/.
+# If -> is omitted, destination defaults to the same path as the source.
+# Supports both files and directories.
+# Blank lines and lines starting with # are ignored.
