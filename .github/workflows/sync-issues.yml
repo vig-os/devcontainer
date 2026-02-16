@@ -130,7 +130,7 @@ jobs:
         with:
           app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
           app-private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
-          output-dir: '.github_data'
+          output-dir: 'docs'
           sync-issues: 'true'
           sync-prs: 'true'
           include-closed: 'true'
