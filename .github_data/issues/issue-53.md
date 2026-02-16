@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-02-12T20:16:22Z
-updated: 2026-02-12T20:16:22Z
+updated: 2026-02-16T10:57:25Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/53
@@ -12,7 +12,7 @@ assignees: none
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-12T20:16:40.754Z
+synced: 2026-02-16T10:57:44.929Z
 ---
 
 # [Issue 53]: [[FEATURE] Reduce file duplication and package Python scripts as installable module](https://github.com/vig-os/devcontainer/issues/53)
@@ -25,7 +25,7 @@ Several files in this repository are manually duplicated across `scripts/`, `ass
 
 Three categories of duplication exist today:
 
-### 1. Python scripts (`scripts/` vs `assets/`)
+### 1. Python scripts (`scripts/` vs `assets/`) [solved in #51]
 
 `validate_commit_msg.py` (and potentially future utilities) exists in both:
 - `scripts/validate_commit_msg.py` — used by the repo's own pre-commit hooks and CI
