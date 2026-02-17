@@ -152,19 +152,18 @@ dependencies:
       all: npm install -g @devcontainers/cli@{{version}}
       manual: https://github.com/devcontainers/cli
 
-# Optional dependencies for multi-arch builds
-optional:
-  - name: qemu-user-static
+  # Parallel (auto-installed by npm install)
+  - name: parallel
     version: latest
-    purpose: Multi-architecture container builds (AMD64/ARM64)
+    purpose: Parallelizes BATS test execution for faster test runs
     required: false
     check:
-      command: test -f /proc/sys/fs/binfmt_misc/qemu-aarch64
+      command: command -v parallel
+      version_command: parallel --version
+      version_regex: 'GNU parallel (\d+)'
     install:
-      debian: |
-        sudo apt install -y qemu-user-static
-        sudo podman run --privileged --rm docker.io/tonistiigi/binfmt --install all
-      fedora: |
-        sudo dnf install -y qemu-user-static
-        sudo podman run --privileged --rm docker.io/tonistiigi/binfmt --install all
-      manual: Only needed for cross-architecture builds
+      macos: brew install parallel
+      debian: sudo apt install -y parallel
+      fedora: sudo dnf install -y parallel
+      alpine: sudo apk add parallel
+      manual: https://www.gnu.org/software/parallel/

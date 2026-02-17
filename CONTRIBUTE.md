@@ -19,12 +19,13 @@ This guide explains how to develop, build, test, and release the vigOS developme
 | **uv** | >=0.8 | Python package and project manager |
 | **bats** | 1.13.0 | Bash Automated Testing System for shell script tests |
 | **devcontainer** | 0.81.1 | DevContainer CLI for testing devcontainer functionality |
+| **parallel** | latest | Parallelizes BATS test execution for faster test runs |
 
 **Ubuntu/Debian:**
 
 ```bash
 sudo apt update
-sudo apt install -y podman git openssh-client nodejs npm
+sudo apt install -y podman git openssh-client nodejs npm parallel
 # just
 curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
 
@@ -38,7 +39,7 @@ sudo apt update && sudo apt install -y gh
 **macOS (Homebrew):**
 
 ```bash
-brew install podman just git openssh gh node
+brew install podman just git openssh gh node parallel
 ```
 
 - For other Linux distributions, use your package manager (e.g., `dnf`, `yum`, `zypper`, `apk`) to install these dependencies.

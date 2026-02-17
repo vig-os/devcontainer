@@ -138,7 +138,14 @@ test-vig-utils:
 [group('test')]
 test-bats:
     #!/usr/bin/env bash
-    npx bats tests/bats/
+    # Use GNU parallel if available for faster test execution
+    if command -v parallel >/dev/null 2>&1; then
+        echo "Running BATS tests in parallel..."
+        find tests/bats -name '*.bats' -print0 | parallel -0 -j+0 npx bats {}
+    else
+        echo "Running BATS tests sequentially (install 'parallel' for faster execution)..."
+        npx bats tests/bats/
+    fi
 
 # Clean up lingering containers before running tests
 [private]
