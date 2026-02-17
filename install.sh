@@ -209,6 +209,11 @@ sanitize_name() {
     echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[ -]/_/g' | sed 's/[^a-z0-9_]/_/g'
 }
 
+# Sanitize for security only: remove shell metacharacters but preserve capitalization
+sanitize_for_security() {
+    echo "$1" | sed 's/[^a-zA-Z0-9._\/-]/_/g'
+}
+
 # Run copy-host-user-conf.sh from the deployed project (non-fatal)
 run_user_conf() {
     local project_path="$1"
@@ -296,6 +301,9 @@ if [ -z "$PROJECT_NAME" ]; then
 fi
 PROJECT_NAME=$(sanitize_name "$PROJECT_NAME")
 
+# Sanitize ORG_NAME for security (remove shell metacharacters) but preserve capitalization
+ORG_NAME=$(sanitize_for_security "$ORG_NAME")
+
 # Detect container runtime
 RUNTIME=$(detect_runtime)
 if [ -z "$RUNTIME" ]; then
@@ -354,14 +362,27 @@ info "Using $RUNTIME with image $IMAGE"
 info "Target directory: $PROJECT_PATH"
 info "Project name: $PROJECT_NAME"
 
-# Build the command
+# Build the command using an array for safe execution
 # Use --rm to cleanup container after run; no -it since we use --no-prompts (non-interactive)
 # Pass SHORT_NAME and ORG_NAME as environment variables to the container
-CMD="$RUNTIME run --rm -e SHORT_NAME=\"$PROJECT_NAME\" -e ORG_NAME=\"$ORG_NAME\" -v \"$PROJECT_PATH:/workspace\" \"$IMAGE\" /root/assets/init-workspace.sh --no-prompts $FORCE"
+declare -a CMD=(
+    "$RUNTIME" run --rm
+    -e "SHORT_NAME=$PROJECT_NAME"
+    -e "ORG_NAME=$ORG_NAME"
+    -v "$PROJECT_PATH:/workspace"
+    "$IMAGE"
+    /root/assets/init-workspace.sh --no-prompts
+)
+
+if [ "$FORCE" = true ]; then
+    CMD+=(--force)
+fi
 
 if [ "$DRY_RUN" = true ]; then
     info "Would execute:"
-    echo "  $CMD"
+    printf "  "
+    printf "%s " "${CMD[@]}"
+    printf "\n"
     exit 0
 fi
 
@@ -402,9 +423,8 @@ fi
 info "Initializing workspace..."
 echo ""
 
-# Execute the container
-# Since we use --no-prompts, no interactive input is needed.
-if ! eval "$CMD"; then
+# Execute the container using array expansion (safe from shell injection)
+if ! "${CMD[@]}"; then
     err "Failed to initialize workspace"
     exit 1
 fi
