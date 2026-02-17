@@ -1,12 +1,14 @@
 """
-Tests for the install.sh curl-based deployment script.
+Integration tests for install.sh — full deployment workflow.
 
-These tests verify that install.sh works correctly for deploying
-the devcontainer to new projects without requiring interactive input.
+These tests require a built container image (ghcr.io/vig-os/devcontainer:<tag>)
+and are run by the test-integration CI job, NOT project-checks.
 
-Test categories:
-1. Unit tests - test script logic without running containers
-2. Integration tests - test full deployment workflow
+Tests the full install.sh workflow which:
+1. Pulls the container image
+2. Runs init-workspace.sh with --no-prompts
+3. Runs host-side user configuration (copy-host-user-conf.sh)
+4. Creates a fully initialized workspace
 """
 
 import atexit
@@ -18,111 +20,8 @@ from pathlib import Path
 import pytest
 
 
-class TestInstallScriptUnit:
-    """Unit tests for install.sh - test script logic without containers."""
-
-    @pytest.fixture
-    def install_script(self):
-        """Path to install.sh."""
-        return Path(__file__).resolve().parents[1] / "install.sh"
-
-    def test_script_exists_and_executable(self, install_script):
-        """Test install.sh exists and is executable."""
-        assert install_script.exists(), "install.sh not found"
-        assert install_script.stat().st_mode & 0o111, "install.sh not executable"
-
-    def test_help_output(self, install_script):
-        """Test --help shows usage information."""
-        result = subprocess.run(
-            [str(install_script), "--help"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        assert result.returncode == 0, f"--help failed: {result.stderr}"
-        assert "vigOS Devcontainer Install Script" in result.stdout
-        assert "--force" in result.stdout
-        assert "--version" in result.stdout
-        assert "--dry-run" in result.stdout
-        assert "--name" in result.stdout
-
-    def test_dry_run_shows_command(self, install_script, tmp_path):
-        """Test --dry-run shows what would be executed without running."""
-        result = subprocess.run(
-            [str(install_script), "--dry-run", str(tmp_path)],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        assert result.returncode == 0, f"--dry-run failed: {result.stderr}"
-        assert "Would execute:" in result.stdout
-        # Should NOT create any files
-        assert not (tmp_path / ".devcontainer").exists()
-
-    def test_nonexistent_directory_fails(self, install_script):
-        """Test script fails gracefully for non-existent directory."""
-        result = subprocess.run(
-            [str(install_script), "/nonexistent/path/that/does/not/exist"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        assert result.returncode != 0
-        output = result.stdout + result.stderr
-        assert "does not exist" in output
-
-    def test_name_sanitization_in_dry_run(self, install_script, tmp_path):
-        """Test that project name is sanitized correctly."""
-        # Create directory with name that needs sanitization
-        test_dir = tmp_path / "My-Awesome-Project"
-        test_dir.mkdir()
-
-        result = subprocess.run(
-            [str(install_script), "--dry-run", str(test_dir)],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        assert result.returncode == 0, f"Failed: {result.stderr}"
-        # Name should be sanitized: lowercase, hyphens → underscores
-        assert "my_awesome_project" in result.stdout.lower()
-
-    def test_custom_name_override(self, install_script, tmp_path):
-        """Test --name flag overrides derived name."""
-        result = subprocess.run(
-            [str(install_script), "--dry-run", "--name", "custom_proj", str(tmp_path)],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        assert result.returncode == 0, f"Failed: {result.stderr}"
-        assert "custom_proj" in result.stdout
-
-    def test_version_flag_in_dry_run(self, install_script, tmp_path):
-        """Test --version flag is passed to container."""
-        result = subprocess.run(
-            [str(install_script), "--dry-run", "--version", "1.2.3", str(tmp_path)],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        assert result.returncode == 0, f"Failed: {result.stderr}"
-        assert "1.2.3" in result.stdout
-
-    def test_force_flag_in_dry_run(self, install_script, tmp_path):
-        """Test --force flag is passed to init-workspace.sh."""
-        result = subprocess.run(
-            [str(install_script), "--dry-run", "--force", str(tmp_path)],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        assert result.returncode == 0, f"Failed: {result.stderr}"
-        assert "--force" in result.stdout
-
-
 class TestInstallScriptIntegration:
-    """Integration tests - actually deploy using install.sh.
+    """Integration tests for install.sh - full deployment workflow.
 
     These tests run the full install.sh workflow which:
     1. Pulls the container image
@@ -226,13 +125,13 @@ class TestInstallScriptIntegration:
         )
 
     def test_install_uses_default_org_name(self, install_workspace):
-        """Test ORG_NAME defaults to vigOS/devc."""
+        """Test ORG_NAME defaults to vigOS."""
         license_file = install_workspace / "LICENSE"
         assert license_file.exists(), "LICENSE file not created"
 
         content = license_file.read_text()
-        assert "vigOS/devc" in content, (
-            f"Expected 'vigOS/devc' in LICENSE (default ORG_NAME), "
+        assert "vigOS" in content, (
+            f"Expected 'vigOS' in LICENSE (default ORG_NAME), "
             f"but found: {content[-500:]}"
         )
 
@@ -287,7 +186,157 @@ class TestInstallScriptIntegration:
         githooks_dir = install_workspace / ".githooks"
         assert githooks_dir.exists(), ".githooks directory not created"
 
+    def test_install_replaces_org_name_placeholder(self, install_workspace):
+        """Test {{ORG_NAME}} placeholder is replaced everywhere."""
+        for file_path in install_workspace.rglob("*"):
+            if file_path.is_file():
+                try:
+                    content = file_path.read_text()
+                    assert "{{ORG_NAME}}" not in content, (
+                        f"{{{{ORG_NAME}}}} placeholder not replaced in {file_path}"
+                    )
+                except UnicodeDecodeError:
+                    # Skip binary files
+                    continue
+
     def test_install_creates_pre_commit_config(self, install_workspace):
         """Test .pre-commit-config.yaml is created."""
         precommit_config = install_workspace / ".pre-commit-config.yaml"
         assert precommit_config.exists(), ".pre-commit-config.yaml not created"
+
+    def test_install_creates_conf_directory(self, install_workspace):
+        """Test install.sh creates .devcontainer/.conf/ via user config script."""
+        conf_dir = install_workspace / ".devcontainer" / ".conf"
+        assert conf_dir.exists(), (
+            ".devcontainer/.conf/ directory not created by copy-host-user-conf.sh"
+        )
+        assert conf_dir.is_dir(), ".devcontainer/.conf/ is not a directory"
+
+    def test_install_conf_directory_contains_expected_files(self, install_workspace):
+        """Test .devcontainer/.conf/ contains expected configuration files.
+
+        Files are split into two categories:
+        - Required: always created by copy-host-user-conf.sh (git config)
+        - Optional: only created when host has the corresponding tool/config
+          (SSH key, allowed-signers, gh CLI auth, gh CLI config directory)
+        """
+        conf_dir = install_workspace / ".devcontainer" / ".conf"
+
+        # Required files — always generated from git config
+        required_files = {
+            ".gitconfig.global",
+            ".gitconfig",
+        }
+
+        for filename in required_files:
+            file_path = conf_dir / filename
+            assert file_path.exists(), (
+                f"Expected file '{filename}' not found in .devcontainer/.conf/"
+            )
+            assert file_path.is_file(), f"'{filename}' exists but is not a regular file"
+
+        # Optional files — depend on host environment (SSH key, git
+        # allowed-signers, gh CLI authentication).  Warn instead of failing so
+        # the test is stable in CI where these may not be configured.
+        optional_files = {
+            "id_ed25519_github.pub": "SSH public key (~/.ssh/id_ed25519_github.pub)",
+            "allowed-signers": "Git allowed-signers (~/.config/git/allowed-signers)",
+            ".gh_token": "GitHub CLI authentication (gh auth login)",
+        }
+
+        for filename, description in optional_files.items():
+            file_path = conf_dir / filename
+            if not file_path.exists():
+                import warnings
+
+                warnings.warn(
+                    f"{filename} not found in .devcontainer/.conf/ "
+                    f"(this is optional if {description} is not available on host)",
+                    stacklevel=2,
+                )
+            else:
+                assert file_path.is_file(), (
+                    f"'{filename}' exists but is not a regular file"
+                )
+
+        # Optional subdirectory — gh CLI config (~/.config/gh)
+        gh_dir = conf_dir / "gh"
+        if not gh_dir.exists():
+            import warnings
+
+            warnings.warn(
+                "gh/ subdirectory not found in .devcontainer/.conf/ "
+                "(this is optional if ~/.config/gh is not present on host)",
+                stacklevel=2,
+            )
+        else:
+            assert gh_dir.is_dir(), "'gh' exists but is not a directory"
+
+            # Check gh/ subdirectory contents
+            expected_gh_files = {"config.yml", "hosts.yml"}
+            for filename in expected_gh_files:
+                file_path = gh_dir / filename
+                assert file_path.exists(), (
+                    f"Expected file '{filename}' not found in .devcontainer/.conf/gh/"
+                )
+                assert file_path.is_file(), (
+                    f"'{filename}' exists in gh/ but is not a regular file"
+                )
+
+    def test_install_creates_git_repository(self, install_workspace):
+        """Test install.sh initializes a git repository."""
+        git_dir = install_workspace / ".git"
+        assert git_dir.exists(), ".git directory not created"
+        assert git_dir.is_dir(), ".git is not a directory"
+
+    def test_install_initial_commit(self, install_workspace):
+        """Test git repository has correct initial commit."""
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(install_workspace),
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, "Failed to get HEAD commit"
+        assert result.stdout.strip(), "No initial commit found"
+
+        result = subprocess.run(
+            ["git", "log", "-1", "--pretty=%s"],
+            cwd=str(install_workspace),
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, "Failed to get commit message"
+        assert result.stdout.strip() == "chore: initial project scaffold", (
+            f"Expected 'chore: initial project scaffold', got: {result.stdout.strip()}"
+        )
+
+    def test_install_git_branches(self, install_workspace):
+        """Test git repository has main and dev branches."""
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", "main"],
+            cwd=str(install_workspace),
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, "main branch not found"
+
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", "dev"],
+            cwd=str(install_workspace),
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, "dev branch not found"
+
+    def test_install_git_all_files_committed(self, install_workspace):
+        """Test all workspace files are committed (no uncommitted changes)."""
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(install_workspace),
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, "Failed to check git status"
+        # Should be empty (no uncommitted changes)
+        assert not result.stdout.strip(), f"Found uncommitted changes:\n{result.stdout}"

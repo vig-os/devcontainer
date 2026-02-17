@@ -1,25 +1,21 @@
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # vigOS Devcontainer - Just Recipes
 # Build automation for devcontainer image development
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # Import standard dev recipes
 
 import 'justfile.base'
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # VARIABLES
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # Allow TEST_REGISTRY to override REPO for testing (e.g., localhost:5000/test/)
 
-repo := env_var_or_default("TEST_REGISTRY", "ghcr.io/vig-os/devcontainer")
+repo := env("TEST_REGISTRY", "ghcr.io/vig-os/devcontainer")
 
-# Multi-arch support: build for both AMD64 and ARM64
-
-platforms := "linux/amd64,linux/arm64"
-
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # INFO
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 # Show available commands (default)
 [group('info')]
@@ -62,9 +58,9 @@ login:
     echo "Logging in to GitHub Container Registry..."
     podman login ghcr.io
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # BUILD
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 # Build local development image
 [group('build')]
@@ -82,9 +78,9 @@ build no_cache="":
         ./scripts/build.sh dev "{{ repo }}" "$NATIVE_ARCH"
     fi
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # TEST
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 # Helper to ensure dev image exists before running image/integration tests
 [private]
@@ -95,7 +91,7 @@ _ensure-dev-image version="dev":
             echo "Building dev image..."
             just build
         else
-            echo "❌ Image {{ repo }}:{{ version }} not found. Please build it first."
+            echo "[ERROR] Image {{ repo }}:{{ version }} not found. Please build it first."
             exit 1
         fi
     fi
@@ -120,18 +116,43 @@ test-utils:
     #!/usr/bin/env bash
     uv run pytest tests/test_utils.py -v -s --tb=short
 
-# Run version check tests only
+# Run install script tests only
 [group('test')]
-test-version-check:
+test-install:
     #!/usr/bin/env bash
-    uv run pytest tests/test_version_check.py -v -s --tb=short
+    uv run pytest tests/test_install_script.py -v -s --tb=short
+
+# Run validate commit msg tests only
+[group('test')]
+test-validate-commit-msg:
+    #!/usr/bin/env bash
+    uv run pytest tests/test_validate_commit_msg.py -v -s --tb=short
+
+# Run check action pins tests only
+[group('test')]
+test-vig-utils:
+    #!/usr/bin/env bash
+    uv run pytest packages/vig-utils/tests -v -s --tb=short
+
+# Run BATS shell script tests
+[group('test')]
+test-bats:
+    #!/usr/bin/env bash
+    # Use GNU parallel if available for faster test execution
+    if command -v parallel >/dev/null 2>&1; then
+        echo "Running BATS tests in parallel..."
+        find tests/bats -name '*.bats' -print0 | parallel -0 -j+0 npx bats {}
+    else
+        echo "Running BATS tests sequentially (install 'parallel' for faster execution)..."
+        npx bats tests/bats/
+    fi
 
 # Clean up lingering containers before running tests
 [private]
 _test-cleanup-check:
     #!/usr/bin/env bash
     if podman ps -a --filter "name=workspace-devcontainer" -q 2>/dev/null | grep -q .; then
-        echo "⚠️  Lingering test containers found, cleaning up..."
+        echo "[!]  Lingering test containers found, cleaning up..."
         just clean-test-containers
     fi
 
@@ -142,22 +163,59 @@ test version="dev":
     @just _ensure-dev-image {{ version }}
     #!/usr/bin/env bash
     TEST_CONTAINER_TAG={{ version }}  uv run pytest tests -v -s --tb=short
+    @just test-bats
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# RELEASE
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
+# RELEASE MANAGEMENT
+# ===============================================================================
+# Unified release workflow via GitHub Actions (.github/workflows/release.yml)
+#
+# Process:
+#   1. just prepare-release X.Y.Z    - Create release/X.Y.Z branch, draft PR
+#   2. Test release branch, fix bugs as needed via PRs to release branch
+#   3. Mark PR ready for review (gh pr ready PR_NUMBER)
+#   4. Get PR approval from reviewer
+#   5. just finalize-release X.Y.Z   - Triggers GitHub Actions workflow that:
+#      - Validates PR status and all prerequisites
+#      - Sets release date in CHANGELOG, syncs PR docs
+#      - Builds and tests container images
+#      - Creates vX.Y.Z tag
+#      - Publishes images to GHCR
+#      - On failure: automatic rollback and issue creation
+#   6. Merge release PR to main       - Triggers post-release.yml automatically:
+#      - Merges main back into dev
+#      - Resets CHANGELOG for next cycle
+#      - Deletes release branch
+# ===============================================================================
 
-# Push versioned release to registry (builds, tests, tags, pushes)
+# Prepare release branch for testing (step 1)
 [group('release')]
-push version:
+prepare-release version *flags:
     #!/usr/bin/env bash
-    ARCH=$(uname -m)
-    if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-        NATIVE_ARCH="linux/arm64"
-    else
-        NATIVE_ARCH="linux/amd64"
-    fi
-    ./scripts/push.sh "{{ version }}" "{{ repo }}" "$NATIVE_ARCH" "{{ platforms }}" "${REGISTRY_TEST:-}"
+    set -euo pipefail
+    # Trigger the prepare-release workflow via GitHub Actions
+    # The workflow handles: validate inputs, create release branch, prepare CHANGELOG, create draft PR
+    gh workflow run prepare-release.yml -f "version={{ version }}" {{ flags }}
+    echo ""
+    echo "✓ Release preparation workflow triggered for version {{ version }}"
+    echo "Monitor progress: gh run list --workflow prepare-release.yml"
+
+# Finalize and publish release via GitHub Actions workflow (step 3, after testing)
+[group('release')]
+finalize-release version *flags:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Trigger the release workflow via GitHub Actions
+    # The workflow handles: finalize CHANGELOG, build/test images, create tag, publish
+    gh workflow run release.yml -f "version={{ version }}" {{ flags }}
+    echo ""
+    echo "✓ Release workflow triggered for version {{ version }}"
+    echo "Monitor progress: gh run list --workflow release.yml"
+
+# Reset CHANGELOG Unreleased section (after merging release to dev)
+[group('release')]
+reset-changelog:
+    uv run prepare-changelog reset CHANGELOG.md
 
 # Pull image from registry (default: latest)
 [group('release')]
@@ -168,11 +226,11 @@ pull version="latest":
     if [ "${REGISTRY_TEST:-}" = "1" ]; then
         TLS_FLAG="--tls-verify=false"
     fi
-    podman pull $TLS_FLAG "{{ repo }}:{{ version }}" || echo "⚠️  Failed to pull {{ repo }}:{{ version }}"
+    podman pull $TLS_FLAG "{{ repo }}:{{ version }}" || echo "[!]  Failed to pull {{ repo }}:{{ version }}"
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # BUILD / CLEAN
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 # Remove image (default: dev)
 [group('build')]
@@ -193,7 +251,7 @@ clean version="dev":
 [group('build')]
 clean-test-containers:
     #!/usr/bin/env bash
-    echo "🧹 Cleaning up lingering test containers..."
+    echo "Cleaning Cleaning up lingering test containers..."
     FMT=$(printf '\x7b\x7b.ID\x7d\x7d')
     DEVCONTAINERS=$(podman ps -a --filter "name=workspace-devcontainer" --format "$FMT" 2>/dev/null)
     SIDECARS=$(podman ps -a --filter "name=test-sidecar" --format "$FMT" 2>/dev/null)
@@ -206,23 +264,14 @@ clean-test-containers:
             echo "  Removing test sidecars..."
             echo "$SIDECARS" | xargs -r podman rm -f
         fi
-        echo "✅ Cleanup complete"
+        echo "[OK] Cleanup complete"
     else
-        echo "✨ No lingering test containers found"
+        echo "[*] No lingering test containers found"
     fi
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# SIDECAR
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# Convenience alias for test-sidecar (uses generic sidecar recipe)
-[group('sidecar')]
-test-sidecar *args:
-    @just sidecar test-sidecar {{ args }}
-
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # PODMAN
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # Podman container & image management recipes
 
 import 'justfile.podman'

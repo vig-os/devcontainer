@@ -220,3 +220,6 @@ __marimo__/
 
 # Pre-commit cache
 .pre-commit-cache/
+
+# Bats
+node_modules/

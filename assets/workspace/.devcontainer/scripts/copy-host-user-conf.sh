@@ -87,7 +87,7 @@ echo "Generated valid .gitconfig at $GITCONFIG_OUT from effective config in curr
 # Copy GitHub CLI config from host to container (for settings, aliases, etc.)
 HOST_GITHUB_CLI_CONFIG_DIR="$HOME/.config/gh"
 if [ -d "$HOST_GITHUB_CLI_CONFIG_DIR" ]; then
-	cp -r "$HOST_GITHUB_CLI_CONFIG_DIR" "$CONF_DIR/gh"
+	cp -r "$HOST_GITHUB_CLI_CONFIG_DIR" "$CONF_DIR"
 	echo "Copied GitHub CLI config from $HOST_GITHUB_CLI_CONFIG_DIR to $CONF_DIR/gh"
 else
 	echo "Warning: No GitHub CLI config directory found at $HOST_GITHUB_CLI_CONFIG_DIR"

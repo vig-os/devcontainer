@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Build container image
-# Usage: build.sh <version> [REPO] [NATIVE_PLATFORM]
+# Usage: build.sh [--no-cache] <version> <repo> [NATIVE_PLATFORM]
+#
+# This script prepares and builds a container image using podman:
+# - Calls prepare-build.sh to prepare the build directory
+# - Builds the container image using podman
 
 set -e
 
@@ -16,7 +20,7 @@ if [ "${1:-}" = "--no-cache" ]; then
 fi
 
 VERSION="${1:-dev}"
-REPO="ghcr.io/vig-os/devcontainer"
+REPO="${2:-ghcr.io/vig-os/devcontainer}"
 echo "🔍 DEBUG: VERSION='$VERSION'"
 echo "🔍 DEBUG: REPO='$REPO'"
 
@@ -50,8 +54,9 @@ echo "🔍 DEBUG: VCS_REF='$VCS_REF'"
 
 echo "Building $REPO:$VERSION..."
 
-# Create and clear build folder
-"$SCRIPT_DIR"/prepare-build.sh "$VERSION" "$BUILD_DIR"
+# Prepare build directory
+echo "Preparing build directory..."
+"$SCRIPT_DIR/prepare-build.sh" "$VERSION"
 
 # Build the image from build folder
 echo "Building image from build folder..."

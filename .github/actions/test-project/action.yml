@@ -1,0 +1,153 @@
+# Composite action to run project-level checks
+#
+# This action is self-contained and handles:
+# - Checks out repository code
+# - Sets up the environment (uv, Python deps, BATS) via setup-env
+# - Runs pre-commit linters (ruff, shellcheck, pymarkdown, etc.)
+# - Runs BATS shell script tests
+# - Runs project-level tests (utils, commit-msg, action-pins, prepare-changelog)
+# - Generates code coverage report and GitHub Actions job summary (suite: all)
+#
+# Inputs:
+#   suite: Which checks to run (all | lint | utils). Default: 'all'
+#   test-args: Arguments to pass to pytest (default: '-v -s --tb=short')
+#
+# Usage:
+#   # Run all project checks (includes coverage)
+#   - uses: ./.github/actions/test-project
+#
+#   # Run only linters
+#   - uses: ./.github/actions/test-project
+#     with:
+#       suite: 'lint'
+
+name: 'Test Project'
+description: 'Run project-level checks: linters, tests, code coverage'
+
+inputs:
+  suite:
+    description: 'Which checks to run: all | lint | utils'
+    required: false
+    default: 'all'
+
+  test-args:
+    description: 'Arguments to pass to pytest'
+    required: false
+    default: '-v -s --tb=short'
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+    - name: Set up test environment
+      uses: ./.github/actions/setup-env
+      with:
+        sync-dependencies: 'true'
+        install-bats: 'true'
+
+    - name: Cache pre-commit hooks
+      if: inputs.suite == 'all' || inputs.suite == 'lint'
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
+      with:
+        path: ~/.cache/pre-commit
+        key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+        restore-keys: |
+          pre-commit-${{ runner.os }}-
+
+    - name: Run pre-commit linters
+      if: inputs.suite == 'all' || inputs.suite == 'lint'
+      shell: bash
+      run: |
+        set -euo pipefail
+        export PATH="$HOME/.local/bin:$PATH"
+
+        # Verify pre-commit is available
+        uv run pre-commit --version
+
+        echo "Running pre-commit hooks on all files..."
+        uv run pre-commit run --all-files --show-diff-on-failure --color=always
+
+    # --- BATS shell script tests ---------------------------------------------
+    - name: Run BATS shell script tests
+      if: inputs.suite == 'all'
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Running BATS tests..."
+        bats tests/bats/
+
+    # --- Individual suite runs (no coverage, for targeted testing) -----------
+    - name: Run utility tests
+      if: inputs.suite == 'utils'
+      shell: bash
+      env:
+        TEST_ARGS: ${{ inputs.test-args }}
+      run: uv run pytest tests/test_utils.py $TEST_ARGS
+
+    # --- Combined run with coverage (suite: all) ----------------------------
+    - name: Run project tests with coverage
+      if: inputs.suite == 'all'
+      shell: bash
+      env:
+        TEST_ARGS: ${{ inputs.test-args }}
+      run: |
+        uv run pytest \
+          tests/test_utils.py \
+          packages/vig-utils/tests \
+          --cov --cov-report=term-missing --cov-report=xml \
+          $TEST_ARGS
+
+    - name: Generate coverage summary
+      if: always() && inputs.suite == 'all'
+      shell: bash
+      run: |
+        if [ ! -f coverage.xml ]; then
+          echo "::warning::No coverage report generated"
+          echo "## Code Coverage" >> "$GITHUB_STEP_SUMMARY"
+          echo "No coverage report was generated." >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+
+        # Parse coverage.xml and write a summary table to the job summary
+        python3 - <<'PYEOF'
+        import xml.etree.ElementTree as ET
+        import os
+
+        tree = ET.parse("coverage.xml")
+        root = tree.getroot()
+        total_rate = float(root.attrib.get("line-rate", 0)) * 100
+
+        lines = []
+        lines.append(f"## Code Coverage: {total_rate:.1f}%\n")
+        lines.append("| File | Statements | Missing | Coverage |")
+        lines.append("|------|-----------|---------|----------|")
+
+        for pkg in root.findall(".//package"):
+            for cls in pkg.findall(".//class"):
+                filename = cls.attrib.get("filename", "")
+                stmts = len(cls.findall(".//line"))
+                misses = len(
+                    [l for l in cls.findall(".//line") if l.attrib.get("hits") == "0"]
+                )
+                rate = float(cls.attrib.get("line-rate", 0)) * 100
+                lines.append(f"| `{filename}` | {stmts} | {misses} | {rate:.1f}% |")
+
+        summary = "\n".join(lines) + "\n"
+        summary_file = os.environ.get("GITHUB_STEP_SUMMARY", "")
+        if summary_file:
+            with open(summary_file, "a") as f:
+                f.write(summary)
+        else:
+            print(summary)
+        PYEOF
+
+    - name: Upload coverage report
+      if: always() && inputs.suite == 'all'
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+      with:
+        name: coverage-report
+        path: coverage.xml
+        retention-days: 30
+        if-no-files-found: warn

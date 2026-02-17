@@ -1,5 +1,7 @@
-# Use Python 3.12 as base image
-FROM python:3.12-slim-trixie
+# Use Python 3.12 as base image (pinned to digest for supply chain integrity)
+# Dependabot (docker ecosystem) will propose digest updates automatically
+# Updated to bookworm (stable) for better security patch cadence
+FROM python:3.12-slim-bookworm@sha256:73dbd1a2ad74137451593a8ac30f7bdd0f5010fc05fb34644190cffa7696bbf3
 
 # Add metadata
 # By default, we build the dev version unless specified as an argument
@@ -29,6 +31,24 @@ LABEL org.opencontainers.image.ref.name="${IMAGE_TAG}"
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Security patching strategy: we do NOT run blanket apt-get upgrade/dist-upgrade.
+# The base image digest pin (line 4) guarantees reproducible builds. A blanket
+# upgrade silently changes packages between builds, defeating that guarantee.
+#
+# Instead we rely on:
+#   1. Dependabot proposing base-image digest updates (covers most CVEs).
+#   2. Weekly Trivy scans (.github/workflows/security-scan.yml) for visibility.
+#   3. Targeted --only-upgrade for HIGH/CRITICAL CVEs that cannot wait for a
+#      new base image rebuild. Each entry must reference a CVE.
+#
+# See docs/CONTAINER_SECURITY.md for the full policy.
+#
+# Uncomment and add packages below when a critical CVE needs an immediate fix.
+# Remove entries once the base image digest is updated to include the patch.
+# RUN apt-get update && apt-get install -y --only-upgrade \
+#     <package>=<version> \  # CVE-XXXX-XXXXX
+#     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Install minimal system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
@@ -36,6 +56,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     locales \
     ca-certificates \
+    nano \
+    minisign \
+    podman \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Generate en_US.UTF-8 locale
@@ -45,15 +68,6 @@ RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen
 ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
-
-# Install Podman client for Docker-out-of-Docker (DooD) pattern
-# This allows the container to communicate with the host's Podman daemon via mounted socket
-RUN set -eux; \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-        podman \
-    && rm -rf /var/lib/apt/lists/*; \
-    podman --version
 
 # Install latest GitHub CLI manually from releases
 # TARGETARCH is automatically provided by Docker BuildKit for multi-platform builds
@@ -77,16 +91,57 @@ RUN set -eux; \
     rm -rf "gh_${GH_VERSION}_${ARCH}" "$FILE"; \
     gh --version;
 
-# Install latest just
+# Install latest just with checksum verification
 RUN set -eux; \
-    curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin; \
+    case "${TARGETARCH}" in \
+        amd64) ARCH=x86_64-unknown-linux-musl ;; \
+        arm64) ARCH=aarch64-unknown-linux-musl ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    JUST_VERSION="$(curl -fsSL https://api.github.com/repos/casey/just/releases/latest | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')"; \
+    URL="https://github.com/casey/just/releases/download/${JUST_VERSION}"; \
+    FILE="just-${JUST_VERSION}-${ARCH}.tar.gz"; \
+    curl -fsSL "${URL}/${FILE}" -o "$FILE"; \
+    CHECKSUM=$(curl -fsSL "${URL}/SHA256SUMS" | grep "${FILE}" | awk '{print $1}'); \
+    echo "${CHECKSUM}  ${FILE}" | sha256sum -c -; \
+    tar -xzf "$FILE" -C /usr/local/bin just; \
+    chmod +x /usr/local/bin/just; \
+    rm "$FILE"; \
     just --version;
 
-# Install latest cargo-binstall (installs to ~/.cargo/bin)
+# Install latest cargo-binstall from release archive with minisign signature verification
+# cargo-binstall uses minisign for signing releases. Each release has an ephemeral key.
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN set -eux; \
-    curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash; \
-    cargo-binstall -V;
+    case "${TARGETARCH}" in \
+        amd64) ARCH=x86_64-unknown-linux-musl ;; \
+        arm64) ARCH=aarch64-unknown-linux-musl ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    BINSTALL_VERSION="$(curl -fsSL https://api.github.com/repos/cargo-bins/cargo-binstall/releases/latest | sed -n 's/.*"tag_name": *"v\?\([^"]*\)".*/\1/p')"; \
+    URL="https://github.com/cargo-bins/cargo-binstall/releases/download/v${BINSTALL_VERSION}"; \
+    FILE="cargo-binstall-${ARCH}.tgz"; \
+    SIG_FILE="${FILE}.sig"; \
+    PUBKEY_FILE="minisign.pub"; \
+    curl -fsSL "${URL}/${FILE}" -o "$FILE"; \
+    curl -fsSL "${URL}/${SIG_FILE}" -o "$SIG_FILE"; \
+    curl -fsSL "${URL}/${PUBKEY_FILE}" -o "$PUBKEY_FILE"; \
+    PUBKEY="$(grep -v '^untrusted comment:' "$PUBKEY_FILE")"; \
+    minisign -V -m "$FILE" -x "$SIG_FILE" -P "$PUBKEY"; \
+    mkdir -p /root/.cargo/bin; \
+    tar -xzf "$FILE" -C /root/.cargo/bin; \
+    chmod +x /root/.cargo/bin/cargo-binstall; \
+    rm "$FILE" "$SIG_FILE" "$PUBKEY_FILE"; \
+    INSTALLED_VERSION="$(cargo-binstall -V | cut -d ' ' -f2)"; \
+    if [ "$INSTALLED_VERSION" != "$BINSTALL_VERSION" ]; then \
+        echo "Version mismatch: expected ${BINSTALL_VERSION}, got ${INSTALLED_VERSION}"; \
+        exit 1; \
+    fi; \
+    echo "cargo-binstall ${INSTALLED_VERSION} verified with minisign";
+
+# Install just LSP
+RUN cargo-binstall just-lsp; \
+    just-lsp --version;
 
 # Install typstyle
 RUN cargo-binstall typstyle; \
@@ -110,9 +165,16 @@ RUN set -eux; \
     rm "$FILE";
 
 # Install Python development tools directly into system using uv
+# and upgrade pip to fix CVE-2025-8869 (symbolic link extraction vulnerability)
 RUN uv pip install --system \
     pre-commit \
-    ruff
+    ruff \
+    pip-licenses && \
+    uv pip install --system --upgrade pip
+
+# Copy vig-utils package and install system-wide
+COPY packages/vig-utils /root/packages/vig-utils
+RUN uv pip install --system /root/packages/vig-utils
 
 # Copy assets into container image
 COPY assets /root/assets
@@ -136,7 +198,8 @@ RUN grep -rl '{{SHORT_NAME}}\|{{ORG_NAME}}\|{{IMAGE_TAG}}' /root/assets/workspac
 # This cache is used by the container (not copied to workspace by init-workspace.sh)
 # Host users will use their own cache (~/.cache/pre-commit or project-local)
 WORKDIR /root/assets/workspace
-RUN git init && \
+RUN git config --global init.defaultBranch main && \
+    git init && \
     PRE_COMMIT_HOME=/opt/pre-commit-cache \
     pre-commit install-hooks && \
     rm -rf .git

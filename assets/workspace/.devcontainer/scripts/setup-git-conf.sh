@@ -225,3 +225,9 @@ if [ -d "$PROJECT_ROOT/.githooks" ]; then
 else
 	echo "No .githooks directory found, using default git hooks"
 fi
+
+if [ -f "$PROJECT_ROOT/.gitmessage" ]; then
+	cd "$PROJECT_ROOT"
+	git config commit.template .gitmessage
+	echo "Commit message template configured (.gitmessage)"
+fi

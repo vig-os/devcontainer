@@ -126,9 +126,22 @@ dependencies:
       all: curl -LsSf https://astral.sh/uv/install.sh | sh
       manual: https://github.com/astral-sh/uv
 
+  # Shell testing (auto-installed by npm install)
+  - name: bats
+    version: "1.13.0"
+    purpose: Bash Automated Testing System for shell script tests
+    required: true
+    check:
+      command: command -v bats || test -x node_modules/.bin/bats
+      version_command: npx bats --version
+      version_regex: 'Bats (\d+\.\d+)'
+    install:
+      all: npm install
+      manual: https://bats-core.readthedocs.io/en/stable/installation.html#any-os-npm
+
   # DevContainer CLI (auto-installed by setup.sh)
   - name: devcontainer
-    version: "0.80.1"
+    version: "0.81.1"
     purpose: DevContainer CLI for testing devcontainer functionality
     required: true
     check:
@@ -139,19 +152,18 @@ dependencies:
       all: npm install -g @devcontainers/cli@{{version}}
       manual: https://github.com/devcontainers/cli
 
-# Optional dependencies for multi-arch builds
-optional:
-  - name: qemu-user-static
+  # Parallel (auto-installed by npm install)
+  - name: parallel
     version: latest
-    purpose: Multi-architecture container builds (AMD64/ARM64)
+    purpose: Parallelizes BATS test execution for faster test runs
     required: false
     check:
-      command: test -f /proc/sys/fs/binfmt_misc/qemu-aarch64
+      command: command -v parallel
+      version_command: parallel --version
+      version_regex: 'GNU parallel (\d+)'
     install:
-      debian: |
-        sudo apt install -y qemu-user-static
-        sudo podman run --privileged --rm docker.io/tonistiigi/binfmt --install all
-      fedora: |
-        sudo dnf install -y qemu-user-static
-        sudo podman run --privileged --rm docker.io/tonistiigi/binfmt --install all
-      manual: Only needed for cross-architecture builds
+      macos: brew install parallel
+      debian: sudo apt install -y parallel
+      fedora: sudo dnf install -y parallel
+      alpine: sudo apk add parallel
+      manual: https://www.gnu.org/software/parallel/

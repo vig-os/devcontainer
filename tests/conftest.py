@@ -883,7 +883,7 @@ def devcontainer_up(initialized_workspace):
     if not shutil.which("devcontainer"):
         pytest.skip(
             "devcontainer CLI not available. "
-            "Install with: npm install -g @devcontainers/cli@0.80.1"
+            "Install with: npm install -g @devcontainers/cli"
         )
 
     docker_path = "podman"
@@ -997,7 +997,7 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
     if not shutil.which("devcontainer"):
         pytest.skip(
             "devcontainer CLI not available. "
-            "Install with: npm install -g @devcontainers/cli@0.80.1"
+            "Install with: npm install -g @devcontainers/cli"
         )
 
     docker_path = "podman"
@@ -1183,3 +1183,62 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
         with devcontainer_json_path.open("w") as f:
             f.write(original_config)
         print("[DEBUG] Restored original devcontainer.json")
+
+
+@pytest.fixture
+def parse_manifest():
+    """
+    Fixture to parse sync-manifest.txt file and return list of (src, dest) tuples.
+
+    Reads the manifest from the local workspace (not from container).
+
+    Args:
+        manifest_path: Path to the manifest file (default: scripts/sync-manifest.txt relative to project root)
+
+    Returns:
+        Function that takes optional manifest_path and returns list of (src, dest) tuples
+
+    Raises:
+        FileNotFoundError: If the manifest file cannot be found
+        RuntimeError: If the file cannot be read
+    """
+
+    def _parse(manifest_path="scripts/sync-manifest.txt"):
+        """Parse manifest file and return list of (src, dest) tuples."""
+        # Resolve the manifest path relative to project root
+        # The test runs from the workspace root
+        project_root = Path(__file__).parent.parent
+        full_manifest_path = project_root / manifest_path
+
+        # Try to read the file
+        try:
+            content = full_manifest_path.read_text()
+        except FileNotFoundError as e:
+            raise FileNotFoundError(
+                f"Manifest file not found at {full_manifest_path}"
+            ) from e
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to read manifest file at {full_manifest_path}: {e}"
+            ) from e
+
+        manifest_files = []
+
+        for line in content.strip().split("\n"):
+            line = line.strip()
+            # Skip blank lines and comments
+            if not line or line.startswith("#"):
+                continue
+            # Parse "source -> destination" or just "source" (dest defaults to source)
+            if " -> " in line:
+                src, dest = line.split(" -> ", 1)
+                src = src.strip()
+                dest = dest.strip()
+            else:
+                src = line.strip()
+                dest = src
+            manifest_files.append((src, dest))
+
+        return manifest_files
+
+    return _parse

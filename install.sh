@@ -11,6 +11,7 @@
 #   --docker          Force docker (default: auto-detect, prefers podman)
 #   --podman          Force podman
 #   --name NAME       Override project name (SHORT_NAME)
+#   --org ORG         Override organization name (default: vigOS)
 #   --dry-run         Show what would be done without executing
 #   -h, --help        Show this help message
 #
@@ -18,6 +19,7 @@
 #   curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh
 #   curl -sSf ... | sh -s -- ~/Projects/my-project
 #   curl -sSf ... | sh -s -- --version 1.0.0 --force ./my-project
+#   curl -sSf ... | sh -s -- --org MyOrg ./my-project
 
 set -euo pipefail
 
@@ -30,6 +32,7 @@ DRY_RUN=false
 SKIP_PULL=false
 PROJECT_PATH=""
 PROJECT_NAME=""
+ORG_NAME="vigOS"
 
 # Colors (disabled if not a tty)
 if [ -t 1 ]; then
@@ -61,6 +64,7 @@ OPTIONS:
     --docker          Force docker runtime
     --podman          Force podman runtime
     --name NAME       Override project name (SHORT_NAME, used for module name)
+    --org ORG         Override organization name (default: vigOS)
     --dry-run         Show what would be done
     -h, --help        Show this help
 
@@ -79,6 +83,9 @@ EXAMPLES:
 
     # Override project name
     curl -sSf ... | sh -s -- --name my_custom_name ./my-project
+
+    # Use custom organization name
+    curl -sSf ... | sh -s -- --org MyOrg ./my-project
 EOF
 }
 
@@ -202,6 +209,33 @@ sanitize_name() {
     echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[ -]/_/g' | sed 's/[^a-z0-9_]/_/g'
 }
 
+# Sanitize for security only: remove shell metacharacters but preserve capitalization
+sanitize_for_security() {
+    echo "$1" | sed 's/[^a-zA-Z0-9._\/-]/_/g'
+}
+
+# Run copy-host-user-conf.sh from the deployed project (non-fatal)
+run_user_conf() {
+    local project_path="$1"
+    local script="$project_path/.devcontainer/scripts/copy-host-user-conf.sh"
+
+    if [ ! -f "$script" ]; then
+        warn "User configuration script not found at $script"
+        echo "  Ensure the workspace has been initialized first."
+        return 1
+    fi
+
+    info "Running user configuration setup (git, ssh, gh)..."
+    if bash "$script"; then
+        success "User configuration complete"
+    else
+        warn "User configuration had issues (see warnings above)"
+        echo "  You can re-run this step later with:"
+        echo "    cd $project_path && bash .devcontainer/scripts/copy-host-user-conf.sh"
+        echo "  Or use: bash install.sh --user-conf $project_path"
+    fi
+}
+
 # Parse arguments
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -223,6 +257,10 @@ while [ $# -gt 0 ]; do
             ;;
         --name)
             PROJECT_NAME="$2"
+            shift 2
+            ;;
+        --org)
+            ORG_NAME="$2"
             shift 2
             ;;
         --dry-run)
@@ -262,6 +300,9 @@ if [ -z "$PROJECT_NAME" ]; then
     PROJECT_NAME="$(basename "$PROJECT_PATH")"
 fi
 PROJECT_NAME=$(sanitize_name "$PROJECT_NAME")
+
+# Sanitize ORG_NAME for security (remove shell metacharacters) but preserve capitalization
+ORG_NAME=$(sanitize_for_security "$ORG_NAME")
 
 # Detect container runtime
 RUNTIME=$(detect_runtime)
@@ -321,8 +362,35 @@ info "Using $RUNTIME with image $IMAGE"
 info "Target directory: $PROJECT_PATH"
 info "Project name: $PROJECT_NAME"
 
+# Build the command using an array for safe execution
+# Use --rm to cleanup container after run; no -it since we use --no-prompts (non-interactive)
+# Pass SHORT_NAME and ORG_NAME as environment variables to the container
+declare -a CMD=(
+    "$RUNTIME" run --rm
+    -e "SHORT_NAME=$PROJECT_NAME"
+    -e "ORG_NAME=$ORG_NAME"
+    -v "$PROJECT_PATH:/workspace"
+    "$IMAGE"
+    /root/assets/init-workspace.sh --no-prompts
+)
+
+if [ -n "$FORCE" ]; then
+    CMD+=(--force)
+fi
+
+if [ "$DRY_RUN" = true ]; then
+    info "Would execute:"
+    printf "  %s" "$RUNTIME run --rm -e SHORT_NAME=\"$PROJECT_NAME\" -e ORG_NAME=\"$ORG_NAME\" -v $PROJECT_PATH:/workspace $IMAGE /root/assets/init-workspace.sh --no-prompts"
+    if [ -n "$FORCE" ]; then
+        printf " %s" "--force"
+    fi
+    printf "\n"
+    exit 0
+fi
+
 # Check if terminal is interactive (needed for init-workspace.sh prompts)
 # When piped via curl, stdin is the script - use /dev/tty for user input
+# Only check this when actually running (not in dry-run mode)
 if [ ! -t 0 ]; then
     if [ ! -e /dev/tty ]; then
         err "This script requires an interactive terminal"
@@ -332,17 +400,6 @@ if [ ! -t 0 ]; then
         echo "  bash install.sh $PROJECT_PATH"
         exit 1
     fi
-fi
-
-# Build the command
-# Use --rm to cleanup container after run; no -it since we use --no-prompts (non-interactive)
-# Pass SHORT_NAME as environment variable to the container
-CMD="$RUNTIME run --rm -e SHORT_NAME=\"$PROJECT_NAME\" -v \"$PROJECT_PATH:/workspace\" \"$IMAGE\" /root/assets/init-workspace.sh --no-prompts $FORCE"
-
-if [ "$DRY_RUN" = true ]; then
-    info "Would execute:"
-    echo "  $CMD"
-    exit 0
 fi
 
 # Pull image first (better UX - shows progress separately)
@@ -368,12 +425,87 @@ fi
 info "Initializing workspace..."
 echo ""
 
-# Execute the container
-# Since we use --no-prompts, no interactive input is needed.
-if ! eval "$CMD"; then
+# Execute the container using array expansion (safe from shell injection)
+if ! "${CMD[@]}"; then
     err "Failed to initialize workspace"
     exit 1
 fi
+
+# ── Post-initialization: host-side setup ──────────────────────────────────────
+
+echo ""
+info "Running post-initialization setup..."
+
+# 1. Copy host user configuration (git, ssh, gh) into .devcontainer/.conf/
+# Non-fatal: warnings about missing SSH keys or GH CLI are expected on CI/fresh machines
+run_user_conf "$PROJECT_PATH" || true
+
+# 2. Git repository setup (init, initial commit, dev branch)
+# Runs on the host (not in container) so that SSH agent is available for commit signing
+info "Setting up git repository..."
+
+setup_git_repo() {
+    local workspace_dir="$1"
+    local created_repo=false
+
+    echo "Verifying git repository..."
+    cd "$workspace_dir"
+
+    # Initialize git repo if missing
+    if [ ! -d ".git" ]; then
+        echo "No git repository found, initializing..."
+        git init -b main
+        created_repo=true
+        echo "Git repository initialized with 'main' branch"
+    fi
+
+    # Create initial commit if repo has no commits (enables branch creation)
+    if ! git rev-parse HEAD >/dev/null 2>&1; then
+        echo "Creating initial commit..."
+        git add -A
+        git commit -m "chore: initial project scaffold" --allow-empty
+        created_repo=true
+        echo "Initial commit created"
+    fi
+
+    # Verify or create branches
+    if [ "$created_repo" = true ]; then
+        # New repo: create dev branch from main
+        if ! git rev-parse --verify dev >/dev/null 2>&1; then
+            echo "Creating 'dev' branch..."
+            git branch dev
+            echo "'dev' branch created"
+        fi
+    else
+        # Existing repo: warn about missing branches
+        if ! git rev-parse --verify main >/dev/null 2>&1; then
+            echo "Warning: Branch 'main' not found in existing repository"
+            echo "  The project workflow expects a 'main' branch."
+        fi
+        if ! git rev-parse --verify dev >/dev/null 2>&1; then
+            echo "Warning: Branch 'dev' not found in existing repository"
+            echo "  The project workflow expects a 'dev' branch."
+            echo "  Create it with: git branch dev"
+        fi
+    fi
+
+    echo ""
+    echo "Git repository setup complete."
+    echo ""
+    echo "You can set a remote origin with:"
+    echo "  git remote add origin <your-repo-url>"
+    echo "Then push your branches with:"
+    echo "  git push -u origin main dev"
+    echo ""
+}
+
+if ! setup_git_repo "$PROJECT_PATH"; then
+    warn "Git repository setup failed (non-fatal)"
+    echo "  You can set up the repository manually with:"
+    echo "    cd $PROJECT_PATH && git init -b main && git add -A && git commit -m 'chore: initial project scaffold'"
+fi
+
+# ── Done ──────────────────────────────────────────────────────────────────────
 
 echo ""
 success "Devcontainer deployed to $PROJECT_PATH"

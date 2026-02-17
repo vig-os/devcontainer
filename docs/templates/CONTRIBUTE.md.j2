@@ -104,63 +104,48 @@ When contributing to this project, follow this workflow:
 
 ## Release Workflow
 
-When releasing a new version of the devcontainer image, follow these steps:
+Releases are managed through automated GitHub Actions workflows. For the full
+reference, see [docs/RELEASE_CYCLE.md](docs/RELEASE_CYCLE.md).
 
-1. **Update documentation**
-   - Ensure documentation templates are up to date
-   - Run `just docs` to regenerate all documentation
-   - Update [CHANGELOG.md](CHANGELOG.md):
-     - Move all `[Unreleased]` entries to a new version section (e.g., `[1.0.0]`)
-     - Add the release date in YYYY-MM-DD format
-     - Update the version links at the bottom of the file
-     - Clear the `[Unreleased]` section for future changes
-   - Verify all documentation reflects the current state
+### Quick Reference
 
-2. **Run tests**
+1. **Ensure all features are merged to `dev`** and tests are passing
 
    ```bash
-   # Run all test suites to ensure everything works
+   git checkout dev
+   git pull origin dev
    just test
    ```
 
-3. **Ensure clean git state**
+2. **Prepare the release** (creates release branch, prepares CHANGELOG, opens draft PR)
 
    ```bash
-   # Make sure you are on the dev branch
-   git checkout dev
-   git pull origin dev
-
-   # Ensure no uncommitted changes
-   git status
-   # All changes should be committed before releasing
+   just prepare-release X.Y.Z
    ```
 
-4. **Create and push the version tag to trigger the release workflow**
+3. **Review and test the release**
+   - Monitor CI on the draft PR
+   - Fix any issues via bugfix PRs to `release/X.Y.Z`
+   - Mark PR as ready for review and get approval
 
-   Releases are published by the [GitHub Actions workflow](.github/workflows/publish-container-image.yml) when a version tag (e.g. `v1.0.0`) is pushed.
+4. **Finalize and publish** (validates, finalizes CHANGELOG, builds, tests, signs, and publishes)
 
    ```bash
-   # Replace X.Y.Z with the semantic version (e.g. 1.0.0, 1.1.0, 2.0.0)
-   # Version must follow Semantic Versioning: MAJOR.MINOR.PATCH
-   git tag -a vX.Y.Z -m "Release X.Y.Z"
-   git push origin vX.Y.Z
+   just finalize-release X.Y.Z
    ```
 
    The workflow will:
-   - Build the image for the specified version (multi-arch: amd64, arm64)
-   - Run image tests before push
+   - Validate CI status and PR approval
+   - Set the release date in CHANGELOG
+   - Build and test multi-arch images (amd64, arm64)
+   - Scan for vulnerabilities with Trivy
    - Push to GHCR with `:latest` and `:X.Y.Z` tags
-   - Create a multi-architecture manifest
+   - Sign images with Sigstore cosign
+   - Generate SBOM and attest provenance
+   - Automatically roll back on failure
 
-   Ensure [CHANGELOG.md](CHANGELOG.md) and any version references are updated before tagging.
-
-5. **Create pull request to merge into `main`**
-   - After the version tag is pushed and the publish workflow completes, create a [pull request](https://github.com/vig-os/devcontainer/pulls) from `dev` to `main`
-   - The PR should include:
-     - Summary of changes in this release
-     - Reference to the version tag created
-     - Any important notes for users
-   - Once merged, `main` will reflect the stable release
+5. **Merge the release PR into `main`**
+   - The post-release workflow automatically syncs `dev` with `main` and resets the CHANGELOG Unreleased section
 
 ## Version Tagging
 

@@ -15,7 +15,7 @@
                 "ms-vscode.vscode-json",
                 "redhat.vscode-yaml",
                 "GitHub.vscode-pull-request-github",
-                "promptexecution.justlang-lsp"
+                "nefrob.vscode-just-syntax"
             ],
             "settings": {
                 "python.defaultInterpreterPath": "/root/assets/workspace/.venv/bin/python",

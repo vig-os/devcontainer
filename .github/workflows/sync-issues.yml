@@ -26,19 +26,20 @@ on:  # yamllint disable-line rule:truthy
   issues:
     types:
       - opened
-      - edited
       - reopened
       - closed
   # Run on PR creation and closure
   pull_request:
     types:
       - opened
-      - edited
       - closed
+
+permissions: {}  # restrict default; job declares its own
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
     # Prevent concurrent runs to avoid race conditions when committing and cache collisions
     concurrency:
       group: sync-issues-${{ github.repository }}
@@ -52,22 +53,33 @@ jobs:
     steps:
       - name: Generate a token
         id: generate-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
         with:
           app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
           private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
 
       - name: Determine target branch
         id: branch
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TARGET_BRANCH: ${{ github.event.inputs.target-branch }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           # Use manual input if provided (workflow_dispatch), otherwise use automatic detection
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.target-branch }}" ]; then
-            TARGET_BRANCH="${{ github.event.inputs.target-branch }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$INPUT_TARGET_BRANCH" ]; then
+            # Validate target branch against allowed patterns
+            if [[ ! "$INPUT_TARGET_BRANCH" =~ ^(dev|main|release/.+)$ ]]; then
+              echo "ERROR: Invalid target branch: $INPUT_TARGET_BRANCH"
+              echo "Allowed branches: dev, main, release/*"
+              exit 1
+            fi
+            TARGET_BRANCH="$INPUT_TARGET_BRANCH"
             echo "✓ Using manual target branch: $TARGET_BRANCH"
           # If PR was merged into main, commit to main; otherwise use dev
-          elif [ "${{ github.event_name }}" = "pull_request" ] && \
-               [ "${{ github.event.pull_request.merged }}" = "true" ] && \
-               [ "${{ github.event.pull_request.base.ref }}" = "main" ]; then
+          elif [ "$EVENT_NAME" = "pull_request" ] && \
+               [ "$PR_MERGED" = "true" ] && \
+               [ "$PR_BASE_REF" = "main" ]; then
             TARGET_BRANCH="main"
             echo "✓ PR merged into main - will commit to main"
           else
@@ -78,20 +90,19 @@ jobs:
           echo "Target branch: $TARGET_BRANCH"
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           ref: ${{ steps.branch.outputs.branch || 'dev' }}
           persist-credentials: false
 
       - name: Restore sync state (last synced timestamp)
         id: restore-state
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
           path: .sync-state
           key: sync-issues-state-${{ github.repository }}
           restore-keys: |
             sync-issues-state-${{ github.repository }}
-            sync-issues-state-
 
       - name: Delete old cache to free key for this run
         if: always()
@@ -115,11 +126,11 @@ jobs:
       - name: Sync Issues and PRs
         id: sync
         # Using local action for testing
-        uses: vig-os/sync-issues-action@v0.1.1
+        uses: vig-os/sync-issues-action@b4cdf371bb708230ce410a8203e6463e9e6caf2d  # v0.1.1
         with:
           app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
           app-private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
-          output-dir: '.github_data'
+          output-dir: 'docs'
           sync-issues: 'true'
           sync-prs: 'true'
           include-closed: 'true'
@@ -129,7 +140,7 @@ jobs:
       - name: Commit and push changes via API
         id: commit
         if: steps.sync.outputs.modified-files != ''
-        uses: vig-os/commit-action@v0.1.3
+        uses: vig-os/commit-action@b70c2d87acd0f146c40e8d88a9bda40b76c084b5  # v0.1.3
         env:
           # Use App token so push can bypass branch protection when App is in bypass list
           GH_TOKEN: ${{ steps.generate-token.outputs.token || github.token }}
@@ -140,7 +151,7 @@ jobs:
 
       - name: Save sync state
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
           path: .sync-state
           key: sync-issues-state-${{ github.repository }}

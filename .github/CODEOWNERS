@@ -1,0 +1,21 @@
+# CODEOWNERS — default reviewers for pull requests
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Each line defines a file pattern and the GitHub users/teams required to review
+# changes to matching files. Later rules take precedence over earlier ones.
+
+# Default: all files require review from the maintainer
+*                               @c-vigo
+
+# CI/CD workflows — require maintainer review for any workflow change
+.github/workflows/              @c-vigo
+.github/actions/                @c-vigo
+
+# Build and release tooling
+scripts/                        @c-vigo
+
+# Security-sensitive configuration
+.github/dependabot.yml          @c-vigo
+.github/CODEOWNERS              @c-vigo
+SECURITY.md                     @c-vigo
+Containerfile                   @c-vigo
