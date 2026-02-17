@@ -48,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Chore Refs exemption** in commit message standard ([#37](https://github.com/vig-os/devcontainer/issues/37))
   - `chore` commits may omit the `Refs:` line when no issue or PR is directly related
   - Validator updated with `REFS_OPTIONAL_TYPES` to accept chore commits without Refs
+- **Dependency review allowlist entry** for debug@0.6.0 ([#37](https://github.com/vig-os/devcontainer/issues/37))
+  - Added GHSA-9vvw-cc9w-f27h exception to `.github/dependency-review-allow.txt`
+  - Addresses ReDoS vulnerability in transitive test dependency (bats-assert → verbose → debug)
+  - High risk severity but isolated to CI/development environment with expiration 2026-11-17
 - **Dependency review exception for legacy test vulnerabilities** ([#37](https://github.com/vig-os/devcontainer/issues/37))
   - GHSA-h4j5-c7cj-74xg (xmlhttprequest@1.5.0 arbitrary code injection) in unmaintained bats-assert dependencies
   - GHSA-fjxv-7rqg-78g4 (form-data@2.3.3 unsafe random function) already documented

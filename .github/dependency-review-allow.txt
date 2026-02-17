@@ -46,3 +46,15 @@ GHSA-fjxv-7rqg-78g4
 # Mitigation: Transitive dependency through unmaintained packages; isolated CI-only usage
 Expiration: 2026-08-17
 GHSA-h4j5-c7cj-74xg
+
+# GHSA-9vvw-cc9w-f27h: debug@0.6.0 inefficient regular expression complexity (indirect dependency)
+# Risk Assessment: HIGH - In test-only dependency context
+# - Vulnerability affects debug@0.6.0 (deprecated version from 2015)
+# - Transitive dependency: bats-assert → verbose → debug@0.6.0
+# - verbose and debug are unmaintained legacy packages
+# - Risk: ReDoS (Regular Expression Denial of Service) via inefficient regex
+# - Impact: Limited in test-only dependency context (CI/development environment)
+# - Does not affect runtime production code
+# Mitigation: Transitive dependency through unmaintained packages; isolated CI-only usage
+Expiration: 2026-11-17
+GHSA-9vvw-cc9w-f27h
