@@ -17,6 +17,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Virtual environment prompt renaming** ([#34](https://github.com/vig-os/devcontainer/issues/34))
   - Post-create script updates venv prompt from "template-project" to project short name
   - Integration test verifies venv activate script does not contain "template-project"
+- **BATS (Bash Automated Testing System) shell testing framework** ([#35](https://github.com/vig-os/devcontainer/issues/35))
+  - npm dependencies for bats, bats-support, bats-assert, and bats-file
+  - `test-bats` justfile task and requirements configuration
+  - `test_helper.bash` supporting both local (node_modules) and CI (BATS_LIB_PATH) library resolution
+  - CI integration in setup-env and test-project actions with conditional parallel execution via GNU parallel
+  - Comprehensive BATS test suites for build, clean, init, install, and prepare-build scripts
+  - Tests verify script structure, argument parsing, function definitions, error handling, and OS/runtime detection patterns
+- **Post-install user configuration step** ([#35](https://github.com/vig-os/devcontainer/issues/35))
+  - Automatically call copy-host-user-conf.sh after workspace initialization
+  - `run_user_conf()` helper for host-side setup (git, ssh, gh)
+  - Integration tests for .devcontainer/.conf/ directory creation and expected config files
+- **Git repository initialization in install script** ([#35](https://github.com/vig-os/devcontainer/issues/35))
+  - `setup_git_repo()` function to initialize git if missing
+  - Creates initial commit "chore: initial project scaffold" for new repos
+  - Automatically creates main and dev branches
+  - `test-install` justfile recipe for running install tests
+  - Integration tests for git repo initialization, branches, and initial commit
 - **Commit message standardization** ([#36](https://github.com/vig-os/devcontainer/issues/36))
   - Commit message format: `type(scope)!: subject` with mandatory `Refs: #<issue>` line
   - Documentation: `docs/COMMIT_MESSAGE_STANDARD.md` defining format, approved types (feat, fix, docs, chore, refactor, test, ci, build, revert, style), and traceability requirements
@@ -104,6 +121,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - GitHub workflow templates for devcontainer projects included in sync manifest
   - Automated npm dependency management with centralized version pinning in `.github/package.json`
   - Extract build preparation into dedicated `prepare-build.sh` script with manifest sync
+  - SHA-256 checksum verification tests for synced files via `parse_manifest` fixture and `test_manifest_files`
 - **GitHub workflow templates for devcontainer projects** ([#53](https://github.com/vig-os/devcontainer/issues/53))
   - Reusable workflow templates for continuous integration and deployment
   - Support for projects using devcontainer-based development environments
@@ -113,6 +131,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Git initialization default branch** ([#35](https://github.com/vig-os/devcontainer/issues/35))
+  - Updated git initialization to set the default branch to 'main' instead of 'master'
+  - Consolidated Podman installation with other apt commands in Containerfile
+- **CI release workflow uses GitHub API** ([#35](https://github.com/vig-os/devcontainer/issues/35))
+  - Replace local git operations with GitHub API in prepare-release workflow
+  - Use commit-action for CHANGELOG updates instead of local git
+  - Replace git operations with GitHub API in release finalization flow
+  - Simplify rollback and tag deletion to use gh api
+  - Add sync-dependencies input to setup-env action (default: false)
+  - Remove checkout step from setup-env; callers must checkout explicitly
+  - Update all workflow callers to pass sync-dependencies input
+  - Update CI security job to use uv with setup-env action
 - **Commit message guidelines** - updated documentation ([#36](https://github.com/vig-os/devcontainer/issues/37))
 - **Expected version checks** - updated ruff and pre-commit versions in test suite ([#37](https://github.com/vig-os/devcontainer/issues/37))
 - **Bumped `actions/create-github-app-token`** from v1 to v2 across workflows with updated SHA pins ([#37](https://github.com/vig-os/devcontainer/issues/37))
@@ -136,6 +166,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated all CodeQL Action references from v3 (deprecated Dec 2026) to v4.32.2
   - Updated in `.github/workflows/codeql.yml`, `security-scan.yml`, and `ci.yml`
   - Uses commit hash `45cbd0c69e560cd9e7cd7f8c32362050c9b7ded2` for integrity
+- **Sync-issues workflow output directory** ([#53](https://github.com/vig-os/devcontainer/issues/53))
+  - Changed output directory from '.github_data' to 'docs' for better project structure alignment
 
 ### Deprecated
 
@@ -147,6 +179,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **GitHub CLI config copy target path** ([#35](https://github.com/vig-os/devcontainer/issues/35))
+  - Corrected target path for copying GitHub CLI configuration in post-install step
+- **Install script terminal check in dry-run mode** ([#37](https://github.com/vig-os/devcontainer/issues/37))
+  - Moved TTY check to after dry-run flag check to allow --dry-run mode to exit immediately without requiring an interactive terminal
+  - Fixes test_dry_run_shows_command timeout in CI environments
 - **Action outputs set conditionally** based on step outcome in composite actions — tar-file output only set when `output-type=tar`, test-result reflects actual test pass/fail ([#37](https://github.com/vig-os/devcontainer/issues/37))
 - **Sync-issues workflow robustness** — pinned runner to ubuntu-22.04, added target branch validation for `workflow_dispatch`, removed overly broad cache restore-key pattern ([#37](https://github.com/vig-os/devcontainer/issues/37))
 - **Integration test image tag normalization** — fixed overly greedy regex that removed commit hashes from image tags; now only removes known architecture suffixes (`-amd64`, `-arm64`) at the end ([#37](https://github.com/vig-os/devcontainer/issues/37))
