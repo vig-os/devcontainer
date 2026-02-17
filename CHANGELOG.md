@@ -52,18 +52,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added GHSA-9vvw-cc9w-f27h exception to `.github/dependency-review-allow.txt`
   - Addresses ReDoS vulnerability in transitive test dependency (bats-assert → verbose → debug)
   - High risk severity but isolated to CI/development environment with expiration 2026-11-17
-- **Dependency review exception for legacy test vulnerabilities** ([#37](https://github.com/vig-os/devcontainer/issues/37))
-  - GHSA-h4j5-c7cj-74xg (xmlhttprequest@1.5.0 arbitrary code injection) in unmaintained bats-assert dependencies
-  - GHSA-fjxv-7rqg-78g4 (form-data@2.3.3 unsafe random function) already documented
-  - Both isolated to CI-only test dependencies with no runtime risk
-  - Expiration dates enforce periodic review; documented in `.github/dependency-review-allow.txt`
-- **Dependency review exception for form-data vulnerability** ([#37](https://github.com/vig-os/devcontainer/issues/37))
-  - Added exception for GHSA-fjxv-7rqg-78g4 (CVE-2025-7783) in `.github/dependency-review-allow.txt`
-  - Vulnerability affects form-data@2.3.3 (transitive dependency: bats-assert → verbose → reconnect → request → form-data)
-  - Risk assessment: MEDIUM - exploit requires active MITM + attacker control of request field
-  - Impact limited to CI/test environment (usage in BATS test dependencies only)
-  - Expiration set to 2026-05-17 to force periodic review and investigation of BATS alternatives
-  - Comprehensive test suite (`TestChoreRefsExemption`) covering all exemption scenarios
+|- **Dependency review exception for legacy test vulnerabilities** ([#37](https://github.com/vig-os/devcontainer/issues/37))
+  - Comprehensive acceptance register for 9 transitive vulnerabilities in unmaintained BATS test framework dependencies
+  - All 9 vulnerabilities are isolated to CI/development environment (engine.io, debug, node-uuid, qs, tough-cookie, ws, xmlhttprequest, form-data)
+  - Formal risk assessments and mitigations documented in `SECURITY.md` and `.github/dependency-review-allow.txt`
+  - Expiration-enforced exceptions with 2026-11-17 expiration date to force periodic re-evaluation
+
 - **Bandit and Safety security scanning** ([#37](https://github.com/vig-os/devcontainer/issues/37), [#50](https://github.com/vig-os/devcontainer/issues/50))
   - Bandit pre-commit hook for medium/high/critical severity Python code analysis
   - CI pipeline job with Bandit static analysis and Safety dependency vulnerability scanning
@@ -212,13 +206,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+|- **Accepted test dependency vulnerabilities** ([#37](https://github.com/vig-os/devcontainer/issues/37))
+- Comprehensive acceptance register for 9 transitive vulnerabilities in unmaintained BATS test framework dependencies (engine.io, debug, node-uuid, qs, tough-cookie, ws, xmlhttprequest, form-data)
+- Risk assessment: HIGH/MODERATE severity from packages last updated 5-10+ years ago; impact isolated to CI/development environment with no runtime production code exposure
+- Formal documentation in `SECURITY.md` and `.github/dependency-review-allow.txt` with IEC 62304 medtech-compliant risk assessments
+- Expiration-enforced exceptions with 2026-11-17 expiration date to force periodic re-evaluation and investigation of BATS framework modernization
 - **Go stdlib CVEs from gh binary accepted and documented** ([#37](https://github.com/vig-os/devcontainer/issues/37))
-  - CVE-2025-68121, CVE-2025-61726, CVE-2025-61728, CVE-2025-61730 added to `.trivyignore`
-  - Vulnerabilities embedded in statically-linked GitHub CLI binary; low exploitability in devcontainer context
-  - Each entry includes risk assessment, justification, and 3-month expiration date to force re-review
-  - Awaiting upstream `gh` release with Go 1.25.7 or later
+- CVE-2025-68121, CVE-2025-61726, CVE-2025-61728, CVE-2025-61730 added to `.trivyignore`
+- Vulnerabilities embedded in statically-linked GitHub CLI binary; low exploitability in devcontainer context
+- Each entry includes risk assessment, justification, and 3-month expiration date to force re-review
+- Awaiting upstream `gh` release with Go 1.25.7 or later
 - **GHSA-wvrr-2x4r-394v (bats-file false positive) accepted in dependency review** ([#37](https://github.com/vig-os/devcontainer/issues/37))
-  - Added to `.github/dependency-review-allow.txt` with 6-month expiration date enforced by CI
+- Added to `.github/dependency-review-allow.txt` with 6-month expiration date enforced by CI
 - **Upgraded pip** in Containerfile to fix CVE-2025-8869 (symbolic link extraction vulnerability) ([#37](https://github.com/vig-os/devcontainer/issues/37))
 - **Digest-pinned base image** (`python:3.12-slim-bookworm`) with SHA256 checksum verification for all downloaded binaries and `.trivyignore` risk-assessment policy in Containerfile ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Minisign signature verification** for cargo-binstall downloads ([#50](https://github.com/vig-os/devcontainer/issues/50))

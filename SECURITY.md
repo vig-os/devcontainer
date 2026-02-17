@@ -69,3 +69,33 @@ This repository follows these security practices:
 This project is designed to support medical device software development under
 IEC 62304 and ISO 13485. Security practices align with configuration management
 and risk management requirements of these standards.
+
+## Known Vulnerability Exceptions
+
+This project accepts and documents known vulnerabilities in test-only dependencies
+through expiration-enforced exception registers (`.github/dependency-review-allow.txt`
+and `.trivyignore`). These exceptions follow an IEC 62304 medtech-compliant risk
+assessment model:
+
+### Test Dependency Vulnerabilities (GHSA Exceptions)
+
+Nine vulnerabilities have been accepted in unmaintained legacy BATS test framework
+dependencies (bats-assert, verbose, reconnect, request, sockjs, engine.io, engine.io-client):
+
+- **engine.io** (GHSA-r7qp-cfhv-p84w): Uncaught exception leading to DoS
+- **engine.io** (GHSA-j4f2-536g-r55m): Resource exhaustion via large messages
+- **debug** (GHSA-gxpj-cx7g-858c): Regular Expression Denial of Service (ReDoS)
+- **node-uuid** (GHSA-265q-28rp-chq5): Insecure entropy source (Math.random())
+- **qs** (GHSA-6rw7-vpxm-498p): DoS via memory exhaustion (arrayLimit bypass)
+- **tough-cookie** (GHSA-72xf-g2v4-qvf3): Prototype Pollution
+- **ws** (GHSA-6663-c963-2gqg): DoS via large websocket messages
+- **ws** (GHSA-5v72-xg48-5rpm): Denial of Service via malformed frames
+- **ws** (GHSA-2mhh-w6q8-5hxw): Remote memory disclosure
+
+**Risk Assessment:** All are HIGH or MODERATE severity vulnerabilities from packages
+last updated 5-10+ years ago. Impact is **isolated to CI/development environment**
+with **no runtime production code exposure**. Expiration dates (2026-11-17) enforce
+periodic re-evaluation and investigation of BATS framework modernization.
+
+**Mitigation:** These dependencies are transitive and only used in the test pipeline.
+Production deployments do not include or execute any test dependencies.
