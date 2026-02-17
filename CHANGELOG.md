@@ -63,6 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Formal medtech-compliant register (IEC 62304 / ISO 13485) documenting 10 accepted CVEs
   - Each entry includes risk assessment, exploitability justification, fix status, and mitigation
   - 6-month expiration dates enforce periodic re-evaluation
+- **Expiration-enforced dependency-review exceptions** ([#37](https://github.com/vig-os/devcontainer/issues/37))
+  - Allow GHSA-wvrr-2x4r-394v (bats-file false positive) via `.github/dependency-review-allow.txt`
+  - CI validation step parses expiration dates and fails the pipeline when exceptions expire, forcing periodic review
 - **Branch name enforcement as a pre-commit hook** ([#38](https://github.com/vig-os/devcontainer/issues/38))
   - New `branch-name` hook enforcing `<type>/<issue>-<summary>` convention (e.g. `feature/38-standardize-branching-strategy-enforcement`)
   - Pre-commit configuration updated in repo and in workspace assets (`.pre-commit-config.yaml`, `assets/workspace/.pre-commit-config.yaml`)
@@ -184,15 +187,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Install script terminal check in dry-run mode** ([#37](https://github.com/vig-os/devcontainer/issues/37))
   - Moved TTY check to after dry-run flag check to allow --dry-run mode to exit immediately without requiring an interactive terminal
   - Fixes test_dry_run_shows_command timeout in CI environments
-- **Action outputs set conditionally** based on step outcome in composite actions — tar-file output only set when `output-type=tar`, test-result reflects actual test pass/fail ([#37](https://github.com/vig-os/devcontainer/issues/37))
 - **Sync-issues workflow robustness** — pinned runner to ubuntu-22.04, added target branch validation for `workflow_dispatch`, removed overly broad cache restore-key pattern ([#37](https://github.com/vig-os/devcontainer/issues/37))
 - **Integration test image tag normalization** — fixed overly greedy regex that removed commit hashes from image tags; now only removes known architecture suffixes (`-amd64`, `-arm64`) at the end ([#37](https://github.com/vig-os/devcontainer/issues/37))
-- **Project-checks CI failing on install.sh integration tests** — `TestInstallScriptIntegration` required a built container image but ran in the `project-checks` job which has no image; moved to dedicated `test_install_script.py` under the `test-integration` job ([#37](https://github.com/vig-os/devcontainer/issues/37))
 - **`just precommit` recipe** - Run pre-commit through `uv run` to ensure it uses the virtual environment ([#46](https://github.com/vig-os/devcontainer/issues/46))
-- **Hardened release workflows** — CI status check validation, eliminated double-push with PR creation as last step ([#48](https://github.com/vig-os/devcontainer/issues/48))
-- **PR and CI checks enforced as hard gates** (exit 1) in finalize-release workflow instead of soft warnings ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **Sidecar tests in CI** — run via host podman to avoid API version mismatch between host (3.4.4) and container client (4.0.0) ([#48](https://github.com/vig-os/devcontainer/issues/48))
-- **CI environment setup** — podman socket handling, base image tagging, docker-compose wrapper for devcontainer CLI compatibility ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **Non-ASCII characters in justfiles** - Replaced Unicode box-drawing characters (═, ───) and emojis with ASCII equivalents for just-lsp compatibility ([#49](https://github.com/vig-os/devcontainer/issues/49))
 - **Pre-commit exclusion pattern** for pymarkdown updated to correct regex ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Pytest test collection** - Exclude `tests/tmp/` directory (integration test workspaces) from test discovery to prevent import errors
@@ -204,6 +202,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vulnerabilities embedded in statically-linked GitHub CLI binary; low exploitability in devcontainer context
   - Each entry includes risk assessment, justification, and 3-month expiration date to force re-review
   - Awaiting upstream `gh` release with Go 1.25.7 or later
+- **GHSA-wvrr-2x4r-394v (bats-file false positive) accepted in dependency review** ([#37](https://github.com/vig-os/devcontainer/issues/37))
+  - Added to `.github/dependency-review-allow.txt` with 6-month expiration date enforced by CI
 - **Upgraded pip** in Containerfile to fix CVE-2025-8869 (symbolic link extraction vulnerability) ([#37](https://github.com/vig-os/devcontainer/issues/37))
 - **Digest-pinned base image** (`python:3.12-slim-bookworm`) with SHA256 checksum verification for all downloaded binaries and `.trivyignore` risk-assessment policy in Containerfile ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Minisign signature verification** for cargo-binstall downloads ([#50](https://github.com/vig-os/devcontainer/issues/50))
