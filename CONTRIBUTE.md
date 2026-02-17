@@ -17,6 +17,7 @@ This guide explains how to develop, build, test, and release the vigOS developme
 | **gh** | latest | GitHub CLI for repository and PR/issue management |
 | **npm** | latest | Node.js package manager (for DevContainer CLI) |
 | **uv** | >=0.8 | Python package and project manager |
+| **bats** | 1.13.0 | Bash Automated Testing System for shell script tests |
 | **devcontainer** | 0.81.1 | DevContainer CLI for testing devcontainer functionality |
 
 **Ubuntu/Debian:**
@@ -163,6 +164,7 @@ Available recipes:
 
     [test]
     test version="dev"              # Run all test suites
+    test-bats                       # Run BATS shell script tests
     test-cov *args                  # Run tests with coverage
     test-image version="dev"        # Run image tests only
     test-integration version="dev"  # Run integration tests only

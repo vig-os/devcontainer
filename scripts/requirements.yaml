@@ -126,6 +126,19 @@ dependencies:
       all: curl -LsSf https://astral.sh/uv/install.sh | sh
       manual: https://github.com/astral-sh/uv
 
+  # Shell testing (auto-installed by npm install)
+  - name: bats
+    version: "1.13.0"
+    purpose: Bash Automated Testing System for shell script tests
+    required: true
+    check:
+      command: command -v bats || test -x node_modules/.bin/bats
+      version_command: npx bats --version
+      version_regex: 'Bats (\d+\.\d+)'
+    install:
+      all: npm install
+      manual: https://bats-core.readthedocs.io/en/stable/installation.html#any-os-npm
+
   # DevContainer CLI (auto-installed by setup.sh)
   - name: devcontainer
     version: "0.81.1"

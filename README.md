@@ -150,6 +150,7 @@ Available recipes:
 
     [test]
     test version="dev"              # Run all test suites
+    test-bats                       # Run BATS shell script tests
     test-cov *args                  # Run tests with coverage
     test-image version="dev"        # Run image tests only
     test-integration version="dev"  # Run integration tests only

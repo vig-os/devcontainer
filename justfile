@@ -128,6 +128,12 @@ test-vig-utils:
     #!/usr/bin/env bash
     uv run pytest packages/vig-utils/tests -v -s --tb=short
 
+# Run BATS shell script tests
+[group('test')]
+test-bats:
+    #!/usr/bin/env bash
+    npx bats tests/bats/
+
 # Clean up lingering containers before running tests
 [private]
 _test-cleanup-check:
@@ -144,6 +150,7 @@ test version="dev":
     @just _ensure-dev-image {{ version }}
     #!/usr/bin/env bash
     TEST_CONTAINER_TAG={{ version }}  uv run pytest tests -v -s --tb=short
+    @just test-bats
 
 # ===============================================================================
 # RELEASE MANAGEMENT
