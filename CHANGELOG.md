@@ -48,6 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Chore Refs exemption** in commit message standard ([#37](https://github.com/vig-os/devcontainer/issues/37))
   - `chore` commits may omit the `Refs:` line when no issue or PR is directly related
   - Validator updated with `REFS_OPTIONAL_TYPES` to accept chore commits without Refs
+- **Dependency review exception for legacy test vulnerabilities** ([#37](https://github.com/vig-os/devcontainer/issues/37))
+  - GHSA-h4j5-c7cj-74xg (xmlhttprequest@1.5.0 arbitrary code injection) in unmaintained bats-assert dependencies
+  - GHSA-fjxv-7rqg-78g4 (form-data@2.3.3 unsafe random function) already documented
+  - Both isolated to CI-only test dependencies with no runtime risk
+  - Expiration dates enforce periodic review; documented in `.github/dependency-review-allow.txt`
 - **Dependency review exception for form-data vulnerability** ([#37](https://github.com/vig-os/devcontainer/issues/37))
   - Added exception for GHSA-fjxv-7rqg-78g4 (CVE-2025-7783) in `.github/dependency-review-allow.txt`
   - Vulnerability affects form-data@2.3.3 (transitive dependency: bats-assert → verbose → reconnect → request → form-data)
