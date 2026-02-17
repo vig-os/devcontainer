@@ -165,4 +165,9 @@ runs:
     - name: Export BATS_LIB_PATH
       if: inputs.install-bats == 'true'
       shell: bash
-      run: echo "BATS_LIB_PATH=${{ steps.bats.outputs.libpath }}" >> "$GITHUB_ENV"
+      run: |
+        # The bats-core/bats-action installs libraries to standard system paths
+        # Set BATS_LIB_PATH so bats_load_library can find them
+        BATS_LIB_PATH="/usr/lib/bats-support:/usr/lib/bats-assert:/usr/lib/bats-file"
+        echo "BATS_LIB_PATH=$BATS_LIB_PATH" >> "$GITHUB_ENV"
+        echo "Exported BATS_LIB_PATH=$BATS_LIB_PATH"
