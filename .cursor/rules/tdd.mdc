@@ -1,0 +1,16 @@
+---
+description: Test-driven development discipline when writing code
+alwaysApply: true
+---
+
+# TDD
+
+When implementing features or fixes that have testable behavior:
+
+1. Write the failing test first. Run it. Confirm it fails.
+2. Write minimal code to make the test pass. Run it. Confirm it passes.
+3. Refactor. Run tests. Confirm no regressions.
+
+Do not write implementation code before its test. If you already wrote code, delete it and start with the test.
+
+Skip TDD only for non-testable changes (config, templates, docs). Note why when skipping.

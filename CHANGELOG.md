@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Cursor commands and rules for agent-driven development workflows** ([#63](https://github.com/vig-os/devcontainer/issues/63))
+  - Always-on rules: `coding-principles.mdc` (YAGNI, minimal diff, DRY, no secrets, traceability, single responsibility) and `tdd.mdc` (RED-GREEN-REFACTOR discipline)
+  - Tier 1 commands: `start-issue.md`, `create-issue.md`, `brainstorm.md`, `tdd.md`, `review.md`, `verify.md`
+  - Tier 2 commands: `check-ci.md`, `fix-ci.md`
+  - Tier 3 commands: `plan.md`, `execute-plan.md`, `debug.md`
 - **`--org` flag for install script** ([#33](https://github.com/vig-os/devcontainer/issues/33))
   - Allows overriding the default organization name (default: `vigOS`)
   - Passes `ORG_NAME` as environment variable to the container
