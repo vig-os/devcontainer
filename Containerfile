@@ -58,6 +58,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     nano \
     minisign \
+    podman \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Generate en_US.UTF-8 locale
@@ -67,15 +68,6 @@ RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen
 ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
-
-# Install Podman client for Docker-out-of-Docker (DooD) pattern
-# This allows the container to communicate with the host's Podman daemon via mounted socket
-RUN set -eux; \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-        podman \
-    && rm -rf /var/lib/apt/lists/*; \
-    podman --version
 
 # Install latest GitHub CLI manually from releases
 # TARGETARCH is automatically provided by Docker BuildKit for multi-platform builds
@@ -206,7 +198,8 @@ RUN grep -rl '{{SHORT_NAME}}\|{{ORG_NAME}}\|{{IMAGE_TAG}}' /root/assets/workspac
 # This cache is used by the container (not copied to workspace by init-workspace.sh)
 # Host users will use their own cache (~/.cache/pre-commit or project-local)
 WORKDIR /root/assets/workspace
-RUN git init && \
+RUN git config --global init.defaultBranch main && \
+    git init && \
     PRE_COMMIT_HOME=/opt/pre-commit-cache \
     pre-commit install-hooks && \
     rm -rf .git
