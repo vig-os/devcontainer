@@ -33,3 +33,16 @@ GHSA-wvrr-2x4r-394v
 # Mitigation: Transitive dependency through unmaintained packages; usage in CI only
 Expiration: 2026-05-17
 GHSA-fjxv-7rqg-78g4
+
+# GHSA-h4j5-c7cj-74xg: xmlhttprequest@1.5.0 arbitrary code injection (indirect dependency)
+# Risk Assessment: CRITICAL - In unmaintained legacy test dependency context only
+# - Vulnerability affects xmlhttprequest@1.5.0 (from 2014)
+# - Transitive dependency: bats-assert → verbose → reconnect/engine.io → engine.io-client@0.7.12 → xmlhttprequest@1.5.0
+# - verbose, reconnect, and engine.io-client@0.7.12 are unmaintained legacy packages
+# - Risk: Arbitrary Code Injection vulnerability (GHSA-h4j5-c7cj-74xg)
+# - Impact: Limited in test-only dependency context (CI/development environment)
+# - No runtime execution of untrusted xmlhttprequest code in CI tests
+# - Being investigated as part of BATS framework modernization efforts
+# Mitigation: Transitive dependency through unmaintained packages; isolated CI-only usage
+Expiration: 2026-08-17
+GHSA-h4j5-c7cj-74xg
