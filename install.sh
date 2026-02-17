@@ -418,6 +418,71 @@ info "Running post-initialization setup..."
 # Non-fatal: warnings about missing SSH keys or GH CLI are expected on CI/fresh machines
 run_user_conf "$PROJECT_PATH" || true
 
+# 2. Git repository setup (init, initial commit, dev branch)
+# Runs on the host (not in container) so that SSH agent is available for commit signing
+info "Setting up git repository..."
+
+setup_git_repo() {
+    local workspace_dir="$1"
+    local created_repo=false
+
+    echo "Verifying git repository..."
+    cd "$workspace_dir"
+
+    # Initialize git repo if missing
+    if [ ! -d ".git" ]; then
+        echo "No git repository found, initializing..."
+        git init -b main
+        created_repo=true
+        echo "Git repository initialized with 'main' branch"
+    fi
+
+    # Create initial commit if repo has no commits (enables branch creation)
+    if ! git rev-parse HEAD >/dev/null 2>&1; then
+        echo "Creating initial commit..."
+        git add -A
+        git commit -m "chore: initial project scaffold" --allow-empty
+        created_repo=true
+        echo "Initial commit created"
+    fi
+
+    # Verify or create branches
+    if [ "$created_repo" = true ]; then
+        # New repo: create dev branch from main
+        if ! git rev-parse --verify dev >/dev/null 2>&1; then
+            echo "Creating 'dev' branch..."
+            git branch dev
+            echo "'dev' branch created"
+        fi
+    else
+        # Existing repo: warn about missing branches
+        if ! git rev-parse --verify main >/dev/null 2>&1; then
+            echo "Warning: Branch 'main' not found in existing repository"
+            echo "  The project workflow expects a 'main' branch."
+        fi
+        if ! git rev-parse --verify dev >/dev/null 2>&1; then
+            echo "Warning: Branch 'dev' not found in existing repository"
+            echo "  The project workflow expects a 'dev' branch."
+            echo "  Create it with: git branch dev"
+        fi
+    fi
+
+    echo ""
+    echo "Git repository setup complete."
+    echo ""
+    echo "You can set a remote origin with:"
+    echo "  git remote add origin <your-repo-url>"
+    echo "Then push your branches with:"
+    echo "  git push -u origin main dev"
+    echo ""
+}
+
+if ! setup_git_repo "$PROJECT_PATH"; then
+    warn "Git repository setup failed (non-fatal)"
+    echo "  You can set up the repository manually with:"
+    echo "    cd $PROJECT_PATH && git init -b main && git add -A && git commit -m 'chore: initial project scaffold'"
+fi
+
 # ── Done ──────────────────────────────────────────────────────────────────────
 
 echo ""

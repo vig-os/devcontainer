@@ -250,3 +250,61 @@ class TestInstallScriptIntegration:
             assert file_path.is_file(), (
                 f"'{filename}' exists in gh/ but is not a regular file"
             )
+
+    def test_install_creates_git_repository(self, install_workspace):
+        """Test install.sh initializes a git repository."""
+        git_dir = install_workspace / ".git"
+        assert git_dir.exists(), ".git directory not created"
+        assert git_dir.is_dir(), ".git is not a directory"
+
+    def test_install_initial_commit(self, install_workspace):
+        """Test git repository has correct initial commit."""
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(install_workspace),
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, "Failed to get HEAD commit"
+        assert result.stdout.strip(), "No initial commit found"
+
+        result = subprocess.run(
+            ["git", "log", "-1", "--pretty=%s"],
+            cwd=str(install_workspace),
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, "Failed to get commit message"
+        assert result.stdout.strip() == "chore: initial project scaffold", (
+            f"Expected 'chore: initial project scaffold', got: {result.stdout.strip()}"
+        )
+
+    def test_install_git_branches(self, install_workspace):
+        """Test git repository has main and dev branches."""
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", "main"],
+            cwd=str(install_workspace),
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, "main branch not found"
+
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", "dev"],
+            cwd=str(install_workspace),
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, "dev branch not found"
+
+    def test_install_git_all_files_committed(self, install_workspace):
+        """Test all workspace files are committed (no uncommitted changes)."""
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(install_workspace),
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, "Failed to check git status"
+        # Should be empty (no uncommitted changes)
+        assert not result.stdout.strip(), f"Found uncommitted changes:\n{result.stdout}"

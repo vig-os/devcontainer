@@ -167,6 +167,7 @@ Available recipes:
     test-bats                       # Run BATS shell script tests
     test-cov *args                  # Run tests with coverage
     test-image version="dev"        # Run image tests only
+    test-install                    # Run install script tests only
     test-integration version="dev"  # Run integration tests only
     test-pytest *args               # Run tests with pytest
     test-utils                      # Run utils tests only

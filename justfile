@@ -116,6 +116,12 @@ test-utils:
     #!/usr/bin/env bash
     uv run pytest tests/test_utils.py -v -s --tb=short
 
+# Run install script tests only
+[group('test')]
+test-install:
+    #!/usr/bin/env bash
+    uv run pytest tests/test_install_script.py -v -s --tb=short
+
 # Run validate commit msg tests only
 [group('test')]
 test-validate-commit-msg:
