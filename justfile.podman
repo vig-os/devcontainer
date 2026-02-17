@@ -75,7 +75,7 @@ podman-kill-all:
     #!/usr/bin/env bash
     CONTAINERS=$(podman ps -aq 2>/dev/null)
     if [ -n "$CONTAINERS" ]; then
-        echo "Removing Removing all containers..."
+        echo "Removing all containers..."
         echo "$CONTAINERS" | xargs podman rm -f
         echo "[OK] All containers removed"
     else
@@ -86,7 +86,7 @@ podman-kill-all:
 [group('podman')]
 podman-kill-project:
     #!/usr/bin/env bash
-    echo "Removing Removing project-related containers..."
+    echo "Removing project-related containers..."
     FMT=$(printf '\x7b\x7b.ID\x7d\x7d')
     CONTAINERS=$(podman ps -a --filter "name=devcontainer" --filter "name=test-sidecar" --filter "name=init-workspace" --filter "name=workspace-inspector" --format "$FMT" 2>/dev/null || true)
     if [ -n "$CONTAINERS" ]; then
