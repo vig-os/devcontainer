@@ -153,6 +153,7 @@ runs:
     # Installs BATS core and helper libraries via the official action.
     # Versions match package.json to keep local and CI environments in sync.
     - name: Setup BATS and libraries
+      id: bats
       if: inputs.install-bats == 'true'
       uses: bats-core/bats-action@77d6fb60505b4d0d1d73e48bd035b55074bbfb43  # v4.0.0
       with:
@@ -160,3 +161,8 @@ runs:
         assert-version: '2.1.0'
         file-version: '0.4.0'
         detik-install: 'false'
+
+    - name: Export BATS_LIB_PATH
+      if: inputs.install-bats == 'true'
+      shell: bash
+      run: echo "BATS_LIB_PATH=${{ steps.bats.outputs.libpath }}" >> "$GITHUB_ENV"
