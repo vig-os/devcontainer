@@ -374,14 +374,16 @@ declare -a CMD=(
     /root/assets/init-workspace.sh --no-prompts
 )
 
-if [ "$FORCE" = true ]; then
+if [ -n "$FORCE" ]; then
     CMD+=(--force)
 fi
 
 if [ "$DRY_RUN" = true ]; then
     info "Would execute:"
-    printf "  "
-    printf "%s " "${CMD[@]}"
+    printf "  %s" "$RUNTIME run --rm -e SHORT_NAME=\"$PROJECT_NAME\" -e ORG_NAME=\"$ORG_NAME\" -v $PROJECT_PATH:/workspace $IMAGE /root/assets/init-workspace.sh --no-prompts"
+    if [ -n "$FORCE" ]; then
+        printf " %s" "--force"
+    fi
     printf "\n"
     exit 0
 fi
