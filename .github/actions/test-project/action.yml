@@ -2,8 +2,9 @@
 #
 # This action is self-contained and handles:
 # - Checks out repository code
-# - Sets up the environment (uv, Python deps) via setup-env
+# - Sets up the environment (uv, Python deps, BATS) via setup-env
 # - Runs pre-commit linters (ruff, shellcheck, pymarkdown, etc.)
+# - Runs BATS shell script tests
 # - Runs project-level tests (utils, commit-msg, action-pins, prepare-changelog)
 # - Generates code coverage report and GitHub Actions job summary (suite: all)
 #
@@ -44,6 +45,7 @@ runs:
       uses: ./.github/actions/setup-env
       with:
         sync-dependencies: 'true'
+        install-bats: 'true'
 
     - name: Cache pre-commit hooks
       if: inputs.suite == 'all' || inputs.suite == 'lint'
@@ -67,8 +69,16 @@ runs:
         echo "Running pre-commit hooks on all files..."
         uv run pre-commit run --all-files --show-diff-on-failure --color=always
 
-    # --- Individual suite runs (no coverage, for targeted testing) -----------
+    # --- BATS shell script tests ---------------------------------------------
+    - name: Run BATS shell script tests
+      if: inputs.suite == 'all'
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Running BATS tests..."
+        bats tests/bats/
 
+    # --- Individual suite runs (no coverage, for targeted testing) -----------
     - name: Run utility tests
       if: inputs.suite == 'utils'
       shell: bash
@@ -77,7 +87,6 @@ runs:
       run: uv run pytest tests/test_utils.py $TEST_ARGS
 
     # --- Combined run with coverage (suite: all) ----------------------------
-
     - name: Run project tests with coverage
       if: inputs.suite == 'all'
       shell: bash

@@ -4,6 +4,7 @@
 # - Podman (for container operations)
 # - Node.js (for JS tooling)
 # - Devcontainer CLI + docker-compose wrapper (for integration tests)
+# - BATS + helper libraries (for shell script testing)
 #
 # IMPORTANT: The caller must checkout the repository before using this action.
 # This action does NOT checkout code, allowing callers to control ref, token,
@@ -15,6 +16,7 @@
 #   install-node:             Install Node.js (default: false)
 #   node-version:             Node.js version (default: '20')
 #   install-devcontainer-cli: Install devcontainer CLI + docker-compose wrapper (default: false)
+#   install-bats:             Install BATS + helper libraries (default: false)
 #
 # Outputs:
 #   uv-version: The version of uv that was installed
@@ -39,7 +41,7 @@
 #       install-devcontainer-cli: 'true'
 
 name: 'Setup Environment'
-description: 'Set up CI environment with Python, uv, and optional tools (podman, Node.js, devcontainer CLI)'
+description: 'Set up CI environment with Python, uv, and optional tools (podman, Node.js, devcontainer CLI, BATS)'
 
 inputs:
   sync-dependencies:
@@ -66,6 +68,10 @@ inputs:
     description: 'Install just command runner for Justfile support'
     required: false
     default: 'true'
+  install-bats:
+    description: 'Install BATS and helper libraries (support, assert, file) for shell testing'
+    required: false
+    default: 'false'
 
 outputs:
   uv-version:
@@ -142,3 +148,15 @@ runs:
         echo "Installing @devcontainers/cli@${DEVCONTAINER_VERSION}..."
         npm install -g "@devcontainers/cli@${DEVCONTAINER_VERSION}"
         echo "devcontainer $(devcontainer --version)"
+
+    # ── BATS (shell testing) ─────────────────────────────────────────
+    # Installs BATS core and helper libraries via the official action.
+    # Versions match package.json to keep local and CI environments in sync.
+    - name: Setup BATS and libraries
+      if: inputs.install-bats == 'true'
+      uses: bats-core/bats-action@77d6fb60505b4d0d1d73e48bd035b55074bbfb43  # v4.0.0
+      with:
+        support-version: '0.3.0'
+        assert-version: '2.1.0'
+        file-version: '0.4.0'
+        detik-install: 'false'
