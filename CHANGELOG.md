@@ -48,6 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Chore Refs exemption** in commit message standard ([#37](https://github.com/vig-os/devcontainer/issues/37))
   - `chore` commits may omit the `Refs:` line when no issue or PR is directly related
   - Validator updated with `REFS_OPTIONAL_TYPES` to accept chore commits without Refs
+- **Dependency review exception for form-data vulnerability** ([#37](https://github.com/vig-os/devcontainer/issues/37))
+  - Added exception for GHSA-fjxv-7rqg-78g4 (CVE-2025-7783) in `.github/dependency-review-allow.txt`
+  - Vulnerability affects form-data@2.3.3 (transitive dependency: bats-assert → verbose → reconnect → request → form-data)
+  - Risk assessment: MEDIUM - exploit requires active MITM + attacker control of request field
+  - Impact limited to CI/test environment (usage in BATS test dependencies only)
+  - Expiration set to 2026-05-17 to force periodic review and investigation of BATS alternatives
   - Comprehensive test suite (`TestChoreRefsExemption`) covering all exemption scenarios
 - **Bandit and Safety security scanning** ([#37](https://github.com/vig-os/devcontainer/issues/37), [#50](https://github.com/vig-os/devcontainer/issues/50))
   - Bandit pre-commit hook for medium/high/critical severity Python code analysis
