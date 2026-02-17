@@ -213,43 +213,75 @@ class TestInstallScriptIntegration:
         assert conf_dir.is_dir(), ".devcontainer/.conf/ is not a directory"
 
     def test_install_conf_directory_contains_expected_files(self, install_workspace):
-        """Test .devcontainer/.conf/ contains expected configuration files."""
+        """Test .devcontainer/.conf/ contains expected configuration files.
+
+        Files are split into two categories:
+        - Required: always created by copy-host-user-conf.sh (git config)
+        - Optional: only created when host has the corresponding tool/config
+          (SSH key, allowed-signers, gh CLI auth, gh CLI config directory)
+        """
         conf_dir = install_workspace / ".devcontainer" / ".conf"
 
-        # Expected files
-        expected_files = {
-            "id_ed25519_github.pub",
-            "allowed-signers",
+        # Required files — always generated from git config
+        required_files = {
             ".gitconfig.global",
             ".gitconfig",
-            ".gh_token",
         }
 
-        # Check that all expected files exist
-        for filename in expected_files:
+        for filename in required_files:
             file_path = conf_dir / filename
             assert file_path.exists(), (
                 f"Expected file '{filename}' not found in .devcontainer/.conf/"
             )
             assert file_path.is_file(), f"'{filename}' exists but is not a regular file"
 
-        # Expected subdirectory
-        gh_dir = conf_dir / "gh"
-        assert gh_dir.exists(), (
-            "Expected 'gh' subdirectory not found in .devcontainer/.conf/"
-        )
-        assert gh_dir.is_dir(), "'gh' exists but is not a directory"
+        # Optional files — depend on host environment (SSH key, git
+        # allowed-signers, gh CLI authentication).  Warn instead of failing so
+        # the test is stable in CI where these may not be configured.
+        optional_files = {
+            "id_ed25519_github.pub": "SSH public key (~/.ssh/id_ed25519_github.pub)",
+            "allowed-signers": "Git allowed-signers (~/.config/git/allowed-signers)",
+            ".gh_token": "GitHub CLI authentication (gh auth login)",
+        }
 
-        # Check gh/ subdirectory contents
-        expected_gh_files = {"config.yml", "hosts.yml"}
-        for filename in expected_gh_files:
-            file_path = gh_dir / filename
-            assert file_path.exists(), (
-                f"Expected file '{filename}' not found in .devcontainer/.conf/gh/"
+        for filename, description in optional_files.items():
+            file_path = conf_dir / filename
+            if not file_path.exists():
+                import warnings
+
+                warnings.warn(
+                    f"{filename} not found in .devcontainer/.conf/ "
+                    f"(this is optional if {description} is not available on host)",
+                    stacklevel=2,
+                )
+            else:
+                assert file_path.is_file(), (
+                    f"'{filename}' exists but is not a regular file"
+                )
+
+        # Optional subdirectory — gh CLI config (~/.config/gh)
+        gh_dir = conf_dir / "gh"
+        if not gh_dir.exists():
+            import warnings
+
+            warnings.warn(
+                "gh/ subdirectory not found in .devcontainer/.conf/ "
+                "(this is optional if ~/.config/gh is not present on host)",
+                stacklevel=2,
             )
-            assert file_path.is_file(), (
-                f"'{filename}' exists in gh/ but is not a regular file"
-            )
+        else:
+            assert gh_dir.is_dir(), "'gh' exists but is not a directory"
+
+            # Check gh/ subdirectory contents
+            expected_gh_files = {"config.yml", "hosts.yml"}
+            for filename in expected_gh_files:
+                file_path = gh_dir / filename
+                assert file_path.exists(), (
+                    f"Expected file '{filename}' not found in .devcontainer/.conf/gh/"
+                )
+                assert file_path.is_file(), (
+                    f"'{filename}' exists in gh/ but is not a regular file"
+                )
 
     def test_install_creates_git_repository(self, install_workspace):
         """Test install.sh initializes a git repository."""
