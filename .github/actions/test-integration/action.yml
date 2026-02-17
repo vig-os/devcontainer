@@ -1,0 +1,246 @@
+# Composite action to run integration tests
+#
+# This action is self-contained and handles the complete integration test process:
+# - Checks out repository code (self-contained - no workflow checkout needed)
+# - Sets up the environment (uv, Python deps, podman, Node.js, devcontainer CLI) via setup-env
+# - Runs devcontainer integration tests
+#
+# Unlike test-image which tests the image properties, this tests the full
+# devcontainer lifecycle including initialization, git configuration, SSH setup,
+# and sidecar containers.
+#
+# Inputs:
+#   image-tag: Image tag to test (e.g., 1.0.0-amd64)
+#   registry: Container registry URL (default: ghcr.io/vig-os/devcontainer)
+#
+# Outputs:
+#   test-result: Test exit code (0=pass, non-zero=fail)
+#
+# Usage:
+#   - uses: ./.github/actions/test-integration
+#     with:
+#       image-tag: '1.0.0-amd64'
+
+name: 'Integration Tests'
+description: 'Set up environment and run devcontainer integration tests'
+
+inputs:
+  image-tag:
+    description: 'Image tag to test (e.g., 1.0.0-amd64)'
+    required: true
+  registry:
+    description: 'Container registry URL'
+    required: false
+    default: 'ghcr.io/vig-os/devcontainer'
+
+outputs:
+  test-result:
+    description: 'Test exit code (0=pass, 1=fail)'
+    value: ${{ steps.set-result.outputs.result }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+    - name: Set up test environment
+      uses: ./.github/actions/setup-env
+      with:
+        sync-dependencies: 'true'
+        install-podman: 'true'
+        install-devcontainer-cli: 'true'
+
+    - name: Load image from tar
+      shell: bash
+      run: |
+        set -euo pipefail
+        TAR_FILE="/tmp/image.tar"
+
+        echo "Loading image from $TAR_FILE into podman..."
+
+        if [ ! -f "$TAR_FILE" ]; then
+          echo "ERROR: Tar file not found: $TAR_FILE"
+          echo "Contents of /tmp:"
+          ls -lh /tmp/ || true
+          exit 1
+        fi
+
+        # Retry logic for podman load (can fail with corrupted downloads)
+        RETRIES=2
+        for i in $(seq 1 $RETRIES); do
+          if LOADED_IMAGE=$(podman load < "$TAR_FILE" 2>&1 | grep -oP 'Loaded image.*: \K.*'); then
+            echo "Loaded image: $LOADED_IMAGE"
+
+            # Tag the loaded image with the expected name
+            IMAGE_TAG="${{ inputs.registry }}:${{ inputs.image-tag }}"
+            podman tag "$LOADED_IMAGE" "$IMAGE_TAG"
+            echo "Tagged image as: $IMAGE_TAG"
+
+            # Also tag without the arch suffix (e.g. 99.0.1-amd64 -> 99.0.1)
+            # docker-compose.yml inside the workspace uses the base version
+            BASE_TAG="${{ inputs.image-tag }}"
+            BASE_TAG="${BASE_TAG%-*}"  # strip -amd64 / -arm64
+            if [ "$BASE_TAG" != "${{ inputs.image-tag }}" ]; then
+              BASE_IMAGE_TAG="${{ inputs.registry }}:${BASE_TAG}"
+              podman tag "$LOADED_IMAGE" "$BASE_IMAGE_TAG"
+              echo "Tagged image as: $BASE_IMAGE_TAG"
+            fi
+
+            # Verify the image is available
+            podman images | grep "${{ inputs.registry }}"
+            echo "Image loaded successfully into podman"
+            break
+          else
+            if [ $i -lt $RETRIES ]; then
+              echo "Image load failed, retrying ($i/$RETRIES)..."
+              sleep 1
+            else
+              echo "Image load failed after $RETRIES attempts"
+              exit 1
+            fi
+          fi
+        done
+
+    - name: Verify image is available
+      shell: bash
+      run: |
+        set -euo pipefail
+        FULL_TAG="${{ inputs.registry }}:${{ inputs.image-tag }}"
+
+        echo "Verifying image exists: $FULL_TAG"
+
+        if ! podman image exists "$FULL_TAG"; then
+          echo "ERROR: Image not found: $FULL_TAG"
+          echo "Available images:"
+          podman images
+          exit 1
+        fi
+
+        echo "Image verified: $FULL_TAG"
+
+    - name: Start podman socket
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Starting podman socket service..."
+
+        # Start podman socket in systemd (user mode)
+        systemctl --user start podman.socket || true
+
+        # Alternative: start socket directly
+        podman system service --time=0 unix:///run/user/$(id -u)/podman/podman.sock &
+        sleep 2
+
+        # Verify socket is accessible
+        if [ -S "/run/user/$(id -u)/podman/podman.sock" ]; then
+          SOCK="/run/user/$(id -u)/podman/podman.sock"
+          echo "Podman socket started successfully"
+          echo "CONTAINER_SOCKET_PATH=$SOCK" >> $GITHUB_ENV
+        else
+          echo "Warning: Podman socket not found at expected location"
+          # Fallback to rootful socket if available
+          if [ -S "/run/podman/podman.sock" ]; then
+            SOCK="/run/podman/podman.sock"
+            echo "Using rootful podman socket"
+            echo "CONTAINER_SOCKET_PATH=$SOCK" >> $GITHUB_ENV
+          fi
+        fi
+
+        # Point DOCKER_HOST at the podman socket so that docker-compose
+        # (wrapper around 'docker compose') talks to podman, not dockerd.
+        # Without this, 'docker compose up' cannot find images loaded into podman.
+        if [ -n "${SOCK:-}" ]; then
+          echo "DOCKER_HOST=unix://$SOCK" >> $GITHUB_ENV
+          echo "Docker CLI will use podman socket at: $SOCK"
+        fi
+
+    - name: Setup SSH agent for tests
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # Start SSH agent for git signing tests
+        eval "$(ssh-agent -s)"
+
+        # Create a test SSH key (for testing purposes only)
+        mkdir -p ~/.ssh
+        ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_github -N "" -C "test@example.com"
+
+        # Add to agent
+        ssh-add ~/.ssh/id_ed25519_github
+
+        echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> $GITHUB_ENV
+        echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> $GITHUB_ENV
+
+        echo "SSH agent configured for integration tests"
+
+    - name: Configure git for tests
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # Configure git for the test environment
+        git config --global user.name "Test User"
+        git config --global user.email "test@example.com"
+        git config --global gpg.format ssh
+        git config --global user.signingkey "$(cat ~/.ssh/id_ed25519_github.pub)"
+        git config --global commit.gpgsign true
+
+        # Setup allowed signers for signature verification
+        mkdir -p ~/.config/git
+        echo "test@example.com $(cat ~/.ssh/id_ed25519_github.pub)" > ~/.config/git/allowed-signers
+        git config --global gpg.ssh.allowedSignersFile ~/.config/git/allowed-signers
+
+        echo "Git configuration complete"
+
+    - name: Run integration tests
+      id: run-tests
+      shell: bash
+      env:
+        TEST_CONTAINER_TAG: ${{ inputs.image-tag }}
+      run: |
+        set -euo pipefail
+
+        echo "Running integration tests..."
+        echo "Test image: ${{ inputs.registry }}:$TEST_CONTAINER_TAG"
+
+        # Run integration tests with verbose output
+        uv run pytest tests/test_integration.py tests/test_install_script.py \
+          -v \
+          --tb=short \
+          --color=yes \
+          --maxfail=5 \
+          -x
+
+        echo "All integration tests passed"
+
+    - name: Set test result
+      id: set-result
+      if: always()
+      shell: bash
+      run: |
+        if [ "${{ steps.run-tests.outcome }}" = "success" ]; then
+          echo "result=0" >> $GITHUB_OUTPUT
+        else
+          echo "result=1" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Cleanup test containers
+      if: always()
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "Cleaning up test containers..."
+
+        # Stop all devcontainers created during tests
+        podman ps -a --filter "name=workspace-devcontainer" -q | xargs -r podman rm -f || true
+        podman ps -a --filter "name=test-sidecar" -q | xargs -r podman rm -f || true
+
+        # Stop SSH agent
+        if [ -n "${SSH_AGENT_PID:-}" ]; then
+          kill $SSH_AGENT_PID || true
+        fi
+
+        echo "Cleanup complete"

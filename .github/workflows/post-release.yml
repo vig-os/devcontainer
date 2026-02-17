@@ -1,0 +1,150 @@
+# Post-Release - Sync dev with main after merge
+#
+# Triggered automatically when a PR is merged into main.
+# Keeps the dev branch in sync by merging main back into dev.
+#
+# After a release merge (release/X.Y.Z -> main):
+#   - Merges main into dev
+#   - Resets CHANGELOG Unreleased section for next cycle
+#   - Deletes the release branch
+#
+# After any other merge to main (e.g., hotfix):
+#   - Merges main into dev
+#   - CHANGELOG reset is skipped (Unreleased section already exists)
+
+name: Post-Release
+
+on:  # yamllint disable-line rule:truthy
+  # NOTE: GitHub Actions does not support a "merged" filter on pull_request triggers.
+  # This fires on every closed PR targeting main; the job-level `if` condition
+  # below correctly skips runs where the PR was closed without merging.
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      git-user-name:
+        description: 'Git user name for commits'
+        required: false
+        default: 'vigOS Release Bot'
+        type: string
+      git-user-email:
+        description: 'Git user email for commits'
+        required: false
+        default: 'release@vig-os.local'
+        type: string
+
+permissions:
+  contents: read       # safe default; sync-dev job escalates as needed
+
+jobs:
+  sync-dev:
+    name: Sync dev with main
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write    # push merge commit to dev
+      actions: write     # trigger sync-issues workflow
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch'
+       || github.event.pull_request.merged == true }}
+
+    steps:
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
+        with:
+          app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
+          private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
+
+      - name: Checkout dev branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          ref: dev
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+
+      - name: Configure git
+        env:
+          GIT_USER_NAME: ${{ inputs.git-user-name || 'vigOS Release Bot' }}
+          GIT_USER_EMAIL: ${{ inputs.git-user-email || 'release@vig-os.local' }}
+        run: |
+          git config user.name "$GIT_USER_NAME"
+          git config user.email "$GIT_USER_EMAIL"
+
+      - name: Merge main into dev
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          if git merge origin/main --no-edit; then
+            echo "✓ Merged main into dev"
+          else
+            echo "ERROR: Merge conflict merging main into dev"
+            echo ""
+            echo "Manual resolution required:"
+            echo "  git checkout dev"
+            echo "  git pull origin dev"
+            echo "  git merge origin/main"
+            echo "  # resolve conflicts..."
+            echo "  git commit"
+            echo "  git push origin dev"
+            exit 1
+          fi
+
+      - name: Set up environment
+        uses: ./.github/actions/setup-env
+        with:
+          sync-dependencies: 'true'
+
+      - name: Reset CHANGELOG for next cycle
+        id: reset-changelog
+        # Only reset after a release merge (release/X.Y.Z -> main).
+        # Hotfix merges already have the Unreleased section; reset would fail.
+        if: startsWith(github.event.pull_request.head.ref, 'release/')
+        run: |
+          set -euo pipefail
+          uv run prepare-changelog reset CHANGELOG.md
+          echo "✓ CHANGELOG Unreleased section reset"
+          echo "reset=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push changes
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit (dev already in sync)"
+          else
+            COMMIT_MSG="chore: sync dev with main after merge"
+            if [ -n "$PR_NUMBER" ]; then
+              COMMIT_MSG="$COMMIT_MSG
+
+          Refs: #$PR_NUMBER"
+            fi
+            git commit -m "$COMMIT_MSG" --no-verify
+            git push origin dev
+            echo "✓ Changes committed and pushed to dev"
+          fi
+
+      - name: Trigger sync-issues workflow
+        run: |
+          set -euo pipefail
+          echo "Triggering sync-issues workflow..."
+          gh workflow run sync-issues.yml \
+            -f "target-branch=dev"
+          echo "✓ sync-issues workflow triggered"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Summary
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CHANGELOG_RESET: ${{ steps.reset-changelog.outcome }}
+        run: |
+          echo "✓ Post-release sync complete"
+          echo ""
+          echo "Trigger: $EVENT_NAME"
+          echo "CHANGELOG reset: $CHANGELOG_RESET"
