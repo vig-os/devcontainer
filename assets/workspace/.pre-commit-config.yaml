@@ -73,12 +73,9 @@ repos:
         files: ^justfile(\..*)?$
         pass_filenames: false
 
-  # Typo Linting
-  - repo: https://github.com/crate-ci/typos
-    rev: 07d900b8fa1097806b8adb6391b0d3e0ac2fdea7  # v1.39.0
+  # Documentation Generation (auto-regenerate on template/requirements changes)
+  - repo: local
     hooks:
-      - id: typos
-
   # License Compliance Check (runs only when dependencies change)
   - repo: local
     hooks:
@@ -104,7 +101,7 @@ repos:
     hooks:
       - id: bandit
         name: bandit (Python security linting)
-        entry: uv run bandit -r packages/vig-utils/src/ scripts/ assets/workspace/ -ll
+        entry: uv run bandit -r src/ -ll
         language: system
         types: [python]
         pass_filenames: false

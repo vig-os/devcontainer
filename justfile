@@ -46,10 +46,52 @@ info:
 init *args:
     ./scripts/init.sh {{ args }}
 
+# Initialize a workspace with devcontainer template files
+[group('info')]
+init-workspace path *flags:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Resolve absolute path
+    TARGET_PATH=$(cd "{{ path }}" 2>/dev/null && pwd || echo "{{ path }}")
+
+    # Check if path exists
+    if [ ! -d "$TARGET_PATH" ]; then
+        echo "[ERROR] Directory does not exist: $TARGET_PATH"
+        echo "Please create the directory first or provide a valid path."
+        exit 1
+    fi
+
+    # Detect container runtime
+    if command -v podman >/dev/null 2>&1; then
+        RUNTIME="podman"
+    elif command -v docker >/dev/null 2>&1; then
+        RUNTIME="docker"
+    else
+        echo "[ERROR] Neither podman nor docker found."
+        echo "Please install a container runtime first."
+        exit 1
+    fi
+
+    echo "Initializing workspace at: $TARGET_PATH"
+    echo "Using runtime: $RUNTIME"
+    echo ""
+
+    # Run the init-workspace.sh script from the container
+    $RUNTIME run -it --rm \
+        -v "$TARGET_PATH:/workspace" \
+        "{{ repo }}:latest" \
+        /root/assets/init-workspace.sh {{ flags }}
+
 # Generate documentation from templates
 [group('info')]
 docs:
     uv run python docs/generate.py
+
+# Sync workspace templates from repo root to assets/workspace/
+[group('info')]
+sync-workspace:
+    scripts/sync-workspace.sh
 
 # Test login to GHCR
 [group('info')]

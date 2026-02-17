@@ -134,7 +134,9 @@ Available recipes:
     help                            # Show available commands
     info                            # Show image information
     init *args                      # Install system dependencies and setup development environment
+    init-workspace path *flags      # Initialize a workspace with devcontainer template files
     login                           # Test login to GHCR
+    sync-workspace                  # Sync workspace templates from repo root to assets/workspace/
 
     [podman]
     podman-kill name                # Stop and remove a container by name or ID

@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Cursor commands and rules for agent-driven development workflows** ([#63](https://github.com/vig-os/devcontainer/issues/63))
+  - Always-on rules: `coding-principles.mdc` (YAGNI, minimal diff, DRY, no secrets, traceability, single responsibility) and `tdd.mdc` (RED-GREEN-REFACTOR discipline)
+  - Tier 1 commands: `start-issue.md`, `create-issue.md`, `brainstorm.md`, `tdd.md`, `review.md`, `verify.md`
+  - Tier 2 commands: `check-ci.md`, `fix-ci.md`
+  - Tier 3 commands: `plan.md`, `execute-plan.md`, `debug.md`
+- **Workspace template sync mechanism for Cursor and GitHub files** ([#63](https://github.com/vig-os/devcontainer/issues/63))
+  - `scripts/sync-workspace.sh` copies `.cursor/`, `.github/` templates, and supporting files from repo root to `assets/workspace/` with generalizations
+  - `just sync-workspace` recipe for manual sync
+  - Pre-commit hook auto-syncs workspace templates when source files change
+  - Ground truth lives in repo root; `assets/workspace/` is generated output
+  - New files in `.cursor/` or `.github/ISSUE_TEMPLATE/` auto-ship to downstream projects
+- **GitHub issue and PR templates in workspace template** ([#63](https://github.com/vig-os/devcontainer/issues/63))
+  - Pull request template (`.github/pull_request_template.md`)
+  - Issue templates: `task.yml`, `feature_request.yml`, `bug_report.yml`
+  - Generalized Dependabot configuration (GitHub Actions, pip, npm)
+  - Git commit message template (`.gitmessage`)
 - **`--org` flag for install script** ([#33](https://github.com/vig-os/devcontainer/issues/33))
   - Allows overriding the default organization name (default: `vigOS`)
   - Passes `ORG_NAME` as environment variable to the container
