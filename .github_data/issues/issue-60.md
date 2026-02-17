@@ -1,18 +1,18 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-17T19:33:45Z
-updated: 2026-02-17T19:33:45Z
+updated: 2026-02-17T19:34:27Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/60
-comments: 0
+comments: 1
 labels: bug
 assignees: none
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-17T19:34:02.544Z
+synced: 2026-02-17T19:34:46.721Z
 ---
 
 # [Issue 60]: [[BUG] Host-specific paths in .gitconfig and unreliable postAttachCommand lifecycle](https://github.com/vig-os/devcontainer/issues/60)
@@ -58,3 +58,19 @@ The devcontainer setup scripts have two related issues with git/SSH/gh configura
 1. Fix `copy-host-user-conf.sh` awk block to rewrite paths and strip host-only entries at export time (fix at the source)
 2. Refactor lifecycle: move one-time setup into `postCreateCommand`, keep only auth verification in `postAttachCommand`
 3. Extract SSH agent + gh auth verification into a separate `verify-auth.sh` script
+---
+
+# [Comment #1]() by [gerchowl]()
+
+_Posted on February 17, 2026 at 07:34 PM_
+
+Fixed in commit 07aaab3 on `dev` branch.
+
+**Changes:**
+- `copy-host-user-conf.sh`: awk block now rewrites `signingkey` and `allowedsignersfile` to container paths (`/root/...`) and strips host-only entries (`credential`, `excludesfile`, `includeIf`) at export time
+- `post-create.sh`: now runs all one-time setup (`init-git.sh`, `setup-git-conf.sh`, `init-precommit.sh`, `uv sync`)
+- `setup-git-conf.sh`: stripped down to one-time file placement and gh auth (removed SSH agent scanning)
+- `verify-auth.sh`: new script for lightweight SSH agent + gh auth verification
+- `post-attach.sh`: now only calls `verify-auth.sh` (no longer critical if it doesn't fire)
+- Tests updated to expect `verify-auth.sh` in file lists
+
