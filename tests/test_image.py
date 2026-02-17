@@ -403,6 +403,7 @@ class TestFileStructure:
             "/root/assets/workspace/.devcontainer/scripts/init-git.sh",
             "/root/assets/workspace/.devcontainer/scripts/init-precommit.sh",
             "/root/assets/workspace/.devcontainer/scripts/setup-git-conf.sh",
+            "/root/assets/workspace/.devcontainer/scripts/verify-auth.sh",
             # Git hooks
             "/root/assets/workspace/.githooks/pre-commit",
         ]

@@ -191,6 +191,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Host-specific paths in `.gitconfig` and unreliable `postAttachCommand` lifecycle** ([#60](https://github.com/vig-os/devcontainer/issues/60))
+  - `copy-host-user-conf.sh` now generates a container-ready `.gitconfig` with `/root/...` paths and strips host-only entries (credential helpers, `excludesfile`, `includeIf`) at export time
+  - Refactored devcontainer lifecycle: moved all one-time setup (`init-git.sh`, `setup-git-conf.sh`, `init-precommit.sh`, `uv sync`) from `postAttachCommand` into `postCreateCommand`
+  - New `verify-auth.sh` script for lightweight SSH agent and `gh` auth verification (read-only, no side effects)
+  - `postAttachCommand` now only runs auth verification — no longer depends on unreliable attach hook for critical setup
+  - `setup-git-conf.sh` simplified to one-time file placement (removed SSH agent scanning logic)
 - **GitHub CLI config copy target path** ([#35](https://github.com/vig-os/devcontainer/issues/35))
   - Corrected target path for copying GitHub CLI configuration in post-install step
 - **Install script terminal check in dry-run mode** ([#37](https://github.com/vig-os/devcontainer/issues/37))
