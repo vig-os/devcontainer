@@ -209,6 +209,28 @@ sanitize_name() {
     echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[ -]/_/g' | sed 's/[^a-z0-9_]/_/g'
 }
 
+# Run copy-host-user-conf.sh from the deployed project (non-fatal)
+run_user_conf() {
+    local project_path="$1"
+    local script="$project_path/.devcontainer/scripts/copy-host-user-conf.sh"
+
+    if [ ! -f "$script" ]; then
+        warn "User configuration script not found at $script"
+        echo "  Ensure the workspace has been initialized first."
+        return 1
+    fi
+
+    info "Running user configuration setup (git, ssh, gh)..."
+    if bash "$script"; then
+        success "User configuration complete"
+    else
+        warn "User configuration had issues (see warnings above)"
+        echo "  You can re-run this step later with:"
+        echo "    cd $project_path && bash .devcontainer/scripts/copy-host-user-conf.sh"
+        echo "  Or use: bash install.sh --user-conf $project_path"
+    fi
+}
+
 # Parse arguments
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -386,6 +408,17 @@ if ! eval "$CMD"; then
     err "Failed to initialize workspace"
     exit 1
 fi
+
+# ── Post-initialization: host-side setup ──────────────────────────────────────
+
+echo ""
+info "Running post-initialization setup..."
+
+# 1. Copy host user configuration (git, ssh, gh) into .devcontainer/.conf/
+# Non-fatal: warnings about missing SSH keys or GH CLI are expected on CI/fresh machines
+run_user_conf "$PROJECT_PATH" || true
+
+# ── Done ──────────────────────────────────────────────────────────────────────
 
 echo ""
 success "Devcontainer deployed to $PROJECT_PATH"

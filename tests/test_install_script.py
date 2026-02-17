@@ -7,7 +7,8 @@ and are run by the test-integration CI job, NOT project-checks.
 Tests the full install.sh workflow which:
 1. Pulls the container image
 2. Runs init-workspace.sh with --no-prompts
-3. Creates a fully initialized workspace
+3. Runs host-side user configuration (copy-host-user-conf.sh)
+4. Creates a fully initialized workspace
 """
 
 import atexit
@@ -202,3 +203,50 @@ class TestInstallScriptIntegration:
         """Test .pre-commit-config.yaml is created."""
         precommit_config = install_workspace / ".pre-commit-config.yaml"
         assert precommit_config.exists(), ".pre-commit-config.yaml not created"
+
+    def test_install_creates_conf_directory(self, install_workspace):
+        """Test install.sh creates .devcontainer/.conf/ via user config script."""
+        conf_dir = install_workspace / ".devcontainer" / ".conf"
+        assert conf_dir.exists(), (
+            ".devcontainer/.conf/ directory not created by copy-host-user-conf.sh"
+        )
+        assert conf_dir.is_dir(), ".devcontainer/.conf/ is not a directory"
+
+    def test_install_conf_directory_contains_expected_files(self, install_workspace):
+        """Test .devcontainer/.conf/ contains expected configuration files."""
+        conf_dir = install_workspace / ".devcontainer" / ".conf"
+
+        # Expected files
+        expected_files = {
+            "id_ed25519_github.pub",
+            "allowed-signers",
+            ".gitconfig.global",
+            ".gitconfig",
+            ".gh_token",
+        }
+
+        # Check that all expected files exist
+        for filename in expected_files:
+            file_path = conf_dir / filename
+            assert file_path.exists(), (
+                f"Expected file '{filename}' not found in .devcontainer/.conf/"
+            )
+            assert file_path.is_file(), f"'{filename}' exists but is not a regular file"
+
+        # Expected subdirectory
+        gh_dir = conf_dir / "gh"
+        assert gh_dir.exists(), (
+            "Expected 'gh' subdirectory not found in .devcontainer/.conf/"
+        )
+        assert gh_dir.is_dir(), "'gh' exists but is not a directory"
+
+        # Check gh/ subdirectory contents
+        expected_gh_files = {"config.yml", "hosts.yml"}
+        for filename in expected_gh_files:
+            file_path = gh_dir / filename
+            assert file_path.exists(), (
+                f"Expected file '{filename}' not found in .devcontainer/.conf/gh/"
+            )
+            assert file_path.is_file(), (
+                f"'{filename}' exists in gh/ but is not a regular file"
+            )
