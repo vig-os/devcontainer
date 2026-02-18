@@ -272,6 +272,8 @@ MANIFEST: list[Entry] = [
             ),
         ],
     ),
+    # ── Cursor skills ───────────────────────────────────────────────────
+    Entry(src=".cursor/skills/"),
     # ── Cursor commands ──────────────────────────────────────────────────
     Entry(
         src=".cursor/commands/",
