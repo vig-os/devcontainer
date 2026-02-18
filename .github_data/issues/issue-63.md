@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-17T22:32:42Z
-updated: 2026-02-17T22:35:40Z
+updated: 2026-02-18T16:31:00Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/63
-comments: 0
-labels: feature
+comments: 1
+labels: feature, priority:medium, area:workflow, effort:large, semver:minor
 assignees: none
-milestone: none
+milestone: 0.3
 projects: none
 relationship: none
-synced: 2026-02-17T22:36:00.013Z
+synced: 2026-02-18T16:37:20.355Z
 ---
 
 # [Issue 63]: [Add Cursor commands and rules for agent-driven development workflows](https://github.com/vig-os/devcontainer/issues/63)
@@ -108,3 +108,100 @@ Key principles:
 - The worktree workflow is intentionally deferred — it requires updating multiple existing commands and rules
 - Consider splitting this into sub-issues per tier if the scope is too large for one branch
 - The `brainstorm.md` command should be the natural entry point before `plan.md` and `execute-plan.md`
+---
+
+# [Comment #1]() by [gerchowl]()
+
+_Posted on February 18, 2026 at 02:16 PM_
+
+## Design: Issue-Comment-Based Agent Plans
+
+**Date:** 2026-02-18
+**Context:** PR #68 discussion — gerchowl + c-vigo agreed to move plan/design storage from local files and issue bodies to GitHub issue comments.
+
+### Core Principle
+
+The **GitHub issue comment** is the single source of truth for both implementation plans (from `/plan`) and designs (from `/brainstorm`). No local plan files. The agent always reads from and writes to GitHub via `gh api`. A `sync-issues` workflow trigger (fire-and-forget) provides eventual local availability.
+
+---
+
+### Changes to `/plan`
+
+**Precondition** — unchanged (must be on an issue branch).
+
+**New workflow:**
+
+1. **Read the issue** — same as today (`gh issue view`).
+2. **Break into tasks** — same as today.
+3. **Present for user approval** — same as today.
+4. **Publish as issue comment** — after approval, post the full detailed plan (file paths, verification commands) as a comment on the issue via `gh api`. Comment starts with `##` (H2) to avoid header-level bumping in synced files.
+5. **Trigger sync-issues** — fire-and-forget `gh workflow run sync-issues.yml -f target-branch=<branch>`.
+6. **No local plan files** — drop `docs/plans/<issue_number>-plan.md` entirely.
+
+**Comment format:**
+
+```markdown
+## Implementation Plan
+
+Issue: #<issue_number>
+Branch: <branch_name>
+
+### Tasks
+
+- [ ] Task 1: description — `files` — verify: `command`
+- [ ] Task 2: description — `files` — verify: `command`
+...
+```
+
+---
+
+### Changes to `/execute-plan`
+
+**Precondition** — unchanged (must be on an issue branch).
+
+**New workflow:**
+
+1. **Load plan from GitHub** — read issue comments via `gh api repos/{owner}/{repo}/issues/{number}/comments`. Find the comment containing `## Implementation Plan`. Parse the task list.
+2. **Execute in batches** — unchanged (2–3 tasks per batch, TDD, verification).
+3. **Update progress by editing the comment** — after each batch, edit the plan comment via `gh api` to check off completed tasks (`- [ ]` → `- [x]`).
+4. **Checkpoint** — unchanged (stop, show user, wait for "continue").
+5. **Handle failures** — unchanged.
+6. **Wrap up** — unchanged.
+
+---
+
+### Changes to `/brainstorm`
+
+**Current:** saves design to `docs/plans/YYYY-MM-DD-<name>-design.md` and commits it.
+
+**New workflow:**
+
+1. Steps 1–4 unchanged (explore, ask questions, propose approaches, present design).
+2. **Publish design as issue comment** — after user approval, post the design as a comment on the issue (starts with `##`). Replaces local file + commit.
+3. **Trigger sync-issues** — fire-and-forget.
+4. **Transition to `/plan`** — unchanged.
+
+---
+
+### API Calls
+
+| Action | Command |
+|--------|---------|
+| Post comment | `gh api repos/{owner}/{repo}/issues/{number}/comments -f body="..."` |
+| Read comments | `gh api repos/{owner}/{repo}/issues/{number}/comments --jq '...'` |
+| Edit comment | `gh api repos/{owner}/{repo}/issues/comments/{comment_id} -X PATCH -f body="..."` |
+| Trigger sync | `gh workflow run sync-issues.yml -f target-branch=<branch>` |
+
+### Edge Cases
+
+- **Finding the right comment**: search for `## Implementation Plan` (plans) or `## Design` (brainstorm). If multiple exist, use the most recent.
+- **Rate limits**: ~2–3 comment edits per issue execution — well within limits.
+- **Concurrent edits**: low risk (one agent per issue). Last-write-wins if conflict occurs.
+- **Network required**: by design — the agent already requires network for all operations.
+
+### What Gets Removed
+
+- `docs/plans/*-plan.md` pattern and its `.gitignore` entry
+- Local plan file creation/reading logic from `/plan` and `/execute-plan`
+- Design file creation + commit from `/brainstorm`
+

@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-17T23:08:54Z
-updated: 2026-02-17T23:08:54Z
+updated: 2026-02-18T08:04:10Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/64
-comments: 0
+comments: 1
 labels: feature
 assignees: none
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-17T23:09:11.049Z
+synced: 2026-02-18T09:39:54.173Z
 ---
 
 # [Issue 64]: [Add Cursor worktree support for parallel agent development](https://github.com/vig-os/devcontainer/issues/64)
@@ -63,3 +63,13 @@ Cursor's worktree/parallel agents have **known bugs inside devcontainers**:
 - [ ] `start-issue.md` updated to mention parallel agent option
 - [ ] Devcontainer limitation documented
 - [ ] Tested with Cursor Parallel Agents in local (non-container) mode
+---
+
+# [Comment #1]() by [gerchowl]()
+
+_Posted on February 18, 2026 at 08:04 AM_
+
+**Idea: tmux + cursor-agent CLI for multi-worktree terminals**
+
+We might want to include `tmux` in the container and also have the `cursor-agent` CLI installed. This would allow running multiple worktrees in parallel terminals via tmux sessions — useful for orchestrating several agent-driven development streams simultaneously from within the devcontainer.
+

@@ -174,6 +174,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Centralized `@devcontainers/cli` version management** ([#53](https://github.com/vig-os/devcontainer/issues/53))
   - Version pinned in `.github/package.json` for consistent behavior across workflows and builds
   - Ensures reproducibility across build and setup environments
+- **`--require-scope` flag for `validate-commit-msg`** ([#58](https://github.com/vig-os/devcontainer/issues/58))
+  - New CLI flag to mandate that all commits include at least one scope (e.g. `feat(api): ...`)
+  - When enabled, scopeless commits (e.g. `feat: ...`) are rejected at the commit-msg stage
+  - Comprehensive tests added to `test_validate_commit_msg.py`
 
 ### Changed
 
@@ -214,6 +218,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Uses commit hash `45cbd0c69e560cd9e7cd7f8c32362050c9b7ded2` for integrity
 - **Sync-issues workflow output directory** ([#53](https://github.com/vig-os/devcontainer/issues/53))
   - Changed output directory from '.github_data' to 'docs' for better project structure alignment
+- **Workspace `validate-commit-msg` hook configured strict-by-default** ([#58](https://github.com/vig-os/devcontainer/issues/58))
+  - `assets/workspace/.pre-commit-config.yaml` now ships with explicit `args` instead of commented-out examples
+  - Default args enable type enforcement, scope enforcement with `--require-scope`, and `chore` refs exemption
+  - Link to `vig-utils` README added as a comment above the hook for discoverability
 
 ### Deprecated
 
@@ -237,6 +245,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Non-ASCII characters in justfiles** - Replaced Unicode box-drawing characters (═, ───) and emojis with ASCII equivalents for just-lsp compatibility ([#49](https://github.com/vig-os/devcontainer/issues/49))
 - **Pre-commit exclusion pattern** for pymarkdown updated to correct regex ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Pytest test collection** - Exclude `tests/tmp/` directory (integration test workspaces) from test discovery to prevent import errors
+- **CI/CD release validation and test action checkout refs** ([#72](https://github.com/vig-os/devcontainer/issues/72))
+  - Block release if CI checks are still pending, in progress, queued, or in other non-terminal states
+  - Add `ref` input to `test-image` and `test-integration` composite actions to pin checkout commit
+  - Pass `finalize_sha` to test actions ensuring tests always run against the correct built commit
+  - Fix `install-just` conditional in `setup-env` to respect input flag; was unconditionally running
+  - Remove dead macOS `stat` fallback from `build-image` verification step (action only runs on ubuntu-22.04)
 
 ### Security
 

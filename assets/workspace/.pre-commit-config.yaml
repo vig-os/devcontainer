@@ -109,6 +109,7 @@ repos:
         pass_filenames: false
 
   # Commit message validation (commit-msg stage)
+  # See https://github.com/vig-os/devcontainer/tree/main/packages/vig-utils/README.md for more details.
   - repo: local
     hooks:
       - id: validate-commit-msg
@@ -116,10 +117,9 @@ repos:
         entry: uv run validate-commit-msg
         language: system
         stages: [commit-msg]
-        # Optional: customize commit types, scopes, or refs-optional types via CLI arguments.
-        # By default, scopes are not enforced. Set --scopes to require specific scopes.
-        # Examples (choose one args line):
-        #   args: ["--types", "feat,fix,docs,chore"]
-        #   args: ["--scopes", "api,cli,utils"]
-        #   args: ["--refs-optional-types", "chore"]
-        #   args: ["--types", "feat,fix,docs", "--scopes", "api,cli,utils", "--refs-optional-types", "chore"]
+        args: [
+          "--types", "feat,fix,docs,chore,refactor,test,ci,build,revert,style",
+          "--scopes", "api,cli,utils",
+          "--refs-optional-types", "chore",
+          "--require-scope",
+        ]
