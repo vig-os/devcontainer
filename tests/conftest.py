@@ -19,6 +19,7 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -1206,6 +1207,7 @@ def parse_manifest():
             "sync_manifest", project_root / "scripts" / "sync_manifest.py"
         )
         module = importlib.util.module_from_spec(spec)
+        sys.modules["sync_manifest"] = module
         spec.loader.exec_module(module)
 
         return [
