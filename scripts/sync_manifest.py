@@ -298,6 +298,12 @@ MANIFEST: list[Entry] = [
                 replace="just test",
                 target="verify.md",
             ),
+            # plan.md: generalize devcontainer-specific test recipes
+            Sed(
+                pattern=r"just test-image",
+                replace="just test",
+                target="plan.md",
+            ),
         ],
     ),
     # ── Project config ───────────────────────────────────────────────────
