@@ -10,20 +10,24 @@
 docs/COMMIT_MESSAGE_STANDARD.md
 
 # Cursor
-.cursor
+# NOTE: .cursor is now synced via scripts/sync-workspace.sh with transformations (not manifest-based).
+# .cursor
 
 # Project config
-.gitmessage
+# NOTE: These files are now synced via scripts/sync-workspace.sh with transformations (not manifest-based).
+# .gitmessage
+# .pre-commit-config.yaml
 .yamllint
 .pymarkdown
 .pymarkdown.config.md
 .hadolint.yaml
 
 # GitHub
-.github/pull_request_template.md
+# NOTE: Some GitHub files are now synced via scripts/sync-workspace.sh with transformations (not manifest-based).
+# .github/pull_request_template.md
 .github/ISSUE_TEMPLATE
 .github/actions/setup-env
-.github/dependabot.yml
+# .github/dependabot.yml
 .github/workflows/scorecard.yml
 .github/workflows/sync-issues.yml
 .github/workflows/codeql.yml

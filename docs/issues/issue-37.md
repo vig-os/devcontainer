@@ -17,7 +17,7 @@ synced: 2026-02-17T15:33:16.057Z
 
 # [Issue 37]: [[FEATURE] Automate and Standardize Repository Setup for Devcontainer Template](https://github.com/vig-os/devcontainer/issues/37)
 
-### Description
+## Description
 
 Create a fully automated and standardized repository setup.
 This setup will serve as a reproducible starting point for all projects (software, QMS, others),
@@ -89,21 +89,21 @@ The goal is that any new repository created from this devcontainer template
 
 ### Alternatives Considered
 
-- Manual repository setup per project → inconsistent, error-prone, not auditable  
-- Individual tooling setup for each project → high maintenance overhead  
-- Using separate templates for software vs QMS → complicates maintenance and consistency  
+- Manual repository setup per project → inconsistent, error-prone, not auditable
+- Individual tooling setup for each project → high maintenance overhead
+- Using separate templates for software vs QMS → complicates maintenance and consistency
 
 
 ### Additional Context
 
-- This is intended as the **base template** for all new projects.  
-- Sub-issues will be created for each component (commit standard, branch enforcement, CI, security, release cycle, etc.)  
+- This is intended as the **base template** for all new projects.
+- Sub-issues will be created for each component (commit standard, branch enforcement, CI, security, release cycle, etc.)
 - Links / references for best practices: IEC 62304, ISO 13485, GitHub security guidelines, GitHub Actions best practices
 
 
 ### Impact
 
-- **Beneficiaries:** All developers, QA, RA, auditors  
-- **Compatibility:** Backward-compatible with existing projects; all future repos standardized  
-- **Risks:** Minor; mostly tool adoption and learning curve for developers  
+- **Beneficiaries:** All developers, QA, RA, auditors
+- **Compatibility:** Backward-compatible with existing projects; all future repos standardized
+- **Risks:** Minor; mostly tool adoption and learning curve for developers
 - **Compliance:** Aligns repository setup with medical device QMS and software configuration requirements
