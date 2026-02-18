@@ -182,11 +182,20 @@ jobs:
 
           # Check CI status
           STATUS_ROLLUP=$(echo "$PR_JSON" | jq -r '.[0].statusCheckRollup // []')
-          CI_FAILED=$(echo "$STATUS_ROLLUP" | jq '[.[] | select(.conclusion == "FAILURE" or .conclusion == "ERROR")] | length')
 
+          # Reject if any checks have failed or errored
+          CI_FAILED=$(echo "$STATUS_ROLLUP" | jq '[.[] | select(.conclusion == "FAILURE" or .conclusion == "ERROR")] | length')
           if [ "$CI_FAILED" != "0" ]; then
             echo "ERROR: PR #$PR_NUMBER has failed CI checks"
             echo "Fix CI issues before releasing"
+            exit 1
+          fi
+
+          # Reject if any checks are still pending, in progress, queued, or null (non-terminal state)
+          CI_PENDING=$(echo "$STATUS_ROLLUP" | jq '[.[] | select(.conclusion == null or .conclusion == "" or .conclusion == "PENDING" or .conclusion == "IN_PROGRESS" or .conclusion == "QUEUED")] | length')
+          if [ "$CI_PENDING" != "0" ]; then
+            echo "ERROR: PR #$PR_NUMBER has $CI_PENDING checks still in progress"
+            echo "Wait for all CI checks to complete before releasing"
             exit 1
           fi
 
@@ -420,11 +429,13 @@ jobs:
           image-tag: ${{ needs.validate.outputs.version }}-${{ matrix.arch }}
           image-source: tar
           tar-file: /tmp/image.tar
+          ref: ${{ needs.finalize.outputs.finalize_sha }}
 
       - name: Run integration tests
         uses: ./.github/actions/test-integration
         with:
           image-tag: ${{ needs.validate.outputs.version }}-${{ matrix.arch }}
+          ref: ${{ needs.finalize.outputs.finalize_sha }}
 
       - name: Scan image for vulnerabilities
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
