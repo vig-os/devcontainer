@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Issue triage agent skill** ([#81](https://github.com/vig-os/devcontainer/issues/81))
+  - Cursor skill at `.cursor/skills/issue-triage/` for triaging open issues across priority, area, effort, SemVer impact, dependencies, and release readiness
+  - Decision matrix groups issues into parent/sub-issue clusters with milestone suggestions
+  - Predefined label taxonomy (`label-taxonomy.md`) for priority, area, effort, and SemVer dimensions
+  - Sync manifest updated to propagate skill to workspace template
 - **Cursor commands and rules for agent-driven development workflows** ([#63](https://github.com/vig-os/devcontainer/issues/63))
   - Always-on rules: `coding-principles.mdc` (YAGNI, minimal diff, DRY, no secrets, traceability, single responsibility) and `tdd.mdc` (RED-GREEN-REFACTOR discipline)
   - Tier 1 commands: `start-issue.md`, `create-issue.md`, `brainstorm.md`, `tdd.md`, `review.md`, `verify.md`
