@@ -313,6 +313,7 @@ MANIFEST: list[Entry] = [
     Entry(src=".pymarkdown.config.md"),
     Entry(src=".hadolint.yaml"),
     # ── GitHub templates & config ────────────────────────────────────────
+    Entry(src=".github/label-taxonomy.toml"),
     Entry(src=".github/pull_request_template.md"),
     Entry(src=".github/ISSUE_TEMPLATE/"),
     Entry(src=".github/actions/setup-env/"),

@@ -1,0 +1,40 @@
+# Canonical repository labels.
+# Single source of truth — referenced by:
+#   - scripts/setup-labels.sh           (provision labels on a repo)
+#   - .cursor/commands/create-issue.md  (agent label mapping)
+#   - .github/ISSUE_TEMPLATE/*.yml      (template label values)
+
+[[labels]]
+name = "bug"
+description = "Something isn't working"
+color = "d73a4a"
+
+[[labels]]
+name = "chore"
+description = "General tasks (e.g. update dependencies, contact a manufacturer, read a paper)"
+color = "c5def5"
+
+[[labels]]
+name = "discussion"
+description = "Discuss new ideas"
+color = "d4c5f9"
+
+[[labels]]
+name = "docs"
+description = "Improvements or additions to documentation"
+color = "0075ca"
+
+[[labels]]
+name = "feature"
+description = "New feature or request"
+color = "a2eeef"
+
+[[labels]]
+name = "refactor"
+description = "Modifications that do not bring any significant change (e.g. style, reorganization)"
+color = "fbca04"
+
+[[labels]]
+name = "wontfix"
+description = "This will not be worked on (duplicate, irrelevant...)"
+color = "ffffff"

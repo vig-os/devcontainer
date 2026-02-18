@@ -6,12 +6,12 @@ Create a new GitHub issue using the appropriate issue template.
 
 1. **Determine issue type from context**
    - Infer which template to use based on the user's description:
-     - Bug → `bug_report` (label: `bug`)
-     - Feature/enhancement → `feature_request` (label: `feature`)
+     - Bug → `bug` (label: `bug`)
+     - Feature/enhancement → `feature` (label: `feature`)
      - Refactoring → `refactor` (label: `refactor`)
-     - Documentation → `documentation` (label: `docs`)
-     - CI/Build change → `ci_build` (label: `ci`)
-     - General work item → `task` (label: `task`)
+     - Documentation → `docs` (label: `docs`)
+     - CI/Build change, general task, maintenance → `chore` (label: `chore`)
+   - Canonical labels are defined in `.github/label-taxonomy.toml` (single source of truth).
    - Ask the user if ambiguous.
 
 2. **Populate fields from conversation context**
@@ -34,6 +34,6 @@ Create a new GitHub issue using the appropriate issue template.
 
 ## Important Notes
 
-- Use the correct repo labels (check `gh label list` if unsure). Known mappings: `feature` (not `enhancement`), `bug`, `docs`, `task`.
+- Canonical labels are defined in `.github/label-taxonomy.toml`. When unsure, check `gh label list` or read the taxonomy file.
 - Do not create the issue until the user has approved the draft.
 - If the user wants to start working on it immediately, follow up with the [start-issue](start-issue.md) workflow.
