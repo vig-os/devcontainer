@@ -142,23 +142,55 @@ awk '/^  # Docker/,/^$/{next} 1' "$WORKSPACE_DEST/.github/dependabot.yml" | \
 echo "  ✓ dependabot.yml: removed Docker ecosystem"
 
 # .pre-commit-config.yaml - Multiple transforms
-# 1. Remove generate-docs hook block (from "id: generate-docs" through "pass_filenames: false" plus blank line)
-# 2. Remove sync-workspace hook block (devcontainer-repo-specific, not for downstream projects)
-awk '
-    /id: generate-docs/ { skip=1 }
-    /id: sync-workspace/ { skip=1 }
-    skip && /pass_filenames: false/ { getline; next }
-    !skip { print }
-    skip && /^$/ { skip=0; next }
-' "$WORKSPACE_DEST/.pre-commit-config.yaml" > "$WORKSPACE_DEST/.pre-commit-config.yaml.tmp" && \
-    mv "$WORKSPACE_DEST/.pre-commit-config.yaml.tmp" "$WORKSPACE_DEST/.pre-commit-config.yaml"
+# 1. Remove generate-docs and sync-workspace hooks
+# First pass: remove the hook blocks (id through pass_filenames and blank line)
+sed -e '/id: generate-docs/,/pass_filenames: false/{/pass_filenames: false/{N;d;};d;}' \
+    -e '/id: sync-workspace/,/pass_filenames: false/{/pass_filenames: false/{N;d;};d;}' \
+    "$WORKSPACE_DEST/.pre-commit-config.yaml" > "$WORKSPACE_DEST/.pre-commit-config.yaml.tmp1"
 
-# 3. Replace Bandit paths (cross-platform using Python)
+# Second pass: remove empty local repo blocks (repo: local followed by hooks: with no actual hooks)
+awk '
+    BEGIN { in_local=0; buffer="" }
+    /^  - repo: local/ {
+        in_local=1
+        buffer=$0 "\n"
+        next
+    }
+    in_local && /^    hooks:/ {
+        buffer=buffer $0 "\n"
+        next
+    }
+    in_local && /^  - repo:/ {
+        # Hit next repo - buffer had no hooks after "hooks:", discard it
+        in_local=0
+        buffer=""
+        print $0
+        next
+    }
+    in_local && /^      - id:/ {
+        # Found an actual hook - print buffered header and this line
+        printf "%s", buffer
+        buffer=""
+        in_local=0
+        print $0
+        next
+    }
+    in_local {
+        # Continue buffering
+        buffer=buffer $0 "\n"
+        next
+    }
+    { print }
+' "$WORKSPACE_DEST/.pre-commit-config.yaml.tmp1" > "$WORKSPACE_DEST/.pre-commit-config.yaml.tmp2" && \
+    mv "$WORKSPACE_DEST/.pre-commit-config.yaml.tmp2" "$WORKSPACE_DEST/.pre-commit-config.yaml" && \
+    rm -f "$WORKSPACE_DEST/.pre-commit-config.yaml.tmp1"
+
+# 2. Replace Bandit paths (cross-platform using Python)
 uv run python "$REPO_ROOT/scripts/utils.py" sed \
     's|bandit -r packages/vig-utils/src/ scripts/ assets/workspace/|bandit -r src/|g' \
     "$WORKSPACE_DEST/.pre-commit-config.yaml"
 
-# 4. Comment out validate-commit-msg args (replace with documented examples)
+# 3. Comment out validate-commit-msg args (replace with documented examples)
 # Use awk to find the section and replace the args block
 awk '
     /id: validate-commit-msg/ { in_section=1; print; next }

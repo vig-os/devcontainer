@@ -74,8 +74,11 @@ repos:
         pass_filenames: false
 
   # Documentation Generation (auto-regenerate on template/requirements changes)
-  - repo: local
+  - repo: https://github.com/crate-ci/typos
+    rev: 07d900b8fa1097806b8adb6391b0d3e0ac2fdea7  # v1.39.0
     hooks:
+      - id: typos
+
   # License Compliance Check (runs only when dependencies change)
   - repo: local
     hooks:
