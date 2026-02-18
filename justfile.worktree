@@ -84,7 +84,7 @@ worktree-start issue prompt="":
     pushd "$WT_DIR" >/dev/null
     uv sync
     git config --unset-all core.hooksPath 2>/dev/null || true
-    pre-commit install --install-hooks
+    pre-commit install
     git config commit.template .gitmessage
     if [ -f "$(git worktree list --porcelain | head -1 | cut -d' ' -f2-)/.env" ]; then
         cp "$(git worktree list --porcelain | head -1 | cut -d' ' -f2-)/.env" .env
