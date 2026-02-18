@@ -50,16 +50,51 @@ Refs: #<issue> [, #<issue2>] [, REQ-..., RISK-..., SOP-...]
 **Usage:**
 
 ```bash
-# Validate a commit message file (Git hook usage)
-validate-commit-msg .git/COMMIT_EDITMSG
-
-# Exit codes:
-#   0 — Validation passed
-#   1 — Validation failed
-#   2 — Usage error
+validate-commit-msg <message-file> [--types TYPE,...] [--scopes SCOPE,...] [--refs-optional-types TYPE,...] [--require-scope]
 ```
 
+**Options:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--types TYPE,...` | all standard types | Comma-separated list of allowed commit types |
+| `--scopes SCOPE,...` | *(none — not enforced)* | Comma-separated list of allowed scopes; if omitted, any scope is accepted |
+| `--refs-optional-types TYPE,...` | `chore` | Commit types where the `Refs:` line is optional |
+| `--require-scope` | `false` | Reject commits that do not include a scope; requires `--scopes` to be set |
+
+**Exit codes:**
+
+| Code | Meaning |
+|---|---|
+| `0` | Validation passed |
+| `1` | Validation failed |
+| `2` | Usage error (e.g. file not found) |
+
 **Examples:**
+
+```bash
+# Basic hook usage
+validate-commit-msg .git/COMMIT_EDITMSG
+
+# Restrict to a subset of types
+validate-commit-msg .git/COMMIT_EDITMSG --types feat,fix,docs,chore
+
+# Enforce allowed scopes (but scope remains optional)
+validate-commit-msg .git/COMMIT_EDITMSG --scopes api,cli,utils
+
+# Enforce allowed scopes and make scope mandatory
+validate-commit-msg .git/COMMIT_EDITMSG --scopes api,cli,utils --require-scope
+
+# Allow multiple types to omit the Refs line
+validate-commit-msg .git/COMMIT_EDITMSG --refs-optional-types chore,build
+
+# Combine all options
+validate-commit-msg .git/COMMIT_EDITMSG \
+  --types feat,fix,docs,chore \
+  --scopes api,cli,utils \
+  --refs-optional-types chore \
+  --require-scope
+```
 
 Valid:
 
@@ -79,6 +114,14 @@ Invalid (wrong type):
 
 ```
 feature(ci): add commit-msg validation hook
+
+Refs: #36
+```
+
+Invalid (missing scope when `--require-scope` is set):
+
+```
+feat: add new endpoint
 
 Refs: #36
 ```

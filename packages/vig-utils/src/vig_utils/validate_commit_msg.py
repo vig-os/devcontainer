@@ -7,7 +7,7 @@ and exits 0 if the message complies, non-zero with an error on stderr otherwise.
 See docs/COMMIT_MESSAGE_STANDARD.md for the full standard.
 
 Usage:
-    validate-commit-msg <path-to-commit-message-file> [--types TYPE,TYPE,...] [--scopes SCOPE,SCOPE,...] [--refs-optional-types TYPE,TYPE,...]
+    validate-commit-msg <path-to-commit-message-file> [--types TYPE,TYPE,...] [--scopes SCOPE,SCOPE,...] [--refs-optional-types TYPE,TYPE,...] [--require-scope]
 
 Examples:
     validate-commit-msg .git/COMMIT_EDITMSG
@@ -15,6 +15,7 @@ Examples:
     validate-commit-msg .git/COMMIT_EDITMSG --scopes api,cli,utils
     validate-commit-msg .git/COMMIT_EDITMSG --refs-optional-types chore,build
     validate-commit-msg .git/COMMIT_EDITMSG --types feat,fix --scopes api,cli --refs-optional-types chore
+    validate-commit-msg .git/COMMIT_EDITMSG --scopes api,cli,utils --require-scope
 """
 
 from __future__ import annotations
@@ -80,6 +81,7 @@ def validate_commit_message(
     approved_types: frozenset[str] | None = None,
     approved_scopes: frozenset[str] | None = None,
     refs_optional_types: frozenset[str] | None = None,
+    require_scope: bool = False,
 ) -> tuple[bool, str | None]:
     """Validate a commit message string.
 
@@ -88,6 +90,7 @@ def validate_commit_message(
         approved_types: Set of allowed commit types. Defaults to DEFAULT_APPROVED_TYPES.
         approved_scopes: Set of allowed scopes. If None or empty, scopes are not enforced.
         refs_optional_types: Set of commit types where Refs line is optional. Defaults to DEFAULT_REFS_OPTIONAL_TYPES.
+        require_scope: If True, at least one scope is mandatory. Defaults to False.
 
     Returns:
         (True, None) if valid.
@@ -99,7 +102,14 @@ def validate_commit_message(
         refs_optional_types = DEFAULT_REFS_OPTIONAL_TYPES
     # Scopes are optional - if not provided or empty, don't enforce them
     if approved_scopes is None:
-        approved_scopes = frozenset()
+        approved_scopes = frozenset[str]()
+
+    # require_scope requires approved_scopes to be configured
+    if require_scope and not approved_scopes:
+        return (
+            False,
+            "require_scope=True requires approved_scopes to be configured.",
+        )
 
     subject_pattern, ref_pattern, issue_ref_pattern = _build_patterns(approved_types)
 
@@ -129,6 +139,11 @@ def validate_commit_message(
 
     # Validate scope if provided and scopes are configured
     scope_part = match.group(2)  # Will be like "(scope)" or "(scope1, scope2)" or None
+    if require_scope and scope_part is None:
+        return (
+            False,
+            f"A scope is required for this commit type, valid scopes are: {', '.join(sorted(approved_scopes))}",
+        )
     if scope_part is not None and approved_scopes:
         # Scope is provided and scopes are configured; validate each scope is in the approved list
         # Remove the parentheses to get the scope content
@@ -227,6 +242,11 @@ def main() -> int:
         default=None,
         help="Comma-separated list of commit types where Refs line is optional (default: chore)",
     )
+    parser.add_argument(
+        "--require-scope",
+        action="store_true",
+        help="Require at least one scope in the commit message (default: false)",
+    )
 
     args = parser.parse_args()
 
@@ -262,6 +282,7 @@ def main() -> int:
         approved_types=approved_types,
         approved_scopes=approved_scopes,
         refs_optional_types=refs_optional_types,
+        require_scope=args.require_scope,
     )
     if valid:
         return 0
