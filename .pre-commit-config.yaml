@@ -83,16 +83,6 @@ repos:
         files: ^(docs/templates/.*\.j2|docs/narrative/.*\.md|scripts/requirements\.yaml|justfile)$
         pass_filenames: false
 
-  # Workspace Template Sync (auto-sync templates to assets/workspace/)
-  - repo: local
-    hooks:
-      - id: sync-workspace
-        name: sync-workspace (sync templates to assets/workspace)
-        entry: bash -c 'scripts/sync-workspace.sh && git add assets/workspace/ 2>/dev/null || true'
-        language: system
-        files: ^(\.cursor/|\.github/ISSUE_TEMPLATE/|\.github/pull_request_template\.md|\.github/dependabot\.yml|\.pre-commit-config\.yaml|\.gitmessage)
-        pass_filenames: false
-
   # Typo Linting
   - repo: https://github.com/crate-ci/typos
     rev: 07d900b8fa1097806b8adb6391b0d3e0ac2fdea7  # v1.39.0

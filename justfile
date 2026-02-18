@@ -54,7 +54,7 @@ docs:
 # Sync workspace templates from repo root to assets/workspace/
 [group('info')]
 sync-workspace:
-    scripts/sync-workspace.sh
+    uv run python scripts/sync_manifest.py sync assets/workspace/
 
 # Test login to GHCR
 [group('info')]

@@ -454,19 +454,26 @@ class TestFileStructure:
         )
 
     def test_manifest_files(self, host, parse_manifest):
-        """Test that all files in manifest are copied and identical.
+        """Test that all files in manifest are copied to the image.
 
-        Directory entries are expanded into individual files so that each
-        file is verified via SHA-256 checksum comparison.
+        Non-transformed entries are verified via SHA-256 checksum comparison.
+        Transformed entries are only checked for existence (content differs
+        intentionally due to post-copy transformations).
         """
         manifest_entries = parse_manifest()
         project_root = Path(__file__).parent.parent
         workspace_base = "/root/assets/workspace"
 
-        for src_rel, dest_rel in manifest_entries:
+        for src_rel, dest_rel, is_transformed in manifest_entries:
             src_path = project_root / src_rel
             if src_path.is_file():
-                verify_file_identity(host, src_rel, f"{workspace_base}/{dest_rel}")
+                if is_transformed:
+                    dest_path = f"{workspace_base}/{dest_rel}"
+                    assert host.file(dest_path).exists, (
+                        f"Transformed manifest file not found at {dest_path}"
+                    )
+                else:
+                    verify_file_identity(host, src_rel, f"{workspace_base}/{dest_rel}")
             elif src_path.is_dir():
                 files = sorted(f for f in src_path.rglob("*") if f.is_file())
                 assert files, f"Manifest local directory is empty: {src_rel}"
@@ -474,7 +481,12 @@ class TestFileStructure:
                     rel = file_path.relative_to(project_root)
                     dest_file_rel = f"{dest_rel}/{file_path.relative_to(src_path)}"
                     dest_file_path = f"{workspace_base}/{dest_file_rel}"
-                    verify_file_identity(host, str(rel), dest_file_path)
+                    if is_transformed:
+                        assert host.file(dest_file_path).exists, (
+                            f"Transformed manifest file not found at {dest_file_path}"
+                        )
+                    else:
+                        verify_file_identity(host, str(rel), dest_file_path)
 
 
 class TestPlaceholders:

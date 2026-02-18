@@ -6,7 +6,7 @@
 # These tests verify:
 # - Build directory creation and cleanup
 # - File copying (Containerfile, assets, packages)
-# - Manifest file syncing
+# - Manifest syncing (via Python sync_manifest.py)
 # - Template placeholder replacement ({{IMAGE_TAG}})
 # - Version handling
 #
@@ -95,65 +95,20 @@ setup() {
     assert_success
 }
 
-# ── manifest file syncing ─────────────────────────────────────────────────────
+# ── manifest syncing (via Python) ────────────────────────────────────────────
 
-@test "prepare-build.sh defines sync_manifest_files function" {
-    run grep 'sync_manifest_files()' "$PREPARE_BUILD_SH"
+@test "prepare-build.sh calls sync_manifest.py for workspace sync" {
+    run grep 'sync_manifest.py sync' "$PREPARE_BUILD_SH"
     assert_success
 }
 
-@test "prepare-build.sh reads manifest from sync-manifest.txt" {
-    run grep 'manifest="\$SCRIPT_DIR/sync-manifest.txt"' "$PREPARE_BUILD_SH"
+@test "prepare-build.sh passes project-root to sync_manifest.py" {
+    run grep -- '--project-root "\$PROJECT_ROOT"' "$PREPARE_BUILD_SH"
     assert_success
 }
 
-@test "prepare-build.sh validates manifest file exists" {
-    run grep 'if \[\[ ! -f "\$manifest" \]\]' "$PREPARE_BUILD_SH"
-    assert_success
-}
-
-@test "prepare-build.sh validates destination directory exists" {
-    run grep 'if \[\[ ! -d "\$dest_base" \]\]' "$PREPARE_BUILD_SH"
-    assert_success
-}
-
-@test "prepare-build.sh skips blank lines in manifest" {
-    run grep 'Skip blank lines' "$PREPARE_BUILD_SH"
-    assert_success
-}
-
-@test "prepare-build.sh skips comment lines in manifest" {
-    run grep 'Skip.*comment' "$PREPARE_BUILD_SH"
-    assert_success
-}
-
-@test "prepare-build.sh parses source and destination from manifest" {
-    run grep 'if \[\[ "\$line" == \*" -> "\* \]\]' "$PREPARE_BUILD_SH"
-    assert_success
-}
-
-@test "prepare-build.sh handles directory entries in manifest" {
-    run grep 'if \[\[ -d "\$src_path" \]\]' "$PREPARE_BUILD_SH"
-    assert_success
-}
-
-@test "prepare-build.sh handles file entries in manifest" {
-    run grep 'elif \[\[ -f "\$src_path" \]\]' "$PREPARE_BUILD_SH"
-    assert_success
-}
-
-@test "prepare-build.sh reports missing source files" {
-    run grep 'MISSING' "$PREPARE_BUILD_SH"
-    assert_success
-}
-
-@test "prepare-build.sh reports synced files" {
-    run grep 'SYNCED' "$PREPARE_BUILD_SH"
-    assert_success
-}
-
-@test "prepare-build.sh calls sync_manifest_files for workspace" {
-    run grep 'sync_manifest_files "\$BUILD_DIR/assets/workspace"' "$PREPARE_BUILD_SH"
+@test "prepare-build.sh syncs into build/assets/workspace" {
+    run grep 'sync.*\$BUILD_DIR/assets/workspace' "$PREPARE_BUILD_SH"
     assert_success
 }
 
@@ -203,12 +158,5 @@ setup() {
 
 @test "prepare-build.sh outputs final success message" {
     run grep '✓ Build directory prepared' "$PREPARE_BUILD_SH"
-    assert_success
-}
-
-# ── error handling and validation ─────────────────────────────────────────────
-
-@test "prepare-build.sh validates manifest sync results" {
-    run grep 'if \[\[ \$failed -ne 0 \]\]' "$PREPARE_BUILD_SH"
     assert_success
 }
