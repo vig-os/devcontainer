@@ -31,9 +31,22 @@ worktree-start issue prompt="":
         echo "Install: curl https://cursor.com/install -fsSL | bash"
         exit 1
     fi
-    if [ -z "${CURSOR_API_KEY:-}" ]; then
-        echo "[ERROR] CURSOR_API_KEY is not set. Export it in your shell profile or .env."
-        exit 1
+
+    # Auth: check existing login first, then fall back to CURSOR_API_KEY
+    if agent status 2>/dev/null | grep -qi "logged in\|authenticated"; then
+        echo "[OK] cursor-agent: authenticated via browser login"
+    elif [ -n "${CURSOR_API_KEY:-}" ]; then
+        echo "[OK] cursor-agent: using CURSOR_API_KEY"
+    else
+        echo "[!] cursor-agent: not authenticated. Attempting browser login..."
+        if agent login; then
+            echo "[OK] cursor-agent: browser login successful"
+        else
+            echo "[ERROR] Authentication failed. Either:"
+            echo "  1. Run 'agent login' to authenticate via browser, or"
+            echo "  2. Export CURSOR_API_KEY in your shell profile or .env"
+            exit 1
+        fi
     fi
 
     ISSUE="{{ issue }}"
