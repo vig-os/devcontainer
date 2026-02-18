@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-18T01:02:45Z
-updated: 2026-02-18T01:02:45Z
+updated: 2026-02-18T12:24:59Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/69
-comments: 0
+comments: 1
 labels: none
 assignees: none
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-18T01:03:03.818Z
+synced: 2026-02-18T13:30:33.019Z
 ---
 
 # [Issue 69]: [[TASK] Run pre-commit formatting in sync-issues workflow before committing](https://github.com/vig-os/devcontainer/issues/69)
@@ -49,3 +49,13 @@ These then cause the **Project Checks** CI job to fail on unrelated PRs because 
 ### Priority
 
 Medium
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on February 18, 2026 at 12:24 PM_
+
+The fails were happening because the output directory was changed in the workflow, but not excluded in the pre-commit configuration. This has been fixed, and I would keep it excluded since we cannot guarantee that auto-fix will actually fix all issues.
+
+The question remains whether to actually run pre-commit once with auto-fix during the sync-issues workflow, overriding the exclusion rule.
+
