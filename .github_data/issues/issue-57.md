@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-17T18:35:19Z
-updated: 2026-02-17T18:35:19Z
+updated: 2026-02-18T13:35:44Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/57
-comments: 0
+comments: 1
 labels: bug
 assignees: c-vigo
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-17T18:35:40.536Z
+synced: 2026-02-18T13:36:37.841Z
 ---
 
 # [Issue 57]: [Inconsistent version tag convention: git tags use 'v' prefix, GHCR image tags do not](https://github.com/vig-os/devcontainer/issues/57)
@@ -48,3 +48,13 @@ Pick one convention and apply it consistently, or publish image tags under **bot
 - README documented `--version 1.0.0` (non-existent version) — already fixed in a pending change along with a note about the tag convention
 
 /cc @c-vigo
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on February 18, 2026 at 01:35 PM_
+
+- Consolidate into version tags `X.Y.Z`without `v`
+- Try to update existing tags and released images (or re-tag them)
+
+
