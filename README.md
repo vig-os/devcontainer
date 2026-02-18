@@ -113,6 +113,9 @@ Available recipes:
     sync                            # Sync dependencies from pyproject.toml
     update                          # Update all dependencies
 
+    [github]
+    gh-issues                       # List open issues and PRs grouped by milestone
+
     [info]
     default                         # Show available commands (default)
     docs                            # Generate documentation from templates

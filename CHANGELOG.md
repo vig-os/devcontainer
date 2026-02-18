@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **GitHub issue and PR dashboard recipe** ([#84](https://github.com/vig-os/devcontainer/issues/84))
+  - `just gh-issues` displays open issues grouped by milestone in rich tables with columns for type, title, assignee, linked branch, priority, scope, effort, and semver
+  - Open pull requests section with author, branch, review status, and diff delta
+  - Linked branches fetched via a single GraphQL call
+  - Ships to downstream workspaces via sync manifest (`.devcontainer/justfile.gh` + `.devcontainer/scripts/gh_issues.py`)
 - **Issue triage agent skill** ([#81](https://github.com/vig-os/devcontainer/issues/81))
   - Cursor skill at `.cursor/skills/issue:triage/` for triaging open issues across priority, area, effort, SemVer impact, dependencies, and release readiness
   - Decision matrix groups issues into parent/sub-issue clusters with milestone suggestions
