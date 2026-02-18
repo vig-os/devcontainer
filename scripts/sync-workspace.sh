@@ -104,6 +104,11 @@ cp "$REPO_ROOT/.gitmessage" \
    "$WORKSPACE_DEST/.gitmessage"
 echo "  ✓ .gitmessage"
 
+mkdir -p "$WORKSPACE_DEST/docs"
+cp "$REPO_ROOT/docs/COMMIT_MESSAGE_STANDARD.md" \
+   "$WORKSPACE_DEST/docs/COMMIT_MESSAGE_STANDARD.md"
+echo "  ✓ docs/COMMIT_MESSAGE_STANDARD.md"
+
 echo ""
 
 # ===============================================================================
