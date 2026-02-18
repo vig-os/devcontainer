@@ -142,7 +142,7 @@ def validate_commit_message(
     if require_scope and scope_part is None:
         return (
             False,
-            "A scope is required for this commit type, valid scopes are: {', '.join(sorted(approved_scopes))}",
+            f"A scope is required for this commit type, valid scopes are: {', '.join(sorted(approved_scopes))}",
         )
     if scope_part is not None and approved_scopes:
         # Scope is provided and scopes are configured; validate each scope is in the approved list
