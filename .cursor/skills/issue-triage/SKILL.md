@@ -20,8 +20,13 @@ in memory:
 gh issue list --state open --limit 200 \
   --json number,title,labels,milestone,assignees,body,createdAt,updatedAt
 
-# Open PRs (for readiness context -- which issues have active work)
-gh pr list --state open --json number,title,headRefName,labels,milestone
+# Open PRs (readiness context + PR-to-issue mapping)
+gh pr list --state open \
+  --json number,title,headRefName,labels,milestone,body,reviewDecision
+
+# Recently merged PRs (last 20 -- for issues that may be nearly done)
+gh pr list --state merged --limit 20 \
+  --json number,title,headRefName,mergedAt
 
 # Milestones
 gh api repos/{owner}/{repo}/milestones \
@@ -72,7 +77,7 @@ gh label create "priority:high" --color "d93f0b" \
 ## Phase 3: Analyze and build decision matrix
 
 For each open issue, analyze the title, body, and existing labels to suggest
-values across all 7 dimensions:
+values across all 7 dimensions plus PR coverage:
 
 | Dimension | Values | How to determine |
 |-----------|--------|-----------------|
@@ -83,6 +88,40 @@ values across all 7 dimensions:
 | **SemVer** | `major`, `minor`, `patch` | Breaking vs additive vs fix |
 | **Readiness** | `needs design`, `ready`, `in progress`, `done` | Linked PRs/branches, design docs in body |
 | **Dependencies** | Issue numbers | Cross-references in bodies (#N, "depends on", "blocks") |
+| **PR** | PR number or `—` | Linked open/merged PRs (see PR analysis below) |
+
+### PR analysis
+
+Use the open and recently merged PRs collected in Phase 1 to enrich the
+issue analysis:
+
+1. **Map PRs to issues.** For each PR, determine which issue(s) it addresses
+   by matching:
+   - Branch name pattern: `<type>/<issue_number>-...` (e.g. `feature/67-declarative-sync-manifest` → #67)
+   - PR body keywords: `Refs: #N`, `Closes #N`, `Fixes #N`
+   - PR title references: `#N` in the title
+
+2. **Infer readiness from PR state:**
+   | PR state | Issue readiness |
+   |----------|----------------|
+   | Open, review pending | `in progress` |
+   | Open, changes requested | `in progress` (note: needs rework) |
+   | Open, approved | `in progress` (ready to merge) |
+   | Recently merged | `done` (or close to done — verify issue is closed) |
+   | No PR exists | Keep existing readiness inference |
+
+3. **Surface PR-based dependencies.** If issue A depends on issue B, and
+   issue B has an open (unmerged) PR, then issue A is **blocked by PR #X**.
+   Note this in the Deps column: `#B (PR #X)`.
+
+4. **Identify issues without PRs.** For issues marked `ready` or higher
+   priority that have no linked PR, flag them in the matrix as candidates
+   for immediate work. Optionally suggest this in a "PR gaps" summary
+   section after the matrix.
+
+5. **Suggest PRs for review.** In the PR summary section, list open PRs
+   with their review status so the user can identify PRs that need attention
+   (e.g. approved but not merged, or waiting for review).
 
 ### Grouping into clusters
 
@@ -106,30 +145,73 @@ Present as grouped tables, one per cluster:
 ## Triage Decision Matrix
 
 ### Cluster: "<theme>" (suggested parent: #N or NEW)
-| # | Title | Type | Area | Priority | Effort | SemVer | Readiness | Milestone | Deps |
-|---|-------|------|------|----------|--------|--------|-----------|-----------|------|
-| P #N | Parent issue title... | ... | ... | ... | ... | ... | ... | ... | ... |
-| └ #M | Sub-issue title... | ... | ... | ... | ... | ... | ... | ... | #X |
+| # | Title | Type | Area | Priority | Effort | SemVer | Readiness | PR | Milestone | Deps |
+|---|-------|------|------|----------|--------|--------|-----------|-----|-----------|------|
+| P #N | Parent issue title... | ... | ... | ... | ... | ... | ... | #68 | ... | ... |
+| └ #M | Sub-issue title... | ... | ... | ... | ... | ... | ... | — | ... | #X (PR #68) |
 
 ### Ungrouped
-| # | Title | Type | Area | Priority | Effort | SemVer | Readiness | Milestone | Deps |
-|---|-------|------|------|----------|--------|--------|-----------|-----------|------|
-| #K | Standalone issue... | ... | ... | ... | ... | ... | ... | ... | ... |
+| # | Title | Type | Area | Priority | Effort | SemVer | Readiness | PR | Milestone | Deps |
+|---|-------|------|------|----------|--------|--------|-----------|-----|-----------|------|
+| #K | Standalone issue... | ... | ... | ... | ... | ... | ... | — | ... | ... |
 ```
 
 Column key:
 - **#**: `P` = parent, `P #N` = existing issue as parent, `└ #N` = sub-issue
+- **PR**: linked open PR number, or `—` if none
 - **Milestone**: suggest a SemVer milestone (`0.3`, `0.4`, etc.) or `backlog`
-- **Deps**: issue numbers this issue depends on
+- **Deps**: issue numbers this issue depends on; append `(PR #X)` when the
+  dependency is blocked by an unmerged PR
+
+### PR summary section
+
+After the cluster tables and before the milestone summary, add a **PR
+Summary** section:
+
+```
+## PR Summary
+
+### Open PRs
+| PR | Issue | Branch | Review | Status |
+|----|-------|--------|--------|--------|
+| #68 | #67 | feature/67-... | pending | In progress |
+
+### Issues without PRs (ready or higher priority)
+| # | Title | Priority | Readiness | Suggested action |
+|---|-------|----------|-----------|-----------------|
+| #80 | Reconcile labels... | high | ready | Needs a PR |
+```
+
+This helps the user spot:
+- PRs that need review attention (approved but unmerged, changes requested)
+- High-priority issues with no active work
+- Blocked dependency chains where merging a PR would unblock others
+
+### Parent milestone convention
+
+A parent issue represents a theme/initiative that may span multiple milestones.
+**Convention:** parent issues should have **no milestone assigned** — they are
+pure tracking issues that close when all sub-issues are done. Only sub-issues
+(the actual work units) get milestone assignments. In the matrix, leave the
+Milestone cell empty for parent rows.
+
+### Write matrix to file
+
+After building the decision matrix, write it to `.github_data/triage-matrix.md`.
+Create the `.github_data/` directory if it does not exist. Write the full matrix
+tables (grouped by cluster and ungrouped) to this file so the user can open and
+edit it directly in their IDE. Do not rely on chat output alone — the file is
+the canonical editable artifact.
 
 ## Phase 4: Present and get approval
 
-1. Show the full decision matrix.
-2. Ask the user to review. They can:
-   - **Override any cell** (change priority, milestone, effort, etc.)
-   - **Reassign rows** to different clusters or ungrouped
-   - **Reject clusters** or individual suggestions
-3. Iterate until the user says the matrix is approved.
+1. Tell the user the matrix has been written to `.github_data/triage-matrix.md`.
+2. Ask the user to open the file, review it, and edit any cells directly (priority,
+   milestone, effort, cluster assignment, etc.).
+3. When the user says they are done, re-read `.github_data/triage-matrix.md` and
+   parse any changes before proceeding to Phase 5.
+4. Use the parsed content (including user edits) as the source of truth for
+   applying changes.
 
 ## Phase 5: Apply changes (batched)
 
