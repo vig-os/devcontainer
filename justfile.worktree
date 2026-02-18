@@ -32,6 +32,24 @@ worktree-start issue prompt="":
         exit 1
     fi
 
+    # Helper: ensure a directory is in cursor-agent's trustedDirectories
+    _wt_ensure_trust() {
+        local dir_abs
+        dir_abs=$(cd "$1" && pwd)
+        local cfg="${HOME}/.cursor/cli-config.json"
+        mkdir -p "$(dirname "$cfg")"
+        if [ ! -f "$cfg" ]; then
+            echo '{}' > "$cfg"
+        fi
+        if ! jq -e --arg d "$dir_abs" '.trustedDirectories // [] | index($d)' "$cfg" >/dev/null 2>&1; then
+            jq --arg d "$dir_abs" '.trustedDirectories = ((.trustedDirectories // []) + [$d])' "$cfg" > "${cfg}.tmp" \
+                && mv "${cfg}.tmp" "$cfg"
+            echo "[OK] Trusted directory added: $dir_abs"
+        else
+            echo "[OK] Directory already trusted: $dir_abs"
+        fi
+    }
+
     # Auth: check existing login first, then fall back to CURSOR_API_KEY
     if agent status 2>/dev/null | grep -qi "logged in\|authenticated"; then
         echo "[OK] cursor-agent: authenticated via browser login"
@@ -57,6 +75,8 @@ worktree-start issue prompt="":
     # Check if worktree already exists
     if [ -d "$WT_DIR" ]; then
         echo "[!] Worktree already exists at $WT_DIR"
+        # Ensure trust even for pre-existing worktrees
+        _wt_ensure_trust "$WT_DIR"
         if tmux has-session -t "$SESSION" 2>/dev/null; then
             echo "    tmux session '$SESSION' is running. Use: just worktree-attach $ISSUE"
         else
@@ -92,19 +112,7 @@ worktree-start issue prompt="":
     popd >/dev/null
 
     # Ensure worktree directory is trusted by cursor-agent
-    WT_ABS=$(cd "$WT_DIR" && pwd)
-    CLI_CONFIG="${HOME}/.cursor/cli-config.json"
-    mkdir -p "$(dirname "$CLI_CONFIG")"
-    if [ ! -f "$CLI_CONFIG" ]; then
-        echo '{}' > "$CLI_CONFIG"
-    fi
-    if ! jq -e --arg d "$WT_ABS" '.trustedDirectories // [] | index($d)' "$CLI_CONFIG" >/dev/null 2>&1; then
-        jq --arg d "$WT_ABS" '.trustedDirectories = ((.trustedDirectories // []) + [$d])' "$CLI_CONFIG" > "${CLI_CONFIG}.tmp" \
-            && mv "${CLI_CONFIG}.tmp" "$CLI_CONFIG"
-        echo "[OK] Trusted directory added: $WT_ABS"
-    else
-        echo "[OK] Directory already trusted: $WT_ABS"
-    fi
+    _wt_ensure_trust "$WT_DIR"
 
     # Start tmux session
     # Trust is handled via trustedDirectories in ~/.cursor/cli-config.json (set above).
