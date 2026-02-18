@@ -50,21 +50,27 @@ graph LR
 
 ### Topic Branch Naming and Workflow
 
-Topic branches follow the pattern: `<type>/<issue-number>-<short-summary>`
+Topic branches follow one of these patterns:
+
+- **Issue-tied:** `<type>/<issue-number>-<short-summary>` (for feature, bugfix, release)
+- **Maintenance:** `chore/<short-summary>` (for routine tasks, no issue required)
 
 **Branch Types:**
 
-| Type | Use for |
-|------|---------|
-| **feature** | New functionality, enhancements |
-| **bugfix** | Bug fixes (non-urgent) |
-| **release** | Release preparation, version bumps, release notes |
+| Type | Issue Required | Use for |
+|------|---|---------|
+| **feature** | Yes | New functionality, enhancements |
+| **bugfix** | Yes | Bug fixes (non-urgent) |
+| **release** | Yes | Release preparation, version bumps, release notes |
+| **chore** | No | Maintenance tasks, syncing branches, dependency updates |
 
 **Examples:**
 - `feature/48-release-automation`
 - `bugfix/52-fix-changelog-parsing`
+- `chore/sync-main-to-dev`
+- `chore/update-dependencies`
 
-**Creating a Development Branch:**
+**Creating a Development Branch for an Issue:**
 
 When starting work on a GitHub issue:
 
@@ -73,6 +79,23 @@ When starting work on a GitHub issue:
 3. Use a kebab-case short summary from the issue title (a few words, omitting prefixes like "Add")
 4. Create and link via GitHub: `gh issue develop <issue_number> --base dev --name <branch_name> --checkout`
 5. Ensure local branch is up to date: `git pull origin <branch_name>`
+
+**Creating a Chore Branch:**
+
+For routine maintenance tasks that don't correspond to a specific issue:
+
+```bash
+# Create and checkout a chore branch
+git checkout -b chore/<short-summary> dev
+
+# Make changes, commit, and push
+git add .
+git commit -m "chore: description of maintenance task"
+git push -u origin chore/<short-summary>
+
+# Create PR for review
+gh pr create --base dev --head chore/<short-summary>
+```
 
 ---
 
