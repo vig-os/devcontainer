@@ -276,33 +276,33 @@ MANIFEST: list[Entry] = [
     Entry(
         src=".cursor/skills/",
         transforms=[
-            # tdd: generalize devcontainer-specific test recipes
+            # code:tdd: generalize devcontainer-specific test recipes
             Sed(
                 pattern=r"just test-image",
                 replace="just test",
-                target="tdd/SKILL.md",
+                target="code:tdd/SKILL.md",
             ),
             Sed(
                 pattern=r"just test-integration",
                 replace="just test-cov",
-                target="tdd/SKILL.md",
+                target="code:tdd/SKILL.md",
             ),
             Sed(
                 pattern=r"just test-utils",
                 replace="just test-pytest",
-                target="tdd/SKILL.md",
+                target="code:tdd/SKILL.md",
             ),
-            # verify: generalize devcontainer-specific test recipes
+            # code:verify: generalize devcontainer-specific test recipes
             Sed(
                 pattern=r"just test-image",
                 replace="just test",
-                target="verify/SKILL.md",
+                target="code:verify/SKILL.md",
             ),
-            # plan: generalize devcontainer-specific test recipes
+            # design:plan: generalize devcontainer-specific test recipes
             Sed(
                 pattern=r"just test-image",
                 replace="just test",
-                target="plan/SKILL.md",
+                target="design:plan/SKILL.md",
             ),
         ],
     ),

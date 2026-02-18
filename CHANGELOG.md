@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Issue triage agent skill** ([#81](https://github.com/vig-os/devcontainer/issues/81))
-  - Cursor skill at `.cursor/skills/issue-triage/` for triaging open issues across priority, area, effort, SemVer impact, dependencies, and release readiness
+  - Cursor skill at `.cursor/skills/issue:triage/` for triaging open issues across priority, area, effort, SemVer impact, dependencies, and release readiness
   - Decision matrix groups issues into parent/sub-issue clusters with milestone suggestions
   - Predefined label taxonomy (`label-taxonomy.md`) for priority, area, effort, and SemVer dimensions
   - Sync manifest updated to propagate skill to workspace template
@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replaced `sync-manifest.txt` + bash function and `sync-workspace.sh` with `scripts/sync_manifest.py`
   - Single source of truth for which files to sync and what transformations to apply
   - `prepare-build.sh` and `just sync-workspace` both call the same manifest
+- **Namespace-prefixed Cursor skill names** ([#67](https://github.com/vig-os/devcontainer/issues/67))
+  - Renamed all 15 skills with colon-separated namespace prefixes (`issue:`, `design:`, `code:`, `git:`, `ci:`, `pr:`)
+  - Enables filtering by namespace when invoking skills (e.g., typing `code:` shows implementation skills)
 - **`--org` flag for install script** ([#33](https://github.com/vig-os/devcontainer/issues/33))
   - Allows overriding the default organization name (default: `vigOS`)
   - Passes `ORG_NAME` as environment variable to the container
