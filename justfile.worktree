@@ -62,7 +62,7 @@ worktree-start issue prompt="":
         else
             echo "    No tmux session found. Starting one..."
             if [ -n "$PROMPT" ]; then
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat \"$PROMPT\""
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat --yes \"$PROMPT\""
             else
                 tmux new-session -d -s "$SESSION" -c "$WT_DIR"
             fi
@@ -91,9 +91,24 @@ worktree-start issue prompt="":
     fi
     popd >/dev/null
 
-    # Start tmux session
+    # Ensure worktree directory is trusted by cursor-agent
+    WT_ABS=$(cd "$WT_DIR" && pwd)
+    CLI_CONFIG="${HOME}/.cursor/cli-config.json"
+    mkdir -p "$(dirname "$CLI_CONFIG")"
+    if [ ! -f "$CLI_CONFIG" ]; then
+        echo '{}' > "$CLI_CONFIG"
+    fi
+    if ! jq -e --arg d "$WT_ABS" '.trustedDirectories // [] | index($d)' "$CLI_CONFIG" >/dev/null 2>&1; then
+        jq --arg d "$WT_ABS" '.trustedDirectories = ((.trustedDirectories // []) + [$d])' "$CLI_CONFIG" > "${CLI_CONFIG}.tmp" \
+            && mv "${CLI_CONFIG}.tmp" "$CLI_CONFIG"
+        echo "[OK] Trusted directory added: $WT_ABS"
+    else
+        echo "[OK] Directory already trusted: $WT_ABS"
+    fi
+
+    # Start tmux session (--yes auto-approves the workspace trust prompt)
     if [ -n "$PROMPT" ]; then
-        tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat \"$PROMPT\""
+        tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat --yes \"$PROMPT\""
     else
         tmux new-session -d -s "$SESSION" -c "$WT_DIR"
     fi
