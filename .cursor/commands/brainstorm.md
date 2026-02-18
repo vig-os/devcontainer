@@ -4,12 +4,24 @@ Explore requirements and design before writing any code. This command activates 
 
 **Rule: no code until the user approves a design.**
 
+## Precondition: Issue Branch Required
+
+Before doing anything else, verify you are on an issue branch:
+
+1. Run: `git branch --show-current`
+2. The branch name **must** match `<type>/<issue_number>-*` (e.g. `feature/63-worktree-support`).
+3. Extract the `<issue_number>` from the branch name.
+4. If the branch does not match, **stop** and tell the user:
+   - They need to be on an issue branch.
+   - Offer to run [start-issue](start-issue.md) to create one.
+
 ## Workflow Steps
 
 ### 1. Explore project context
 
 - Read relevant files, docs, recent commits to understand current state.
 - Identify constraints, existing patterns, and related code.
+- Check issue comments for prior discussion or context.
 
 ### 2. Ask clarifying questions
 
@@ -31,10 +43,24 @@ Explore requirements and design before writing any code. This command activates 
 - Cover: architecture, components, data flow, error handling, testing strategy.
 - Revise if the user pushes back. Go back to questions if something is unclear.
 
-### 5. Save design document
+### 5. Publish design as a GitHub issue comment
 
-- Write the validated design to `docs/plans/YYYY-MM-DD-<name>-design.md`.
-- Commit the design doc.
+After user approval, post the design as a **comment on the issue**. This is the durable, visible record.
+
+1. Determine the repo: `gh repo view --json nameWithOwner --jq '.nameWithOwner'`
+2. Post the design comment:
+
+   ```bash
+   gh api repos/{owner}/{repo}/issues/{issue_number}/comments \
+     -f body="<design_content>"
+   ```
+
+3. The comment must start with `##` (H2) to avoid header-level bumping when synced by the `sync-issues` workflow.
+4. Trigger the `sync-issues` workflow (fire-and-forget):
+
+   ```bash
+   gh workflow run sync-issues.yml -f target-branch=<current_branch>
+   ```
 
 ### 6. Transition to planning
 
@@ -42,6 +68,7 @@ Explore requirements and design before writing any code. This command activates 
 
 ## Important Notes
 
+- **Do not run** without being on an issue branch. No exceptions.
 - Every project goes through this, regardless of perceived simplicity. The design can be short (a few sentences) for truly simple tasks, but it must exist and be approved.
 - Do not invoke any implementation command or write any code until design is approved.
 - If the user says "just do it" or "skip design", push back once explaining why, then comply if they insist.

@@ -2,13 +2,24 @@
 
 Break an approved design or issue into bite-sized implementation tasks.
 
+## Precondition: Issue Branch Required
+
+Before doing anything else, verify you are on an issue branch:
+
+1. Run: `git branch --show-current`
+2. The branch name **must** match `<type>/<issue_number>-*` (e.g. `feature/63-worktree-support`).
+3. Extract the `<issue_number>` from the branch name.
+4. If the branch does not match, **stop** and tell the user:
+   - They need to be on an issue branch.
+   - Offer to run [start-issue](start-issue.md) to create one.
+
 ## Workflow Steps
 
-### 1. Read the source
+### 1. Read the issue
 
-- If a design doc exists in `docs/plans/`, read it.
-- Otherwise, read the linked GitHub issue (acceptance criteria, implementation notes).
-- Identify all deliverables, constraints, and test requirements.
+- Run: `gh issue view <issue_number> --json title,labels,body`
+- Read acceptance criteria, implementation notes, and constraints from the issue body.
+- Check issue comments for an existing design (look for `## Design` heading) for additional context.
 
 ### 2. Break into tasks
 
@@ -16,7 +27,7 @@ Break an approved design or issue into bite-sized implementation tasks.
 - Each task must specify:
   - **What**: one sentence describing the change
   - **Files**: exact file paths to create or modify
-  - **Verification**: how to confirm the task is done (e.g. `just test-image`, specific test passes)
+  - **Verification**: how to confirm the task is done (e.g. `just test`, specific test passes)
 - Order tasks by dependency — earlier tasks should not depend on later ones.
 
 ### 3. Identify test tasks
@@ -29,14 +40,45 @@ Break an approved design or issue into bite-sized implementation tasks.
 - Show the full task list to the user.
 - Ask for confirmation or adjustments before proceeding.
 
-### 5. Save plan
+### 5. Publish the plan as a GitHub issue comment
 
-- Write to `docs/plans/YYYY-MM-DD-<name>-plan.md`.
-- Commit the plan.
+After user approval, post the full detailed plan as a **comment on the issue**. This is the single source of truth.
+
+1. Determine the repo: `gh repo view --json nameWithOwner --jq '.nameWithOwner'`
+2. Post the plan comment:
+
+   ```bash
+   gh api repos/{owner}/{repo}/issues/{issue_number}/comments \
+     -f body="<plan_content>"
+   ```
+
+3. The comment must start with `##` (H2) to avoid header-level bumping when synced by the `sync-issues` workflow.
+4. Use this format:
+
+   ```markdown
+   ## Implementation Plan
+
+   Issue: #<issue_number>
+   Branch: <branch_name>
+
+   ### Tasks
+
+   - [ ] Task 1: description — `files` — verify: `command`
+   - [ ] Task 2: description — `files` — verify: `command`
+   ...
+   ```
+
+5. Trigger the `sync-issues` workflow (fire-and-forget) so the plan is eventually available locally:
+
+   ```bash
+   gh workflow run sync-issues.yml -f target-branch=<current_branch>
+   ```
 
 ## Important Notes
 
+- **Do not run** without being on an issue branch. No exceptions.
 - Do not start implementation until the user approves the plan.
 - If a task is too large to describe in one sentence, split it.
 - Reference specific `just` recipes for verification where applicable.
-- The plan is the input for [execute-plan](execute-plan.md).
+- The issue comment is the **single source of truth** for the plan. No local plan files.
+- The plan comment is the input for [execute-plan](execute-plan.md).
