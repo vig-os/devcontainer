@@ -458,6 +458,61 @@ class TestCustomScopes:
         assert valid is False
         assert "Unknown scope" in err
 
+    def test_require_scope_without_approved_scopes(self):
+        """require_scope=True without approved_scopes should fail early."""
+        msg = "feat(api): add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, require_scope=True)
+        assert valid is False
+        assert "require_scope=True requires approved_scopes" in err
+
+    def test_require_scope_with_scope_provided(self):
+        """Commit with scope passes when require_scope=True and scopes are approved."""
+        custom_scopes = frozenset({"api", "cli"})
+        msg = "feat(api): add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(
+            msg, approved_scopes=custom_scopes, require_scope=True
+        )
+        assert valid is True
+        assert err is None
+
+    def test_require_scope_without_scope_fails(self):
+        """Commit without scope fails when require_scope=True."""
+        custom_scopes = frozenset({"api", "cli"})
+        msg = "feat: add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(
+            msg, approved_scopes=custom_scopes, require_scope=True
+        )
+        assert valid is False
+        assert "scope is required" in err
+
+    def test_require_scope_with_multiple_scopes(self):
+        """Multiple scopes satisfy require_scope=True."""
+        custom_scopes = frozenset({"api", "cli", "utils"})
+        msg = "feat(api, cli): add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(
+            msg, approved_scopes=custom_scopes, require_scope=True
+        )
+        assert valid is True
+        assert err is None
+
+    def test_require_scope_with_invalid_scope(self):
+        """Invalid scope still fails even when require_scope=True."""
+        custom_scopes = frozenset({"api", "cli"})
+        msg = "feat(invalid): add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(
+            msg, approved_scopes=custom_scopes, require_scope=True
+        )
+        assert valid is False
+        assert "Unknown scope" in err
+
+    def test_require_scope_false_by_default(self):
+        """require_scope defaults to False; scope is optional."""
+        custom_scopes = frozenset({"api", "cli"})
+        msg = "feat: add feature\n\nRefs: #1\n"
+        valid, err = validate_commit_message(msg, approved_scopes=custom_scopes)
+        assert valid is True
+        assert err is None
+
     def test_combined_types_and_scopes(self):
         """Use custom types with custom scopes."""
         custom_types = frozenset({"feature", "bugfix"})
@@ -930,5 +985,71 @@ class TestMainWithCustomScopes:
                 "api , cli , utils",
             ]
             assert main() == 0
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_with_require_scope_valid(self, tmp_path):
+        """Test main() with --require-scope accepts commit with scope."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("feat(api): add endpoint\n\nRefs: #1\n")
+        orig_argv = sys.argv
+        try:
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--scopes",
+                "api,cli,utils",
+                "--require-scope",
+            ]
+            assert main() == 0
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_with_require_scope_invalid(self, tmp_path):
+        """Test main() with --require-scope rejects commit without scope."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("feat: add feature\n\nRefs: #1\n")
+        orig_argv = sys.argv
+        try:
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--scopes",
+                "api,cli,utils",
+                "--require-scope",
+            ]
+            assert main() == 1
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_with_require_scope_multiple_scopes(self, tmp_path):
+        """Test main() with --require-scope accepts multiple scopes."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("feat(api, cli): add feature\n\nRefs: #1\n")
+        orig_argv = sys.argv
+        try:
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--scopes",
+                "api,cli,utils",
+                "--require-scope",
+            ]
+            assert main() == 0
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_with_require_scope_without_scopes(self, tmp_path):
+        """Test main() with --require-scope but no --scopes still validates scope requirement."""
+        msg_file = tmp_path / "msg"
+        msg_file.write_text("feat: add feature\n\nRefs: #1\n")
+        orig_argv = sys.argv
+        try:
+            sys.argv = [
+                "validate_commit_msg.py",
+                str(msg_file),
+                "--require-scope",
+            ]
+            assert main() == 1
         finally:
             sys.argv = orig_argv

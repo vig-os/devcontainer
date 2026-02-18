@@ -1,0 +1,57 @@
+---
+type: issue
+state: closed
+created: 2025-12-10T09:36:23Z
+updated: 2026-01-26T15:01:33Z
+author: c-vigo
+author_url: https://github.com/c-vigo
+url: https://github.com/vig-os/devcontainer/issues/10
+comments: 0
+labels: feature
+assignees: c-vigo
+milestone: 0.3
+projects: none
+relationship: none
+synced: 2026-02-18T08:56:43.716Z
+---
+
+# [Issue 10]: [[FEATURE] ci/publish-container-image](https://github.com/vig-os/devcontainer/issues/10)
+
+## Description
+Introduce a CI workflow that automatically builds and publishes the project's container image for all supported architectures, especially `arm64`, which is currently slow to build locally. The goal is to formalize and automate the image publishing process using GitHub Actions.
+
+## Problem Statement
+Building `arm64` images locally is slow, often requires QEMU emulation, and results in long and inconsistent release times. Releases currently depend on local developer environments, which reduces reproducibility and makes publishing container images a manual and error-prone process.
+
+This slows down development workflows and makes multi-architecture distribution difficult.
+
+## Proposed Solution
+Use GitHub-hosted runners—particularly the native `arm64` runners—to build and publish container images automatically.
+
+The workflow would:
+
+- Add a dedicated GitHub Actions workflow: **ci/publish-container-image**
+- Build `amd64` and `arm64` images in parallel using native runners
+- Use `docker buildx` for multi-architecture builds and pushes
+- Publish per-architecture images and then combine them into a multi-arch manifest
+- Trigger automatically on tagged releases
+- Optionally run tests as part of the release workflow to ensure the image works before publishing
+
+This provides a fast, reliable, and industry-standard solution.
+
+## Alternatives Considered
+- Local builds using QEMU (too slow, fragile)
+- Cross-building both architectures in a single workflow via emulation (still slow)
+- Self-hosted ARM runners (works but adds maintenance overhead)
+
+## Additional Context
+A proper reproducible CI pipeline ensures that container images are always built in the same environment and available immediately after releases. Using GitHub runners aligns with modern best practices for multi-arch container publishing. After the CI is established, consider moving the infrastructure to [actions](https://github.com/vig-os/actions) to make it the default scheme for other repositories.
+
+## Impact
+- **Who benefits?**  
+  Developers and users relying on the container image; releases become faster and reproducible.
+  
+- **Compatibility considerations:**  
+  Fully backward compatible.  
+  Integrating tests into the release workflow further improves reliability without breaking existing behavior.
+

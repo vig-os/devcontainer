@@ -34,17 +34,26 @@ When the user asks to create or start work on an issue (e.g. "create branch for 
 
 ## Branch name format (reference)
 
+### Issue-tied branches
 ```
 <type>/<issue_number>-<short_summary>
 ```
+Example: `feature/36-standardize-commit-messages`, `bugfix/42-fix-login-bug`
+
+### Chore branches (no issue required)
+```
+chore/<short_summary>
+```
+Example: `chore/sync-main-to-dev`, `chore/update-dependencies`
 
 ## Branch types (reference)
 
-| Type     | Use for                                                                 |
-|----------|-------------------------------------------------------------------------|
-| feature  | New functionality, enhancements                                         |
-| bugfix   | Bug fixes (non-urgent)                                                  |
-| release  | Release preparation, version bumps, release notes                       |
+| Type     | Issue Required | Use for                                                                 |
+|----------|----------------|-------------------------------------------------------------------------|
+| feature  | Yes            | New functionality, enhancements                                         |
+| bugfix   | Yes            | Bug fixes (non-urgent)                                                  |
+| release  | Yes            | Release preparation, version bumps, release notes                       |
+| chore   | No             | Maintenance tasks, syncing branches, dependency updates, routine work   |
 
 ## One-off branch name only
 

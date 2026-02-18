@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-17T18:44:24Z
-updated: 2026-02-17T18:44:24Z
+updated: 2026-02-18T10:21:28Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/58
-comments: 0
+comments: 2
 labels: question
 assignees: none
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-17T18:44:38.155Z
+synced: 2026-02-18T12:21:24.455Z
 ---
 
 # [Issue 58]: [validate-commit-msg: enforce types/scopes/refs by default](https://github.com/vig-os/devcontainer/issues/58)
@@ -26,3 +26,37 @@ cc @c-vigo
 **TL;DR:** Default strict → show config path in error → users discover greatness, can relax if needed.
 
 Ref: `.pre-commit-config.yaml` lines 120–126.
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on February 18, 2026 at 10:00 AM_
+
+I agree on enforced types, but not so much on scopes since they can be very project-dependent, and there is even a question to be made whether they are useful or not.
+
+Currently we use:
+
+```ini
+  # Commit message validation (commit-msg stage)
+  - repo: local
+    hooks:
+      - id: validate-commit-msg
+        name: validate commit message
+        entry: uv run validate-commit-msg
+        language: system
+        stages: [commit-msg]
+        args: [
+          "--types", "feat,fix,docs,chore,refactor,test,ci,build,revert,style",
+          "--scopes", "setup,image,vigutils",
+          "--refs-optional-types", "chore",
+        ]
+```
+
+---
+
+# [Comment #2]() by [gerchowl]()
+
+_Posted on February 18, 2026 at 10:21 AM_
+
+I'd say so, i.e. for changelog generation/grouping and, yes, scopes one could do some generic (or even have them auto populated based on codebase/project analysis / AST .. :-D)
+
