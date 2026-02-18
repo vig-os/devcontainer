@@ -306,6 +306,8 @@ MANIFEST: list[Entry] = [
             ),
         ],
     ),
+    # ── Cursor worktree config ────────────────────────────────────────────
+    Entry(src=".cursor/worktrees.json"),
     # ── Project config ───────────────────────────────────────────────────
     Entry(src=".gitmessage"),
     Entry(src=".yamllint"),
@@ -334,6 +336,8 @@ MANIFEST: list[Entry] = [
     # ── GitHub CLI recipes (managed, replaced on upgrade) ────────────────
     Entry(src="justfile.gh", dest=".devcontainer/justfile.gh"),
     Entry(src="scripts/gh_issues.py", dest=".devcontainer/scripts/gh_issues.py"),
+    # ── Worktree recipes (managed, replaced on upgrade) ───────────────
+    Entry(src="justfile.worktree", dest=".devcontainer/justfile.worktree"),
     # ── Pre-commit config ────────────────────────────────────────────────
     Entry(
         src=".pre-commit-config.yaml",
