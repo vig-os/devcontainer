@@ -143,20 +143,22 @@ echo "  ✓ dependabot.yml: removed Docker ecosystem"
 
 # .pre-commit-config.yaml - Multiple transforms
 # 1. Remove generate-docs hook block (from "id: generate-docs" through "pass_filenames: false" plus blank line)
+# 2. Remove sync-workspace hook block (devcontainer-repo-specific, not for downstream projects)
 awk '
     /id: generate-docs/ { skip=1 }
+    /id: sync-workspace/ { skip=1 }
     skip && /pass_filenames: false/ { getline; next }
     !skip { print }
     skip && /^$/ { skip=0; next }
 ' "$WORKSPACE_DEST/.pre-commit-config.yaml" > "$WORKSPACE_DEST/.pre-commit-config.yaml.tmp" && \
     mv "$WORKSPACE_DEST/.pre-commit-config.yaml.tmp" "$WORKSPACE_DEST/.pre-commit-config.yaml"
 
-# 2. Replace Bandit paths (cross-platform using Python)
+# 3. Replace Bandit paths (cross-platform using Python)
 uv run python "$REPO_ROOT/scripts/utils.py" sed \
     's|bandit -r packages/vig-utils/src/ scripts/ assets/workspace/|bandit -r src/|g' \
     "$WORKSPACE_DEST/.pre-commit-config.yaml"
 
-# 3. Comment out validate-commit-msg args (replace with documented examples)
+# 4. Comment out validate-commit-msg args (replace with documented examples)
 # Use awk to find the section and replace the args block
 awk '
     /id: validate-commit-msg/ { in_section=1; print; next }
@@ -178,7 +180,7 @@ awk '
 ' "$WORKSPACE_DEST/.pre-commit-config.yaml" > "$WORKSPACE_DEST/.pre-commit-config.yaml.tmp" && \
     mv "$WORKSPACE_DEST/.pre-commit-config.yaml.tmp" "$WORKSPACE_DEST/.pre-commit-config.yaml"
 
-echo "  ✓ .pre-commit-config.yaml: removed generate-docs, generalized Bandit paths, commented validate-commit-msg args"
+echo "  ✓ .pre-commit-config.yaml: removed generate-docs and sync-workspace hooks, generalized Bandit paths, commented validate-commit-msg args"
 
 echo ""
 echo -e "${GREEN}✓ Workspace sync complete${NC}"
