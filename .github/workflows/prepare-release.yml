@@ -1,0 +1,290 @@
+# Prepare Release Branch for Testing and Validation
+#
+# Workflow that creates and prepares a release branch for testing:
+# 1. Validate: Check inputs and prerequisites (version format, no existing branch/tag, CHANGELOG ready)
+# 2. Prepare: Create release branch, prepare CHANGELOG, commit, push, create draft PR
+#
+# This replaces the local prepare-release.sh script, providing:
+# - Consistent CI environment (not dependent on developer tools)
+# - Audit trail of all actions via GitHub Actions logs
+# - CI triggering on new release branch (via GitHub App token)
+
+name: Prepare Release
+
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Semantic version to prepare (e.g., 1.2.3)'
+        required: true
+        type: string
+      dry-run:
+        description: 'Validate without making changes'
+        required: false
+        default: false
+        type: boolean
+      git-user-name:
+        description: 'Git user name for commits'
+        required: false
+        default: 'vigOS Release Bot'
+        type: string
+      git-user-email:
+        description: 'Git user email for commits'
+        required: false
+        default: 'release@vig-os.local'
+        type: string
+
+permissions:
+  contents: read          # safe default; prepare job escalates as needed
+
+jobs:
+  validate:
+    name: Validate Release Preparation
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.vars.outputs.version }}
+      release_branch: ${{ steps.vars.outputs.release_branch }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Validate and prepare variables
+        id: vars
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          VERSION="$INPUT_VERSION"
+
+          # Validate semantic version format
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "ERROR: Invalid version format '$VERSION'"
+            echo "Version must follow semantic versioning format: MAJOR.MINOR.PATCH (e.g., 1.2.3)"
+            exit 1
+          fi
+
+          RELEASE_BRANCH="release/$VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "release_branch=$RELEASE_BRANCH" >> $GITHUB_OUTPUT
+          echo "✓ Version format validated: $VERSION"
+
+      - name: Verify release branch does not exist
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+        run: |
+          set -euo pipefail
+          RELEASE_BRANCH="release/$VERSION"
+
+          if git show-ref --verify --quiet "refs/heads/$RELEASE_BRANCH"; then
+            echo "ERROR: Release branch already exists locally: $RELEASE_BRANCH"
+            exit 1
+          fi
+
+          if git show-ref --verify --quiet "refs/remotes/origin/$RELEASE_BRANCH"; then
+            echo "ERROR: Release branch already exists on remote: $RELEASE_BRANCH"
+            exit 1
+          fi
+
+          echo "✓ Release branch does not exist: $RELEASE_BRANCH"
+
+      - name: Verify tag does not exist
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          if git tag -l | grep -q "^v$VERSION$"; then
+            echo "ERROR: Tag v$VERSION already exists"
+            exit 1
+          fi
+
+          echo "✓ Tag does not exist: v$VERSION"
+
+      - name: Set up environment
+        uses: ./.github/actions/setup-env
+        with:
+          sync-dependencies: 'true'
+
+      - name: Verify CHANGELOG has Unreleased section with content
+        run: |
+          set -euo pipefail
+          uv run prepare-changelog validate CHANGELOG.md
+
+      - name: Verify dev branch is checked out
+        run: |
+          set -euo pipefail
+          CURRENT_BRANCH=$(git branch --show-current)
+          if [ "$CURRENT_BRANCH" != "dev" ]; then
+            echo "ERROR: Expected to be on dev branch, but on: $CURRENT_BRANCH"
+            exit 1
+          fi
+          echo "✓ Checked out dev branch"
+
+      - name: Summary
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+          RELEASE_BRANCH: ${{ steps.vars.outputs.release_branch }}
+          DRY_RUN: ${{ github.event.inputs.dry-run }}
+        run: |
+          echo "✓ All validation checks passed"
+          echo ""
+          echo "Release Preparation Configuration:"
+          echo "  Version: $VERSION"
+          echo "  Release Branch: $RELEASE_BRANCH"
+          echo "  Dry-run: $DRY_RUN"
+
+  prepare:
+    name: Prepare Release Branch
+    needs: validate
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    if: ${{ github.event.inputs.dry-run != 'true' }}
+    permissions:
+      contents: read          # checkout dev branch
+      pull-requests: write    # create draft PR
+
+    steps:
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
+        with:
+          app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
+          private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
+
+      - name: Checkout dev branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Set up environment
+        uses: ./.github/actions/setup-env
+        with:
+          sync-dependencies: 'true'
+
+      - name: Prepare CHANGELOG
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          echo "Preparing CHANGELOG for version $VERSION..."
+          uv run prepare-changelog prepare "$VERSION" CHANGELOG.md
+          echo "✓ CHANGELOG prepared"
+
+      - name: Extract CHANGELOG content for PR body
+        id: changelog
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # Extract the version section from CHANGELOG (between ## [VERSION] and next ## [)
+          CHANGELOG_CONTENT=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$d')
+
+          # Use heredoc delimiter for multiline output
+          {
+            echo "changelog<<CHANGELOGEOF"
+            echo "$CHANGELOG_CONTENT"
+            echo "CHANGELOGEOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create release branch via API
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
+        run: |
+          set -euo pipefail
+          DEV_SHA=$(git rev-parse HEAD)
+          echo "Creating branch $RELEASE_BRANCH from dev at $DEV_SHA..."
+          gh api "repos/${{ github.repository }}/git/refs" \
+            -f ref="refs/heads/$RELEASE_BRANCH" \
+            -f sha="$DEV_SHA"
+          echo "✓ Release branch created on remote"
+
+      - name: Commit release preparation via API
+        uses: vig-os/commit-action@b70c2d87acd0f146c40e8d88a9bda40b76c084b5  # v0.1.3
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TARGET_BRANCH: refs/heads/${{ needs.validate.outputs.release_branch }}
+          COMMIT_MESSAGE: |-
+            chore: prepare release ${{ needs.validate.outputs.version }}
+
+            Prepare CHANGELOG.md structure for version ${{ needs.validate.outputs.version }}.
+            Release date TBD (set during finalization).
+          FILE_PATHS: CHANGELOG.md
+
+      - name: Create draft PR to main
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
+          CHANGELOG_CONTENT: ${{ steps.changelog.outputs.changelog }}
+        run: |
+          set -euo pipefail
+
+          PR_BODY="## Release v$VERSION
+
+          This PR prepares release v$VERSION for merge to main.
+
+          ### Release Content
+
+          $CHANGELOG_CONTENT
+
+          ### Testing Checklist
+          - [ ] All tests pass (\`just test\`)
+          - [ ] Manual testing complete
+          - [ ] No critical bugs found
+          - [ ] Ready for release
+
+          ### When Ready to Release
+          Run: \`just finalize-release $VERSION\`
+
+          This will:
+          - Set release date in CHANGELOG
+          - Update documentation
+          - Create commit and push
+          - Build and test container images for all architectures
+          - Create release tag and publish to GHCR
+
+          ### Related
+          - Release automation: #48
+          "
+
+          PR_URL=$(gh pr create \
+            --base main \
+            --head "$RELEASE_BRANCH" \
+            --title "Release v$VERSION" \
+            --body "$PR_BODY" \
+            --draft)
+
+          # Extract PR number from URL (format: https://github.com/owner/repo/pull/123)
+          PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+          echo "✓ Draft PR created: $PR_URL (#$PR_NUMBER)"
+
+      - name: Summary
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
+        run: |
+          echo "✓ Release branch prepared successfully!"
+          echo ""
+          echo "Release Summary:"
+          echo "  Version: $VERSION"
+          echo "  Branch: $RELEASE_BRANCH"
+          echo ""
+          echo "Next steps:"
+          echo "  1. Test release: git checkout $RELEASE_BRANCH"
+          echo "  2. Review draft PR and monitor CI"
+          echo "  3. Fix any issues via bugfix PRs to $RELEASE_BRANCH"
+          echo "  4. Mark PR as ready for review (gh pr ready <PR_NUMBER>)"
+          echo "  5. Get PR approval from reviewer"
+          echo "  6. Run: just finalize-release $VERSION"

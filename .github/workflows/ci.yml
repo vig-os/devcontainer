@@ -1,0 +1,21 @@
+# CI Workflow
+#
+# This workflow placeholder is registered with GitHub to enable CI checks.
+# It serves as a pre-merge gate for pull requests targeting dev, main, and release branches.
+# Full implementation details are managed separately.
+
+name: CI
+
+"on":
+  pull_request:
+  push:
+    branches:
+      - dev
+      - main
+      - release/**
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
