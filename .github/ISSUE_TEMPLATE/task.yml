@@ -55,6 +55,22 @@ body:
         - Critical
     validations:
       required: true
+  - type: dropdown
+    id: changelog-category
+    attributes:
+      label: Changelog Category
+      description: |
+        Under which CHANGELOG.md section should this appear?
+      options:
+        - Added
+        - Changed
+        - Fixed
+        - Removed
+        - Security
+        - No changelog needed
+      default: 0
+    validations:
+      required: true
   - type: textarea
     id: additional-context
     attributes:

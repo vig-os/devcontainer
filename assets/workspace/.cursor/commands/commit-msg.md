@@ -16,6 +16,7 @@ git status && echo "=== STAGED CHANGES ===" && git diff --cached
 - What files are staged vs un-staged
 - Change types and scope (additions/deletions)
 - Which changes will actually be committed
+- Break down into smaller commits if no common type and scope
 
 3. **Write accurate commit message** based on staged changes only:
 - Follow rules in [.commit-messages.mdc](../rules/commit-messages.mdc)

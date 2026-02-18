@@ -58,3 +58,16 @@ body:
       placeholder: |
         - Who would benefit from this feature?
         - Is this a breaking change or backward compatible?
+  - type: dropdown
+    id: changelog-category
+    attributes:
+      label: Changelog Category
+      description: |
+        Under which CHANGELOG.md section should this feature appear?
+      options:
+        - Added
+        - Changed
+        - No changelog needed
+      default: 0
+    validations:
+      required: true

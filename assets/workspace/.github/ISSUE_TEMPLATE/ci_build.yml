@@ -1,0 +1,102 @@
+---
+name: CI / Build Change
+description: Propose a change to CI workflows, GitHub Actions, or build configuration
+title: '[CI] '
+labels: ['ci']
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for changes to CI/CD pipelines, GitHub Actions
+        workflows, composite actions, or build configuration. These changes
+        are high-risk — please be specific about which files are affected
+        and what behavior should change.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: |
+        A clear description of the CI/build change and its motivation
+      placeholder: Describe the change and why it's needed...
+    validations:
+      required: true
+  - type: textarea
+    id: target-workflows
+    attributes:
+      label: Target Workflows / Actions
+      description: |
+        Which workflow files or composite actions are affected?
+      placeholder: |
+        - .github/workflows/ci.yml
+        - .github/actions/test-project/action.yml
+        - justfile
+    validations:
+      required: true
+  - type: checkboxes
+    id: trigger-types
+    attributes:
+      label: Trigger Types Affected
+      description: Which event triggers does this change affect?
+      options:
+        - label: Push to branch
+        - label: Pull request
+        - label: Schedule (cron)
+        - label: Manual dispatch (workflow_dispatch)
+        - label: Release / tag
+        - label: Not applicable
+  - type: dropdown
+    id: release-impact
+    attributes:
+      label: Release Pipeline Impact
+      description: |
+        Does this change affect the release pipeline
+        (prepare-release, finalize-release, post-release)?
+      options:
+        - 'No — does not affect the release pipeline'
+        - 'Yes — modifies release workflows or steps'
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior (Before → After)
+      description: |
+        Describe the current CI behavior and the desired behavior after
+        the change
+      placeholder: |
+        Before: CI runs all tests sequentially
+        After: CI runs image and integration tests in parallel
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Define what "done" looks like
+      placeholder: |
+        - [ ] CI pipeline passes on the PR
+        - [ ] No regressions in existing workflows
+        - [ ] New workflow tested with act or manual dispatch
+    validations:
+      required: true
+  - type: dropdown
+    id: changelog-category
+    attributes:
+      label: Changelog Category
+      description: |
+        Under which CHANGELOG.md section should this appear?
+      options:
+        - Changed
+        - Added
+        - Fixed
+        - No changelog needed
+      default: 3
+    validations:
+      required: true
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other relevant information
+      placeholder: Error logs, workflow run links, related issues...

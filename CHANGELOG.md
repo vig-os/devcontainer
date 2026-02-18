@@ -14,17 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tier 1 commands: `start-issue.md`, `create-issue.md`, `brainstorm.md`, `tdd.md`, `review.md`, `verify.md`
   - Tier 2 commands: `check-ci.md`, `fix-ci.md`
   - Tier 3 commands: `plan.md`, `execute-plan.md`, `debug.md`
-- **Workspace template sync mechanism for Cursor and GitHub files** ([#63](https://github.com/vig-os/devcontainer/issues/63))
-  - `scripts/sync-workspace.sh` copies `.cursor/`, `.github/` templates, and supporting files from repo root to `assets/workspace/` with generalizations
-  - `just sync-workspace` recipe for manual sync
-  - Pre-commit hook auto-syncs workspace templates when source files change
-  - Ground truth lives in repo root; `assets/workspace/` is generated output
-  - New files in `.cursor/` or `.github/ISSUE_TEMPLATE/` auto-ship to downstream projects
+- **Agent-friendly issue templates, changelog rule, and PR template enhancements** ([#61](https://github.com/vig-os/devcontainer/issues/61))
+  - Cursor rule `.cursor/rules/changelog.mdc` (always applied) guiding agents on when, where, and how to update CHANGELOG.md
+  - Changelog Category dropdown added to `bug_report.yml`, `feature_request.yml`, and `task.yml` issue templates
+  - New issue templates: `refactor.yml` (scope/invariants), `documentation.yml` (docs/templates workflow), `ci_build.yml` (target workflows/triggers/release impact)
+  - Template chooser `config.yml` disabling blank issues and linking to project docs
+  - PR template enhanced with explicit Changelog Entry section, CI/Build change type, and updated checklist referencing `docs/templates/` and `just docs`
 - **GitHub issue and PR templates in workspace template** ([#63](https://github.com/vig-os/devcontainer/issues/63))
-  - Pull request template (`.github/pull_request_template.md`)
-  - Issue templates: `task.yml`, `feature_request.yml`, `bug_report.yml`
-  - Generalized Dependabot configuration (GitHub Actions, pip, npm)
-  - Git commit message template (`.gitmessage`)
+  - Pull request template, issue templates, Dependabot config, and `.gitmessage` synced to `assets/workspace/`
+  - Ground truth lives in repo root; `assets/workspace/` is generated output
+
+### Changed
+
+- **Declarative Python sync manifest** ([#67](https://github.com/vig-os/devcontainer/issues/67))
+  - Replaced `sync-manifest.txt` + bash function and `sync-workspace.sh` with `scripts/sync_manifest.py`
+  - Single source of truth for which files to sync and what transformations to apply
+  - `prepare-build.sh` and `just sync-workspace` both call the same manifest
 - **`--org` flag for install script** ([#33](https://github.com/vig-os/devcontainer/issues/33))
   - Allows overriding the default organization name (default: `vigOS`)
   - Passes `ORG_NAME` as environment variable to the container
