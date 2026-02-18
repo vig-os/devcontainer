@@ -82,7 +82,7 @@ worktree-start issue prompt="":
         else
             echo "    No tmux session found. Starting one..."
             if [ -n "$PROMPT" ]; then
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat \"$PROMPT\""
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat --yolo \"$PROMPT\""
             else
                 tmux new-session -d -s "$SESSION" -c "$WT_DIR"
             fi
@@ -115,10 +115,9 @@ worktree-start issue prompt="":
     _wt_ensure_trust "$WT_DIR"
 
     # Start tmux session
-    # Trust is handled via trustedDirectories in ~/.cursor/cli-config.json (set above).
-    # For headless (--print) mode, --trust --force can also be passed.
+    # --yolo: auto-approve all shell commands (autonomous agent, no human at the terminal)
     if [ -n "$PROMPT" ]; then
-        tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat \"$PROMPT\""
+        tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat --yolo \"$PROMPT\""
     else
         tmux new-session -d -s "$SESSION" -c "$WT_DIR"
     fi
