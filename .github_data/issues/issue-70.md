@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-02-18T01:45:43Z
-updated: 2026-02-18T07:50:48Z
+updated: 2026-02-18T07:53:30Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/70
@@ -12,7 +12,7 @@ assignees: none
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-18T07:51:09.104Z
+synced: 2026-02-18T07:53:50.565Z
 ---
 
 # [Issue 70]: [[FEATURE] Remote devcontainer orchestration via just recipe](https://github.com/vig-os/devcontainer/issues/70)
@@ -38,7 +38,7 @@ A `just` recipe (or small shell script invoked by `just`) in `justfile.base` tha
 
 1. **SSHs into the specified remote host** and runs pre-flight checks (see Pre-flight Checks below)
 2. **Clones the repo** if a target path is specified (defaults to `~/`), or skips if already present
-3. **Starts the devcontainer** via `compose up -d` on the remote host (reusing the same compose file stack as the local `just up` recipe)
+3. **Starts the devcontainer** via `compose up -d` on the remote host, with container state detection (see below)
 4. **Opens Cursor** directly into the remote devcontainer using the **nested authority CLI syntax** (see below)
 
 Example usage:
@@ -95,40 +95,180 @@ The recipe must validate the following before proceeding, with clear error messa
 | Container image pullable | Registry auth failure, image not found | "Cannot pull devcontainer image. Check registry access on <host>." |
 | Port conflicts | Ports already bound | "Port <port> already in use on <host>. Stop the conflicting service or use a different port." |
 
+### Implementation Detail: Container State Detection
+
+Before running `compose up`, the recipe must detect and handle existing container state on the remote host. Docker compose scopes containers by project name (derived from directory name), so multiple repos in different directories are naturally isolated.
+
+#### Detection flow
+
+```
+SSH into remote host
+  → cd <repo_path>
+    → compose ps --format json (scoped to project via -f flags)
+      → Parse state of "devcontainer" service
+        → running + healthy  → SKIP compose up, open Cursor
+        → running + unhealthy/restarting → compose restart, health poll, open Cursor
+        → exited/stopped → compose up -d, health poll, open Cursor
+        → not found → compose up -d, health poll, open Cursor
+```
+
+#### Container state matrix
+
+| # | State | Cause | Action | User message |
+|---|-------|-------|--------|-------------|
+| 1 | Running, healthy | Previous `devc-remote` or manual compose up | Skip compose up | "Devcontainer already running on <host>. Opening..." |
+| 2 | Running, unhealthy/restarting | Container crashed, compose restart-looping | `compose restart devcontainer`, health poll | "Devcontainer unhealthy, restarting..." |
+| 3 | Exited/stopped | Manual `compose stop` or unrecoverable crash | `compose up -d`, health poll | "Devcontainer was stopped. Starting..." |
+| 4 | Not found | First run, or `compose down` was used | `compose up -d`, health poll | "Starting devcontainer on <host>..." |
+| 5 | Running, config changed | User edited compose files since last up | `compose up -d` (detects changes, recreates) | "Devcontainer config changed. Recreating..." |
+| 6 | Running, image updated | Image tag changed or new image pulled | `compose up -d` (detects image change, recreates) | "Image updated. Recreating devcontainer..." |
+
+**Detecting config/image changes (cases 5 & 6):** `compose up -d` inherently handles these — it compares the running state to the desired state and recreates only what changed. No custom detection needed; compose's own output indicates whether it recreated or left the service as-is.
+
+#### Health poll after compose up
+
+After any `compose up -d` or `compose restart`, poll the container state before opening Cursor:
+
+```bash
+MAX_WAIT=30
+INTERVAL=5
+for i in $(seq 1 $((MAX_WAIT / INTERVAL))); do
+  STATE=$(compose ps --format json | jq -r '.[] | select(.Service=="devcontainer") | .State')
+  case "$STATE" in
+    running) break ;;
+    exited|dead)
+      echo "[ERROR] Devcontainer failed to start. Last 20 log lines:"
+      compose logs --tail 20 devcontainer
+      exit 1
+      ;;
+  esac
+  [ "$i" -eq $((MAX_WAIT / INTERVAL)) ] && {
+    echo "[ERROR] Devcontainer did not become healthy within ${MAX_WAIT}s"
+    compose logs --tail 20 devcontainer
+    exit 1
+  }
+  sleep "$INTERVAL"
+done
+```
+
+#### Edge cases in state detection
+
+| Scenario | Behavior |
+|----------|----------|
+| Container name collision (different repo, same dir name) | Compose project is scoped by the `-f` file paths, so this is safe. Different repos in different directories get different project names. |
+| Same repo cloned twice to different paths | Each path gets its own compose project — independent containers. No collision. |
+| Multiple users running devc-remote to same host+repo | Compose project is shared. Second user's `compose up -d` is a no-op if config hasn't changed. Both get the same container — this is fine for shared dev servers. |
+| `--force` flag (future) | Could add `--force` to always `compose down && compose up -d`, bypassing state detection. Not in v1 scope. |
+
 ### Failure Modes & Edge Cases
 
 | Scenario | Expected behavior |
 |----------|------------------|
-| SSH connection drops mid-operation | Partial state left on remote. Recipe should be idempotent — re-running should detect existing state and resume. |
-| Container already running from previous run | Detect running container, skip compose up, proceed to open Cursor. |
-| Repo exists but is on wrong branch | Don't touch the branch. Warn the user: "Repo exists at <path> on branch <branch>." |
-| Container runtime is rootless podman | Must work — test both rootless and rootful. |
-| Remote host is macOS (not Linux) | podman runs in a VM on macOS — compose paths differ. Detect OS and warn if unsupported. |
+| SSH connection drops mid-operation | Partial state left on remote. Recipe must be idempotent — re-running detects existing state and resumes. Compose up is already idempotent. Clone skips if directory exists. |
+| Container already running (various states) | See Container State Detection section above. |
+| Repo exists but is on wrong branch | Don't touch the branch. Warn: "Repo exists at <path> on branch <branch>." |
+| Container runtime is rootless podman | Must work — test both rootless and rootful. Rootless podman uses `$XDG_RUNTIME_DIR/podman/podman.sock`. |
+| Remote host is macOS (not Linux) | podman runs in a VM on macOS — compose paths differ. Detect OS via `uname` and warn if unsupported. |
 | `~/.ssh/config` uses ProxyJump or bastion | Cursor's `ssh-remote` authority supports full SSH config, including proxy jumps. Test with multi-hop. |
-| Multiple devcontainer services in compose | Recipe assumes service name `devcontainer` (from template). Fail clearly if service not found. |
-| Compose up succeeds but container exits immediately | Check container health after compose up. Report logs if container exited. |
-| User interrupts with Ctrl+C | Graceful cleanup: don't leave half-started containers. Trap signals. |
+| Multiple devcontainer services in compose | Recipe assumes service name `devcontainer` (from template). Fail clearly if service not found in compose ps output. |
+| Compose up succeeds but container exits immediately | Health poll catches this within 30s. Reports last 20 log lines for debugging. |
+| User interrupts with Ctrl+C | Trap SIGINT/SIGTERM. If mid-compose-up, let compose finish (it's idempotent). If mid-clone, warn about partial clone. |
+| Remote host has no internet (air-gapped) | Image must be pre-loaded. Pre-flight check for image pullability will catch this. Suggest `podman load` as workaround. |
+| SSH agent forwarding needed for private repo clone | Recipe should forward the SSH agent (`ssh -A`) when `--clone` is used with an SSH URL. |
+
+### Implementation Detail: Script Architecture
+
+The recipe should be a thin `just` wrapper calling a shell script for complex logic:
+
+```
+justfile.base
+  └── devc-remote recipe → calls assets/scripts/devc-remote.sh
+
+devc-remote.sh structure:
+  ├── parse_args()          — host, --path, --clone, --clone-to
+  ├── detect_editor_cli()   — cursor > code, store in $EDITOR_CLI
+  ├── check_ssh()           — connectivity + auth test
+  ├── remote_preflight()    — single SSH session, runs all remote checks
+  │   ├── detect_runtime()  — podman > docker, store in $COMPOSE_CMD
+  │   ├── check_git()       — only if --clone
+  │   ├── check_repo()      — exists? has .devcontainer/?
+  │   └── check_disk()      — df, warn if < 2GB
+  ├── remote_clone()        — git clone (if --clone), with SSH agent forwarding
+  ├── remote_compose_up()   — container state detection + compose up + health poll
+  ├── build_cursor_uri()    — hex encode specs, assemble nested authority URI
+  └── open_editor()         — $EDITOR_CLI --folder-uri "$URI"
+```
+
+Key design decisions:
+- **Single SSH session for pre-flight**: Batch all remote checks into one `ssh` call to avoid repeated connection overhead.
+- **Idempotent by design**: Every step checks existing state before acting. Safe to re-run.
+- **No dependencies on remote host beyond runtime + git**: No `just`, `jq`, or other tools assumed on remote. Use basic shell + compose JSON output.
+- **`set -euo pipefail`**: Strict error handling throughout.
+
+### Implementation Detail: Cursor URI Construction
+
+The hex encoding and URI assembly must be exact. Here's the construction logic:
+
+```bash
+build_cursor_uri() {
+  local workspace_path="$1"    # e.g. /home/user/myrepo
+  local ssh_host="$2"          # e.g. myserver or user@host
+  local container_workspace    # e.g. /workspace/myrepo (from devcontainer.json)
+
+  # Read workspaceFolder from devcontainer.json on remote
+  container_workspace=$(ssh "$ssh_host" \
+    "grep -o '\"workspaceFolder\"[[:space:]]*:[[:space:]]*\"[^\"]*\"' \
+     ${workspace_path}/.devcontainer/devcontainer.json" \
+    | sed 's/.*: *"//;s/"//')
+
+  # Build devcontainer spec
+  local dc_conf
+  dc_conf=$(printf '{"settingType":"config","workspacePath":"%s","devcontainerPath":"%s/.devcontainer/devcontainer.json"}' \
+    "$workspace_path" "$workspace_path")
+
+  # Hex encode
+  local dc_hex
+  dc_hex=$(printf '%s' "$dc_conf" | od -A n -t x1 | tr -d '[\n\t ]')
+
+  # Build URI — simple variant (host from SSH config)
+  printf 'vscode-remote://dev-container+%s@ssh-remote+%s%s' \
+    "$dc_hex" "$ssh_host" "$container_workspace"
+}
+```
+
+For hosts not in SSH config, the full variant adds hex-encoded SSH spec:
+```bash
+local ssh_conf
+ssh_conf=$(printf '{"hostName":"%s"}' "$ssh_host")
+local ssh_hex
+ssh_hex=$(printf '%s' "$ssh_conf" | od -A n -t x1 | tr -d '[\n\t ]')
+# URI becomes: dev-container+${dc_hex}@ssh-remote+${ssh_hex}/${container_workspace}
+```
 
 ### Testing Strategy
 
 #### Unit tests (BATS — shell script analysis)
-- Script structure validation (set -euo pipefail, error handling)
-- Argument parsing (host, --path, --clone, --clone-to)
-- Hex encoding correctness for Cursor URI construction
-- Pre-flight check ordering and error message formatting
+- Script structure validation (`set -euo pipefail`, error handling, signal traps)
+- Argument parsing (`host`, `--path`, `--clone`, `--clone-to`)
+- Hex encoding correctness — given known JSON input, assert exact hex output
+- URI assembly — given known specs, assert exact `--folder-uri` output
+- Container state matrix — each state maps to correct action
+- Error message formatting for each pre-flight failure
 
 #### Integration tests — local simulation (pytest, no remote host)
 Reuse existing patterns from `conftest.py`:
 
 | Test | Approach |
 |------|----------|
-| URI construction | Unit-test the hex encoding + URI assembly. Given known inputs, assert exact `--folder-uri` output. |
-| Pre-flight check functions | Mock SSH commands, test each check returns correct pass/fail. |
-| Compose file resolution | Given a workspace path, verify the recipe generates correct `-f` flags. |
-| Idempotency | Run the remote setup logic twice against a local container. Verify second run detects existing state. |
+| URI construction end-to-end | Call `build_cursor_uri()` with known inputs, assert exact output matches Cursor docs examples. |
+| Pre-flight check functions | Mock SSH commands via a stub script, test each check returns correct pass/fail with correct exit code. |
+| Compose file resolution | Given a workspace path, verify the recipe generates correct `-f` flags for all three compose files. |
+| Idempotency | Run the remote setup logic twice against a local container. Verify second run detects "running" state and skips compose up. |
 | Error messages | Trigger each failure mode, assert user-facing message matches spec. |
+| Container state detection | For each of the 6 states in the matrix, mock `compose ps` output and verify correct action is taken. |
+| Health poll timeout | Mock a container that never becomes healthy. Verify timeout fires at 30s with log output. |
 
-#### Integration tests — SSH loopback (pytest + sshd container)
+#### Integration tests — SSH loopback (pytest + sshd sidecar)
 Spin up a **sidecar container running sshd** to simulate a remote host:
 
 ```yaml
@@ -145,11 +285,16 @@ services:
 
 | Test | Approach |
 |------|----------|
-| SSH connectivity check | Connect to sshd sidecar on port 2222. |
-| Remote runtime detection | Sidecar has podman/docker (or mock). Verify detection logic. |
-| Clone + compose up | Clone a test repo into sidecar, run compose up, verify container starts. |
-| Full URI generation | After remote setup, verify the generated `cursor --folder-uri` command is syntactically valid. |
-| Failure modes | Kill sshd mid-operation, remove docker, fill disk — verify graceful failures. |
+| SSH connectivity pre-flight | Connect to sshd sidecar on port 2222. Verify check passes. |
+| SSH auth failure | Connect with wrong key. Verify check fails with correct message. |
+| Remote runtime detection | sshd sidecar has podman/docker installed (or mock binaries). Verify detection picks correct runtime. |
+| No runtime installed | sshd sidecar with neither podman nor docker. Verify error message. |
+| Clone + compose up | Clone a test repo into sidecar, run compose up, verify container starts via `compose ps`. |
+| Container state detection (live) | Start container, verify "already running" detection. Stop container, verify "stopped" detection. |
+| Full URI generation | After remote setup, verify the generated `cursor --folder-uri` command is syntactically valid (parse the URI, decode hex, validate JSON). |
+| Idempotency (live) | Run devc-remote twice against sshd sidecar. Verify second run is a no-op for compose. |
+| SSH drop simulation | Kill sshd mid-compose-up. Re-run. Verify recovery. |
+| Disk space check | Fill sidecar's `/tmp`. Verify disk space warning triggers. |
 
 This follows the existing `devcontainer_with_sidecar` fixture pattern from `conftest.py`.
 
@@ -159,11 +304,14 @@ This follows the existing `devcontainer_with_sidecar` fixture pattern from `conf
 - Existing `test-integration` job structure can host these tests
 - Session-scoped fixture for the sshd sidecar (expensive to set up, reuse across tests)
 - Clean up sidecar containers after test session (existing `PYTEST_AUTO_CLEANUP` pattern)
+- Generate ephemeral SSH keypair in CI (no secrets needed)
 
 #### Manual / smoke testing
-- Test with a real remote host (developer's own server) — not automatable in CI, but documented in a test plan
+- Test with a real remote host (developer's own server) — not automatable in CI, documented in test plan
 - Test with ProxyJump / bastion hosts
 - Test Cursor actually opens and connects (requires human verification)
+- Test with rootless podman on remote
+- Test with macOS remote (expected: warn unsupported)
 
 ### Alternatives Considered
 
@@ -178,6 +326,7 @@ This follows the existing `devcontainer_with_sidecar` fixture pattern from `conf
 - Cursor CLI docs confirm nested `dev-container+...@ssh-remote+...` authority works for single-command remote devcontainer opening
 - The recipe should auto-detect `cursor` vs `code` CLI (prefer cursor, fall back to code)
 - Existing test infrastructure (sidecar pattern, SSH agent forwarding, pexpect) provides a solid foundation
+- No `jq` or `just` assumed on the remote host — only basic shell, git, and a container runtime
 
 ### Impact
 
