@@ -273,38 +273,36 @@ MANIFEST: list[Entry] = [
         ],
     ),
     # ── Cursor skills ───────────────────────────────────────────────────
-    Entry(src=".cursor/skills/"),
-    # ── Cursor commands ──────────────────────────────────────────────────
     Entry(
-        src=".cursor/commands/",
+        src=".cursor/skills/",
         transforms=[
-            # tdd.md: generalize devcontainer-specific test recipes
+            # tdd: generalize devcontainer-specific test recipes
             Sed(
                 pattern=r"just test-image",
                 replace="just test",
-                target="tdd.md",
+                target="tdd/SKILL.md",
             ),
             Sed(
                 pattern=r"just test-integration",
                 replace="just test-cov",
-                target="tdd.md",
+                target="tdd/SKILL.md",
             ),
             Sed(
                 pattern=r"just test-utils",
                 replace="just test-pytest",
-                target="tdd.md",
+                target="tdd/SKILL.md",
             ),
-            # verify.md: generalize devcontainer-specific test recipes
+            # verify: generalize devcontainer-specific test recipes
             Sed(
                 pattern=r"just test-image",
                 replace="just test",
-                target="verify.md",
+                target="verify/SKILL.md",
             ),
-            # plan.md: generalize devcontainer-specific test recipes
+            # plan: generalize devcontainer-specific test recipes
             Sed(
                 pattern=r"just test-image",
                 replace="just test",
-                target="plan.md",
+                target="plan/SKILL.md",
             ),
         ],
     ),
