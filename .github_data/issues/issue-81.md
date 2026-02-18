@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-02-18T13:36:16Z
-updated: 2026-02-18T13:36:16Z
+updated: 2026-02-18T13:43:30Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/81
@@ -12,7 +12,7 @@ assignees: none
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-18T13:36:37.325Z
+synced: 2026-02-18T13:43:51.784Z
 ---
 
 # [Issue 81]: [[FEATURE] Agent skill for issue triage, milestone planning, and sub-issue grouping](https://github.com/vig-os/devcontainer/issues/81)
@@ -67,6 +67,7 @@ The skill creates any missing labels on first run (with user approval).
 
 ### Additional Context
 
+- **Depends on #80** -- The label taxonomy defined here relies on the repo labels being reconciled first. Issue #80 (Reconcile issue template labels with repository labels) must be resolved so the triage skill can use a consistent, complete set of labels for grouping and classification.
 - Sub-issues use the GitHub REST API (`POST /repos/{owner}/{repo}/issues/{issue_number}/sub_issues`). The `gh` CLI does not yet have native sub-issue flags (cli/cli#10298), so the skill uses `gh api` directly.
 - Milestones follow SemVer (e.g. `0.3`, `0.4`, `1.0`) matching the project's release cycle documented in `docs/RELEASE_CYCLE.md`.
 - The skill should be invoked explicitly (not auto-triggered).
