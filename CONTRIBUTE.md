@@ -179,6 +179,13 @@ Available recipes:
     test-validate-commit-msg        # Run validate commit msg tests only
     test-vig-utils                  # Run check action pins tests only
 
+    [worktree]
+    worktree-attach issue           # Attach to a worktree's tmux session
+    worktree-clean                  # Remove all cursor-managed worktrees and tmux sessions
+    worktree-list                   # List active worktrees and their tmux sessions
+    worktree-start issue prompt=""  # Create a worktree for an issue, open tmux session, launch cursor-agent
+    worktree-stop issue             # Stop a worktree's tmux session and remove the worktree
+
 ```
 
 ## Release Workflow

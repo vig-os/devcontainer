@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Cursor worktree support for parallel agent development** ([#64](https://github.com/vig-os/devcontainer/issues/64))
+  - `.cursor/worktrees.json` for native Cursor worktree initialization (macOS/Linux local)
+  - `justfile.worktree` with tmux + cursor-agent CLI recipes (`worktree-start`, `worktree-list`, `worktree-attach`, `worktree-stop`, `worktree-clean`) for devcontainer environments
+  - Autonomous worktree skills: `worktree:brainstorm`, `worktree:plan`, `worktree:execute`, `worktree:verify`, `worktree:pr`, `worktree:ask`, `worktree:solve-and-pr`
+  - Sync manifest updated to propagate worktree config and recipes to downstream projects
 - **GitHub issue and PR dashboard recipe** ([#84](https://github.com/vig-os/devcontainer/issues/84))
   - `just gh-issues` displays open issues grouped by milestone in rich tables with columns for type, title, assignee, linked branch, priority, scope, effort, and semver
   - Open pull requests section with author, branch, review status, and diff delta
