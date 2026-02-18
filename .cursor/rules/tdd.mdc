@@ -7,9 +7,11 @@ alwaysApply: true
 
 When implementing features or fixes that have testable behavior:
 
-1. Write the failing test first. Run it. Confirm it fails.
-2. Write minimal code to make the test pass. Run it. Confirm it passes.
-3. Refactor. Run tests. Confirm no regressions.
+1. Write the failing test first. Run it. Confirm it fails. **Commit** the failing test (`test: ...`).
+2. Write minimal code to make the test pass. Run it. Confirm it passes. **Commit** the implementation.
+3. Refactor. Run tests. Confirm no regressions. **Commit** the refactor if meaningful.
+
+Each phase gets its own commit so the git history proves TDD compliance.
 
 Do not write implementation code before its test. If you already wrote code, delete it and start with the test.
 
