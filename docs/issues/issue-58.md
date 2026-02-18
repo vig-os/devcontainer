@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-17T18:44:24Z
-updated: 2026-02-18T10:00:53Z
+updated: 2026-02-18T12:40:42Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/58
-comments: 1
+comments: 2
 labels: question
-assignees: none
+assignees: c-vigo
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-18T10:02:40.467Z
+synced: 2026-02-18T12:55:28.182Z
 ---
 
 # [Issue 58]: [validate-commit-msg: enforce types/scopes/refs by default](https://github.com/vig-os/devcontainer/issues/58)
@@ -51,4 +51,12 @@ Currently we use:
           "--refs-optional-types", "chore",
         ]
 ```
+
+---
+
+# [Comment #2]() by [gerchowl]()
+
+_Posted on February 18, 2026 at 10:21 AM_
+
+I'd say so, i.e. for changelog generation/grouping and, yes, scopes one could do some generic (or even have them auto populated based on codebase/project analysis / AST .. :-D)
 
