@@ -203,6 +203,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Non-ASCII characters in justfiles** - Replaced Unicode box-drawing characters (═, ───) and emojis with ASCII equivalents for just-lsp compatibility ([#49](https://github.com/vig-os/devcontainer/issues/49))
 - **Pre-commit exclusion pattern** for pymarkdown updated to correct regex ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Pytest test collection** - Exclude `tests/tmp/` directory (integration test workspaces) from test discovery to prevent import errors
+- **CI/CD release validation and test action checkout refs** ([#72](https://github.com/vig-os/devcontainer/issues/72))
+  - Block release if CI checks are still pending, in progress, queued, or in other non-terminal states
+  - Add `ref` input to `test-image` and `test-integration` composite actions to pin checkout commit
+  - Pass `finalize_sha` to test actions ensuring tests always run against the correct built commit
+  - Fix `install-just` conditional in `setup-env` to respect input flag; was unconditionally running
+  - Remove dead macOS `stat` fallback from `build-image` verification step (action only runs on ubuntu-22.04)
 
 ### Security
 

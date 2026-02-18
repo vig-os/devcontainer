@@ -32,6 +32,10 @@ inputs:
     description: 'Container registry URL'
     required: false
     default: 'ghcr.io/vig-os/devcontainer'
+  ref:
+    description: 'Git ref to checkout (e.g., commit SHA, branch, tag)'
+    required: false
+    default: ''
 
 outputs:
   test-result:
@@ -43,6 +47,8 @@ runs:
   steps:
     - name: Checkout code
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      with:
+        ref: ${{ inputs.ref || github.ref }}
 
     - name: Set up test environment
       uses: ./.github/actions/setup-env
