@@ -217,6 +217,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pass `finalize_sha` to test actions ensuring tests always run against the correct built commit
   - Fix `install-just` conditional in `setup-env` to respect input flag; was unconditionally running
   - Remove dead macOS `stat` fallback from `build-image` verification step (action only runs on ubuntu-22.04)
+- **Release tag convention: `v` prefix removed** ([#57](https://github.com/vig-os/devcontainer/issues/57))
+  - Git tags now follow the bare `X.Y.Z` format (e.g. `1.0.0`) instead of `vX.Y.Z`
+  - `release.yml` and `prepare-release.yml` workflows updated to create, push, and validate tags without the `v` prefix
+  - `assets/workspace/.github/workflows/release.yml` template updated to match
+  - CHANGELOG historical release links updated to bare-version URLs (`0.2.1`, `0.2.0`, `0.1`)
+  - Existing repository tags (`v0.1`, `v0.2.0`, `v0.2.1`) renamed to bare versions and pushed
+  - Documentation and inline comments updated across `docs/RELEASE_CYCLE.md`, `CONTRIBUTE.md`, `README.md`, and `build-image` action
 
 ### Security
 
