@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-18T00:45:33Z
-updated: 2026-02-18T00:45:33Z
+updated: 2026-02-18T16:39:57Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/67
-comments: 0
-labels: feature
+comments: 1
+labels: feature, priority:high, area:workspace, effort:large, semver:minor
 assignees: none
-milestone: none
+milestone: 0.4
 projects: none
 relationship: none
-synced: 2026-02-18T08:56:30.789Z
+synced: 2026-02-19T00:08:10.155Z
 ---
 
 # [Issue 67]: [[FEATURE] Consolidate sync-manifest and sync-workspace into a declarative Python manifest](https://github.com/vig-os/devcontainer/issues/67)
@@ -83,3 +83,61 @@ MANIFEST = [
 ### Changelog Category
 
 Changed
+---
+
+# [Comment #1]() by [gerchowl]()
+
+_Posted on February 18, 2026 at 04:39 PM_
+
+## Design: Skill Namespace Renaming (Colon-Separated Prefixes)
+
+### Problem
+
+15 flat skill folders in `.cursor/skills/` make it hard to filter and invoke the right skill quickly. No grouping or namespace hints in the names.
+
+### Approach
+
+Add **colon-separated namespace prefixes** to skill folder names. Cursor doesn't support nested skill directories, so the namespace is encoded in the flat folder name itself (e.g., `git:commit`). Typing `code:` in the skill picker filters to implementation skills only.
+
+### Mapping
+
+| New name | Old name | Namespace |
+|---|---|---|
+| `issue:create` | `create-issue` | issue |
+| `issue:claim` | `claim-issue` | issue |
+| `issue:triage` | `issue-triage` | issue |
+| `design:brainstorm` | `brainstorm` | design |
+| `design:plan` | `plan` | design |
+| `code:execute` | `execute-plan` | code |
+| `code:tdd` | `tdd` | code |
+| `code:debug` | `debug` | code |
+| `code:verify` | `verify` | code |
+| `code:review` | `review` | code |
+| `git:commit` | `commit-msg` | git |
+| `ci:check` | `check-ci` | ci |
+| `ci:fix` | `fix-ci` | ci |
+| `pr:create` | `submit-pr` | pr |
+| `pr:post-merge` | `after-pr-merge` | pr |
+
+### Workflow flow (left to right)
+
+```
+issue:* → design:* → code:* → git:* → ci:* → pr:*
+```
+
+### What changes
+
+For each skill rename:
+1. Rename `.cursor/skills/<old>/` → `.cursor/skills/<new>/`
+2. Update `name:` frontmatter in `SKILL.md`
+3. Update all cross-references (`../old/SKILL.md` → `../new/SKILL.md`)
+4. Update `scripts/sync_manifest.py` transform targets
+5. Rename `assets/workspace/.cursor/skills/<old>/` → `assets/workspace/<new>/` (or re-run sync)
+6. Update any references in `.github/label-taxonomy.toml`, `CHANGELOG.md`
+
+### Constraints
+
+- Cursor does not support nested skill directories — folder name is the skill identifier
+- Colon (`:`) chosen as separator — unambiguous, no collision with kebab-case words
+- `assets/workspace/.cursor/skills/` is a sync mirror; rename source first, then sync
+

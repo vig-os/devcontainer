@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-17T23:08:54Z
-updated: 2026-02-18T20:39:00Z
+updated: 2026-02-18T23:35:13Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/64
-comments: 2
+comments: 3
 labels: feature, priority:low, area:workflow, effort:medium, semver:minor
 assignees: none
-milestone: 0.4
+milestone: 0.3
 projects: none
 relationship: none
-synced: 2026-02-18T20:39:41.984Z
+synced: 2026-02-19T02:37:31.038Z
 ---
 
 # [Issue 64]: [Add Cursor worktree support for parallel agent development](https://github.com/vig-os/devcontainer/issues/64)
@@ -233,3 +233,51 @@ Under `## Unreleased` → `### Added`:
 - **No Windows support** — devcontainer is Linux, native is macOS/Linux.
 - **No Telegram bot implementation** — separate issue. `worktree:ask` uses GitHub comments as placeholder.
 
+---
+
+# [Comment #3]() by [gerchowl]()
+
+_Posted on February 18, 2026 at 09:40 PM_
+
+## Implementation Plan
+
+Issue: #64
+Branch: `feature/64-cursor-worktree-support`
+
+### Tasks
+
+**Phase 1: Native Cursor worktree config**
+
+- [x] Task 1: Create `.cursor/worktrees.json` with `setup-worktree-unix` commands (uv sync, pre-commit install, git config, conditional .env copy) — `.cursor/worktrees.json` — verify: `cat .cursor/worktrees.json | python -m json.tool`
+
+**Phase 2: Justfile worktree recipes**
+
+- [x] Task 2: Create `justfile.worktree` with header comment documenting devcontainer limitation and the `worktree-start` recipe (validate prereqs, create worktree at `../<repo>-worktrees/<issue>/`, setup env, start tmux + cursor-agent) — `justfile.worktree` — verify: `just --list | grep worktree`
+- [x] Task 3: Add `worktree-list` recipe (list active worktrees and tmux sessions) — `justfile.worktree` — verify: `just worktree-list`
+- [x] Task 4: Add `worktree-attach` recipe (attach to tmux session for an issue) — `justfile.worktree` — verify: `just --list | grep worktree-attach`
+- [x] Task 5: Add `worktree-stop` recipe (kill tmux session, remove worktree) — `justfile.worktree` — verify: `just --list | grep worktree-stop`
+- [x] Task 6: Add `worktree-clean` recipe (remove all cursor-managed worktrees and sessions) — `justfile.worktree` — verify: `just --list | grep worktree-clean`
+- [x] Task 7: Import `justfile.worktree` from the main `justfile` — `justfile` — verify: `just --list | grep worktree`
+
+**Phase 3: Autonomous worktree skills**
+
+- [x] Task 8: Create `worktree:brainstorm` skill — autonomous design, reads full issue, posts `## Design` comment, never blocks — `.cursor/skills/worktree:brainstorm/SKILL.md` — verify: file exists with correct frontmatter
+- [x] Task 9: Create `worktree:plan` skill — autonomous planning, posts `## Implementation Plan` comment, never blocks — `.cursor/skills/worktree:plan/SKILL.md` — verify: file exists with correct frontmatter
+- [x] Task 10: Create `worktree:execute` skill — TDD implementation, commits as it goes, no user checkpoints — `.cursor/skills/worktree:execute/SKILL.md` — verify: file exists with correct frontmatter
+- [x] Task 11: Create `worktree:verify` skill — full verification (test + lint + precommit), evidence only, loops back to fix on failure — `.cursor/skills/worktree:verify/SKILL.md` — verify: file exists with correct frontmatter
+- [x] Task 12: Create `worktree:pr` skill — creates PR from worktree branch — `.cursor/skills/worktree:pr/SKILL.md` — verify: file exists with correct frontmatter
+- [x] Task 13: Create `worktree:ask` skill — posts question to issue comment, placeholder for Telegram bot (see future issue) — `.cursor/skills/worktree:ask/SKILL.md` — verify: file exists with correct frontmatter
+- [x] Task 14: Create `worktree:solve-and-pr` compound skill — state detection from full issue (body + comments H2 headings), runs remaining phases in order: brainstorm → plan → execute → verify → PR — `.cursor/skills/worktree:solve-and-pr/SKILL.md` — verify: file exists with correct frontmatter
+
+**Phase 4: Sync manifest & housekeeping**
+
+- [x] Task 15: Add `.cursor/worktrees.json` entry to sync manifest — `scripts/sync_manifest.py` — verify: `uv run python scripts/sync_manifest.py list | grep worktrees`
+- [x] Task 16: Add `justfile.worktree` entry to sync manifest — `scripts/sync_manifest.py` — verify: `uv run python scripts/sync_manifest.py list | grep worktree`
+- [x] Task 17: Update CHANGELOG.md `## Unreleased` → `### Added` with worktree support entry — `CHANGELOG.md` — verify: `grep -A2 'Unreleased' CHANGELOG.md`
+- [x] Task 18: Update CLAUDE.md commands table with new worktree skills — `CLAUDE.md` — verify: `grep worktree CLAUDE.md`
+
+### Notes
+
+- Skills (Phase 3) are markdown files — TDD does not apply. Verification is format/frontmatter correctness.
+- Related: #85 (Tailscale remote SSH — follow-up issue for mobile access to tmux sessions).
+- Telegram bot for `worktree:ask` feedback channel is a separate future issue.
