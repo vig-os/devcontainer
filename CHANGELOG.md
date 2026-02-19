@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Inception skill family for pre-development product thinking** ([#90](https://github.com/vig-os/devcontainer/issues/90))
+  - Four-phase pipeline: `inception:explore` (divergent problem understanding), `inception:scope` (convergent scoping), `inception:architect` (pattern-validated design), `inception:plan` (decomposition into GitHub issues)
+  - Document templates: `docs/templates/RFC.md` (Problem Statement, Proposed Solution, Alternatives, Impact, Phasing) and `docs/templates/DESIGN.md` (Architecture, Components, Data Flow, Technology Stack, Testing)
+  - Document directories: `docs/rfcs/` and `docs/designs/` for durable artifacts
+  - Certified architecture reference repos embedded in `inception:architect` skill: ByteByteGoHq/system-design-101, donnemartin/system-design-primer, karanpratapsingh/system-design, binhnguyennus/awesome-scalability, mehdihadeli/awesome-software-architecture
+  - Fills the gap between "I have an idea" and "I have issues ready for design"
 - **Cursor worktree support for parallel agent development** ([#64](https://github.com/vig-os/devcontainer/issues/64))
   - `.cursor/worktrees.json` for native Cursor worktree initialization (macOS/Linux local)
   - `justfile.worktree` with tmux + cursor-agent CLI recipes (`worktree-start`, `worktree-list`, `worktree-attach`, `worktree-stop`, `worktree-clean`) for devcontainer environments
