@@ -12,6 +12,23 @@ base functionality is preserved in their containers.
 import hashlib
 from pathlib import Path
 
+# Expected versions for installed tools
+# These should be updated when the Containerfile is updated
+EXPECTED_VERSIONS = {
+    "git": "2.",  # Major version check (from apt package)
+    "curl": "8.",  # Major version check (from apt package)
+    "gh": "2.87.",  # Minor version check (GitHub CLI (manually installed from latest release)
+    "uv": "0.10.",  # Minor version check (manually installed from latest release)
+    "python": "3.12",  # Python (from base image)
+    "pre_commit": "4.5.",  # Minor version check (installed via uv pip)
+    "ruff": "0.15.",  # Minor version check (installed via uv pip)
+    "pip_licenses": "5.",  # Major version check (installed via uv pip)
+    "just": "1.46.",  # Minor version check (manually installed from latest release)
+    "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),
+    "typstyle": "0.14.",  # Minor version check (installed from latest release)
+    "vig_utils": "0.1.",  # Minor version check (installed via uv pip)
+}
+
 
 def verify_file_identity(host, src_rel, dest_path):
     """
@@ -48,24 +65,6 @@ def verify_file_identity(host, src_rel, dest_path):
         f"Source: {src_rel} (sha256: {local_sha})\n"
         f"Destination: {dest_path} (sha256: {remote_sha})"
     )
-
-
-# Expected versions for installed tools
-# These should be updated when the Containerfile is updated
-EXPECTED_VERSIONS = {
-    "git": "2.",  # Major version check (from apt package)
-    "curl": "8.",  # Major version check (from apt package)
-    "gh": "2.87.",  # Minor version check (GitHub CLI (manually installed from latest release)
-    "uv": "0.10.",  # Minor version check (manually installed from latest release)
-    "python": "3.12",  # Python (from base image)
-    "pre_commit": "4.5.",  # Minor version check (installed via uv pip)
-    "ruff": "0.15.",  # Minor version check (installed via uv pip)
-    "pip_licenses": "5.",  # Major version check (installed via uv pip)
-    "just": "1.46.",  # Minor version check (manually installed from latest release)
-    "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),
-    "typstyle": "0.14.",  # Minor version check (installed from latest release)
-    "vig_utils": "0.1.",  # Minor version check (installed via uv pip)
-}
 
 
 class TestSystemTools:
