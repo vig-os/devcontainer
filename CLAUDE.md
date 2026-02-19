@@ -16,6 +16,10 @@ Available slash commands (symlinked from `.cursor/skills/`):
 | `/design-brainstorm` | Explore requirements and design before writing code |
 | `/design-plan` | Break approved design into implementation tasks |
 | `/git-commit` | Commit workflow following project conventions |
+| `/inception-explore` | Divergent exploration — understand the problem space |
+| `/inception-scope` | Convergent scoping — define what to build and what not to build |
+| `/inception-architect` | Architecture evaluation — validate design against established patterns |
+| `/inception-plan` | Decomposition — turn scoped design into actionable GitHub issues |
 | `/issue-claim` | Set up local environment to work on a GitHub issue |
 | `/issue-create` | Create a new GitHub issue using templates |
 | `/issue-triage` | Triage and label GitHub issues |
