@@ -85,7 +85,7 @@ jobs:
           RELEASE_BRANCH="release/$VERSION"
           RELEASE_DATE=$(date -u +%Y-%m-%d)
           BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/tag/v$VERSION"
+          RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/tag/$VERSION"
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
@@ -124,8 +124,8 @@ jobs:
         env:
           VERSION: ${{ steps.vars.outputs.version }}
         run: |
-          if git tag -l | grep -q "^v${VERSION}$"; then
-            echo "ERROR: Tag v$VERSION already exists"
+          if git tag -l | grep -q "^${VERSION}$"; then
+            echo "ERROR: Tag $VERSION already exists"
             exit 1
           fi
 
@@ -498,14 +498,14 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          git tag -a "v$VERSION" -m "Release $VERSION"
-          echo "✓ Tag created: v$VERSION"
+          git tag -a "$VERSION" -m "Release $VERSION"
+          echo "✓ Tag created: $VERSION"
 
       - name: Push tag
         env:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          git push origin "v$VERSION"
+          git push origin "$VERSION"
           echo "✓ Tag pushed"
 
       - name: Install cosign
@@ -736,7 +736,7 @@ jobs:
           echo ""
           echo "Release Summary:"
           echo "  Version: $VERSION"
-          echo "  Tag: v$VERSION"
+          echo "  Tag: $VERSION"
           echo "  Images:"
           echo "    - ghcr.io/vig-os/devcontainer:$VERSION"
           echo "    - ghcr.io/vig-os/devcontainer:latest"
@@ -789,7 +789,7 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          TAG="v$VERSION"
+          TAG="$VERSION"
           if gh api "repos/${{ github.repository }}/git/refs/tags/$TAG" >/dev/null 2>&1; then
             echo "Deleting remote tag: $TAG"
             gh api "repos/${{ github.repository }}/git/refs/tags/$TAG" -X DELETE

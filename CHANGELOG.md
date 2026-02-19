@@ -217,6 +217,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pass `finalize_sha` to test actions ensuring tests always run against the correct built commit
   - Fix `install-just` conditional in `setup-env` to respect input flag; was unconditionally running
   - Remove dead macOS `stat` fallback from `build-image` verification step (action only runs on ubuntu-22.04)
+- **Release tag convention: `v` prefix removed** ([#57](https://github.com/vig-os/devcontainer/issues/57))
+  - Git tags now follow the bare `X.Y.Z` format (e.g. `1.0.0`) instead of `vX.Y.Z`
+  - `release.yml` and `prepare-release.yml` workflows updated to create, push, and validate tags without the `v` prefix
+  - `assets/workspace/.github/workflows/release.yml` template updated to match
+  - CHANGELOG historical release links updated to bare-version URLs (`0.2.1`, `0.2.0`, `0.1`)
+  - Existing repository tags (`v0.1`, `v0.2.0`, `v0.2.1`) renamed to bare versions and pushed
+  - Documentation and inline comments updated across `docs/RELEASE_CYCLE.md`, `CONTRIBUTE.md`, `README.md`, and `build-image` action
 - **`gh` version assertion in `test_gh_version`** ([#93](https://github.com/vig-os/devcontainer/issues/93))
   - Updated expected version prefix from `2.86.` to `2.87.` to match GitHub CLI 2.87.0 (released 2026-02-18)
 
@@ -242,7 +249,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Workflow permissions hardened** with least-privilege principle and explicit token scoping ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Input sanitization** — inline expression interpolation replaced with environment variables in workflow run blocks to prevent injection ([#50](https://github.com/vig-os/devcontainer/issues/50))
 
-## [0.2.1](https://github.com/vig-os/devcontainer/releases/tag/v0.2.1) - 2026-01-28
+## [0.2.1](https://github.com/vig-os/devcontainer/releases/tag/0.2.1) - 2026-01-28
 
 ### Added
 
@@ -261,7 +268,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added tests to verify `just` installation and version in `test_image.py`
   - Added integration tests for `just` recipes (`test_just_default`, `test_just_help`, `test_just_info`, `test_just_pytest`)
 - **GitHub Actions workflow for multi-architecture container image publishing** (`.github/workflows/release.yml`)
-  - Automated build and publish workflow triggered on semantic version tags (vX.Y.Z)
+  - Automated build and publish workflow triggered on semantic version tags (X.Y.Z)
   - Multi-architecture support (amd64, arm64) with parallel builds on native runners
   - Image testing before push: runs `pytest tests/test_image.py` against built images
   - Manual dispatch support for testing workflow changes without pushing images (default version: 99.0.1)
@@ -350,7 +357,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed shellcheck warnings by properly quoting script paths
   - Improved debug output and error messages
 
-## [0.2.0](https://github.com/vig-os/devcontainer/releases/tag/v0.2.0) - 2026-01-06
+## [0.2.0](https://github.com/vig-os/devcontainer/releases/tag/0.2.0) - 2026-01-06
 
 ### Added
 
@@ -432,7 +439,7 @@ The previous v0.1 release is kept as-is for backwards compatibility.
 - macOS Podman socket mounting errors caused by SELinux `:Z` flag on socket files
 - Socket detection during tests now matches runtime behavior (Podman-first)
 
-## [0.1](https://github.com/vig-os/devcontainer/releases/tag/v0.1) - 2025-12-10
+## [0.1](https://github.com/vig-os/devcontainer/releases/tag/0.1) - 2025-12-10
 
 ### Core Image
 
