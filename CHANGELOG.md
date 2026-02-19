@@ -224,6 +224,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - CHANGELOG historical release links updated to bare-version URLs (`0.2.1`, `0.2.0`, `0.1`)
   - Existing repository tags (`v0.1`, `v0.2.0`, `v0.2.1`) renamed to bare versions and pushed
   - Documentation and inline comments updated across `docs/RELEASE_CYCLE.md`, `CONTRIBUTE.md`, `README.md`, and `build-image` action
+- **`gh` version assertion in `test_gh_version`** ([#93](https://github.com/vig-os/devcontainer/issues/93))
+  - Updated expected version prefix from `2.86.` to `2.87.` to match GitHub CLI 2.87.0 (released 2026-02-18)
 
 ### Security
 

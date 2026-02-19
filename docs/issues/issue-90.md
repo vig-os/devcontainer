@@ -12,7 +12,7 @@ assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-19T14:42:48.535Z
+synced: 2026-02-19T15:36:54.767Z
 ---
 
 # [Issue 90]: [[FEATURE] Add inception:* skill family for pre-development product thinking](https://github.com/vig-os/devcontainer/issues/90)
