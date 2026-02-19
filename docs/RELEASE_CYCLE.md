@@ -160,7 +160,7 @@ The `prepare-release.yml` workflow prepares the release branch:
 1. ✅ **Validate** job (runs first)
    - Validates semantic version format (X.Y.Z)
    - Verifies release branch `release/X.Y.Z` doesn't exist (local or remote)
-   - Verifies tag `vX.Y.Z` doesn't already exist
+   - Verifies tag `X.Y.Z` doesn't already exist
    - Verifies CHANGELOG has `## Unreleased` section with content
    - Confirms dev branch is checked out
 
@@ -344,7 +344,7 @@ The `release.yml` workflow performs the entire remaining release process:
    - If ANY test fails: entire workflow stops and triggers rollback
 
 4. ✅ **Publish** job (runs only if all builds/tests pass)
-   - Creates annotated tag `vX.Y.Z`
+   - Creates annotated tag `X.Y.Z`
    - Pushes tag to origin
    - Downloads tested images from artifacts
    - Logs in to GitHub Container Registry
@@ -370,7 +370,7 @@ Monitor progress: gh run list --workflow release.yml
 
 Release Summary:
   Version: 1.0.0
-  Tag: v1.0.0
+  Tag: 1.0.0
   Images:
     - ghcr.io/vig-os/devcontainer:1.0.0
     - ghcr.io/vig-os/devcontainer:latest
@@ -409,7 +409,7 @@ Merging any PR to `main` triggers the `post-release.yml` workflow, which:
 
 ```bash
 # List the tag
-git tag | grep v1.0.0
+git tag | grep 1.0.0
 
 # Verify images in registry
 docker pull ghcr.io/vig-os/devcontainer:1.0.0
@@ -567,7 +567,7 @@ gh workflow run prepare-release.yml -f "version=1.0.0" -f "dry-run=true"
    - Fails workflow if any test fails
 
 4. **publish** (runs if all builds/tests pass) - Creates tag and publishes
-   - Creates annotated tag `vX.Y.Z`
+   - Creates annotated tag `X.Y.Z`
    - Pushes tag
    - Downloads tested images from artifacts
    - Pushes images to GHCR
@@ -661,7 +661,7 @@ gh workflow run release.yml \
 The release process provides traceability for quality management:
 
 - **Configuration Identification:**
-  - Version tags (vX.Y.Z) uniquely identify each release
+  - Version tags (X.Y.Z) uniquely identify each release
   - CHANGELOG documents all changes with issue references
   - Container image tags correspond to git tags
 
@@ -819,7 +819,7 @@ gh run view <RUN_ID>
 
 ```bash
 # Delete the old tag
-git push origin :refs/tags/v<VERSION>
+git push origin :refs/tags/<VERSION>
 
 # Try again
 just finalize-release <VERSION>
@@ -884,7 +884,7 @@ git reset --hard $PRE_SHA
 git push --force-with-lease origin release/X.Y.Z
 
 # Delete tag if it exists
-git push origin :refs/tags/vX.Y.Z
+git push origin :refs/tags/X.Y.Z
 
 # Fix the issue and re-run workflow
 just finalize-release X.Y.Z
