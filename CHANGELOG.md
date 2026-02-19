@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Automatic update notifications on devcontainer attach** ([#73](https://github.com/vig-os/devcontainer/issues/73))
+  - Wire `version-check.sh` into `post-attach.sh` for automatic update checks
+  - Silent, throttled checks (24-hour interval by default)
+  - Graceful failure - never disrupts the attach process
+- **Host-side devcontainer upgrade recipe** ([#73](https://github.com/vig-os/devcontainer/issues/73))
+  - New `just devcontainer-upgrade` recipe for convenient upgrades from host
+  - Container detection - prevents accidental execution inside devcontainer
+  - Clear error messages with instructions when run from wrong context
+- **`just check` recipe for version management** ([#73](https://github.com/vig-os/devcontainer/issues/73))
+  - Expose version-check.sh subcommands: `just check`, `just check config`, `just check on/off`, `just check 7d`
+  - User-friendly interface for managing update notifications
 - **Cursor worktree support for parallel agent development** ([#64](https://github.com/vig-os/devcontainer/issues/64))
   - `.cursor/worktrees.json` for native Cursor worktree initialization (macOS/Linux local)
   - `justfile.worktree` with tmux + cursor-agent CLI recipes (`worktree-start`, `worktree-list`, `worktree-attach`, `worktree-stop`, `worktree-clean`) for devcontainer environments
@@ -41,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Updated update notification message** ([#73](https://github.com/vig-os/devcontainer/issues/73))
+  - Fixed misleading `just update` instruction (Python deps, not devcontainer upgrade)
+  - Show correct upgrade instructions: `just devcontainer-upgrade` and curl fallback
+  - Clarify that upgrade must run from host terminal, not inside container
+  - Add reminder to rebuild container in VS Code after upgrade
 - **Declarative Python sync manifest** ([#67](https://github.com/vig-os/devcontainer/issues/67))
   - Replaced `sync-manifest.txt` + bash function and `sync-workspace.sh` with `scripts/sync_manifest.py`
   - Single source of truth for which files to sync and what transformations to apply
