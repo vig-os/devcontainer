@@ -49,8 +49,8 @@
         "--device=/dev/fuse",
         "--group-add=0"
     ],
-    "postStartCommand": "sudo chmod 666 /var/run/docker.sock 2>/dev/null || true",
     "initializeCommand": ".devcontainer/scripts/initialize.sh",
+    "postStartCommand": "/workspace/{{SHORT_NAME}}/.devcontainer/scripts/post-start.sh",
     "postAttachCommand": "/workspace/{{SHORT_NAME}}/.devcontainer/scripts/post-attach.sh",
     "postCreateCommand": "/workspace/{{SHORT_NAME}}/.devcontainer/scripts/post-create.sh"
 }

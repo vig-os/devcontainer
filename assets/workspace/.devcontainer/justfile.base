@@ -42,10 +42,10 @@ test-cov *args:
 # DEPENDENCIES
 # -------------------------------------------------------------------------------
 
-# Sync dependencies from pyproject.toml
+# Sync all dependencies (idempotent, fast if nothing changed)
 [group('deps')]
 sync:
-    uv sync
+    @if [ -f pyproject.toml ]; then uv sync --all-extras --no-install-project; fi
 
 # Update all dependencies
 [group('deps')]
