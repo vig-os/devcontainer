@@ -6,9 +6,9 @@
 name: Sync Issues and PRs
 
 on:  # yamllint disable-line rule:truthy
-  # Run on a schedule (daily at midnight UTC)
+  # Run on a schedule (daily at 2:00 AM UTC)
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 2 * * *'
   # Allow manual triggering
   workflow_dispatch:
     inputs:
@@ -18,21 +18,10 @@ on:  # yamllint disable-line rule:truthy
         default: false
         type: boolean
       target-branch:
-        description: 'Target branch to commit changes to (e.g., main, dev). If not provided, uses automatic detection.'
+        description: 'Target branch to commit changes to (e.g., dev, release/x.y.z).'
         required: false
-        default: ''
+        default: 'dev'
         type: string
-  # Run on issue creation/updates
-  issues:
-    types:
-      - opened
-      - reopened
-      - closed
-  # Run on PR creation and closure
-  pull_request:
-    types:
-      - opened
-      - closed
 
 permissions: {}  # restrict default; job declares its own
 
@@ -58,41 +47,10 @@ jobs:
           app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
           private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
 
-      - name: Determine target branch
-        id: branch
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          INPUT_TARGET_BRANCH: ${{ github.event.inputs.target-branch }}
-          PR_MERGED: ${{ github.event.pull_request.merged }}
-          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: |
-          # Use manual input if provided (workflow_dispatch), otherwise use automatic detection
-          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$INPUT_TARGET_BRANCH" ]; then
-            # Validate target branch against allowed patterns
-            if [[ ! "$INPUT_TARGET_BRANCH" =~ ^(dev|main|release/.+)$ ]]; then
-              echo "ERROR: Invalid target branch: $INPUT_TARGET_BRANCH"
-              echo "Allowed branches: dev, main, release/*"
-              exit 1
-            fi
-            TARGET_BRANCH="$INPUT_TARGET_BRANCH"
-            echo "✓ Using manual target branch: $TARGET_BRANCH"
-          # If PR was merged into main, commit to main; otherwise use dev
-          elif [ "$EVENT_NAME" = "pull_request" ] && \
-               [ "$PR_MERGED" = "true" ] && \
-               [ "$PR_BASE_REF" = "main" ]; then
-            TARGET_BRANCH="main"
-            echo "✓ PR merged into main - will commit to main"
-          else
-            TARGET_BRANCH="dev"
-            echo "✓ Will commit to dev (default for issues, scheduled, or non-main PRs)"
-          fi
-          echo "branch=$TARGET_BRANCH" >> $GITHUB_OUTPUT
-          echo "Target branch: $TARGET_BRANCH"
-
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
-          ref: ${{ steps.branch.outputs.branch || 'dev' }}
+          ref: ${{ github.event.inputs.target-branch }}
           persist-credentials: false
 
       - name: Restore sync state (last synced timestamp)
@@ -145,7 +103,7 @@ jobs:
           # Use App token so push can bypass branch protection when App is in bypass list
           GH_TOKEN: ${{ steps.generate-token.outputs.token || github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          TARGET_BRANCH: refs/heads/${{ steps.branch.outputs.branch }}
+          TARGET_BRANCH: refs/heads/${{ github.event.inputs.target-branch }}
           COMMIT_MESSAGE: "chore: sync issues and PRs"
           FILE_PATHS: ${{ steps.sync.outputs.modified-files }}
 
