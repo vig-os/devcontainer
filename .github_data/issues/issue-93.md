@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-19T15:10:21Z
-updated: 2026-02-19T15:10:21Z
+updated: 2026-02-19T15:14:26Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/93
 comments: 0
-labels: bug
+labels: chore, priority:blocking
 assignees: c-vigo
-milestone: none
+milestone: 0.3
 projects: none
 relationship: none
-synced: 2026-02-19T15:10:41.319Z
+synced: 2026-02-19T15:14:45.139Z
 ---
 
 # [Issue 93]: [fix: update expected gh version in test_gh_version to 2.87.x](https://github.com/vig-os/devcontainer/issues/93)
@@ -23,15 +23,15 @@ CI is failing on \`test_gh_version\` because the installed \`gh\` CLI version bu
 
 ## Failing test
 
-\`\`\`
+```
 tests/test_image.py::TestSystemTools::test_gh_version
-\`\`\`
+```
 
 **Error:**
-\`\`\`
+```
 AssertionError: Expected gh 2.86., got: gh version 2.87.0 (2026-02-18)
 assert '2.86.' in 'gh version 2.87.0 (2026-02-18)\n...'
-\`\`\`
+```
 
 ## Fix
 
