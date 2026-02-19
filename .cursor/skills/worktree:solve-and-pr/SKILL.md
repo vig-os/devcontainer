@@ -54,6 +54,8 @@ Execute phases in order, starting from the detected state:
    - Full test suite + lint + precommit. Loops back to fix on failure.
 5. **PR** → [worktree:pr](../worktree:pr/SKILL.md)
    - Creates pull request with auto-generated text.
+6. **CI** → [worktree:ci-check](../worktree:ci-check/SKILL.md)
+   - Polls remote CI until completion. On failure, invokes [worktree:ci-fix](../worktree:ci-fix/SKILL.md) which diagnoses, fixes, pushes, and loops back to ci-check.
 
 Each phase checks for its own completion marker before running. If the marker exists, it skips to the next phase.
 
@@ -69,6 +71,7 @@ After the PR is created, post a summary comment on the issue:
 - Execute: all tasks done
 - Verify: all checks pass
 - PR: <PR_URL>
+- CI: all checks pass
 ```
 
 ## Important Notes

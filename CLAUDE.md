@@ -21,6 +21,8 @@ Available slash commands (symlinked from `.cursor/skills/`):
 | `/issue-triage` | Triage and label GitHub issues |
 | `/pr-create` | Prepare and submit a pull request |
 | `/pr-post-merge` | Cleanup after PR merge |
+| `/worktree-ci-check` | Autonomous CI check — polls until completion, triggers fix on failure |
+| `/worktree-ci-fix` | Autonomous CI fix — diagnose, post diagnosis, fix, push, re-check |
 | `/worktree-brainstorm` | Autonomous design — reads issue, posts design, never blocks |
 | `/worktree-plan` | Autonomous planning — posts implementation plan, never blocks |
 | `/worktree-execute` | Autonomous TDD implementation — no user checkpoints |

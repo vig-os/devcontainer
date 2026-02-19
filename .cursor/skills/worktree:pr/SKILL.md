@@ -28,37 +28,59 @@ git fetch origin
 - If there are uncommitted changes, commit them first.
 - Push the branch: `git push -u origin HEAD`
 
-### 2. Gather context
+### 2. Determine base branch
+
+Detect whether this issue is a sub-issue and resolve the correct merge target:
+
+1. Determine the repo: `gh repo view --json nameWithOwner --jq '.nameWithOwner'`
+2. Check for a parent issue:
+
+   ```bash
+   gh api repos/{owner}/{repo}/issues/{issue_number}/parent --jq '.number'
+   ```
+
+3. If a parent exists, resolve its linked branch:
+
+   ```bash
+   gh issue develop --list <parent_number>
+   ```
+
+   - Use the parent's branch as `<base_branch>`.
+   - If the parent has no linked branch, fall back to `dev`.
+
+4. If no parent exists, use `dev` as `<base_branch>`.
+
+### 3. Gather context
 
 ```bash
-git log dev..HEAD --oneline
-git diff dev...HEAD --stat
+git log <base_branch>..HEAD --oneline
+git diff <base_branch>...HEAD --stat
 gh issue view <issue_number> --json title,body
 ```
 
 - Read the issue title and acceptance criteria.
 - Summarize what the commits accomplish.
 
-### 3. Ensure CHANGELOG is updated
+### 4. Ensure CHANGELOG is updated
 
 - Check `CHANGELOG.md` for an entry under `## Unreleased` that covers the changes.
 - If missing, add the appropriate entry and commit.
 
-### 4. Generate PR text
+### 5. Generate PR text
 
 - Use the structure from [.github/pull_request_template.md](../../.github/pull_request_template.md).
 - Populate: Description, Related Issue(s) (`Closes #<issue_number>`), Type of Change, Changes Made, Testing, Checklist.
 - Write the body to `.github/pr-draft-<issue_number>.md`.
 
-### 5. Create PR
+### 6. Create PR
 
 ```bash
-gh pr create --base dev --title "<type>: <description> (#<issue_number>)" \
+gh pr create --base <base_branch> --title "<type>: <description> (#<issue_number>)" \
   --body-file .github/pr-draft-<issue_number>.md \
   --assignee @me
 ```
 
-### 6. Clean up
+### 7. Clean up
 
 - Delete the draft file: `rm .github/pr-draft-<issue_number>.md`
 - Report the PR URL.
@@ -66,5 +88,5 @@ gh pr create --base dev --title "<type>: <description> (#<issue_number>)" \
 ## Important Notes
 
 - Never block for user review of the PR text. Generate the best text from available context.
-- Always target `dev` unless the issue specifies otherwise.
+- Base branch is auto-detected: parent issue's branch for sub-issues, `dev` otherwise.
 - The PR title should follow commit message conventions: `type(scope): description (#issue)`.
