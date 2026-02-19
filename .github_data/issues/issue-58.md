@@ -1,18 +1,18 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-17T18:44:24Z
-updated: 2026-02-18T10:21:28Z
+updated: 2026-02-19T14:22:30Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/58
-comments: 2
-labels: question
-assignees: none
-milestone: none
+comments: 3
+labels: feature, priority:medium, area:workflow, effort:small, semver:minor
+assignees: c-vigo
+milestone: 0.3
 projects: none
 relationship: none
-synced: 2026-02-18T12:21:24.455Z
+synced: 2026-02-19T14:22:48.646Z
 ---
 
 # [Issue 58]: [validate-commit-msg: enforce types/scopes/refs by default](https://github.com/vig-os/devcontainer/issues/58)
@@ -59,4 +59,12 @@ Currently we use:
 _Posted on February 18, 2026 at 10:21 AM_
 
 I'd say so, i.e. for changelog generation/grouping and, yes, scopes one could do some generic (or even have them auto populated based on codebase/project analysis / AST .. :-D)
+
+---
+
+# [Comment #3]() by [c-vigo]()
+
+_Posted on February 19, 2026 at 02:22 PM_
+
+Solved in [e27722c](https://github.com/vig-os/devcontainer/commit/e27722c216d1a9a55b74c3a98639ab4615dbde82)
 

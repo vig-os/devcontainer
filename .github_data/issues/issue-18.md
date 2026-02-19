@@ -1,18 +1,18 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2025-12-16T12:07:03Z
-updated: 2025-12-18T09:22:57Z
+updated: 2026-02-19T16:07:10Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/18
-comments: 0
-labels: none
+comments: 2
+labels: feature, priority:medium, effort:medium, area:testing, semver:minor
 assignees: none
 milestone: 0.3
 projects: none
 relationship: none
-synced: 2026-01-09T16:17:33.030Z
+synced: 2026-02-19T16:07:29.308Z
 ---
 
 # [Issue 18]: [feat: Auto-cleanup test containers on failure with --keep-containers flag](https://github.com/vig-os/devcontainer/issues/18)
@@ -87,3 +87,32 @@ make clean-test-containers
 - `devcontainer_with_sidecar`
 - `initialized_workspace`
 - Any other fixtures that create containers
+---
+
+# [Comment #1]() by [gerchowl]()
+
+_Posted on February 18, 2026 at 07:21 PM_
+
+## Triage: Recommend closing as resolved by other means
+
+@c-vigo — the original problem (lingering containers accumulating and breaking subsequent test runs) has been addressed by three layers of protection added since this issue was filed:
+
+1. **`atexit.register(cleanup)`** on `test_container` and `initialized_workspace` fixtures — runs on process exit even on unhandled exceptions.
+2. **`just _test-cleanup-check`** — the `just test` recipe automatically removes lingering containers *before* every test invocation.
+3. **`pytest_sessionstart` pre-flight check** — detects lingering containers at session start and either auto-cleans (`PYTEST_AUTO_CLEANUP=1`) or fails fast with cleanup instructions.
+
+The two remaining asks from this issue:
+
+- **`--keep-containers` flag** — nice-to-have, but `pytest --pdb` or `breakpoint()` are adequate alternatives for inspecting failed containers.
+- **`request.addfinalizer()` migration** — marginal reliability gain over `yield`. The edge case it covers (teardown skipped on fixture setup failure) is already caught by the pre-flight cleanup on the next run.
+
+Neither item addresses a currently broken behavior. OK to close this?
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on February 19, 2026 at 04:07 PM_
+
+Absolutely
+

@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2025-12-16T12:07:03Z
-updated: 2026-01-30T15:16:57Z
+updated: 2026-02-18T19:21:22Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/18
-comments: 0
-labels: feature
+comments: 1
+labels: feature, priority:medium, effort:medium, area:testing, semver:minor
 assignees: none
 milestone: 0.3
 projects: none
 relationship: none
-synced: 2026-02-18T08:56:41.522Z
+synced: 2026-02-19T00:08:19.960Z
 ---
 
 # [Issue 18]: [feat: Auto-cleanup test containers on failure with --keep-containers flag](https://github.com/vig-os/devcontainer/issues/18)
@@ -87,3 +87,24 @@ make clean-test-containers
 - `devcontainer_with_sidecar`
 - `initialized_workspace`
 - Any other fixtures that create containers
+---
+
+# [Comment #1]() by [gerchowl]()
+
+_Posted on February 18, 2026 at 07:21 PM_
+
+## Triage: Recommend closing as resolved by other means
+
+@c-vigo — the original problem (lingering containers accumulating and breaking subsequent test runs) has been addressed by three layers of protection added since this issue was filed:
+
+1. **`atexit.register(cleanup)`** on `test_container` and `initialized_workspace` fixtures — runs on process exit even on unhandled exceptions.
+2. **`just _test-cleanup-check`** — the `just test` recipe automatically removes lingering containers *before* every test invocation.
+3. **`pytest_sessionstart` pre-flight check** — detects lingering containers at session start and either auto-cleans (`PYTEST_AUTO_CLEANUP=1`) or fails fast with cleanup instructions.
+
+The two remaining asks from this issue:
+
+- **`--keep-containers` flag** — nice-to-have, but `pytest --pdb` or `breakpoint()` are adequate alternatives for inspecting failed containers.
+- **`request.addfinalizer()` migration** — marginal reliability gain over `yield`. The edge case it covers (teardown skipped on fixture setup failure) is already caught by the pre-flight cleanup on the next run.
+
+Neither item addresses a currently broken behavior. OK to close this?
+

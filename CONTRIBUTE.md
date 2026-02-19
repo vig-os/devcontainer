@@ -234,7 +234,7 @@ vigOS Development Environment uses **Semantic Versioning** ([SemVer](https://sem
 - **Stable versions** (e.g., `1.2.0`, `2.0.0`):
   - Follow Semantic Versioning format: `MAJOR.MINOR.PATCH` (e.g., `1.0.0`, `1.2.3`, `2.0.0`)
   - Pushes to GHCR with both `:latest` and `:version` tags
-  - Creates git tag `v{version}` (e.g., `v1.2.0`)
+  - Creates git tag `{version}` (e.g., `1.2.0`)
   - Use `just push X.Y.Z` where X.Y.Z is the semantic version
 
 This ensures that `:latest` always points to the latest stable release, and git tags provide traceability for all stable container versions.
