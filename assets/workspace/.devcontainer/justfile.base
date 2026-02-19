@@ -64,6 +64,34 @@ clean-artifacts:
     find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # -------------------------------------------------------------------------------
+# VERSION CHECK
+# -------------------------------------------------------------------------------
+
+# Check for devcontainer updates (verbose)
+# Usage: just check [config|on|off|<duration>]
+# Examples: just check, just check config, just check off, just check 7d
+[group('info')]
+check *args:
+    #!/usr/bin/env bash
+    SCRIPT_DIR="$(cd "$(dirname "{{justfile_directory()}}")/.devcontainer/scripts" && pwd)" || {
+        echo "Error: Could not locate .devcontainer/scripts directory"
+        exit 1
+    }
+    
+    if [[ ! -f "$SCRIPT_DIR/version-check.sh" ]]; then
+        echo "Error: version-check.sh not found at $SCRIPT_DIR"
+        exit 1
+    fi
+    
+    if [[ $# -eq 0 ]]; then
+        # No args provided - run in verbose check mode
+        "$SCRIPT_DIR/version-check.sh" check
+    else
+        # Pass all arguments through to the script
+        "$SCRIPT_DIR/version-check.sh" "$@"
+    fi
+
+# -------------------------------------------------------------------------------
 # SIDECAR
 # -------------------------------------------------------------------------------
 
