@@ -239,6 +239,7 @@ class TestDevContainerStructure:
             "copy-host-user-conf.sh",
             "init-git.sh",
             "setup-git-conf.sh",
+            "verify-auth.sh",
             "init-precommit.sh",
             "post-attach.sh",
             "post-create.sh",

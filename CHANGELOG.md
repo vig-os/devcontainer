@@ -144,8 +144,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New CLI flag to mandate that all commits include at least one scope (e.g. `feat(api): ...`)
   - When enabled, scopeless commits (e.g. `feat: ...`) are rejected at the commit-msg stage
   - Comprehensive tests added to `test_validate_commit_msg.py`
+- **`post-start.sh` devcontainer lifecycle script** ([#60](https://github.com/vig-os/devcontainer/issues/60))
+  - New script runs on every container start (create + restart)
+  - Handles Docker socket permissions and dependency sync via `just sync`
+  - Replaces inline `postStartCommand` in `devcontainer.json`
 
 ### Changed
+
+- **Dependency sync delegated to `just sync` across all lifecycle hooks** ([#60](https://github.com/vig-os/devcontainer/issues/60))
+  - `post-create.sh`, `post-start.sh`, and `post-attach.sh` now call `just sync` instead of `uv sync` directly
+  - `justfile.base` `sync` recipe updated with `--all-extras --no-install-project` flags and `pyproject.toml` guard
+  - Abstracts toolchain details so future dependency managers only need a recipe change
 
 - **Git initialization default branch** ([#35](https://github.com/vig-os/devcontainer/issues/35))
   - Updated git initialization to set the default branch to 'main' instead of 'master'
@@ -199,6 +208,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Host-specific paths in `.gitconfig` and unreliable `postAttachCommand` lifecycle** ([#60](https://github.com/vig-os/devcontainer/issues/60))
+  - `copy-host-user-conf.sh` now generates a container-ready `.gitconfig` with `/root/...` paths and strips host-only entries (credential helpers, `excludesfile`, `includeIf`) at export time
+  - Refactored devcontainer lifecycle: moved all one-time setup (`init-git.sh`, `setup-git-conf.sh`, `init-precommit.sh`) from `postAttachCommand` into `postCreateCommand`
+  - New `verify-auth.sh` script for lightweight SSH agent and `gh` auth verification (read-only, no side effects)
+  - `postAttachCommand` now only runs auth verification and dependency sync — no longer depends on unreliable attach hook for critical setup
+  - `setup-git-conf.sh` simplified to one-time file placement (removed SSH agent scanning logic)
 - **GitHub CLI config copy target path** ([#35](https://github.com/vig-os/devcontainer/issues/35))
   - Corrected target path for copying GitHub CLI configuration in post-install step
 - **Install script terminal check in dry-run mode** ([#37](https://github.com/vig-os/devcontainer/issues/37))

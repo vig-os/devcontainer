@@ -18,7 +18,7 @@
 # Examples:
 #   curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh
 #   curl -sSf ... | sh -s -- ~/Projects/my-project
-#   curl -sSf ... | sh -s -- --version 1.0.0 --force ./my-project
+#   curl -sSf ... | sh -s -- --version 0.2.1 --force ./my-project
 #   curl -sSf ... | sh -s -- --org MyOrg ./my-project
 
 set -euo pipefail
@@ -79,7 +79,7 @@ EXAMPLES:
     curl -sSf ... | sh -s -- --force ./my-project
 
     # Use specific version
-    curl -sSf ... | sh -s -- --version 1.0.0 ./my-project
+    curl -sSf ... | sh -s -- --version 0.2.1 ./my-project
 
     # Override project name
     curl -sSf ... | sh -s -- --name my_custom_name ./my-project
