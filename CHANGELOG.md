@@ -217,6 +217,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pass `finalize_sha` to test actions ensuring tests always run against the correct built commit
   - Fix `install-just` conditional in `setup-env` to respect input flag; was unconditionally running
   - Remove dead macOS `stat` fallback from `build-image` verification step (action only runs on ubuntu-22.04)
+- **`gh` version assertion in `test_gh_version`** ([#93](https://github.com/vig-os/devcontainer/issues/93))
+  - Updated expected version prefix from `2.86.` to `2.87.` to match GitHub CLI 2.87.0 (released 2026-02-18)
 
 ### Security
 
