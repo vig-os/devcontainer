@@ -22,6 +22,7 @@ gh run view <run-id> --log-failed
 ### 2. Read the workflow file
 
 - Open the relevant workflow in `.github/workflows/` or action in `.github/actions/`.
+- Make sure you are using the correct branch specified in the workflow run details.
 - Understand what the failing step does and what it depends on.
 
 ### 3. Root cause analysis (no guessing)

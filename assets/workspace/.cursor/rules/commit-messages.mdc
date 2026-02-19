@@ -1,6 +1,8 @@
 ---
-description: Commit message format and rules (type, Refs)
-alwaysApply: true
+description: Commit message format and rules (type, Refs). Attach when committing, writing commit messages, or preparing PRs.
+alwaysApply: false
+globs:
+  - .gitmessage
 ---
 
 # Commit Message Standard

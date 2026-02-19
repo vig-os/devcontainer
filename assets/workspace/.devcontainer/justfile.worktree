@@ -1,0 +1,271 @@
+# ===============================================================================
+# WORKTREE RECIPES — CLI-based parallel agent development
+# ===============================================================================
+# NOTE: Cursor's native worktree UI does NOT work inside devcontainers (Feb 2026).
+# These recipes provide a CLI-based alternative using tmux + cursor-agent.
+# Native worktree support (.cursor/worktrees.json) works on macOS/Linux local only.
+# Tracked: https://forum.cursor.com/t/cursor-parallel-agents-in-wsl-devcontainers-misresolve-worktree-paths-and-context/145711
+# ===============================================================================
+
+# Derive worktree base directory: ../<repo>-worktrees/
+_wt_repo := `basename "$(git rev-parse --show-toplevel)"`
+_wt_base := "../" + _wt_repo + "-worktrees"
+
+# -------------------------------------------------------------------------------
+# START
+# -------------------------------------------------------------------------------
+
+# Create a worktree for an issue, open tmux session, launch cursor-agent
+[group('worktree')]
+worktree-start issue prompt="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Prerequisites
+    if ! command -v tmux >/dev/null 2>&1; then
+        echo "[ERROR] tmux is not installed. Install it first."
+        exit 1
+    fi
+    if ! command -v agent >/dev/null 2>&1; then
+        echo "[ERROR] cursor-agent CLI is not installed."
+        echo "Install: curl https://cursor.com/install -fsSL | bash"
+        exit 1
+    fi
+
+    # Helper: ensure a directory is in cursor-agent's trustedDirectories
+    _wt_ensure_trust() {
+        local dir_abs
+        dir_abs=$(cd "$1" && pwd)
+        local cfg="${HOME}/.cursor/cli-config.json"
+        mkdir -p "$(dirname "$cfg")"
+        if [ ! -f "$cfg" ]; then
+            echo '{}' > "$cfg"
+        fi
+        if ! jq -e --arg d "$dir_abs" '.trustedDirectories // [] | index($d)' "$cfg" >/dev/null 2>&1; then
+            jq --arg d "$dir_abs" '.trustedDirectories = ((.trustedDirectories // []) + [$d])' "$cfg" > "${cfg}.tmp" \
+                && mv "${cfg}.tmp" "$cfg"
+            echo "[OK] Trusted directory added: $dir_abs"
+        else
+            echo "[OK] Directory already trusted: $dir_abs"
+        fi
+    }
+
+    # Auth: check existing login first, then fall back to CURSOR_API_KEY
+    if agent status 2>/dev/null | grep -qi "logged in\|authenticated"; then
+        echo "[OK] cursor-agent: authenticated via browser login"
+    elif [ -n "${CURSOR_API_KEY:-}" ]; then
+        echo "[OK] cursor-agent: using CURSOR_API_KEY"
+    else
+        echo "[!] cursor-agent: not authenticated. Attempting browser login..."
+        if agent login; then
+            echo "[OK] cursor-agent: browser login successful"
+        else
+            echo "[ERROR] Authentication failed. Either:"
+            echo "  1. Run 'agent login' to authenticate via browser, or"
+            echo "  2. Export CURSOR_API_KEY in your shell profile or .env"
+            exit 1
+        fi
+    fi
+
+    ISSUE="{{ issue }}"
+    PROMPT="{{ prompt }}"
+    WT_DIR="{{ _wt_base }}/${ISSUE}"
+    SESSION="wt-${ISSUE}"
+
+    # Check if worktree already exists
+    if [ -d "$WT_DIR" ]; then
+        echo "[!] Worktree already exists at $WT_DIR"
+        # Ensure trust even for pre-existing worktrees
+        _wt_ensure_trust "$WT_DIR"
+        if tmux has-session -t "$SESSION" 2>/dev/null; then
+            echo "    tmux session '$SESSION' is running. Use: just worktree-attach $ISSUE"
+        else
+            echo "    No tmux session found. Starting one..."
+            if [ -n "$PROMPT" ]; then
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat --yolo \"$PROMPT\""
+            else
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR"
+            fi
+            echo "[OK] tmux session '$SESSION' started. Use: just worktree-attach $ISSUE"
+        fi
+        exit 0
+    fi
+
+    # Create worktree directory
+    mkdir -p "{{ _wt_base }}"
+
+    # Create branch and worktree
+    BRANCH="worktree/${ISSUE}"
+    echo "Creating worktree at $WT_DIR (branch: $BRANCH)..."
+    git worktree add "$WT_DIR" -b "$BRANCH"
+
+    # Setup environment in worktree
+    echo "Setting up worktree environment..."
+    pushd "$WT_DIR" >/dev/null
+    uv sync
+    git config --unset-all core.hooksPath 2>/dev/null || true
+    pre-commit install
+    git config commit.template .gitmessage
+    if [ -f "$(git worktree list --porcelain | head -1 | cut -d' ' -f2-)/.env" ]; then
+        cp "$(git worktree list --porcelain | head -1 | cut -d' ' -f2-)/.env" .env
+    fi
+    popd >/dev/null
+
+    # Ensure worktree directory is trusted by cursor-agent
+    _wt_ensure_trust "$WT_DIR"
+
+    # Start tmux session
+    # --yolo: auto-approve all shell commands (autonomous agent, no human at the terminal)
+    if [ -n "$PROMPT" ]; then
+        tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat --yolo \"$PROMPT\""
+    else
+        tmux new-session -d -s "$SESSION" -c "$WT_DIR"
+    fi
+
+    echo ""
+    echo "[OK] Worktree created at $WT_DIR"
+    echo "[OK] tmux session '$SESSION' started"
+    echo ""
+    echo "Next steps:"
+    echo "  Attach:  just worktree-attach $ISSUE"
+    echo "  Stop:    just worktree-stop $ISSUE"
+
+# -------------------------------------------------------------------------------
+# LIST
+# -------------------------------------------------------------------------------
+
+# List active worktrees and their tmux sessions
+[group('worktree')]
+worktree-list:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    WT_BASE="{{ _wt_base }}"
+    echo "Worktrees ({{ _wt_repo }}):"
+    echo ""
+
+    if [ ! -d "$WT_BASE" ]; then
+        echo "  (no worktrees found)"
+        exit 0
+    fi
+
+    found=0
+    for dir in "$WT_BASE"/*/; do
+        [ -d "$dir" ] || continue
+        found=1
+        issue=$(basename "$dir")
+        session="wt-${issue}"
+        branch=$(git -C "$dir" branch --show-current 2>/dev/null || echo "?")
+
+        if tmux has-session -t "$session" 2>/dev/null; then
+            status="[RUNNING]"
+        else
+            status="[STOPPED]"
+        fi
+
+        echo "  $status  #${issue}  branch: $branch  session: $session"
+    done
+
+    if [ "$found" -eq 0 ]; then
+        echo "  (no worktrees found)"
+    fi
+    echo ""
+    echo "Commands: just worktree-attach <issue> | just worktree-stop <issue>"
+
+# -------------------------------------------------------------------------------
+# ATTACH
+# -------------------------------------------------------------------------------
+
+# Attach to a worktree's tmux session
+[group('worktree')]
+worktree-attach issue:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    SESSION="wt-{{ issue }}"
+    if ! tmux has-session -t "$SESSION" 2>/dev/null; then
+        echo "[ERROR] No tmux session '$SESSION' found."
+        echo "Start one with: just worktree-start {{ issue }}"
+        exit 1
+    fi
+    tmux attach-session -t "$SESSION"
+
+# -------------------------------------------------------------------------------
+# STOP
+# -------------------------------------------------------------------------------
+
+# Stop a worktree's tmux session and remove the worktree
+[group('worktree')]
+worktree-stop issue:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    ISSUE="{{ issue }}"
+    SESSION="wt-${ISSUE}"
+    WT_DIR="{{ _wt_base }}/${ISSUE}"
+
+    # Kill tmux session if running
+    if tmux has-session -t "$SESSION" 2>/dev/null; then
+        tmux kill-session -t "$SESSION"
+        echo "[OK] tmux session '$SESSION' killed"
+    fi
+
+    # Remove worktree
+    if [ -d "$WT_DIR" ]; then
+        BRANCH=$(git -C "$WT_DIR" branch --show-current 2>/dev/null || true)
+        git worktree remove "$WT_DIR" --force
+        echo "[OK] Worktree removed: $WT_DIR"
+        # Clean up the branch
+        if [ -n "$BRANCH" ]; then
+            git branch -D "$BRANCH" 2>/dev/null && echo "[OK] Branch '$BRANCH' deleted" || true
+        fi
+    else
+        echo "[!] No worktree at $WT_DIR"
+    fi
+
+# -------------------------------------------------------------------------------
+# CLEAN
+# -------------------------------------------------------------------------------
+
+# Remove all cursor-managed worktrees and tmux sessions
+[group('worktree')]
+worktree-clean:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    WT_BASE="{{ _wt_base }}"
+
+    if [ ! -d "$WT_BASE" ]; then
+        echo "[*] No worktrees to clean"
+        exit 0
+    fi
+
+    for dir in "$WT_BASE"/*/; do
+        [ -d "$dir" ] || continue
+        issue=$(basename "$dir")
+        session="wt-${issue}"
+
+        # Kill tmux session
+        if tmux has-session -t "$session" 2>/dev/null; then
+            tmux kill-session -t "$session"
+            echo "[OK] Killed session '$session'"
+        fi
+
+        # Remove worktree
+        branch=$(git -C "$dir" branch --show-current 2>/dev/null || true)
+        git worktree remove "$dir" --force 2>/dev/null || rm -rf "$dir"
+        echo "[OK] Removed worktree: $dir"
+
+        # Clean up branch
+        if [ -n "$branch" ]; then
+            git branch -D "$branch" 2>/dev/null && echo "[OK] Deleted branch '$branch'" || true
+        fi
+    done
+
+    # Remove base dir if empty
+    rmdir "$WT_BASE" 2>/dev/null || true
+
+    # Prune stale worktree references
+    git worktree prune
+    echo ""
+    echo "[OK] All worktrees cleaned"

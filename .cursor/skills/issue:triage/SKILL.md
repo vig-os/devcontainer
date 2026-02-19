@@ -42,7 +42,7 @@ gh api repos/{owner}/{repo}/issues/{n}/sub_issues 2>/dev/null
 gh api repos/{owner}/{repo}/issues/{n}/parent 2>/dev/null
 ```
 
-Also read `.github_data/issues/` for local issue markdown files if available.
+Also read `docs/issues/` for local issue markdown files if available.
 
 Determine `{owner}/{repo}` with:
 

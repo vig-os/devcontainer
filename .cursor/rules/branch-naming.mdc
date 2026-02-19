@@ -1,6 +1,6 @@
 ---
-description: Topic branch naming and workflow for starting work on an issue
-alwaysApply: true
+description: Topic branch naming and workflow for starting work on an issue. Attach when creating branches, starting work on issues, or checking out branches.
+alwaysApply: false
 ---
 
 # Topic Branch Naming and Workflow

@@ -125,6 +125,7 @@ runs:
 
     # ── Just (task runner) ──────────────────────────────────────────────
     - name: Install just
+      if: inputs.install-just == 'true'
       uses: taiki-e/install-action@3035223527de4d6eb6207d7b9f901df966359a8e  # just
       with:
         tool: just

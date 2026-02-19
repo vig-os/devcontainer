@@ -28,14 +28,20 @@ Set up the local environment to begin working on a GitHub issue, and ensure the 
 4. **Stash dirty working tree if needed**
    - Run `git status --short`. If there are uncommitted changes, run `git stash push -u -m "before-issue-<number>"` and tell the user.
 
-5. **Follow the branch naming rule**
-   - Apply the workflow in [branch-naming.mdc](../../rules/branch-naming.mdc): infer type, derive short summary, propose branch name, wait for user confirmation.
+5. **Determine base branch**
+   - Check if the issue has a parent: `gh api repos/{owner}/{repo}/issues/{issue_number}/parent --jq '.number'`
+   - If a parent exists, resolve its linked branch: `gh issue develop --list <parent_number>`. Use the parent's branch as `<base_branch>`. If the parent has no linked branch, fall back to `dev`.
+   - If no parent exists, use `dev` as `<base_branch>`.
 
-6. **Create and link the branch**
-   - After user confirms: `gh issue develop <issue_number> --base dev --name <branch_name> --checkout`
+6. **Follow the branch naming rule**
+   - Apply the workflow in [branch-naming.mdc](../../rules/branch-naming.mdc): infer type, derive short summary, propose branch name, wait for user confirmation.
+   - Pass the detected `<base_branch>` to the branch creation step.
+
+7. **Create and link the branch**
+   - After user confirms: `gh issue develop <issue_number> --base <base_branch> --name <branch_name> --checkout`
    - Then: `git pull origin <branch_name>`
 
-7. **Restore stash if applicable**
+8. **Restore stash if applicable**
    - If you stashed in step 4: `git stash pop`
 
 ## Important Notes

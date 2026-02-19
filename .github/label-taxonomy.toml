@@ -4,6 +4,11 @@
 #   - .cursor/skills/issue:triage/SKILL.md  (triage label check)
 #   - .cursor/skills/issue:create/SKILL.md  (agent label mapping)
 #   - .github/ISSUE_TEMPLATE/*.yml          (template label values)
+#
+# Label reconciliation:
+#   Run `scripts/setup-labels.sh` after repo creation to create/update labels
+#   from this taxonomy. Use `--prune` to remove org-default labels that don't
+#   match the taxonomy. Use `--dry-run` to preview changes first.
 
 # ── Type ──────────────────────────────────────────────────────────────────────
 

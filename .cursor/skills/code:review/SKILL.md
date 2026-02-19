@@ -12,9 +12,20 @@ Structured self-review of changes before submitting a PR.
 
 ### 1. Gather context
 
+Determine the base branch (the branch this PR will merge into):
+
 ```bash
-git diff dev...HEAD --stat
-git log dev..HEAD --oneline
+# If a PR exists for the current branch, use its base
+BASE=$(gh pr view --json baseRefName --jq '.baseRefName' 2>/dev/null)
+# Otherwise fall back to the default branch
+: "${BASE:=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name')}"
+```
+
+Then review the diff:
+
+```bash
+git diff "$BASE"...HEAD --stat
+git log "$BASE"..HEAD --oneline
 ```
 
 - Read the linked issue's acceptance criteria.
@@ -37,7 +48,7 @@ git log dev..HEAD --oneline
 Report findings in this structure:
 
 ```
-## Review: <branch> → dev
+## Review: <branch> → <base>
 
 ### Acceptance Criteria
 - [x] Criterion 1 — covered by <file/commit>
