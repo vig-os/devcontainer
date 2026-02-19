@@ -52,7 +52,7 @@ gh repo view --json nameWithOwner --jq '.nameWithOwner'
 
 ## Phase 2: Check label taxonomy
 
-Read [label-taxonomy.md](label-taxonomy.md) for the expected labels.
+Read [`.github/label-taxonomy.toml`](../../../.github/label-taxonomy.toml) for the expected labels.
 
 1. Compare the repo labels from Phase 1 against the taxonomy.
 2. If any labels are missing, present them grouped by category (see example below).
