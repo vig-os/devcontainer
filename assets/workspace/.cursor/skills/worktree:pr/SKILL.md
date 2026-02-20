@@ -96,4 +96,4 @@ gh pr create --base <base_branch> --title "<type>: <description> (#<issue_number
 - Never block for user review of the PR text. Generate the best text from available context.
 - Base branch is auto-detected: parent issue's branch for sub-issues, `dev` otherwise.
 - The PR title should follow commit message conventions: `type(scope): description (#issue)`.
-- **NEVER add cursor-agent as a co-author** in commit messages.
+- **NEVER add 'Co-authored-by: Cursor <cursoragent@cursor.com>'** to commit messages.
