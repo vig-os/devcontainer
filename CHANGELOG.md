@@ -313,6 +313,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`just init` fails to install devcontainer CLI on Linux** ([#111](https://github.com/vig-os/devcontainer/issues/111))
   - `npm install -g` requires root access to `/usr/local/lib/node_modules`, causing EACCES permission denied
   - Switched to local `npm install` (package already declared in `package.json`), matching the existing `bats` pattern
+  - Updated pytest fixtures in `conftest.py` to also check `node_modules/.bin/devcontainer`
 
 ### Security
 

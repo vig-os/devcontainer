@@ -802,12 +802,24 @@ def _ensure_project_yaml_test_mount(project_config, workspace_path, in_container
     return project_config
 
 
+def _find_devcontainer_cli():
+    """Resolve the devcontainer CLI binary, checking PATH then node_modules/.bin/."""
+    path_bin = shutil.which("devcontainer")
+    if path_bin:
+        return path_bin
+    local_bin = Path("node_modules/.bin/devcontainer")
+    if local_bin.is_file():
+        return str(local_bin.resolve())
+    return None
+
+
 def _run_devcontainer_up(
     workspace_path_for_cli, workspace_path, env, docker_path="podman"
 ):
     """Run devcontainer up. Returns subprocess.CompletedProcess."""
+    devcontainer_bin = _find_devcontainer_cli() or "devcontainer"
     up_cmd = [
-        "devcontainer",
+        devcontainer_bin,
         "up",
         "--workspace-folder",
         str(workspace_path_for_cli),
@@ -881,10 +893,11 @@ def devcontainer_up(initialized_workspace):
     workspace_path, workspace_path_for_cli, in_container = (
         _resolve_devcontainer_cli_workspace(initialized_workspace)
     )
-    if not shutil.which("devcontainer") and not (
-        Path("node_modules/.bin/devcontainer").is_file()
-    ):
+    if not _find_devcontainer_cli():
         pytest.skip("devcontainer CLI not available. Install with: npm install")
+    bin_dir = str(Path("node_modules/.bin").resolve())
+    if bin_dir not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")
 
     docker_path = "podman"
     env, original_config = _prepare_devcontainer_env(
@@ -994,9 +1007,7 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
     workspace_path, workspace_path_for_cli, in_container = (
         _resolve_devcontainer_cli_workspace(initialized_workspace)
     )
-    if not shutil.which("devcontainer") and not (
-        Path("node_modules/.bin/devcontainer").is_file()
-    ):
+    if not _find_devcontainer_cli():
         pytest.skip("devcontainer CLI not available. Install with: npm install")
 
     docker_path = "podman"
