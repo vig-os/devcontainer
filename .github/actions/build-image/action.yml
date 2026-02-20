@@ -27,7 +27,7 @@
 #       version: '1.0.0'
 #       arch: 'amd64'
 #       release-date: '2026-02-06'
-#       release-url: 'https://github.com/vig-os/devcontainer/releases/tag/v1.0.0'
+#       release-url: 'https://github.com/vig-os/devcontainer/releases/tag/1.0.0'
 #       build-timestamp: '2026-02-06T12:00:00Z'
 #       vcs-ref: ${{ github.sha }}
 

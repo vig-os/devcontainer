@@ -34,23 +34,23 @@ This will:
 
 ```bash
 # Use specific version
-curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --version 1.0.0 -- ~/my-project
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --version 0.2.1 ~/my-project
 
 # Upgrade existing project (overwrites template files)
-curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --force --  ~/my-project
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --force ~/my-project
 
 # Override project name
-curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --name my_custom_name -- ~/my-project
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --name my_custom_name ~/my-project
 
 # Override organization name (default: vigOS)
-curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --org MyOrg -- ~/my-project
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --org MyOrg ~/my-project
 
 # Preview without executing
-curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --dry-run -- ~/my-project
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --dry-run ~/my-project
 
 # Force specific runtime
-curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --docker -- ~/my-project
-curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s --podman -- ~/my-project
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --docker ~/my-project
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --podman ~/my-project
 ```
 
 > **Note:** If podman or docker is not installed, the script provides OS-specific installation instructions for macOS, Ubuntu/Debian, Fedora, Arch Linux, and Windows.
@@ -66,6 +66,12 @@ curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh 
    podman pull ghcr.io/vig-os/devcontainer:latest
    # or
    docker pull ghcr.io/vig-os/devcontainer:latest
+   ```
+
+   To pull a specific version, use the bare semver tag (without `v` prefix):
+
+   ```bash
+   podman pull ghcr.io/vig-os/devcontainer:0.2.1
    ```
 
 2. **Initialize a workspace inside `PATH_TO_PROJECT`**
@@ -181,7 +187,8 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **Registry**: `ghcr.io/vig-os/devcontainer`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
-- **Latest Version**: [0.2.1](https://github.com/vig-os/devcontainer/releases/tag/v0.2.1) - 2026-01-28
+- **Latest Version**: [0.2.1](https://github.com/vig-os/devcontainer/releases/tag/0.2.1) - 2026-01-28
+- **Image tags**: bare semver (`0.2.1`, `latest`) — git tags use `v` prefix (`v0.2.1`) but image tags do not
 
 ## Features
 

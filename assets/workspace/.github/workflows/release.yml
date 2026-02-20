@@ -7,7 +7,7 @@
 #   - A release branch (release/X.Y.Z) exists
 #   - CHANGELOG.md contains "## [X.Y.Z] - TBD"
 #   - A PR from release/X.Y.Z to main is open, approved, and CI has passed
-#   - Tag vX.Y.Z does not yet exist
+#   - Tag X.Y.Z does not yet exist
 #
 # Steps:
 #   1. Validate  — Check all prerequisites
@@ -113,8 +113,8 @@ jobs:
         env:
           VERSION: ${{ steps.vars.outputs.version }}
         run: |
-          if git tag -l | grep -q "^v${VERSION}$"; then
-            echo "ERROR: Tag v$VERSION already exists"
+          if git tag -l | grep -q "^${VERSION}$"; then
+            echo "ERROR: Tag $VERSION already exists"
             exit 1
           fi
 
@@ -346,9 +346,9 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          git tag -a "v$VERSION" -m "Release $VERSION"
-          git push origin "v$VERSION"
-          echo "Tag v$VERSION created and pushed"
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
+          echo "Tag $VERSION created and pushed"
 
       - name: Extract release notes from CHANGELOG
         id: notes
@@ -373,11 +373,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create "v$VERSION" \
-            --title "v$VERSION" \
+          gh release create "$VERSION" \
+            --title "$VERSION" \
             --notes-file /tmp/release-notes.md \
             --verify-tag
-          echo "GitHub Release v$VERSION created"
+          echo "GitHub Release $VERSION created"
 
       - name: Summary
         env:
@@ -386,8 +386,8 @@ jobs:
           echo "Release published successfully"
           echo ""
           echo "  Version: $VERSION"
-          echo "  Tag:     v$VERSION"
-          echo "  Release: https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
+          echo "  Tag:     $VERSION"
+          echo "  Release: https://github.com/${{ github.repository }}/releases/tag/$VERSION"
           echo ""
           echo "Next steps:"
           echo "  1. Merge the release PR to main"
@@ -440,8 +440,8 @@ jobs:
         env:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          if git ls-remote origin "refs/tags/v$VERSION" | grep -q "v$VERSION"; then
-            git push origin ":refs/tags/v$VERSION" && echo "Tag deleted" || echo "Warning: Could not delete tag"
+          if git ls-remote origin "refs/tags/$VERSION" | grep -q "$VERSION"; then
+            git push origin ":refs/tags/$VERSION" && echo "Tag deleted" || echo "Warning: Could not delete tag"
           else
             echo "Tag does not exist (not created yet)"
           fi

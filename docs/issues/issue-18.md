@@ -1,18 +1,18 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2025-12-16T12:07:03Z
-updated: 2026-02-18T19:21:22Z
+updated: 2026-02-19T16:07:10Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/18
-comments: 1
+comments: 2
 labels: feature, priority:medium, effort:medium, area:testing, semver:minor
 assignees: none
 milestone: 0.3
 projects: none
 relationship: none
-synced: 2026-02-19T00:08:19.960Z
+synced: 2026-02-19T17:40:52.291Z
 ---
 
 # [Issue 18]: [feat: Auto-cleanup test containers on failure with --keep-containers flag](https://github.com/vig-os/devcontainer/issues/18)
@@ -107,4 +107,12 @@ The two remaining asks from this issue:
 - **`request.addfinalizer()` migration** — marginal reliability gain over `yield`. The edge case it covers (teardown skipped on fixture setup failure) is already caught by the pre-flight cleanup on the next run.
 
 Neither item addresses a currently broken behavior. OK to close this?
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on February 19, 2026 at 04:07 PM_
+
+Absolutely
 
