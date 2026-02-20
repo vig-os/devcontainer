@@ -82,9 +82,9 @@ worktree-start issue prompt="" reviewer="":
         else
             echo "    No tmux session found. Starting one..."
             if [ -n "$PROMPT" ]; then
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --yolo \"$PROMPT\""
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --yolo --trust --approve-mcps \"$PROMPT\""
             else
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER"
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --trust --approve-mcps"
             fi
             echo "[OK] tmux session '$SESSION' started. Use: just worktree-attach $ISSUE"
         fi
@@ -174,9 +174,9 @@ worktree-start issue prompt="" reviewer="":
     # Start tmux session
     # --yolo: auto-approve all shell commands (autonomous agent, no human at the terminal)
     if [ -n "$PROMPT" ]; then
-        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --yolo \"$PROMPT\""
+        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --yolo --trust --approve-mcps \"$PROMPT\""
     else
-        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER"
+        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --trust --approve-mcps"
     fi
 
     echo ""
