@@ -305,11 +305,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-|- **Accepted test dependency vulnerabilities** ([#37](https://github.com/vig-os/devcontainer/issues/37))
-- Comprehensive acceptance register for 9 transitive vulnerabilities in unmaintained BATS test framework dependencies (engine.io, debug, node-uuid, qs, tough-cookie, ws, xmlhttprequest, form-data)
-- Risk assessment: HIGH/MODERATE severity from packages last updated 5-10+ years ago; impact isolated to CI/development environment with no runtime production code exposure
-- Formal documentation in `SECURITY.md` and `.github/dependency-review-allow.txt` with IEC 62304 medtech-compliant risk assessments
-- Expiration-enforced exceptions with 2026-11-17 expiration date to force periodic re-evaluation and investigation of BATS framework modernization
+- **Eliminated 13 transitive vulnerabilities in BATS test dependencies** ([#37](https://github.com/vig-os/devcontainer/issues/37))
+  - Bumped bats-assert from v2.1.0 to v2.2.0, which dropped a bogus runtime dependency on the `verbose` npm package
+  - Removed entire transitive dependency tree: engine.io, debug, node-uuid, qs, tough-cookie, ws, xmlhttprequest, form-data, request, sockjs, and others (50+ packages reduced to 5)
+  - Cleaned 13 now-unnecessary GHSA exceptions from `.github/dependency-review-allow.txt`
 - **Go stdlib CVEs from gh binary accepted and documented** ([#37](https://github.com/vig-os/devcontainer/issues/37))
 - CVE-2025-68121, CVE-2025-61726, CVE-2025-61728, CVE-2025-61730 added to `.trivyignore`
 - Vulnerabilities embedded in statically-linked GitHub CLI binary; low exploitability in devcontainer context

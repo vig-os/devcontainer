@@ -6,7 +6,7 @@
     "@devcontainers/cli": "0.81.1",
     "bats": "1.13.0",
     "bats-support": "github:bats-core/bats-support#v0.3.0",
-    "bats-assert": "github:bats-core/bats-assert#v2.1.0",
+    "bats-assert": "github:bats-core/bats-assert#v2.2.0",
     "bats-file": "github:bats-core/bats-file#v0.4.0"
   }
 }
