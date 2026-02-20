@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Optional reviewer parameter for autonomous worktree pipeline** ([#102](https://github.com/vig-os/devcontainer/issues/102))
+  - Support `reviewer` parameter in `just worktree-start`
+  - Propagate `PR_REVIEWER` via tmux environment to the autonomous agent
+  - Update `worktree:pr` skill to automatically request review when `PR_REVIEWER` is set
 - **Inception skill family for pre-development product thinking** ([#90](https://github.com/vig-os/devcontainer/issues/90))
   - Four-phase pipeline: `inception:explore` (divergent problem understanding), `inception:scope` (convergent scoping), `inception:architect` (pattern-validated design), `inception:plan` (decomposition into GitHub issues)
   - Document templates: `docs/templates/RFC.md` (Problem Statement, Proposed Solution, Alternatives, Impact, Phasing) and `docs/templates/DESIGN.md` (Architecture, Components, Data Flow, Technology Stack, Testing)
