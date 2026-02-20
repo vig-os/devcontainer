@@ -67,6 +67,17 @@ CI Status: all checks pass
 
 No comment is posted on success — the green CI status on the PR is sufficient.
 
+## Delegation
+
+The following steps SHOULD be delegated to reduce token consumption:
+
+- **Steps 1-2** (precondition check, identify PR, poll CI): Spawn a Task subagent with `model: "fast"` that validates the branch name, identifies the PR via `gh pr list`, and polls `gh pr checks` with exponential backoff until completion or 15-minute timeout. Returns: issue number, PR number/URL, final CI status for all checks.
+- **Step 4** (report success): Can remain in main agent (simple logging).
+
+Step 3 (handle failure) should remain in the main agent as it requires log analysis and invoking the ci-fix skill with context.
+
+Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
+
 ## Important Notes
 
 - Never guess CI status. Always fetch it via `gh`.

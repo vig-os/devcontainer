@@ -74,6 +74,14 @@ worktree-start issue prompt="":
         fi
     fi
 
+    # Resolve the local gh user as the reviewer (person launching the worktree)
+    REVIEWER=$(gh api user --jq '.login' 2>/dev/null || echo "")
+    if [ -n "$REVIEWER" ]; then
+        echo "[OK] Reviewer (gh user): $REVIEWER"
+    else
+        echo "[!] Could not resolve gh user. PR will be created without reviewer."
+    fi
+
     ISSUE="{{ issue }}"
     PROMPT="{{ prompt }}"
     WT_DIR="{{ _wt_base }}/${ISSUE}"
@@ -88,9 +96,17 @@ worktree-start issue prompt="":
         else
             echo "    No tmux session found. Starting one..."
             if [ -n "$PROMPT" ]; then
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat --model $(_read_model autonomous) --yolo \"$PROMPT\""
+                if [ -n "$REVIEWER" ]; then
+                    tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "WORKTREE_REVIEWER=$REVIEWER" "agent chat --model $(_read_model autonomous) --yolo \"$PROMPT\""
+                else
+                    tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat --model $(_read_model autonomous) --yolo \"$PROMPT\""
+                fi
             else
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR"
+                if [ -n "$REVIEWER" ]; then
+                    tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "WORKTREE_REVIEWER=$REVIEWER"
+                else
+                    tmux new-session -d -s "$SESSION" -c "$WT_DIR"
+                fi
             fi
             echo "[OK] tmux session '$SESSION' started. Use: just worktree-attach $ISSUE"
         fi
@@ -180,9 +196,17 @@ worktree-start issue prompt="":
     # Start tmux session
     # --yolo: auto-approve all shell commands (autonomous agent, no human at the terminal)
     if [ -n "$PROMPT" ]; then
-        tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat --model $(_read_model autonomous) --yolo \"$PROMPT\""
+        if [ -n "$REVIEWER" ]; then
+            tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "WORKTREE_REVIEWER=$REVIEWER" "agent chat --model $(_read_model autonomous) --yolo \"$PROMPT\""
+        else
+            tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat --model $(_read_model autonomous) --yolo \"$PROMPT\""
+        fi
     else
-        tmux new-session -d -s "$SESSION" -c "$WT_DIR"
+        if [ -n "$REVIEWER" ]; then
+            tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "WORKTREE_REVIEWER=$REVIEWER"
+        else
+            tmux new-session -d -s "$SESSION" -c "$WT_DIR"
+        fi
     fi
 
     echo ""

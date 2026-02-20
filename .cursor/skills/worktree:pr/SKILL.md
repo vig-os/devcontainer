@@ -80,10 +80,33 @@ gh pr create --base <base_branch> --title "<type>: <description> (#<issue_number
   --assignee @me
 ```
 
+If the `WORKTREE_REVIEWER` environment variable is set (populated by `just worktree-start`), add the reviewer:
+
+```bash
+gh pr create --base <base_branch> --title "<type>: <description> (#<issue_number>)" \
+  --body-file .github/pr-draft-<issue_number>.md \
+  --assignee @me \
+  --reviewer "$WORKTREE_REVIEWER"
+```
+
+The reviewer is the person who launched the worktree (their gh user login), not the agent.
+
 ### 7. Clean up
 
 - Delete the draft file: `rm .github/pr-draft-<issue_number>.md`
 - Report the PR URL.
+
+## Delegation
+
+The following steps SHOULD be delegated to reduce token consumption:
+
+- **Steps 1-2** (precondition check, ensure clean state, determine base branch): Spawn a Task subagent with `model: "fast"` that validates the branch name, runs `git status`/`git fetch`, pushes the branch, checks for a parent issue via `gh api`, resolves the base branch. Returns: issue number, base branch name, clean state confirmation.
+- **Step 3** (gather context): Spawn a Task subagent with `model: "fast"` that executes `git log`, `git diff`, `gh issue view` and returns the raw outputs. Returns: commit log, diff stat, issue title/body.
+- **Steps 6-7** (create PR, clean up): Spawn a Task subagent with `model: "fast"` that takes the PR title and body file path, executes `gh pr create`, deletes the draft file, and returns the PR URL.
+
+Steps 4-5 (ensure CHANGELOG updated, generate PR text) should remain in the main agent as they require understanding changes and writing structured content.
+
+Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
 
 ## Important Notes
 

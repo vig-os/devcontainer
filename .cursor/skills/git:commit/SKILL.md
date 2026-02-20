@@ -28,13 +28,35 @@ git status && echo "=== STAGED CHANGES ===" && git diff --cached
 - Follow rules in [commit-messages.mdc](../../rules/commit-messages.mdc)
 - Include details in list form if helpful for larger commits
 
-4. **Suggest a git commit command** for the user to review
+4. **Present the commit for review** using exactly this format:
+
+   ````
+
+   commit msg:
+
+   ```
+   type(scope): short description
+
+   Refs: #<issue>
+   ```
+
+   ```bash
+   git commit -m "type(scope): short description" -m "Refs: #<issue>"
+   ```
+
+   Shall I commit?
+
+   ````
+
+   - First block: the human-readable commit message
+   - Second block: the copy-pasteable `git commit` command the user can run/edit themselves
+   - No other output — no summaries, no explanations, no file lists
+   - Wait for user confirmation before executing the commit
 
 ## Important Notes
 
-- Generate minimum output; user only needs final commit command
+- Generate minimum output; the user only needs the commit message, the command, and the confirmation prompt
 - Do not read/summarize git command output after execution unless asked
-- User can modify the commit command in shell before executing
 - Your shell is already at the project root so you do not need `cd` or 'bash', just use `git ...`
 - Do not use `--no-verify` to cheat
 - Do not add any trailer
