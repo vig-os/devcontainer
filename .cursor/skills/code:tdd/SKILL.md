@@ -27,9 +27,14 @@ Each phase is committed separately so the git history proves TDD compliance to a
 - The test must assert the expected behavior.
 - Run the relevant test suite (see `justfile` for available recipes) to confirm the test **fails**.
 - If the test passes before implementation, the test is wrong or the feature already exists. Investigate.
-- **Commit the failing test** using [git:commit](../git:commit/SKILL.md) with type `test`, e.g. `test: add failing test for <behavior>`. This creates an auditable record that the test was written first.
 
-### 4. GREEN — Write minimal code to pass
+### 4. Commit the failing test
+
+- **Commit** using [git:commit](../git:commit/SKILL.md) with type `test`, e.g. `test: add failing test for <behavior>`.
+- Do **not** proceed to GREEN before this commit is created.
+- This creates an auditable record that the test was written first.
+
+### 5. GREEN — Write minimal code to pass
 
 - Write the **smallest** amount of code that makes the failing test pass.
 - Do not add extra functionality, error handling, or optimizations yet.
@@ -37,7 +42,7 @@ Each phase is committed separately so the git history proves TDD compliance to a
 - Run the full relevant test suite to confirm no regressions.
 - **Commit the implementation** using [git:commit](../git:commit/SKILL.md), e.g. `feat: implement <behavior>`.
 
-### 5. REFACTOR — Clean up
+### 6. REFACTOR — Clean up
 
 - Improve the code without changing behavior (rename, extract, simplify).
 - Run tests again after refactoring to confirm nothing broke.

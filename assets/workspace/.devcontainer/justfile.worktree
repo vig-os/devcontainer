@@ -50,6 +50,13 @@ worktree-start issue prompt="" reviewer="":
         fi
     }
 
+    # Helper: read agent model from config
+    _read_model() {
+        local tier="$1"
+        local cfg="$(git rev-parse --show-toplevel)/.cursor/agent-models.toml"
+        grep "^${tier}" "$cfg" | sed 's/.*= *"//' | sed 's/".*//'
+    }
+
     # Auth: check existing login first, then fall back to CURSOR_API_KEY
     if agent status 2>/dev/null | grep -qi "logged in\|authenticated"; then
         echo "[OK] cursor-agent: authenticated via browser login"

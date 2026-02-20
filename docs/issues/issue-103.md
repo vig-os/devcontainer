@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-20T10:00:14Z
-updated: 2026-02-20T13:08:16Z
+updated: 2026-02-20T15:25:13Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/103
-comments: 1
+comments: 2
 labels: feature, area:workflow, effort:large, semver:minor
 assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-20T13:17:17.462Z
+synced: 2026-02-20T15:25:35.960Z
 ---
 
 # [Issue 103]: [[FEATURE] Enhance worktree workflow and autonomous agent integration](https://github.com/vig-os/devcontainer/issues/103)
@@ -72,4 +72,32 @@ _Posted on February 20, 2026 at 10:00 AM_
 ## Sub-issues
 
 - #102 - Add optional reviewer parameter to worktree-start
+
+---
+
+# [Comment #2]() by [gerchowl]()
+
+_Posted on February 20, 2026 at 03:25 PM_
+
+## Implementation Plan
+
+Issue: #103
+Branch: `feature/103-worktree-workflow-enhancements`
+
+**Scope:** Goal 2 — Fix branch resolution for tab-separated `gh issue develop --list` output. (Goals 1 and 3 are already done.)
+
+**Bug:** `gh issue develop --list` returns `branch<TAB>URL`. The current parsing `grep -oE '[^ ]+$'` treats tab as non-space, capturing the entire line instead of just the branch name. Fix: replace with `head -1 | cut -f1`.
+
+### Tasks (TDD)
+
+- [ ] Task 1 (RED): Write BATS test asserting tab-separated `gh issue develop` output is parsed to extract only the branch name — `tests/bats/worktree.bats` — verify: `bats tests/bats/worktree.bats` fails
+- [ ] Task 2 (GREEN): Fix line 117 of `justfile.worktree` — replace `grep -oE '[^ ]+$' | head -1` with `head -1 | cut -f1` for issue branch resolution — `justfile.worktree` — verify: `bats tests/bats/worktree.bats` passes
+- [ ] Task 3 (GREEN): Fix line 154 of `justfile.worktree` — same replacement for parent branch resolution — `justfile.worktree` — verify: `bats tests/bats/worktree.bats` passes
+- [ ] Task 4: Update CHANGELOG — add entry under `## Unreleased` > `Fixed` — `CHANGELOG.md` — verify: visual check
+
+### Commit sequence
+
+1. `test: add BATS test for tab-separated branch resolution parsing` (RED)
+2. `fix: parse tab-separated gh issue develop output in worktree recipes` (GREEN, tasks 2+3)
+3. `docs: update CHANGELOG for branch resolution fix` (task 4)
 

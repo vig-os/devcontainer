@@ -1,18 +1,18 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-19T17:26:31Z
-updated: 2026-02-19T17:26:31Z
+updated: 2026-02-20T15:18:39Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/96
-comments: 0
-labels: refactor, area:workspace, effort:small
+comments: 1
+labels: refactor, priority:low, area:workspace, effort:small, semver:patch
 assignees: none
-milestone: none
+milestone: 0.4
 projects: none
 relationship: none
-synced: 2026-02-19T17:40:47.917Z
+synced: 2026-02-20T15:25:37.106Z
 ---
 
 # [Issue 96]: [Refactor: extract shared utilities from sync_manifest.py](https://github.com/vig-os/devcontainer/issues/96)
@@ -39,3 +39,11 @@ During PR #68 review, it was noted that `scripts/sync_manifest.py` contains util
 - [ ] `sync_manifest.py` imports from `scripts/utils.py`
 - [ ] `just sync-workspace` produces identical output before and after
 - [ ] All existing tests pass
+---
+
+# [Comment #1]() by [gerchowl]()
+
+_Posted on February 20, 2026 at 03:18 PM_
+
+Closing as superseded by #89 (consolidate sync_manifest.py and utils.py into manifest-as-config architecture), which covers the same extraction scope and more.
+

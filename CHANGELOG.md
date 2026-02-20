@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Config-driven model tier assignments for agent skills** ([#103](https://github.com/vig-os/devcontainer/issues/103))
+  - Extended `.cursor/agent-models.toml` with `standard` tier (sonnet-4.5) and `[skill-tiers]` mapping for skill categories (data-gathering, formatting, review, orchestration)
+  - New rule `.cursor/rules/subagent-delegation.mdc` documenting when and how to delegate mechanical sub-steps to lightweight subagents via the Task tool
+  - Added `## Delegation` sections to 12 skills identifying steps that should spawn lightweight/standard-tier subagents to reduce token consumption on the primary autonomous model
+  - Skills updated: `worktree:solve-and-pr`, `worktree:brainstorm`, `worktree:plan`, `worktree:execute`, `worktree:verify`, `worktree:pr`, `worktree:ci-check`, `worktree:ci-fix`, `code:review`, `issue:triage`, `pr:post-merge`, `ci:check`
 - **hadolint pre-commit hook for Containerfile linting** ([#122](https://github.com/vig-os/devcontainer/issues/122))
   - Add `hadolint` hook to `.pre-commit-config.yaml`, pinned by SHA (v2.9.3)
   - Enforce Dockerfile best practices: pinned base image tags, consolidated `RUN` layers, shellcheck for inline scripts
@@ -337,6 +342,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `npm install -g` requires root access to `/usr/local/lib/node_modules`, causing EACCES permission denied
   - Switched to local `npm install` (package already declared in `package.json`), matching the existing `bats` pattern
   - Updated pytest fixtures in `conftest.py` to also check `node_modules/.bin/devcontainer`
+- **Worktree branch resolution broken by tab-separated `gh` output** ([#103](https://github.com/vig-os/devcontainer/issues/103))
+  - `gh issue develop --list` now returns `branch<TAB>URL`; the previous `grep -oE '[^ ]+$'` captured the entire line
+  - Extracted parsing into `scripts/resolve-branch.sh` (`head -1 | cut -f1`) used by both call sites in `justfile.worktree`
 
 ### Security
 

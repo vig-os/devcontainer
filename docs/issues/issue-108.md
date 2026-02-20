@@ -1,18 +1,18 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-20T10:23:44Z
-updated: 2026-02-20T13:16:50Z
+updated: 2026-02-20T13:59:33Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/108
-comments: 1
+comments: 2
 labels: feature, area:image, effort:small, semver:minor
 assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-20T13:17:15.951Z
+synced: 2026-02-20T15:25:35.576Z
 ---
 
 # [Issue 108]: [[FEATURE] Install cursor-agent CLI in devcontainer image](https://github.com/vig-os/devcontainer/issues/108)
@@ -71,6 +71,18 @@ The Containerfile change was contributed externally in PR #110 (by @nacholiya, c
 
 ### Tasks
 
-- [ ] Task 1: Add failing test for `agent` CLI presence — `tests/test_image.py` — verify: `just test-image` (expect fail, image not yet rebuilt with change)
-- [ ] Task 2: Rebuild image and confirm test passes — verify: `just build && just test-image`
+- [x] Task 1: Add failing test for `agent` CLI presence — `tests/test_image.py` — verify: `just test-image` (expect fail, image not yet rebuilt with change)
+- [x] Task 2: Rebuild image and confirm test passes — verify: `just build && just test-image`
+
+### Notes
+
+- Build revealed the cursor-agent installer puts the binary in `~/.local/bin` which wasn't in PATH during docker build. Fixed by adding `ENV PATH="/root/.local/bin:${PATH}"` before the install step, matching the cargo-binstall pattern. Also simplified the RUN step (removed redundant `command -v` check since `set -e` already catches failures).
+
+---
+
+# [Comment #2]() by [nacholiya]()
+
+_Posted on February 20, 2026 at 01:32 PM_
+
+Thanks for integrating the change and preserving authorship — appreciate it!
 
