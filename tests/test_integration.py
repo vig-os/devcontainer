@@ -1801,6 +1801,62 @@ class TestJustRecipes:
         )
 
 
+class TestGhIssuesSmoke:
+    """Smoke test for the just gh-issues recipe (requires gh auth)."""
+
+    def test_just_gh_issues(self, devcontainer_up):
+        """Test that 'just gh-issues' runs and produces table output."""
+        workspace_path = str(devcontainer_up.resolve())
+
+        just_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "just",
+            "gh-issues",
+        ]
+        result = subprocess.run(
+            just_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=30,
+        )
+
+        if result.returncode != 0:
+            error_output = (result.stderr + result.stdout).lower()
+            if "not logged in" in error_output or "auth login" in error_output:
+                pytest.skip(
+                    "gh CLI not authenticated in container. "
+                    "Run 'gh auth login' on the host so the token is "
+                    "available during container initialization."
+                )
+            pytest.fail(
+                f"`just gh-issues` failed (exit {result.returncode})\n"
+                f"stdout: {result.stdout}\n"
+                f"stderr: {result.stderr}\n"
+                f"command: {' '.join(just_cmd)}"
+            )
+
+        output = result.stdout
+        assert "Open Issues" in output or "No open issues" in output, (
+            f"Expected issues section in output\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}"
+        )
+        assert "Pull Requests" in output, (
+            f"Expected pull requests section in output\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}"
+        )
+
+
 class TestDockerComposeProjectOverrides:
     """Test docker-compose.project.yaml functionality for additional mounts."""
 
