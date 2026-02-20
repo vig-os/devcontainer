@@ -13,7 +13,7 @@ Create a pull request **without user interaction**. This is the worktree variant
 ## Precondition: Issue Branch Required
 
 1. Run: `git branch --show-current`
-2. The branch name **must** match `<type>/<issue_number>-*` or `worktree/<issue_number>*`.
+2. The branch name **must** match `<type>/<issue_number>-<summary>` (e.g. `feature/79-declarative-sync-manifest`). See [branch-naming.mdc](../../rules/branch-naming.mdc) for the full convention.
 3. Extract the `<issue_number>` from the branch name.
 
 ## Workflow Steps

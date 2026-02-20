@@ -13,7 +13,7 @@ Explore requirements and produce a design **without user interaction**. This is 
 ## Precondition: Issue Branch Required
 
 1. Run: `git branch --show-current`
-2. The branch name **must** match `<type>/<issue_number>-*` or `worktree/<issue_number>*`.
+2. The branch name **must** match `<type>/<issue_number>-<summary>` (e.g. `feature/79-declarative-sync-manifest`). See [branch-naming.mdc](../../rules/branch-naming.mdc) for the full convention.
 3. Extract the `<issue_number>` from the branch name.
 4. If the branch does not match, **stop** and log the error.
 
