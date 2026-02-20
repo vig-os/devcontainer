@@ -168,6 +168,7 @@ RUN set -eux; \
 # and upgrade pip to fix CVE-2025-8869 (symbolic link extraction vulnerability)
 RUN uv pip install --system \
     pre-commit \
+    rich \
     ruff \
     pip-licenses && \
     uv pip install --system --upgrade pip
