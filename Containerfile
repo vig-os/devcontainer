@@ -82,6 +82,15 @@ RUN set -eux; \
     curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin; \
     just --version;
 
+# Install cursor-agent CLI
+RUN set -eux; \
+    curl -fsSL https://cursor.com/install | bash; \
+    if ! command -v agent >/dev/null 2>&1; then \
+        echo "cursor-agent installation failed"; \
+        exit 1; \
+    fi; \
+    agent --version;
+
 # Install latest cargo-binstall (installs to ~/.cargo/bin)
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN set -eux; \
