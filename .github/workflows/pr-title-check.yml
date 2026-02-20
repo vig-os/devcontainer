@@ -1,0 +1,39 @@
+# PR Title Check
+#
+# Validates that PR titles follow the commit message standard (type(scope): description).
+# Merge commits use PR_TITLE as the commit subject, so enforcing the standard here
+# ensures compliant merge commit messages.
+#
+# Triggers: pull_request opened, edited, synchronize (title may change on edit)
+
+name: PR Title Check
+
+on:  # yamllint disable-line rule:truthy
+  pull_request:
+    types: [opened, edited, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  check-title:
+    name: Validate PR Title
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Set up environment
+        uses: ./.github/actions/setup-env
+        with:
+          sync-dependencies: 'true'
+
+      - name: Validate PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          TITLE_FILE=$(mktemp)
+          printf '%s' "$PR_TITLE" > "$TITLE_FILE"
+          uv run validate-commit-msg "$TITLE_FILE" --subject-only
