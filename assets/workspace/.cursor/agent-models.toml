@@ -1,0 +1,7 @@
+# .cursor/agent-models.toml
+# Single source of truth for cursor-agent model assignments.
+# Referenced by: justfile.worktree (worktree-start recipe)
+
+[models]
+lightweight = "composer-1.5"   # branch naming, quick single-shot tasks
+autonomous  = "opus-4.6"       # full agent sessions (solve-and-pr, execute, etc.)
