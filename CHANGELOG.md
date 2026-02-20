@@ -61,6 +61,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Ground truth lives in repo root; `assets/workspace/` is generated output
 - **cursor-agent CLI pre-installed in devcontainer image** ([#108](https://github.com/vig-os/devcontainer/issues/108))
   - Enables `just worktree-start` to work out of the box without manual installation
+- **Automatic merge commit message compliance** ([#79](https://github.com/vig-os/devcontainer/issues/79))
+  - `setup-gh-repo.sh` configures repo merge settings via `gh api` (`merge_commit_title=PR_TITLE`, `merge_commit_message=PR_BODY`, `allow_auto_merge=true`)
+  - Wired into `post-create.sh` so downstream devcontainer projects get compliant merge commits automatically
+  - `--subject-only` flag for `validate-commit-msg` to validate PR titles without requiring body or Refs
+  - `pr-title-check.yml` CI workflow enforces commit message standard on PR titles
+  - PR body template includes `Refs: #` placeholder for merge commit traceability
 
 ### Changed
 
