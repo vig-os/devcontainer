@@ -3129,8 +3129,9 @@ class TestVersionCheckPostAttachIntegration:
                 # Should be called with no arguments (silent mode)
                 # Allow patterns like: "./version-check.sh" or "$SCRIPT_DIR/version-check.sh"
                 # but NOT: "./version-check.sh check" or with other args
+                after_script = line.split("version-check.sh", 1)[1]
                 assert not any(
-                    arg in line
+                    arg in after_script
                     for arg in ["check", "config", "mute", "enable", "disable"]
                 ), (
                     "post-attach.sh should call version-check.sh in silent mode (no args)"

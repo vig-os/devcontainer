@@ -23,4 +23,6 @@ if [[ -f "$PROJECT_ROOT/pyproject.toml" ]]; then
     uv sync --all-extras --no-install-project --quiet
 fi
 
+"$SCRIPT_DIR/version-check.sh" || true
+
 echo "Post-attach setup complete"
