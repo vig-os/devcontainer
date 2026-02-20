@@ -266,9 +266,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`scripts/prepare-build.sh`** — merged into `build.sh` ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **`scripts/sync-prs-issues.sh`** — deprecated sync script ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **`test.yml` workflow** — replaced by `ci.yml` ([#48](https://github.com/vig-os/devcontainer/issues/48))
+- **Stale `.github_data/` directory** — 98 files superseded by `docs/issues/` and `docs/pull-requests/` ([#91](https://github.com/vig-os/devcontainer/issues/91))
 
 ### Fixed
 
+- **Sync-issues workflow schedule trigger** ([#91](https://github.com/vig-os/devcontainer/issues/91))
+  - `github.event.inputs.target-branch` is null on schedule events, causing `TARGET_BRANCH` to resolve to `refs/heads/` (404 in commit-action)
+  - Added `|| 'dev'` fallbacks for all input references so schedule triggers default to `dev`
+  - Added `output-dir` and `commit-msg` as parameterized `workflow_dispatch` inputs
 - **Host-specific paths in `.gitconfig` and unreliable `postAttachCommand` lifecycle** ([#60](https://github.com/vig-os/devcontainer/issues/60))
   - `copy-host-user-conf.sh` now generates a container-ready `.gitconfig` with `/root/...` paths and strips host-only entries (credential helpers, `excludesfile`, `includeIf`) at export time
   - Refactored devcontainer lifecycle: moved all one-time setup (`init-git.sh`, `setup-git-conf.sh`, `init-precommit.sh`) from `postAttachCommand` into `postCreateCommand`
