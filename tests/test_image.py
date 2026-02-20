@@ -495,12 +495,13 @@ class TestGhIssuesDeployment:
     def test_rich_importable(self, host):
         """Test that the rich library is importable (runtime dep of gh_issues.py).
 
-        Uses uv run from the workspace template directory, matching how
-        just gh-issues actually invokes gh_issues.py at runtime.
+        Uses the pre-built workspace venv directly because the template
+        pyproject.toml still contains {{SHORT_NAME}} placeholders in the
+        image (replaced only at workspace init time).
         """
         result = host.run(
-            "cd /root/assets/workspace && "
-            "uv run python -c \"from rich.table import Table; print('OK')\""
+            "/root/assets/workspace/.venv/bin/python -c "
+            "\"from rich.table import Table; print('OK')\""
         )
         assert result.rc == 0, f"rich is not importable: {result.stderr}"
         assert "OK" in result.stdout
@@ -508,12 +509,12 @@ class TestGhIssuesDeployment:
     def test_gh_issues_importable(self, host):
         """Test that gh_issues.py is importable (catches syntax errors, missing imports).
 
-        Uses uv run from the workspace template directory, matching how
-        just gh-issues actually invokes gh_issues.py at runtime.
+        Uses the pre-built workspace venv directly because the template
+        pyproject.toml still contains {{SHORT_NAME}} placeholders in the
+        image (replaced only at workspace init time).
         """
         result = host.run(
-            "cd /root/assets/workspace && "
-            'uv run python -c "'
+            '/root/assets/workspace/.venv/bin/python -c "'
             "import sys; "
             "sys.path.insert(0, '/root/assets/workspace/.devcontainer/scripts'); "
             "import gh_issues; "
