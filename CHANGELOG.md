@@ -310,6 +310,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BATS test failures in init-workspace and prepare-build suites** ([#67](https://github.com/vig-os/devcontainer/issues/67))
   - Removed premature init-workspace.bats tests for unimplemented `is_git_dirty` feature (9 tests)
   - Fixed prepare-build.bats grep pattern for `sync_manifest.py` invocation to handle shell quoting
+- **Worktree branch resolution broken by tab-separated `gh` output** ([#103](https://github.com/vig-os/devcontainer/issues/103))
+  - `gh issue develop --list` now returns `branch<TAB>URL`; the previous `grep -oE '[^ ]+$'` captured the entire line
+  - Extracted parsing into `scripts/resolve-branch.sh` (`head -1 | cut -f1`) used by both call sites in `justfile.worktree`
 
 ### Security
 
