@@ -58,7 +58,7 @@ After user approval, post the full detailed plan as a **comment on the issue**. 
      -f body="<plan_content>"
    ```
 
-3. The comment must start with `##` (H2) to avoid header-level bumping when synced by the `sync-issues` workflow.
+3. The comment must start with `##` (H2).
 4. Use this format:
 
    ```markdown
@@ -72,12 +72,6 @@ After user approval, post the full detailed plan as a **comment on the issue**. 
    - [ ] Task 1: description — `files` — verify: `command`
    - [ ] Task 2: description — `files` — verify: `command`
    ...
-   ```
-
-5. Trigger the `sync-issues` workflow (fire-and-forget) so the plan is eventually available locally:
-
-   ```bash
-   gh workflow run sync-issues.yml -f target-branch=<current_branch>
    ```
 
 ## Important Notes

@@ -61,12 +61,7 @@ After user approval, post the design as a **comment on the issue**. This is the 
      -f body="<design_content>"
    ```
 
-3. The comment must start with `## Design` (H2) to avoid header-level bumping when synced by the `sync-issues` workflow.
-4. Trigger the `sync-issues` workflow (fire-and-forget):
-
-   ```bash
-   gh workflow run sync-issues.yml -f target-branch=<current_branch>
-   ```
+3. The comment must start with `## Design` (H2) — this is how other skills detect that the design phase is complete.
 
 ### 6. Transition to planning
 
