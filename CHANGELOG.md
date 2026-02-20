@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+- **PR template aligned with canonical commit types** ([#115](https://github.com/vig-os/devcontainer/issues/115))
+  - Replace ad-hoc Type of Change checkboxes with the 10 canonical commit types
+  - Move breaking change from type to a separate modifier checkbox
+  - Add release-branch hint to Related Issues section
+
 ### Added
 
 - **Config-driven model tier assignments for agent skills** ([#103](https://github.com/vig-os/devcontainer/issues/103))
@@ -14,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New rule `.cursor/rules/subagent-delegation.mdc` documenting when and how to delegate mechanical sub-steps to lightweight subagents via the Task tool
   - Added `## Delegation` sections to 12 skills identifying steps that should spawn lightweight/standard-tier subagents to reduce token consumption on the primary autonomous model
   - Skills updated: `worktree:solve-and-pr`, `worktree:brainstorm`, `worktree:plan`, `worktree:execute`, `worktree:verify`, `worktree:pr`, `worktree:ci-check`, `worktree:ci-fix`, `code:review`, `issue:triage`, `pr:post-merge`, `ci:check`
+- **Optional reviewer parameter for autonomous worktree pipeline** ([#102](https://github.com/vig-os/devcontainer/issues/102))
+  - Support `reviewer` parameter in `just worktree-start`
+  - Propagate `PR_REVIEWER` via tmux environment to the autonomous agent
+  - Update `worktree:pr` skill to automatically request review when `PR_REVIEWER` is set
 - **Inception skill family for pre-development product thinking** ([#90](https://github.com/vig-os/devcontainer/issues/90))
   - Four-phase pipeline: `inception:explore` (divergent problem understanding), `inception:scope` (convergent scoping), `inception:architect` (pattern-validated design), `inception:plan` (decomposition into GitHub issues)
   - Document templates: `docs/templates/RFC.md` (Problem Statement, Proposed Solution, Alternatives, Impact, Phasing) and `docs/templates/DESIGN.md` (Architecture, Components, Data Flow, Technology Stack, Testing)
@@ -60,6 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GitHub issue and PR templates in workspace template** ([#63](https://github.com/vig-os/devcontainer/issues/63))
   - Pull request template, issue templates, Dependabot config, and `.gitmessage` synced to `assets/workspace/`
   - Ground truth lives in repo root; `assets/workspace/` is generated output
+- **cursor-agent CLI pre-installed in devcontainer image** ([#108](https://github.com/vig-os/devcontainer/issues/108))
+  - Enables `just worktree-start` to work out of the box without manual installation
 
 ### Changed
 
@@ -271,9 +284,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`scripts/prepare-build.sh`** — merged into `build.sh` ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **`scripts/sync-prs-issues.sh`** — deprecated sync script ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **`test.yml` workflow** — replaced by `ci.yml` ([#48](https://github.com/vig-os/devcontainer/issues/48))
+- **Stale `.github_data/` directory** — 98 files superseded by `docs/issues/` and `docs/pull-requests/` ([#91](https://github.com/vig-os/devcontainer/issues/91))
 
 ### Fixed
 
+- **Sync-issues workflow schedule trigger** ([#91](https://github.com/vig-os/devcontainer/issues/91))
+  - `github.event.inputs.target-branch` is null on schedule events, causing `TARGET_BRANCH` to resolve to `refs/heads/` (404 in commit-action)
+  - Added `|| 'dev'` fallbacks for all input references so schedule triggers default to `dev`
+  - Added `output-dir` and `commit-msg` as parameterized `workflow_dispatch` inputs
 - **Host-specific paths in `.gitconfig` and unreliable `postAttachCommand` lifecycle** ([#60](https://github.com/vig-os/devcontainer/issues/60))
   - `copy-host-user-conf.sh` now generates a container-ready `.gitconfig` with `/root/...` paths and strips host-only entries (credential helpers, `excludesfile`, `includeIf`) at export time
   - Refactored devcontainer lifecycle: moved all one-time setup (`init-git.sh`, `setup-git-conf.sh`, `init-precommit.sh`) from `postAttachCommand` into `postCreateCommand`
@@ -310,6 +328,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BATS test failures in init-workspace and prepare-build suites** ([#67](https://github.com/vig-os/devcontainer/issues/67))
   - Removed premature init-workspace.bats tests for unimplemented `is_git_dirty` feature (9 tests)
   - Fixed prepare-build.bats grep pattern for `sync_manifest.py` invocation to handle shell quoting
+- **`just init` fails to install devcontainer CLI on Linux** ([#111](https://github.com/vig-os/devcontainer/issues/111))
+  - `npm install -g` requires root access to `/usr/local/lib/node_modules`, causing EACCES permission denied
+  - Switched to local `npm install` (package already declared in `package.json`), matching the existing `bats` pattern
+  - Updated pytest fixtures in `conftest.py` to also check `node_modules/.bin/devcontainer`
 - **Worktree branch resolution broken by tab-separated `gh` output** ([#103](https://github.com/vig-os/devcontainer/issues/103))
   - `gh issue develop --list` now returns `branch<TAB>URL`; the previous `grep -oE '[^ ]+$'` captured the entire line
   - Extracted parsing into `scripts/resolve-branch.sh` (`head -1 | cut -f1`) used by both call sites in `justfile.worktree`

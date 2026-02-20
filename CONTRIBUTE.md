@@ -119,72 +119,72 @@ When contributing to this project, follow this workflow:
 ```text
 Available recipes:
     [build]
-    build no_cache=""               # Build local development image
-    clean version="dev"             # Remove image (default: dev)
-    clean-artifacts                 # Clean build artifacts
-    clean-test-containers           # Clean up lingering test containers
+    build no_cache=""                          # Build local development image
+    clean version="dev"                        # Remove image (default: dev)
+    clean-artifacts                            # Clean build artifacts
+    clean-test-containers                      # Clean up lingering test containers
 
     [deps]
-    sync                            # Sync dependencies from pyproject.toml
-    update                          # Update all dependencies
+    sync                                       # Sync dependencies from pyproject.toml
+    update                                     # Update all dependencies
 
     [github]
-    gh-issues                       # List open issues and PRs grouped by milestone [alias: gh-i]
+    gh-issues                                  # List open issues and PRs grouped by milestone [alias: gh-i]
 
     [info]
-    default                         # Show available commands (default)
-    docs                            # Generate documentation from templates
-    help                            # Show available commands
-    info                            # Show image information
-    init *args                      # Install system dependencies and setup development environment
-    login                           # Test login to GHCR
-    sync-workspace                  # Sync workspace templates from repo root to assets/workspace/
+    default                                    # Show available commands (default)
+    docs                                       # Generate documentation from templates
+    help                                       # Show available commands
+    info                                       # Show image information
+    init *args                                 # Install system dependencies and setup development environment
+    login                                      # Test login to GHCR
+    sync-workspace                             # Sync workspace templates from repo root to assets/workspace/
 
     [podman]
-    podman-kill name                # Stop and remove a container by name or ID [alias: pdm-kill]
-    podman-kill-all                 # Stop and remove all containers (with confirmation) [alias: pdm-kill-all]
-    podman-kill-project             # Stop and remove project-related containers [alias: pdm-kill-project]
-    podman-prune                    # Prune unused containers, images, networks, and volumes [alias: pdm-prune]
-    podman-prune-all                # Full cleanup: prune including volumes [alias: pdm-prune-all]
-    podman-ps *args                 # List containers/images (--all for all podman resources) [alias: pdm-ps]
-    podman-rmi image                # Remove an image by name, tag, or ID [alias: pdm-rmi]
-    podman-rmi-all                  # Remove all images (with confirmation) [alias: pdm-rmi-all]
-    podman-rmi-dangling             # Remove dangling images (untagged) [alias: pdm-rmi-dangling]
-    podman-rmi-project              # Remove project-related images [alias: pdm-rmi-project]
+    podman-kill name                           # Stop and remove a container by name or ID [alias: pdm-kill]
+    podman-kill-all                            # Stop and remove all containers (with confirmation) [alias: pdm-kill-all]
+    podman-kill-project                        # Stop and remove project-related containers [alias: pdm-kill-project]
+    podman-prune                               # Prune unused containers, images, networks, and volumes [alias: pdm-prune]
+    podman-prune-all                           # Full cleanup: prune including volumes [alias: pdm-prune-all]
+    podman-ps *args                            # List containers/images (--all for all podman resources) [alias: pdm-ps]
+    podman-rmi image                           # Remove an image by name, tag, or ID [alias: pdm-rmi]
+    podman-rmi-all                             # Remove all images (with confirmation) [alias: pdm-rmi-all]
+    podman-rmi-dangling                        # Remove dangling images (untagged) [alias: pdm-rmi-dangling]
+    podman-rmi-project                         # Remove project-related images [alias: pdm-rmi-project]
 
     [quality]
-    format                          # Format code
-    lint                            # Run all linters
-    precommit                       # Run pre-commit hooks on all files
+    format                                     # Format code
+    lint                                       # Run all linters
+    precommit                                  # Run pre-commit hooks on all files
 
     [release]
-    finalize-release version *flags # Finalize and publish release via GitHub Actions workflow (step 3, after testing)
-    prepare-release version *flags  # Prepare release branch for testing (step 1)
-    pull version="latest"           # Pull image from registry (default: latest)
-    reset-changelog                 # Reset CHANGELOG Unreleased section (after merging release to dev)
+    finalize-release version *flags            # Finalize and publish release via GitHub Actions workflow (step 3, after testing)
+    prepare-release version *flags             # Prepare release branch for testing (step 1)
+    pull version="latest"                      # Pull image from registry (default: latest)
+    reset-changelog                            # Reset CHANGELOG Unreleased section (after merging release to dev)
 
     [sidecar]
-    sidecar name *args              # just sidecar redis flush
-    sidecars                        # List available sidecar containers
+    sidecar name *args                         # just sidecar redis flush
+    sidecars                                   # List available sidecar containers
 
     [test]
-    test version="dev"              # Run all test suites
-    test-bats                       # Run BATS shell script tests
-    test-cov *args                  # Run tests with coverage
-    test-image version="dev"        # Run image tests only
-    test-install                    # Run install script tests only
-    test-integration version="dev"  # Run integration tests only
-    test-pytest *args               # Run tests with pytest
-    test-utils                      # Run utils tests only
-    test-validate-commit-msg        # Run validate commit msg tests only
-    test-vig-utils                  # Run check action pins tests only
+    test version="dev"                         # Run all test suites
+    test-bats                                  # Run BATS shell script tests
+    test-cov *args                             # Run tests with coverage
+    test-image version="dev"                   # Run image tests only
+    test-install                               # Run install script tests only
+    test-integration version="dev"             # Run integration tests only
+    test-pytest *args                          # Run tests with pytest
+    test-utils                                 # Run utils tests only
+    test-validate-commit-msg                   # Run validate commit msg tests only
+    test-vig-utils                             # Run check action pins tests only
 
     [worktree]
-    worktree-attach issue           # Attach to a worktree's tmux session [alias: wt-attach]
-    worktree-clean                  # Remove all cursor-managed worktrees and tmux sessions [alias: wt-clean]
-    worktree-list                   # List active worktrees and their tmux sessions [alias: wt-list]
-    worktree-start issue prompt=""  # Create a worktree for an issue, open tmux session, launch cursor-agent [alias: wt-start]
-    worktree-stop issue             # Stop a worktree's tmux session and remove the worktree [alias: wt-stop]
+    worktree-attach issue                      # Attach to a worktree's tmux session [alias: wt-attach]
+    worktree-clean                             # Remove all cursor-managed worktrees and tmux sessions [alias: wt-clean]
+    worktree-list                              # List active worktrees and their tmux sessions [alias: wt-list]
+    worktree-start issue prompt="" reviewer="" # Create a worktree for an issue, open tmux session, launch cursor-agent [alias: wt-start]
+    worktree-stop issue                        # Stop a worktree's tmux session and remove the worktree [alias: wt-stop]
 
 ```
 

@@ -140,6 +140,11 @@ class TestSystemTools:
             f"Expected just {expected}, got: {result.stdout}"
         )
 
+    def test_cursor_agent_installed(self, host):
+        """Test that cursor-agent CLI (agent) is installed."""
+        result = host.run("agent --version")
+        assert result.rc == 0, "agent --version failed"
+
     def test_cargo_binstall(self, host):
         """Test that cargo-binstall is installed and right version."""
         result = host.run("cargo-binstall -V")

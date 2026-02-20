@@ -75,9 +75,15 @@ gh issue view <issue_number> --json title,body
 ### 6. Create PR
 
 ```bash
+# Append reviewer if PR_REVIEWER is set in environment
+REVIEWER_ARG=""
+if [ -n "${PR_REVIEWER:-}" ]; then
+  REVIEWER_ARG="--reviewer $PR_REVIEWER"
+fi
+
 gh pr create --base <base_branch> --title "<type>: <description> (#<issue_number>)" \
   --body-file .github/pr-draft-<issue_number>.md \
-  --assignee @me
+  --assignee @me $REVIEWER_ARG
 ```
 
 If the `WORKTREE_REVIEWER` environment variable is set (populated by `just worktree-start`), add the reviewer:
@@ -113,4 +119,4 @@ Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
 - Never block for user review of the PR text. Generate the best text from available context.
 - Base branch is auto-detected: parent issue's branch for sub-issues, `dev` otherwise.
 - The PR title should follow commit message conventions: `type(scope): description (#issue)`.
-- **NEVER add cursor-agent as a co-author** in commit messages.
+- **NEVER add 'Co-authored-by: Cursor <cursoragent@cursor.com>'** to commit messages.

@@ -381,3 +381,25 @@ setup() {
     run grep "NC=" "$INIT_SH"
     assert_success
 }
+
+# ── devcontainer local install ───────────────────────────────────────────────
+
+@test "requirements.yaml devcontainer check falls back to node_modules/.bin" {
+    run grep 'node_modules/.bin/devcontainer' "$REQUIREMENTS_YAML"
+    assert_success
+}
+
+@test "requirements.yaml devcontainer does not use npm install -g" {
+    run grep 'npm install -g.*devcontainer' "$REQUIREMENTS_YAML"
+    assert_failure
+}
+
+@test "conftest.py devcontainer check falls back to node_modules/.bin" {
+    run grep 'node_modules/.bin/devcontainer' "$PROJECT_ROOT/tests/conftest.py"
+    assert_success
+}
+
+@test "conftest.py devcontainer skip message does not reference npm install -g" {
+    run grep 'npm install -g.*devcontainer' "$PROJECT_ROOT/tests/conftest.py"
+    assert_failure
+}

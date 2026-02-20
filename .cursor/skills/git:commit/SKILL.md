@@ -59,5 +59,5 @@ git status && echo "=== STAGED CHANGES ===" && git diff --cached
 - Do not read/summarize git command output after execution unless asked
 - Your shell is already at the project root so you do not need `cd` or 'bash', just use `git ...`
 - Do not use `--no-verify` to cheat
-- Do not add any trailer
-- Do not put yourself as co-author
+- Do not add any trailer (e.g. `Co-authored-by: ...`)
+- **NEVER add 'Co-authored-by: Cursor <cursoragent@cursor.com>'** to commit messages.

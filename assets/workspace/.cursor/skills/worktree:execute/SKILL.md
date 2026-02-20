@@ -79,4 +79,4 @@ After all tasks are done, invoke [worktree:verify](../worktree:verify/SKILL.md) 
 - Each task should leave the codebase in a working, testable state.
 - Skip TDD for non-testable changes (config, templates, docs) — note why in the commit.
 - The plan comment is the single source of truth for progress.
-- **NEVER add cursor-agent as a co-author** in commit messages.
+- **NEVER add 'Co-authored-by: Cursor <cursoragent@cursor.com>'** to commit messages.

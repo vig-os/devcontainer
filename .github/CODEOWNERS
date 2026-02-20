@@ -4,8 +4,10 @@
 # Each line defines a file pattern and the GitHub users/teams required to review
 # changes to matching files. Later rules take precedence over earlier ones.
 
-# Default: all files require review from the maintainer
-*                               @c-vigo
+# agent workflows
+.cursor/skills/                 @gerchowl
+justfile.worktree               @gerchowl
+
 
 # CI/CD workflows — require maintainer review for any workflow change
 .github/workflows/              @c-vigo
