@@ -58,11 +58,6 @@ gh issue view <issue_number> --json title,body,labels,comments
    ```
 
 3. The comment **must** start with `## Design` (H2) — this is how other skills detect that the design phase is complete.
-4. Trigger the `sync-issues` workflow (fire-and-forget):
-
-   ```bash
-   gh workflow run sync-issues.yml -f target-branch=<current_branch>
-   ```
 
 ### 6. Proceed to planning
 
