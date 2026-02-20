@@ -1,8 +1,8 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-20T10:59:01Z
-updated: 2026-02-20T10:59:20Z
+updated: 2026-02-20T13:19:21Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/111
@@ -12,7 +12,7 @@ assignees: none
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-20T13:17:14.953Z
+synced: 2026-02-20T15:25:35.197Z
 ---
 
 # [Issue 111]: [[BUG] just init fails to install devcontainer CLI — npm global install permission denied](https://github.com/vig-os/devcontainer/issues/111)

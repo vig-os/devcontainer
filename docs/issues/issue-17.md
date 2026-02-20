@@ -1,18 +1,18 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2025-12-16T10:54:31Z
-updated: 2026-01-30T15:16:35Z
+updated: 2026-02-20T15:18:40Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/17
-comments: 1
-labels: question
+comments: 2
+labels: discussion, priority:low, area:image
 assignees: none
-milestone: none
+milestone: Backlog
 projects: none
 relationship: none
-synced: 2026-02-18T08:56:41.832Z
+synced: 2026-02-20T15:25:38.702Z
 ---
 
 # [Issue 17]: [discuss: Python base image vs uv-managed Python](https://github.com/vig-os/devcontainer/issues/17)
@@ -85,4 +85,12 @@ Otherwise uv might download Python again (~100MB wasted).
 _Posted on December 18, 2025 at 09:19 AM_
 
 works like this fine, no real advantage 
+
+---
+
+# [Comment #2]() by [gerchowl]()
+
+_Posted on February 20, 2026 at 03:18 PM_
+
+@c-vigo Closing this discussion — the uv-managed Python approach has been the de facto standard for a while now. Reopen if there's still something to decide here.
 
