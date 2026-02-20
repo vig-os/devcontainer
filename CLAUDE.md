@@ -85,7 +85,7 @@ Use `gh issue develop` to create and link branches. Always confirm branch name w
 
 Every piece of knowledge lives in exactly one place. Reference it everywhere else. Don't copy -- link. Applies to docs, config, infra, rules, and comments.
 
-### TDD
+### TDD (glob-triggered on source/test files, see `.cursor/rules/tdd.mdc`)
 
 1. Write the failing test first. Run it. Confirm it fails.
 2. **Commit** the failing test (`test: ...`) following the Commit Message Standard above. Do not proceed before committing.
@@ -95,3 +95,5 @@ Every piece of knowledge lives in exactly one place. Reference it everywhere els
 All commits must follow the Commit Message Standard. Never use `--no-verify`.
 
 Each phase gets its own commit. Do not write implementation before its test. Skip TDD only for non-testable changes (config, templates, docs) -- note why.
+
+Before writing tests, use the **scenario checklist** in `tdd.mdc`: happy path, edge cases, error paths, input validation, state/side effects, regression, smoke. Use the narrowest test type (unit > integration > smoke > E2E) that covers the behavior.

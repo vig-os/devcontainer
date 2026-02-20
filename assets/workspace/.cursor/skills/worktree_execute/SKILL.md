@@ -38,7 +38,7 @@ Work through an implementation plan **without user checkpoints**. This is the wo
 For each unchecked task:
 
 1. Read the task description, files, and verification command.
-2. Implement the change following [coding-principles](../../rules/coding-principles.mdc) and TDD:
+2. Implement the change following [coding-principles](../../rules/coding-principles.mdc) and [tdd.mdc](../../rules/tdd.mdc):
    - **RED**: Write failing test, run it, confirm failure, commit via [git_commit](../git_commit/SKILL.md) (`test: ...`).
    - **GREEN**: Write minimal code to pass, run test, confirm pass, commit via [git_commit](../git_commit/SKILL.md) (`feat: ...` or `fix: ...`).
    - **REFACTOR**: Clean up if needed, run tests, commit via [git_commit](../git_commit/SKILL.md) (`refactor: ...`).
@@ -72,6 +72,18 @@ After completing a task, check it off in the plan comment:
 ### 5. Proceed to verification
 
 After all tasks are done, invoke [worktree_verify](../worktree_verify/SKILL.md) for full-suite verification.
+
+## Delegation
+
+The following steps SHOULD be delegated to reduce token consumption:
+
+- **Step 1** (precondition check, load plan): Spawn a Task subagent with `model: "fast"` that validates the branch name, fetches the `## Implementation Plan` comment via `gh api`, parses the task list, and returns: issue number, comment ID, list of pending/completed tasks.
+- **Step 3** (update progress): Spawn a Task subagent with `model: "fast"` that re-fetches the comment, performs the checkbox replacement, and updates the comment via `gh api`. Returns: success confirmation.
+- **Step 5** (invoke next skill): Can remain in main agent (simple skill invocation).
+
+Steps 2 and 4 (execute tasks, handle failures) should remain in the main agent as they require code generation, TDD discipline, and debugging.
+
+Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
 
 ## Important Notes
 
