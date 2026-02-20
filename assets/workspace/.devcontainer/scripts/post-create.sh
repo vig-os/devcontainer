@@ -28,6 +28,7 @@ sed -i 's/template-project/{{SHORT_NAME}}/g' /root/assets/workspace/.venv/bin/ac
 # One-time setup: git repo, config, hooks, gh auth
 "$SCRIPT_DIR/init-git.sh"
 "$SCRIPT_DIR/setup-git-conf.sh"
+"$SCRIPT_DIR/setup-gh-repo.sh"
 "$SCRIPT_DIR/init-precommit.sh"
 
 # Sync dependencies (fast if nothing changed from pre-built venv)

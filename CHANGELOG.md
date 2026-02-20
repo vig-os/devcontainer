@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New rule `.cursor/rules/subagent-delegation.mdc` documenting when and how to delegate mechanical sub-steps to lightweight subagents via the Task tool
   - Added `## Delegation` sections to 12 skills identifying steps that should spawn lightweight/standard-tier subagents to reduce token consumption on the primary autonomous model
   - Skills updated: `worktree:solve-and-pr`, `worktree:brainstorm`, `worktree:plan`, `worktree:execute`, `worktree:verify`, `worktree:pr`, `worktree:ci-check`, `worktree:ci-fix`, `code:review`, `issue:triage`, `pr:post-merge`, `ci:check`
+- **hadolint pre-commit hook for Containerfile linting** ([#122](https://github.com/vig-os/devcontainer/issues/122))
+  - Add `hadolint` hook to `.pre-commit-config.yaml`, pinned by SHA (v2.9.3)
+  - Enforce Dockerfile best practices: pinned base image tags, consolidated `RUN` layers, shellcheck for inline scripts
+  - Fix `tests/fixtures/sidecar.Containerfile` to pass hadolint with no warnings
 - **Optional reviewer parameter for autonomous worktree pipeline** ([#102](https://github.com/vig-os/devcontainer/issues/102))
   - Support `reviewer` parameter in `just worktree-start`
   - Propagate `PR_REVIEWER` via tmux environment to the autonomous agent
@@ -73,6 +77,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Ground truth lives in repo root; `assets/workspace/` is generated output
 - **cursor-agent CLI pre-installed in devcontainer image** ([#108](https://github.com/vig-os/devcontainer/issues/108))
   - Enables `just worktree-start` to work out of the box without manual installation
+- **Automatic merge commit message compliance** ([#79](https://github.com/vig-os/devcontainer/issues/79))
+  - `setup-gh-repo.sh` configures repo merge settings via `gh api` (`merge_commit_title=PR_TITLE`, `merge_commit_message=PR_BODY`, `allow_auto_merge=true`)
+  - Wired into `post-create.sh` so downstream devcontainer projects get compliant merge commits automatically
+  - `--subject-only` flag for `validate-commit-msg` to validate PR titles without requiring body or Refs
+  - `pr-title-check.yml` CI workflow enforces commit message standard on PR titles
+  - PR body template includes `Refs: #` placeholder for merge commit traceability
 
 ### Changed
 
