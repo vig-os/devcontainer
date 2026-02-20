@@ -89,8 +89,10 @@ Every piece of knowledge lives in exactly one place. Reference it everywhere els
 
 ### TDD
 
-1. Write the failing test first. Run it. Confirm it fails. **Commit** (`test: ...`).
+1. Write the failing test first. Run it. Confirm it fails. **Commit** (`test: ...`) following the Commit Message Standard above.
 2. Write minimal code to pass. Run it. Confirm it passes. **Commit** the implementation.
 3. Refactor. Run tests. Confirm no regressions. **Commit** if meaningful.
+
+All commits must follow the Commit Message Standard. Never use `--no-verify`.
 
 Each phase gets its own commit. Do not write implementation before its test. Skip TDD only for non-testable changes (config, templates, docs) -- note why.
