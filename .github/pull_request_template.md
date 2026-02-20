@@ -1,26 +1,25 @@
-# Pull Request
-
 ## Description
 
 <!-- Provide a clear and concise description of what this PR does. -->
 
-## Related Issue(s)
-
-<!-- Link to related issue(s) using #issue_number -->
-<!-- Example: Closes #123, Related to #456 -->
-Closes #
-
 ## Type of Change
 
-<!-- Mark the relevant option with an 'x' -->
+<!-- Mark the relevant option(s) with an 'x' -->
 
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] Documentation update
-- [ ] Refactoring (no functional changes)
-- [ ] CI / Build change
-- [ ] Test updates
+- [ ] `feat` -- New feature
+- [ ] `fix` -- Bug fix
+- [ ] `docs` -- Documentation only
+- [ ] `chore` -- Maintenance task (deps, config, etc.)
+- [ ] `refactor` -- Code restructuring (no behavior change)
+- [ ] `test` -- Adding or updating tests
+- [ ] `ci` -- CI/CD pipeline changes
+- [ ] `build` -- Build system or dependency changes
+- [ ] `revert` -- Reverts a previous commit
+- [ ] `style` -- Code style (formatting, whitespace)
+
+### Modifiers
+
+- [ ] Breaking change (`!`) -- This change breaks backward compatibility
 
 ## Changes Made
 
@@ -62,3 +61,12 @@ Closes #
 ## Additional Notes
 
 <!-- Any additional information, screenshots, or context that reviewers should know -->
+
+Refs:
+
+<!--
+Please include GitHub issue references in the "Refs:" line above (e.g., `Refs: #42`).
+Every change must be traceable to an issue, per project rules.
+If not related to a specific issue, explain why (chore/documentation only).
+See [commit-messages.mdc](../../rules/commit-messages.mdc) for more details.
+-->

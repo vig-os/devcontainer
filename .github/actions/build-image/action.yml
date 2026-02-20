@@ -118,7 +118,7 @@ runs:
           org.opencontainers.image.version=${{ inputs.version }}
           org.opencontainers.image.created=${{ inputs.build-timestamp }}
           org.opencontainers.image.revision=${{ inputs.vcs-ref }}
-          org.opencontainers.image.source=https://github.com/vig-os/devcontainer
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           org.opencontainers.image.vendor=vigOS
           org.opencontainers.image.licenses=MIT
 

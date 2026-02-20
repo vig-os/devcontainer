@@ -35,7 +35,7 @@ Prepare and submit a pull request for **feature or bugfix work**.
 
 ### 5. Ask user to review and choose assignee and reviewers
 
-- Show the user the **title** you will use (e.g. `feat: short description (#NN)`) and the **PR body** (full markdown).
+- Show the user the **title** you will use (e.g. `feat: short description`) and the **PR body** (full markdown). Do **not** include the issue number in the title — GitHub automatically appends `(#PR)` to the merge commit subject, and the issue is traceable via `Refs:` in the body.
 - Ask the user to confirm or edit the text.
 - Ask the user to specify **assignee** and **reviewers** (e.g. "assign to me, no reviewers" or "assign @c-vigo, reviewers @foo"). Do not run `gh pr create` until the user approves and provides assignee/reviewers.
 

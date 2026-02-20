@@ -109,6 +109,12 @@ RUN set -eux; \
     rm "$FILE"; \
     just --version;
 
+# Install cursor-agent CLI (installs to ~/.local/bin)
+ENV PATH="/root/.local/bin:${PATH}"
+RUN set -eux; \
+    curl -fsSL https://cursor.com/install | bash; \
+    agent --version;
+
 # Install latest cargo-binstall from release archive with minisign signature verification
 # cargo-binstall uses minisign for signing releases. Each release has an ephemeral key.
 ENV PATH="/root/.cargo/bin:${PATH}"

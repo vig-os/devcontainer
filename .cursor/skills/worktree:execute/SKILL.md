@@ -39,9 +39,9 @@ For each unchecked task:
 
 1. Read the task description, files, and verification command.
 2. Implement the change following [coding-principles](../../rules/coding-principles.mdc) and TDD:
-   - **RED**: Write failing test, run it, confirm failure, commit (`test: ...`).
-   - **GREEN**: Write minimal code to pass, run test, confirm pass, commit (`feat: ...` or `fix: ...`).
-   - **REFACTOR**: Clean up if needed, run tests, commit (`refactor: ...`).
+   - **RED**: Write failing test, run it, confirm failure, commit via [git:commit](../git:commit/SKILL.md) (`test: ...`).
+   - **GREEN**: Write minimal code to pass, run test, confirm pass, commit via [git:commit](../git:commit/SKILL.md) (`feat: ...` or `fix: ...`).
+   - **REFACTOR**: Clean up if needed, run tests, commit via [git:commit](../git:commit/SKILL.md) (`refactor: ...`).
 3. Run the task's verification step.
 4. If verification fails, debug and fix before moving to the next task.
 
@@ -73,10 +73,22 @@ After completing a task, check it off in the plan comment:
 
 After all tasks are done, invoke [worktree:verify](../worktree:verify/SKILL.md) for full-suite verification.
 
+## Delegation
+
+The following steps SHOULD be delegated to reduce token consumption:
+
+- **Step 1** (precondition check, load plan): Spawn a Task subagent with `model: "fast"` that validates the branch name, fetches the `## Implementation Plan` comment via `gh api`, parses the task list, and returns: issue number, comment ID, list of pending/completed tasks.
+- **Step 3** (update progress): Spawn a Task subagent with `model: "fast"` that re-fetches the comment, performs the checkbox replacement, and updates the comment via `gh api`. Returns: success confirmation.
+- **Step 5** (invoke next skill): Can remain in main agent (simple skill invocation).
+
+Steps 2 and 4 (execute tasks, handle failures) should remain in the main agent as they require code generation, TDD discipline, and debugging.
+
+Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
+
 ## Important Notes
 
 - Never block waiting for user input. Execute tasks continuously.
 - Each task should leave the codebase in a working, testable state.
 - Skip TDD for non-testable changes (config, templates, docs) — note why in the commit.
 - The plan comment is the single source of truth for progress.
-- **NEVER add cursor-agent as a co-author** in commit messages.
+- **NEVER add 'Co-authored-by: Cursor <cursoragent@cursor.com>'** to commit messages.

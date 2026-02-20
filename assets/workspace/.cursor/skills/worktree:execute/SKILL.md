@@ -39,9 +39,9 @@ For each unchecked task:
 
 1. Read the task description, files, and verification command.
 2. Implement the change following [coding-principles](../../rules/coding-principles.mdc) and TDD:
-   - **RED**: Write failing test, run it, confirm failure, commit (`test: ...`).
-   - **GREEN**: Write minimal code to pass, run test, confirm pass, commit (`feat: ...` or `fix: ...`).
-   - **REFACTOR**: Clean up if needed, run tests, commit (`refactor: ...`).
+   - **RED**: Write failing test, run it, confirm failure, commit via [git:commit](../git:commit/SKILL.md) (`test: ...`).
+   - **GREEN**: Write minimal code to pass, run test, confirm pass, commit via [git:commit](../git:commit/SKILL.md) (`feat: ...` or `fix: ...`).
+   - **REFACTOR**: Clean up if needed, run tests, commit via [git:commit](../git:commit/SKILL.md) (`refactor: ...`).
 3. Run the task's verification step.
 4. If verification fails, debug and fix before moving to the next task.
 
@@ -79,4 +79,4 @@ After all tasks are done, invoke [worktree:verify](../worktree:verify/SKILL.md) 
 - Each task should leave the codebase in a working, testable state.
 - Skip TDD for non-testable changes (config, templates, docs) — note why in the commit.
 - The plan comment is the single source of truth for progress.
-- **NEVER add cursor-agent as a co-author** in commit messages.
+- **NEVER add 'Co-authored-by: Cursor <cursoragent@cursor.com>'** to commit messages.

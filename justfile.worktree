@@ -17,7 +17,7 @@ _wt_base := "../" + _wt_repo + "-worktrees"
 
 # Create a worktree for an issue, open tmux session, launch cursor-agent
 [group('worktree')]
-worktree-start issue prompt="":
+worktree-start issue prompt="" reviewer="":
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -50,6 +50,13 @@ worktree-start issue prompt="":
         fi
     }
 
+    # Helper: read agent model from config
+    _read_model() {
+        local tier="$1"
+        local cfg="$(git rev-parse --show-toplevel)/.cursor/agent-models.toml"
+        grep "^${tier}" "$cfg" | sed 's/.*= *"//' | sed 's/".*//'
+    }
+
     # Auth: check existing login first, then fall back to CURSOR_API_KEY
     if agent status 2>/dev/null | grep -qi "logged in\|authenticated"; then
         echo "[OK] cursor-agent: authenticated via browser login"
@@ -67,8 +74,17 @@ worktree-start issue prompt="":
         fi
     fi
 
+    # Resolve the local gh user as the reviewer (person launching the worktree)
+    REVIEWER=$(gh api user --jq '.login' 2>/dev/null || echo "")
+    if [ -n "$REVIEWER" ]; then
+        echo "[OK] Reviewer (gh user): $REVIEWER"
+    else
+        echo "[!] Could not resolve gh user. PR will be created without reviewer."
+    fi
+
     ISSUE="{{ issue }}"
     PROMPT="{{ prompt }}"
+    REVIEWER="{{ reviewer }}"
     WT_DIR="{{ _wt_base }}/${ISSUE}"
     SESSION="wt-${ISSUE}"
 
@@ -81,9 +97,9 @@ worktree-start issue prompt="":
         else
             echo "    No tmux session found. Starting one..."
             if [ -n "$PROMPT" ]; then
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat --yolo \"$PROMPT\""
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --yolo --trust --approve-mcps \"$PROMPT\""
             else
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR"
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --trust --approve-mcps"
             fi
             echo "[OK] tmux session '$SESSION' started. Use: just worktree-attach $ISSUE"
         fi
@@ -91,7 +107,7 @@ worktree-start issue prompt="":
     fi
 
     # Resolve the issue's linked branch (may already exist from issue:claim)
-    BRANCH=$(gh issue develop --list "$ISSUE" 2>/dev/null | grep -oE '[^ ]+$' | head -1)
+    BRANCH=$(gh issue develop --list "$ISSUE" 2>/dev/null | "$(pwd)/scripts/resolve-branch.sh")
 
     if [ -z "$BRANCH" ]; then
         echo "[*] No linked branch for issue #${ISSUE}. Creating one..."
@@ -110,7 +126,7 @@ worktree-start issue prompt="":
 
         # Use agent ONLY for the intelligent part: deriving the short summary
         NAMING_RULE="$(pwd)/.cursor/rules/branch-naming.mdc"
-        SUMMARY=$(agent --print --yolo --trust --model gemini-3-flash \
+        SUMMARY=$(agent --print --yolo --trust --model $(_read_model lightweight) \
             "Read the branch naming rules in ${NAMING_RULE}. " \
             "The issue title is: ${TITLE} " \
             "Output ONLY a kebab-case short summary suitable for a branch name (a few words). " \
@@ -128,7 +144,7 @@ worktree-start issue prompt="":
         OWNER_REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner')
         PARENT=$(gh api "repos/${OWNER_REPO}/issues/${ISSUE}/parent" --jq '.number' 2>/dev/null || true)
         if [ -n "$PARENT" ]; then
-            BASE=$(gh issue develop --list "$PARENT" 2>/dev/null | grep -oE '[^ ]+$' | head -1)
+            BASE=$(gh issue develop --list "$PARENT" 2>/dev/null | "$(pwd)/scripts/resolve-branch.sh")
             BASE="${BASE:-dev}"
         else
             BASE="dev"
@@ -173,9 +189,9 @@ worktree-start issue prompt="":
     # Start tmux session
     # --yolo: auto-approve all shell commands (autonomous agent, no human at the terminal)
     if [ -n "$PROMPT" ]; then
-        tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat --yolo \"$PROMPT\""
+        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --yolo --trust --approve-mcps \"$PROMPT\""
     else
-        tmux new-session -d -s "$SESSION" -c "$WT_DIR"
+        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --trust --approve-mcps"
     fi
 
     echo ""

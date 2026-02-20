@@ -47,7 +47,11 @@ jobs:
           # Version format: scheduled-YYYY-MM-DD-<commit_short>
           COMMIT_SHORT=$(git rev-parse --short HEAD)
           VERSION="scheduled-$(date -u +'%Y-%m-%d')-${COMMIT_SHORT}"
+          RELEASE_DATE=$(date -u +%Y-%m-%d)
+          BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
+          echo "build_timestamp=$BUILD_TIMESTAMP" >> $GITHUB_OUTPUT
           echo "Generated version: ${VERSION}"
 
       - name: Build container image

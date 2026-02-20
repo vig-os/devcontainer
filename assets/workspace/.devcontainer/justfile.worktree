@@ -17,7 +17,7 @@ _wt_base := "../" + _wt_repo + "-worktrees"
 
 # Create a worktree for an issue, open tmux session, launch cursor-agent
 [group('worktree')]
-worktree-start issue prompt="":
+worktree-start issue prompt="" reviewer="":
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -50,6 +50,13 @@ worktree-start issue prompt="":
         fi
     }
 
+    # Helper: read agent model from config
+    _read_model() {
+        local tier="$1"
+        local cfg="$(git rev-parse --show-toplevel)/.cursor/agent-models.toml"
+        grep "^${tier}" "$cfg" | sed 's/.*= *"//' | sed 's/".*//'
+    }
+
     # Auth: check existing login first, then fall back to CURSOR_API_KEY
     if agent status 2>/dev/null | grep -qi "logged in\|authenticated"; then
         echo "[OK] cursor-agent: authenticated via browser login"
@@ -69,6 +76,7 @@ worktree-start issue prompt="":
 
     ISSUE="{{ issue }}"
     PROMPT="{{ prompt }}"
+    REVIEWER="{{ reviewer }}"
     WT_DIR="{{ _wt_base }}/${ISSUE}"
     SESSION="wt-${ISSUE}"
 
@@ -82,9 +90,9 @@ worktree-start issue prompt="":
         else
             echo "    No tmux session found. Starting one..."
             if [ -n "$PROMPT" ]; then
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat --yolo \"$PROMPT\""
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --yolo --trust --approve-mcps \"$PROMPT\""
             else
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR"
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --trust --approve-mcps"
             fi
             echo "[OK] tmux session '$SESSION' started. Use: just worktree-attach $ISSUE"
         fi
@@ -117,9 +125,9 @@ worktree-start issue prompt="":
     # Start tmux session
     # --yolo: auto-approve all shell commands (autonomous agent, no human at the terminal)
     if [ -n "$PROMPT" ]; then
-        tmux new-session -d -s "$SESSION" -c "$WT_DIR" "agent chat --yolo \"$PROMPT\""
+        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --yolo --trust --approve-mcps \"$PROMPT\""
     else
-        tmux new-session -d -s "$SESSION" -c "$WT_DIR"
+        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --trust --approve-mcps"
     fi
 
     echo ""

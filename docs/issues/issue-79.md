@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-18T13:30:08Z
-updated: 2026-02-19T16:03:14Z
+updated: 2026-02-20T14:39:16Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/79
-comments: 2
+comments: 3
 labels: feature, priority:medium, area:ci, effort:small, semver:patch
-assignees: none
+assignees: gerchowl
 milestone: 0.3
 projects: none
 relationship: none
-synced: 2026-02-19T17:40:50.221Z
+synced: 2026-02-20T15:25:37.903Z
 ---
 
 # [Issue 79]: [[FEATURE] Automatic commit message for pull request merge](https://github.com/vig-os/devcontainer/issues/79)
@@ -97,4 +97,30 @@ Looks good to me! COuple of points:
 
 - You might need a placeholder for `pr-title-check.yml` in `main` for this to work right away, not sure.
 - After implementing and merging, I would leave the issue open until we verify it and turn on `Auto merge` [here](https://github.com/vig-os/devcontainer/settings). The `gh-repo-merge-settings` recipe should also set this value.
+
+---
+
+# [Comment #3]() by [gerchowl]()
+
+_Posted on February 20, 2026 at 02:16 PM_
+
+## Implementation Plan
+
+Issue: #79
+Branch: `feature/79-auto-merge-commit-message`
+
+### Tasks
+
+- [x] Task 1: Create `setup-gh-repo.sh` script that configures repo merge settings (`merge_commit_title=PR_TITLE`, `merge_commit_message=PR_BODY`, `allow_auto_merge=true`) via `gh api` — `assets/workspace/.devcontainer/scripts/setup-gh-repo.sh` — verify: `bash -n assets/workspace/.devcontainer/scripts/setup-gh-repo.sh`
+- [x] Task 2: Wire `setup-gh-repo.sh` into `post-create.sh` — call it after git/gh setup — `assets/workspace/.devcontainer/scripts/post-create.sh` — verify: `bash -n assets/workspace/.devcontainer/scripts/post-create.sh`
+- [x] Task 3: Write failing test for `--subject-only` mode in `validate_commit_msg.py` (TDD red) — `packages/vig-utils/tests/test_validate_commit_msg.py` — verify: `just test-vig-utils` shows test failing
+- [x] Task 4: Implement `--subject-only` flag and `subject_only` parameter in `validate_commit_message()` (TDD green) — `packages/vig-utils/src/vig_utils/validate_commit_msg.py` — verify: `just test-vig-utils` passes
+- [x] Task 5: Create `pr-title-check.yml` workflow — validates PR title using `validate-commit-msg --subject-only` on `pull_request: opened/edited/synchronize` — `.github/workflows/pr-title-check.yml` — verify: `yamllint .github/workflows/pr-title-check.yml`
+- [x] Task 6: Update PR body template to include `Refs: #` placeholder — `.github/pull_request_template.md` — verify: visual inspection
+- [x] Task 7: Update `CHANGELOG.md` under `## Unreleased` — `CHANGELOG.md` — verify: follows existing format
+
+**TDD applies to:** Tasks 3–4 (test first, then implementation).
+**TDD skipped for:** Tasks 1, 2, 5, 6, 7 (shell scripts, workflow YAML, template, docs — not unit-testable).
+
+**Post-merge action:** Run `setup-gh-repo.sh` manually against `vig-os/devcontainer` since the container won't be recreated just for this change.
 
