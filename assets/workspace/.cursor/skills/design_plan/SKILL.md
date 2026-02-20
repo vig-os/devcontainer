@@ -58,7 +58,7 @@ After user approval, post the full detailed plan as a **comment on the issue**. 
      -f body="<plan_content>"
    ```
 
-3. The comment must start with `##` (H2).
+3. The comment must start with `##` (H2) so other skills can detect that the planning phase is complete.
 4. Use this format:
 
    ```markdown

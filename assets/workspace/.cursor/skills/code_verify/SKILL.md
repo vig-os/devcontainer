@@ -21,7 +21,7 @@ Run verification and provide evidence before claiming work is done.
 
 ```bash
 just test              # full test suite
-just test        # or specific suite
+just test-image        # or specific suite
 just lint              # linters
 just precommit         # pre-commit hooks on all files
 ```

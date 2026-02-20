@@ -61,7 +61,7 @@ After user approval, post the design as a **comment on the issue**. This is the 
      -f body="<design_content>"
    ```
 
-3. The comment must start with `## Design` (H2) — this is how other skills detect that the design phase is complete.
+3. The comment must start with `## Design` (H2) so other skills can detect the design phase is complete.
 
 ### 6. Transition to planning
 

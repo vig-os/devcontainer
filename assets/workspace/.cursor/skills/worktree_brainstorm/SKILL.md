@@ -63,6 +63,18 @@ gh issue view <issue_number> --json title,body,labels,comments
 
 - Invoke [worktree_plan](../worktree_plan/SKILL.md) to break the design into tasks.
 
+## Delegation
+
+The following steps SHOULD be delegated to reduce token consumption:
+
+- **Steps 1, 4** (precondition check, read issue): Spawn a Task subagent with `model: "fast"` that validates the branch name, executes `gh issue view`, and checks for an existing `## Design` comment. Returns: issue number, parsed body/comments, design-exists flag.
+- **Step 5** (publish design): Spawn a Task subagent with `model: "fast"` that takes the formatted design content and posts it via `gh api`. Returns: comment URL.
+- **Step 6** (invoke next skill): Can remain in main agent (simple skill invocation).
+
+Steps 2-3 (explore context, make design decisions) should remain in the main agent as they require architectural reasoning and decision-making.
+
+Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
+
 ## When stuck
 
 If you cannot make a reasonable design decision (genuinely ambiguous, high-risk, or contradictory requirements), use [worktree_ask](../worktree_ask/SKILL.md) to post a question on the issue. Do not guess on critical decisions.
