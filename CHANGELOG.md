@@ -302,6 +302,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Documentation and inline comments updated across `docs/RELEASE_CYCLE.md`, `CONTRIBUTE.md`, `README.md`, and `build-image` action
 - **`gh` version assertion in `test_gh_version`** ([#93](https://github.com/vig-os/devcontainer/issues/93))
   - Updated expected version prefix from `2.86.` to `2.87.` to match GitHub CLI 2.87.0 (released 2026-02-18)
+- **BATS test failures in init-workspace and prepare-build suites** ([#67](https://github.com/vig-os/devcontainer/issues/67))
+  - Removed premature init-workspace.bats tests for unimplemented `is_git_dirty` feature (9 tests)
+  - Fixed prepare-build.bats grep pattern for `sync_manifest.py` invocation to handle shell quoting
 
 ### Security
 

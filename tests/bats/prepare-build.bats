@@ -98,7 +98,7 @@ setup() {
 # ── manifest syncing (via Python) ────────────────────────────────────────────
 
 @test "prepare-build.sh calls sync_manifest.py for workspace sync" {
-    run grep 'sync_manifest.py sync' "$PREPARE_BUILD_SH"
+    run grep 'sync_manifest.py.*sync' "$PREPARE_BUILD_SH"
     assert_success
 }
 
