@@ -120,7 +120,7 @@ SKILL_GROUP_INTROS = {
 def load_skills() -> list[dict]:
     """Scan .cursor/skills/*/SKILL.md and return parsed skill metadata.
 
-    Each entry has: name, trigger, description, group (prefix before colon).
+    Each entry has: name, trigger, description, group (prefix before underscore).
     """
     skills_dir = Path(__file__).parent.parent / ".cursor" / "skills"
     skills = []
@@ -144,9 +144,9 @@ def load_skills() -> list[dict]:
         skills.append(
             {
                 "name": name,
-                "trigger": "/" + name.replace(":", "-"),
+                "trigger": "/" + name.replace("_", "-"),
                 "description": meta.get("description", ""),
-                "group": name.split(":")[0],
+                "group": name.split("_")[0],
             }
         )
 
