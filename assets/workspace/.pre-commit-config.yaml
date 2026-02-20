@@ -57,6 +57,13 @@ repos:
         name: shellcheck
         args: ["-x"]
 
+  # Containerfile
+  - repo: https://github.com/hadolint/hadolint
+    rev: 346e4199e4baca7d6827f20ac078b6eee5b39327  # v2.9.3
+    hooks:
+      - id: hadolint-docker
+        name: hadolint
+
   # Markdown Linting (excludes auto-generated docs)
   - repo: https://github.com/jackdewinter/pymarkdown
     rev: f93643d339dfee2a1022e7b05e8b5a281bfac553  # v0.9.23
