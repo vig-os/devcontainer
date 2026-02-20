@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+- **PR template aligned with canonical commit types** ([#115](https://github.com/vig-os/devcontainer/issues/115))
+  - Replace ad-hoc Type of Change checkboxes with the 10 canonical commit types
+  - Move breaking change from type to a separate modifier checkbox
+  - Add release-branch hint to Related Issues section
+
 ### Added
 
 - **Optional reviewer parameter for autonomous worktree pipeline** ([#102](https://github.com/vig-os/devcontainer/issues/102))
