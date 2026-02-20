@@ -17,8 +17,12 @@ PROJECT_ROOT="/workspace/{{SHORT_NAME}}"
 
 "$SCRIPT_DIR/verify-auth.sh"
 
-# Sync dependencies (fast no-op if nothing changed)
-echo "Syncing dependencies..."
-just --justfile "$PROJECT_ROOT/justfile" --working-directory "$PROJECT_ROOT" sync
+# Sync Python dependencies if pyproject.toml changed (fast, only installs missing deps)
+# Use --no-install-project since new projects may not have source code yet
+if [[ -f "$PROJECT_ROOT/pyproject.toml" ]]; then
+    uv sync --all-extras --no-install-project --quiet
+fi
 
-echo "Post-attach checks complete"
+"$SCRIPT_DIR/version-check.sh" || true
+
+echo "Post-attach setup complete"

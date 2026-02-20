@@ -1,14 +1,17 @@
 ---
 # .pre-commit-config.yaml
 
-exclude: ^\.github_data/
+exclude: ^.github_data/|^docs/issues/|^docs/pull-requests/
 
 repos:
   # General Pre-commit Hooks (Fixes formatting issues)
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b  # v5.0.0
     hooks:
-      # Enforce topic branch naming: <type>/<issue_number>-<short_summary>
+      # Enforce topic branch naming:
+      # - chore/<short_summary> (no issue required)
+      # - <type>/<issue_number>-<short_summary> (for feature, bugfix, etc.)
+      # - worktree/<issue_number> (autonomous worktree branches)
       # Allows main, dev, and branches matching the convention.
       - id: no-commit-to-branch
         name: branch-name (enforce <type>/<issue>-<summary>)
@@ -16,7 +19,7 @@ repos:
           - --branch
           - __none__  # override default so main/dev are not protected
           - --pattern
-          - "^(?!main$)(?!dev$)(?!^(feature|bugfix|hotfix|release|docs|test|refactor)/[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$).+$"
+          - "^(?!main$)(?!dev$)(?!^(chore)/[a-z0-9]+(-[a-z0-9]+)*$)(?!^(feature|bugfix|hotfix|release|docs|test|refactor)/[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$)(?!^worktree/[0-9]+$).+$"
       - id: check-added-large-files
       - id: check-case-conflict
       - id: check-json
@@ -73,7 +76,6 @@ repos:
         files: ^justfile(\..*)?$
         pass_filenames: false
 
-  # Typo Linting
   - repo: https://github.com/crate-ci/typos
     rev: 07d900b8fa1097806b8adb6391b0d3e0ac2fdea7  # v1.39.0
     hooks:
@@ -104,13 +106,12 @@ repos:
     hooks:
       - id: bandit
         name: bandit (Python security linting)
-        entry: uv run bandit -r packages/vig-utils/src/ scripts/ assets/workspace/ -ll
+        entry: uv run bandit -r src/ -ll
         language: system
         types: [python]
         pass_filenames: false
 
   # Commit message validation (commit-msg stage)
-  # See https://github.com/vig-os/devcontainer/tree/main/packages/vig-utils/README.md for more details.
   - repo: local
     hooks:
       - id: validate-commit-msg
@@ -118,9 +119,10 @@ repos:
         entry: uv run validate-commit-msg
         language: system
         stages: [commit-msg]
-        args: [
-          "--types", "feat,fix,docs,chore,refactor,test,ci,build,revert,style",
-          "--scopes", "api,cli,utils",
-          "--refs-optional-types", "chore",
-          "--require-scope",
-        ]
+        # Optional: customize commit types, scopes, or refs-optional types via CLI arguments.
+        # By default, scopes are not enforced. Set --scopes to require specific scopes.
+        # Examples (choose one args line):
+        #   args: ["--types", "feat,fix,docs,chore"]
+        #   args: ["--scopes", "api,cli,utils"]
+        #   args: ["--refs-optional-types", "chore"]
+        #   args: ["--types", "feat,fix,docs", "--scopes", "api,cli,utils", "--refs-optional-types", "chore"]

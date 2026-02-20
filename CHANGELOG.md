@@ -9,6 +9,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Inception skill family for pre-development product thinking** ([#90](https://github.com/vig-os/devcontainer/issues/90))
+  - Four-phase pipeline: `inception:explore` (divergent problem understanding), `inception:scope` (convergent scoping), `inception:architect` (pattern-validated design), `inception:plan` (decomposition into GitHub issues)
+  - Document templates: `docs/templates/RFC.md` (Problem Statement, Proposed Solution, Alternatives, Impact, Phasing) and `docs/templates/DESIGN.md` (Architecture, Components, Data Flow, Technology Stack, Testing)
+  - Document directories: `docs/rfcs/` and `docs/designs/` for durable artifacts
+  - Certified architecture reference repos embedded in `inception:architect` skill: ByteByteGoHq/system-design-101, donnemartin/system-design-primer, karanpratapsingh/system-design, binhnguyennus/awesome-scalability, mehdihadeli/awesome-software-architecture
+  - Fills the gap between "I have an idea" and "I have issues ready for design"
+- **Automatic update notifications on devcontainer attach** ([#73](https://github.com/vig-os/devcontainer/issues/73))
+  - Wire `version-check.sh` into `post-attach.sh` for automatic update checks
+  - Silent, throttled checks (24-hour interval by default)
+  - Graceful failure - never disrupts the attach process
+- **Host-side devcontainer upgrade recipe** ([#73](https://github.com/vig-os/devcontainer/issues/73))
+  - New `just devcontainer-upgrade` recipe for convenient upgrades from host
+  - Container detection - prevents accidental execution inside devcontainer
+  - Clear error messages with instructions when run from wrong context
+- **`just check` recipe for version management** ([#73](https://github.com/vig-os/devcontainer/issues/73))
+  - Expose version-check.sh subcommands: `just check`, `just check config`, `just check on/off`, `just check 7d`
+  - User-friendly interface for managing update notifications
+- **Cursor worktree support for parallel agent development** ([#64](https://github.com/vig-os/devcontainer/issues/64))
+  - `.cursor/worktrees.json` for native Cursor worktree initialization (macOS/Linux local)
+  - `justfile.worktree` with tmux + cursor-agent CLI recipes (`worktree-start`, `worktree-list`, `worktree-attach`, `worktree-stop`, `worktree-clean`) for devcontainer environments
+  - Autonomous worktree skills: `worktree:brainstorm`, `worktree:plan`, `worktree:execute`, `worktree:verify`, `worktree:pr`, `worktree:ask`, `worktree:solve-and-pr`
+  - Sync manifest updated to propagate worktree config and recipes to downstream projects
+- **GitHub issue and PR dashboard recipe** ([#84](https://github.com/vig-os/devcontainer/issues/84))
+  - `just gh-issues` displays open issues grouped by milestone in rich tables with columns for type, title, assignee, linked branch, priority, scope, effort, and semver
+  - Open pull requests section with author, branch, review status, and diff delta
+  - Linked branches fetched via a single GraphQL call
+  - Ships to downstream workspaces via sync manifest (`.devcontainer/justfile.gh` + `.devcontainer/scripts/gh_issues.py`)
+- **Issue triage agent skill** ([#81](https://github.com/vig-os/devcontainer/issues/81))
+  - Cursor skill at `.cursor/skills/issue:triage/` for triaging open issues across priority, area, effort, SemVer impact, dependencies, and release readiness
+  - Decision matrix groups issues into parent/sub-issue clusters with milestone suggestions
+  - Predefined label taxonomy (`label-taxonomy.md`) for priority, area, effort, and SemVer dimensions
+  - Sync manifest updated to propagate skill to workspace template
+- **Cursor commands and rules for agent-driven development workflows** ([#63](https://github.com/vig-os/devcontainer/issues/63))
+  - Always-on rules: `coding-principles.mdc` (YAGNI, minimal diff, DRY, no secrets, traceability, single responsibility) and `tdd.mdc` (RED-GREEN-REFACTOR discipline)
+  - Tier 1 commands: `start-issue.md`, `create-issue.md`, `brainstorm.md`, `tdd.md`, `review.md`, `verify.md`
+  - Tier 2 commands: `check-ci.md`, `fix-ci.md`
+  - Tier 3 commands: `plan.md`, `execute-plan.md`, `debug.md`
+- **Agent-friendly issue templates, changelog rule, and PR template enhancements** ([#61](https://github.com/vig-os/devcontainer/issues/61))
+  - Cursor rule `.cursor/rules/changelog.mdc` (always applied) guiding agents on when, where, and how to update CHANGELOG.md
+  - Changelog Category dropdown added to `bug_report.yml`, `feature_request.yml`, and `task.yml` issue templates
+  - New issue templates: `refactor.yml` (scope/invariants), `documentation.yml` (docs/templates workflow), `ci_build.yml` (target workflows/triggers/release impact)
+  - Template chooser `config.yml` disabling blank issues and linking to project docs
+  - PR template enhanced with explicit Changelog Entry section, CI/Build change type, and updated checklist referencing `docs/templates/` and `just docs`
+- **GitHub issue and PR templates in workspace template** ([#63](https://github.com/vig-os/devcontainer/issues/63))
+  - Pull request template, issue templates, Dependabot config, and `.gitmessage` synced to `assets/workspace/`
+  - Ground truth lives in repo root; `assets/workspace/` is generated output
+
+### Changed
+
+- **Updated update notification message** ([#73](https://github.com/vig-os/devcontainer/issues/73))
+  - Fixed misleading `just update` instruction (Python deps, not devcontainer upgrade)
+  - Show correct upgrade instructions: `just devcontainer-upgrade` and curl fallback
+  - Clarify that upgrade must run from host terminal, not inside container
+  - Add reminder to rebuild container in VS Code after upgrade
+- **Declarative Python sync manifest** ([#67](https://github.com/vig-os/devcontainer/issues/67))
+  - Replaced `sync-manifest.txt` + bash function and `sync-workspace.sh` with `scripts/sync_manifest.py`
+  - Single source of truth for which files to sync and what transformations to apply
+  - `prepare-build.sh` and `just sync-workspace` both call the same manifest
+- **Namespace-prefixed Cursor skill names** ([#67](https://github.com/vig-os/devcontainer/issues/67))
+  - Renamed all 15 skills with colon-separated namespace prefixes (`issue:`, `design:`, `code:`, `git:`, `ci:`, `pr:`)
+  - Enables filtering by namespace when invoking skills (e.g., typing `code:` shows implementation skills)
 - **`--org` flag for install script** ([#33](https://github.com/vig-os/devcontainer/issues/33))
   - Allows overriding the default organization name (default: `vigOS`)
   - Passes `ORG_NAME` as environment variable to the container
@@ -241,14 +302,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Documentation and inline comments updated across `docs/RELEASE_CYCLE.md`, `CONTRIBUTE.md`, `README.md`, and `build-image` action
 - **`gh` version assertion in `test_gh_version`** ([#93](https://github.com/vig-os/devcontainer/issues/93))
   - Updated expected version prefix from `2.86.` to `2.87.` to match GitHub CLI 2.87.0 (released 2026-02-18)
+- **BATS test failures in init-workspace and prepare-build suites** ([#67](https://github.com/vig-os/devcontainer/issues/67))
+  - Removed premature init-workspace.bats tests for unimplemented `is_git_dirty` feature (9 tests)
+  - Fixed prepare-build.bats grep pattern for `sync_manifest.py` invocation to handle shell quoting
 
 ### Security
 
-|- **Accepted test dependency vulnerabilities** ([#37](https://github.com/vig-os/devcontainer/issues/37))
-- Comprehensive acceptance register for 9 transitive vulnerabilities in unmaintained BATS test framework dependencies (engine.io, debug, node-uuid, qs, tough-cookie, ws, xmlhttprequest, form-data)
-- Risk assessment: HIGH/MODERATE severity from packages last updated 5-10+ years ago; impact isolated to CI/development environment with no runtime production code exposure
-- Formal documentation in `SECURITY.md` and `.github/dependency-review-allow.txt` with IEC 62304 medtech-compliant risk assessments
-- Expiration-enforced exceptions with 2026-11-17 expiration date to force periodic re-evaluation and investigation of BATS framework modernization
+- **Eliminated 13 transitive vulnerabilities in BATS test dependencies** ([#37](https://github.com/vig-os/devcontainer/issues/37))
+  - Bumped bats-assert from v2.1.0 to v2.2.0, which dropped a bogus runtime dependency on the `verbose` npm package
+  - Removed entire transitive dependency tree: engine.io, debug, node-uuid, qs, tough-cookie, ws, xmlhttprequest, form-data, request, sockjs, and others (50+ packages reduced to 5)
+  - Cleaned 13 now-unnecessary GHSA exceptions from `.github/dependency-review-allow.txt`
 - **Go stdlib CVEs from gh binary accepted and documented** ([#37](https://github.com/vig-os/devcontainer/issues/37))
 - CVE-2025-68121, CVE-2025-61726, CVE-2025-61728, CVE-2025-61730 added to `.trivyignore`
 - Vulnerabilities embedded in statically-linked GitHub CLI binary; low exploitability in devcontainer context

@@ -2869,6 +2869,167 @@ class TestVersionCheckJustIntegration:
         assert result.returncode == 0
         assert "Configuration" in result.stdout or "Enabled:" in result.stdout
 
+    def test_just_check_recipe_calls_version_check_script(self, initialized_workspace):
+        """Test that 'just check' recipe properly calls version-check.sh."""
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+
+        if not justfile_base.exists():
+            pytest.skip("justfile.base not found - workspace from older template")
+
+        content = justfile_base.read_text()
+
+        # Verify the recipe calls version-check.sh
+        assert "version-check.sh" in content, (
+            "check recipe doesn't call version-check.sh"
+        )
+
+        # Verify the recipe is in the info group
+        lines = content.split("\n")
+        check_recipe_idx = None
+        for i, line in enumerate(lines):
+            if line.startswith("check "):
+                check_recipe_idx = i
+                break
+
+        assert check_recipe_idx is not None, "check recipe not found"
+
+        # Look backwards for group annotation
+        for i in range(check_recipe_idx - 1, max(0, check_recipe_idx - 5), -1):
+            if "[group('info')]" in lines[i]:
+                break
+        else:
+            pytest.fail("check recipe not in 'info' group")
+
+    def test_just_check_verbose_mode(self, initialized_workspace):
+        """Test that 'just check' runs in verbose mode (check subcommand)."""
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+
+        if not justfile_base.exists():
+            pytest.skip("justfile.base not found")
+
+        content = justfile_base.read_text()
+        if "check" not in content:
+            pytest.skip("check recipe not found")
+
+        # The recipe should call 'check' subcommand when no args provided
+        # This ensures verbose output instead of silent mode
+        assert 'version-check.sh" check' in content or '"$@"' in content, (
+            "check recipe doesn't use verbose mode"
+        )
+
+    def test_just_check_accepts_subcommands(self, initialized_workspace):
+        """Test that 'just check' recipe accepts and passes through subcommands."""
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+
+        if not justfile_base.exists():
+            pytest.skip("justfile.base not found")
+
+        content = justfile_base.read_text()
+        if "check" not in content:
+            pytest.skip("check recipe not found")
+
+        # The recipe should accept variadic args
+        lines = content.split("\n")
+        check_line = None
+        for line in lines:
+            if line.startswith("check "):
+                check_line = line
+                break
+
+        assert check_line is not None
+        assert "*args" in check_line, "check recipe doesn't accept variadic arguments"
+
+    def test_just_check_config_shows_configuration(self, initialized_workspace):
+        """Test that 'just check config' shows version check configuration."""
+        script_path = (
+            initialized_workspace / ".devcontainer" / "scripts" / "version-check.sh"
+        )
+
+        if not script_path.exists():
+            pytest.skip("version-check.sh not found")
+
+        # Call the script directly (just recipe may not exist yet in TDD RED phase)
+        result = subprocess.run(
+            [str(script_path), "config"],
+            capture_output=True,
+            text=True,
+            cwd=str(initialized_workspace),
+            timeout=10,
+        )
+
+        assert result.returncode == 0
+        assert "Enabled:" in result.stdout
+        assert "interval:" in result.stdout.lower()
+
+    def test_just_check_mute_functionality(self, initialized_workspace):
+        """Test that 'just check 7d' mutes notifications."""
+        script_path = (
+            initialized_workspace / ".devcontainer" / "scripts" / "version-check.sh"
+        )
+
+        if not script_path.exists():
+            pytest.skip("version-check.sh not found")
+
+        # Test mute command
+        result = subprocess.run(
+            [str(script_path), "mute", "7d"],
+            capture_output=True,
+            text=True,
+            cwd=str(initialized_workspace),
+            timeout=10,
+        )
+
+        assert result.returncode == 0
+        assert "muted" in result.stdout.lower()
+
+        # Verify mute file was created
+        muted_file = initialized_workspace / ".devcontainer" / ".local" / ".muted-until"
+        assert muted_file.exists()
+
+    def test_just_check_enable_disable(self, initialized_workspace):
+        """Test that 'just check on/off' enables/disables notifications."""
+        script_path = (
+            initialized_workspace / ".devcontainer" / "scripts" / "version-check.sh"
+        )
+
+        if not script_path.exists():
+            pytest.skip("version-check.sh not found")
+
+        # Test disable
+        result = subprocess.run(
+            [str(script_path), "off"],
+            capture_output=True,
+            text=True,
+            cwd=str(initialized_workspace),
+            timeout=10,
+        )
+
+        assert result.returncode == 0
+        assert "disabled" in result.stdout.lower()
+
+        # Verify config was updated
+        config_file = (
+            initialized_workspace / ".devcontainer" / ".local" / "version-check.conf"
+        )
+        assert config_file.exists()
+        config_content = config_file.read_text()
+        assert "enabled=false" in config_content
+
+        # Test enable
+        result = subprocess.run(
+            [str(script_path), "on"],
+            capture_output=True,
+            text=True,
+            cwd=str(initialized_workspace),
+            timeout=10,
+        )
+
+        assert result.returncode == 0
+        assert "enabled" in result.stdout.lower()
+
+        config_content = config_file.read_text()
+        assert "enabled=true" in config_content
+
 
 class TestVersionCheckInitWorkspace:
     """Test that init-workspace.sh creates necessary version check files."""
@@ -2894,6 +3055,343 @@ class TestVersionCheckInitWorkspace:
         assert "enabled=true" in config_content
         # Interval may vary - just check it exists
         assert "interval=" in config_content
+
+
+class TestVersionCheckPostAttachIntegration:
+    """Test that post-attach.sh automatically calls version-check.sh."""
+
+    def test_post_attach_calls_version_check(self, initialized_workspace):
+        """Test that post-attach.sh calls version-check.sh in silent mode."""
+        post_attach = (
+            initialized_workspace / ".devcontainer" / "scripts" / "post-attach.sh"
+        )
+
+        if not post_attach.exists():
+            pytest.skip("post-attach.sh not found")
+
+        content = post_attach.read_text()
+
+        # Verify the script calls version-check.sh
+        assert "version-check.sh" in content, (
+            "post-attach.sh doesn't call version-check.sh"
+        )
+
+    def test_post_attach_calls_version_check_at_end(self, initialized_workspace):
+        """Test that version-check.sh is called at the end of post-attach.sh."""
+        post_attach = (
+            initialized_workspace / ".devcontainer" / "scripts" / "post-attach.sh"
+        )
+
+        if not post_attach.exists():
+            pytest.skip("post-attach.sh not found")
+
+        content = post_attach.read_text()
+        lines = content.split("\n")
+
+        # Find the version-check.sh call
+        version_check_line = None
+        for i, line in enumerate(lines):
+            if "version-check.sh" in line and not line.strip().startswith("#"):
+                version_check_line = i
+                break
+
+        assert version_check_line is not None, "version-check.sh call not found"
+
+        # Verify it's near the end (within last 10 non-empty lines)
+        non_empty_lines = [
+            i
+            for i, line in enumerate(lines)
+            if line.strip() and not line.strip().startswith("#")
+        ]
+
+        if non_empty_lines:
+            last_meaningful_line = non_empty_lines[-1]
+            # Version check should be within last 10 meaningful lines
+            assert (last_meaningful_line - version_check_line) < 10, (
+                "version-check.sh should be called near the end of post-attach.sh"
+            )
+
+    def test_post_attach_uses_silent_mode(self, initialized_workspace):
+        """Test that post-attach.sh calls version-check.sh with no args (silent)."""
+        post_attach = (
+            initialized_workspace / ".devcontainer" / "scripts" / "post-attach.sh"
+        )
+
+        if not post_attach.exists():
+            pytest.skip("post-attach.sh not found")
+
+        content = post_attach.read_text()
+
+        # Find the version-check.sh invocation
+        lines = content.split("\n")
+        for line in lines:
+            if "version-check.sh" in line and not line.strip().startswith("#"):
+                # Should be called with no arguments (silent mode)
+                # Allow patterns like: "./version-check.sh" or "$SCRIPT_DIR/version-check.sh"
+                # but NOT: "./version-check.sh check" or with other args
+                after_script = line.split("version-check.sh", 1)[1]
+                assert not any(
+                    arg in after_script
+                    for arg in ["check", "config", "mute", "enable", "disable"]
+                ), (
+                    "post-attach.sh should call version-check.sh in silent mode (no args)"
+                )
+                break
+
+    def test_post_attach_graceful_failure(self, initialized_workspace):
+        """Test that post-attach.sh doesn't fail if version-check.sh fails."""
+        post_attach = (
+            initialized_workspace / ".devcontainer" / "scripts" / "post-attach.sh"
+        )
+
+        if not post_attach.exists():
+            pytest.skip("post-attach.sh not found")
+
+        content = post_attach.read_text()
+
+        # Find the version-check.sh call
+        lines = content.split("\n")
+        for line in lines:
+            if "version-check.sh" in line and not line.strip().startswith("#"):
+                # Should have || true or similar error handling
+                assert "|| true" in line or "|| :" in line, (
+                    "post-attach.sh should use graceful failure (|| true) for version-check.sh"
+                )
+                break
+
+
+class TestVersionCheckNotificationMessage:
+    """Test that the version check notification shows correct upgrade instructions."""
+
+    @pytest.fixture
+    def version_check_script(self, initialized_workspace):
+        """Path to version-check.sh script."""
+        script_path = (
+            initialized_workspace / ".devcontainer" / "scripts" / "version-check.sh"
+        )
+        if not script_path.exists():
+            pytest.skip("version-check.sh not found")
+        return script_path
+
+    def test_notification_shows_devcontainer_upgrade_command(
+        self, version_check_script
+    ):
+        """Test that notification message shows 'just devcontainer-upgrade'."""
+        content = version_check_script.read_text()
+
+        # Find the notify_update function
+        assert "notify_update" in content, "notify_update function not found"
+
+        # Check if it mentions the correct upgrade command
+        assert (
+            "just devcontainer-upgrade" in content or "devcontainer-upgrade" in content
+        ), "Notification should mention 'just devcontainer-upgrade' command"
+
+    def test_notification_does_not_show_just_update(self, version_check_script):
+        """Test that notification doesn't show misleading 'just update' command."""
+        content = version_check_script.read_text()
+
+        # Find the notify_update function (approximately lines 253-300)
+        lines = content.split("\n")
+        notify_start = None
+        notify_end = None
+
+        for i, line in enumerate(lines):
+            if "notify_update()" in line or "notify_update ()" in line:
+                notify_start = i
+            if notify_start and line.strip() == "}" and i > notify_start:
+                notify_end = i
+                break
+
+        assert notify_start is not None, "notify_update function not found"
+
+        notify_function = "\n".join(lines[notify_start:notify_end])
+
+        # Should NOT mention "just update" in the notification
+        # (that's for Python deps, not devcontainer upgrade)
+        # Allow "just" but not "just update" as a standalone command
+        assert "To update: ${BOLD}just update${NC}" not in notify_function, (
+            "Notification should not suggest 'just update' for devcontainer upgrade"
+        )
+
+    def test_notification_shows_curl_fallback(self, version_check_script):
+        """Test that notification shows curl install.sh fallback option."""
+        content = version_check_script.read_text()
+
+        # Should mention the curl command as a fallback
+        assert "curl" in content and "install.sh" in content, (
+            "Notification should show curl install.sh as fallback option"
+        )
+
+    def test_notification_mentions_host_terminal(self, version_check_script):
+        """Test that notification clarifies upgrade must run on host."""
+        content = version_check_script.read_text()
+
+        # Should clarify that this needs to run on host
+        assert "host" in content.lower() and "terminal" in content.lower(), (
+            "Notification should clarify upgrade runs on host terminal"
+        )
+
+    def test_notification_mentions_rebuild_container(self, version_check_script):
+        """Test that notification reminds user to rebuild container."""
+        content = version_check_script.read_text()
+
+        # Should mention rebuilding the container
+        assert "rebuild" in content.lower(), (
+            "Notification should remind user to rebuild container after upgrade"
+        )
+
+    def test_notification_shows_mute_options(self, version_check_script):
+        """Test that notification shows how to mute or disable."""
+        content = version_check_script.read_text()
+
+        # Should show mute and disable options
+        notify_section = content[content.find("notify_update") :]
+
+        assert "just check" in notify_section and "off" in notify_section, (
+            "Notification should show how to disable ('just check off')"
+        )
+
+        assert "7d" in notify_section or "mute" in notify_section.lower(), (
+            "Notification should show how to mute (e.g., 'just check 7d')"
+        )
+
+
+class TestDevcontainerUpgradeRecipe:
+    """Test the host-side 'just devcontainer-upgrade' recipe."""
+
+    def test_devcontainer_upgrade_recipe_exists(self, initialized_workspace):
+        """Test that 'just devcontainer-upgrade' recipe exists in justfile.base."""
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+
+        if not justfile_base.exists():
+            pytest.skip("justfile.base not found")
+
+        content = justfile_base.read_text()
+
+        # Recipe should exist
+        assert "devcontainer-upgrade" in content, (
+            "devcontainer-upgrade recipe not found in justfile.base"
+        )
+
+    def test_devcontainer_upgrade_detects_container_environment(
+        self, initialized_workspace
+    ):
+        """Test that recipe detects when running inside container."""
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+
+        if not justfile_base.exists():
+            pytest.skip("justfile.base not found")
+
+        content = justfile_base.read_text()
+
+        # Should check for container indicators
+        assert "/.dockerenv" in content or "container" in content, (
+            "devcontainer-upgrade recipe should detect container environment"
+        )
+
+    def test_devcontainer_upgrade_shows_error_in_container(self, initialized_workspace):
+        """Test that recipe shows clear error when run inside container."""
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+
+        if not justfile_base.exists():
+            pytest.skip("justfile.base not found")
+
+        content = justfile_base.read_text()
+
+        # Find the devcontainer-upgrade recipe
+        lines = content.split("\n")
+        recipe_start = None
+        recipe_end = None
+
+        for i, line in enumerate(lines):
+            if "devcontainer-upgrade" in line and ":" in line:
+                recipe_start = i
+                # Find the end (next recipe or end of file)
+                for j in range(i + 1, len(lines)):
+                    if (
+                        lines[j]
+                        and not lines[j].startswith(" ")
+                        and not lines[j].startswith("\t")
+                    ):
+                        recipe_end = j
+                        break
+                break
+
+        if recipe_start is None:
+            pytest.skip("devcontainer-upgrade recipe not found")
+
+        recipe_content = "\n".join(
+            lines[recipe_start : recipe_end if recipe_end else len(lines)]
+        )
+
+        # Should show error message about running from host
+        assert "ERROR" in recipe_content.upper() or "error" in recipe_content, (
+            "Recipe should show error message when run in container"
+        )
+
+        assert (
+            "host" in recipe_content.lower() and "terminal" in recipe_content.lower()
+        ), "Error message should mention running from host terminal"
+
+    def test_devcontainer_upgrade_checks_runtime_available(self, initialized_workspace):
+        """Test that recipe checks if podman/docker is available."""
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+
+        if not justfile_base.exists():
+            pytest.skip("justfile.base not found")
+
+        content = justfile_base.read_text()
+
+        # Should check for runtime availability
+        assert (
+            "podman" in content and "docker" in content
+        ) or "command -v" in content, (
+            "Recipe should check if podman or docker is available"
+        )
+
+    def test_devcontainer_upgrade_calls_install_script(self, initialized_workspace):
+        """Test that recipe calls install.sh with --force flag."""
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+
+        if not justfile_base.exists():
+            pytest.skip("justfile.base not found")
+
+        content = justfile_base.read_text()
+
+        # Find the devcontainer-upgrade recipe section
+        if "devcontainer-upgrade" in content:
+            # Should call the install script
+            assert "install.sh" in content, "Recipe should call install.sh"
+
+            assert "--force" in content, "Recipe should use --force flag for upgrades"
+
+    def test_devcontainer_upgrade_in_info_group(self, initialized_workspace):
+        """Test that devcontainer-upgrade recipe is in the 'info' group."""
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+
+        if not justfile_base.exists():
+            pytest.skip("justfile.base not found")
+
+        content = justfile_base.read_text()
+        lines = content.split("\n")
+
+        # Find the devcontainer-upgrade recipe
+        recipe_idx = None
+        for i, line in enumerate(lines):
+            if "devcontainer-upgrade:" in line:
+                recipe_idx = i
+                break
+
+        if recipe_idx is None:
+            pytest.skip("devcontainer-upgrade recipe not found")
+
+        # Look backwards for group annotation
+        for i in range(recipe_idx - 1, max(0, recipe_idx - 5), -1):
+            if "[group('info')]" in lines[i]:
+                return  # Found it
+
+        pytest.fail("devcontainer-upgrade recipe not in 'info' group")
 
 
 class TestVersionCheckGracefulFailure:

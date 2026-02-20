@@ -281,4 +281,3 @@ Branch: `feature/64-cursor-worktree-support`
 - Skills (Phase 3) are markdown files — TDD does not apply. Verification is format/frontmatter correctness.
 - Related: #85 (Tailscale remote SSH — follow-up issue for mobile access to tmux sessions).
 - Telegram bot for `worktree:ask` feedback channel is a separate future issue.
-

@@ -19,6 +19,7 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -1188,57 +1189,29 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
 @pytest.fixture
 def parse_manifest():
     """
-    Fixture to parse sync-manifest.txt file and return list of (src, dest) tuples.
+    Fixture that returns manifest entries from the declarative Python manifest.
 
-    Reads the manifest from the local workspace (not from container).
-
-    Args:
-        manifest_path: Path to the manifest file (default: scripts/sync-manifest.txt relative to project root)
+    Each entry is a tuple of (src, dest, is_transformed).
 
     Returns:
-        Function that takes optional manifest_path and returns list of (src, dest) tuples
-
-    Raises:
-        FileNotFoundError: If the manifest file cannot be found
-        RuntimeError: If the file cannot be read
+        Function that returns list of (src, dest, is_transformed) tuples
     """
 
-    def _parse(manifest_path="scripts/sync-manifest.txt"):
-        """Parse manifest file and return list of (src, dest) tuples."""
-        # Resolve the manifest path relative to project root
-        # The test runs from the workspace root
+    def _parse():
+        """Read manifest entries from scripts/sync_manifest.py."""
+        # Import the manifest directly
+        import importlib.util
+
         project_root = Path(__file__).parent.parent
-        full_manifest_path = project_root / manifest_path
+        spec = importlib.util.spec_from_file_location(
+            "sync_manifest", project_root / "scripts" / "sync_manifest.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["sync_manifest"] = module
+        spec.loader.exec_module(module)
 
-        # Try to read the file
-        try:
-            content = full_manifest_path.read_text()
-        except FileNotFoundError as e:
-            raise FileNotFoundError(
-                f"Manifest file not found at {full_manifest_path}"
-            ) from e
-        except Exception as e:
-            raise RuntimeError(
-                f"Failed to read manifest file at {full_manifest_path}: {e}"
-            ) from e
-
-        manifest_files = []
-
-        for line in content.strip().split("\n"):
-            line = line.strip()
-            # Skip blank lines and comments
-            if not line or line.startswith("#"):
-                continue
-            # Parse "source -> destination" or just "source" (dest defaults to source)
-            if " -> " in line:
-                src, dest = line.split(" -> ", 1)
-                src = src.strip()
-                dest = dest.strip()
-            else:
-                src = line.strip()
-                dest = src
-            manifest_files.append((src, dest))
-
-        return manifest_files
+        return [
+            (entry.src, entry.dest, entry.is_transformed) for entry in module.MANIFEST
+        ]
 
     return _parse

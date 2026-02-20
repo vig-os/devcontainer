@@ -119,6 +119,9 @@ Available recipes:
     sync                            # Sync dependencies from pyproject.toml
     update                          # Update all dependencies
 
+    [github]
+    gh-issues                       # List open issues and PRs grouped by milestone [alias: gh-i]
+
     [info]
     default                         # Show available commands (default)
     docs                            # Generate documentation from templates
@@ -126,18 +129,19 @@ Available recipes:
     info                            # Show image information
     init *args                      # Install system dependencies and setup development environment
     login                           # Test login to GHCR
+    sync-workspace                  # Sync workspace templates from repo root to assets/workspace/
 
     [podman]
-    podman-kill name                # Stop and remove a container by name or ID
-    podman-kill-all                 # Stop and remove all containers (with confirmation)
-    podman-kill-project             # Stop and remove project-related containers
-    podman-prune                    # Prune unused containers, images, networks, and volumes
-    podman-prune-all                # Full cleanup: prune including volumes
-    podman-ps *args                 # List containers/images (--all for all podman resources)
-    podman-rmi image                # Remove an image by name, tag, or ID
-    podman-rmi-all                  # Remove all images (with confirmation)
-    podman-rmi-dangling             # Remove dangling images (untagged)
-    podman-rmi-project              # Remove project-related images
+    podman-kill name                # Stop and remove a container by name or ID [alias: pdm-kill]
+    podman-kill-all                 # Stop and remove all containers (with confirmation) [alias: pdm-kill-all]
+    podman-kill-project             # Stop and remove project-related containers [alias: pdm-kill-project]
+    podman-prune                    # Prune unused containers, images, networks, and volumes [alias: pdm-prune]
+    podman-prune-all                # Full cleanup: prune including volumes [alias: pdm-prune-all]
+    podman-ps *args                 # List containers/images (--all for all podman resources) [alias: pdm-ps]
+    podman-rmi image                # Remove an image by name, tag, or ID [alias: pdm-rmi]
+    podman-rmi-all                  # Remove all images (with confirmation) [alias: pdm-rmi-all]
+    podman-rmi-dangling             # Remove dangling images (untagged) [alias: pdm-rmi-dangling]
+    podman-rmi-project              # Remove project-related images [alias: pdm-rmi-project]
 
     [quality]
     format                          # Format code
@@ -165,6 +169,13 @@ Available recipes:
     test-utils                      # Run utils tests only
     test-validate-commit-msg        # Run validate commit msg tests only
     test-vig-utils                  # Run check action pins tests only
+
+    [worktree]
+    worktree-attach issue           # Attach to a worktree's tmux session [alias: wt-attach]
+    worktree-clean                  # Remove all cursor-managed worktrees and tmux sessions [alias: wt-clean]
+    worktree-list                   # List active worktrees and their tmux sessions [alias: wt-list]
+    worktree-start issue prompt=""  # Create a worktree for an issue, open tmux session, launch cursor-agent [alias: wt-start]
+    worktree-stop issue             # Stop a worktree's tmux session and remove the worktree [alias: wt-stop]
 
 ```
 

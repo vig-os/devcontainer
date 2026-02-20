@@ -1,0 +1,6 @@
+# Typos configuration
+# https://github.com/crate-ci/typos
+
+[default.extend-words]
+# Shell scripting: sed label syntax uses 'ba' (branch to label 'a')
+ba = "ba"

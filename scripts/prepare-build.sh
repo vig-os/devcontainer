@@ -35,78 +35,10 @@ cp Containerfile "$BUILD_DIR/"
 cp -r assets "$BUILD_DIR/"
 cp -r packages "$BUILD_DIR/"
 
-# Sync canonical files into build template (from manifest)
+# Sync canonical files into build template (from declarative Python manifest)
 echo "Syncing canonical files into build template..."
-sync_manifest_files() {
-	local dest_base="$1"
-	local manifest="$SCRIPT_DIR/sync-manifest.txt"
-	local failed=0
-
-	if [[ ! -f "$manifest" ]]; then
-		echo "Error: Manifest not found at $manifest" >&2
-		exit 1
-	fi
-
-	if [[ ! -d "$dest_base" ]]; then
-		echo "Error: Target directory $dest_base does not exist" >&2
-		exit 1
-	fi
-
-	while IFS= read -r line || [[ -n "$line" ]]; do
-		# Skip blank lines and comments
-		[[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-		# Parse line: "source -> destination" or just "source" (dest defaults to source)
-		local src dest
-		if [[ "$line" == *" -> "* ]]; then
-			src="$(echo "$line" | sed 's/ *->.*$//' | xargs)"
-			dest="$(echo "$line" | sed 's/^.*-> *//' | xargs)"
-		else
-			src="$(echo "$line" | xargs)"
-			dest=""
-		fi
-		if [[ -z "$src" ]]; then
-			echo "Warning: Skipping malformed manifest line: $line" >&2
-			continue
-		fi
-		# Default destination to source path if omitted
-		if [[ -z "$dest" ]]; then
-			dest="$src"
-		fi
-
-		local src_path="$PROJECT_ROOT/$src"
-		local dest_path="$dest_base/$dest"
-
-		# Check if source exists (file or directory)
-		if [[ ! -e "$src_path" ]]; then
-			echo "  [MISSING] Source not found: $src" >&2
-			failed=1
-			continue
-		fi
-
-		# Handle directories
-		if [[ -d "$src_path" ]]; then
-			mkdir -p "$(dirname "$dest_path")"
-			cp -r "$src_path" "$dest_path"
-			echo "  [SYNCED]  $src/ -> assets/workspace/$dest/"
-		# Handle files
-		elif [[ -f "$src_path" ]]; then
-			mkdir -p "$(dirname "$dest_path")"
-			cp "$src_path" "$dest_path"
-			echo "  [SYNCED]  $src -> assets/workspace/$dest"
-		else
-			echo "  [UNKNOWN] Source is neither file nor directory: $src" >&2
-			failed=1
-		fi
-	done < "$manifest"
-
-	if [[ $failed -ne 0 ]]; then
-		echo "Error: Some files could not be synced" >&2
-		exit 1
-	fi
-	echo "All manifest files synced successfully."
-}
-
-sync_manifest_files "$BUILD_DIR/assets/workspace"
+uv run python "$SCRIPT_DIR/sync_manifest.py" sync "$BUILD_DIR/assets/workspace" \
+	--project-root "$PROJECT_ROOT"
 
 # Replace {{IMAGE_TAG}} placeholders in template files
 if [ -d "$BUILD_DIR/assets/workspace" ]; then
