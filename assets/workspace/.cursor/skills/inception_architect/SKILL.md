@@ -13,7 +13,7 @@ Define system architecture and validate against established patterns. This is th
 ## When to Use
 
 Use this skill when:
-- Solution scope is defined (from [inception:scope](../inception_scope/SKILL.md))
+- Solution scope is defined (from [inception_scope](../inception_scope/SKILL.md))
 - Need to define system structure and components
 - Need to validate architecture against best practices
 - System complexity justifies formal architecture review
@@ -21,7 +21,7 @@ Use this skill when:
 Skip this skill when:
 - Solution is trivial (single script, config change)
 - Architecture is already well-established in the codebase
-- It's an extension of existing patterns (use [design:brainstorm](../design_brainstorm/SKILL.md) instead)
+- It's an extension of existing patterns (use [design_brainstorm](../design_brainstorm/SKILL.md) instead)
 
 ## Precondition: Complete RFC Exists
 
@@ -213,7 +213,7 @@ Create a new design document:
 **Prompt:**
 > "The architecture is defined. Should we continue to decompose this into issues, or pause for broader review?"
 
-**If continue:** Proceed to [inception:plan](../inception_plan/SKILL.md)
+**If continue:** Proceed to [inception_plan](../inception_plan/SKILL.md)
 
 **If pause:** Save design doc, create RFC/design review issue, hand off to team
 
@@ -237,4 +237,4 @@ Create a new design document:
 
 ## Next Phase
 
-After user approval, invoke [inception:plan](../inception_plan/SKILL.md) to decompose into GitHub issues.
+After user approval, invoke [inception_plan](../inception_plan/SKILL.md) to decompose into GitHub issues.

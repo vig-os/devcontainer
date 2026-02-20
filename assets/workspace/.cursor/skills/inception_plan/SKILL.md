@@ -13,13 +13,13 @@ Decompose a scoped solution into actionable GitHub issues. This is the fourth an
 ## When to Use
 
 Use this skill when:
-- Design is complete (from [inception:architect](../inception_architect/SKILL.md))
+- Design is complete (from [inception_architect](../inception_architect/SKILL.md))
 - Ready to create work items for development
 - Need to organize work into issues and milestones
 
 Skip this skill when:
 - Design isn't finalized
-- Solution is trivial (single issue sufficient, use [issue:create](../issue_create/SKILL.md))
+- Solution is trivial (single issue sufficient, use [issue_create](../issue_create/SKILL.md))
 
 ## Precondition: Design Document Exists
 
@@ -224,8 +224,8 @@ Add section:
 > "Inception complete. The work is now captured in GitHub issues. The first issue to tackle is #<issue>, which has no blockers."
 
 **Next steps for development:**
-- Issues are ready for [issue:claim](../issue_claim/SKILL.md)
-- Each issue will go through [design:brainstorm](../design_brainstorm/SKILL.md) → [code:execute](../code_execute/SKILL.md) workflow
+- Issues are ready for [issue_claim](../issue_claim/SKILL.md)
+- Each issue will go through [design_brainstorm](../design_brainstorm/SKILL.md) → [code_execute](../code_execute/SKILL.md) workflow
 - Spikes feed findings back to RFC/Design docs
 
 ## Important Notes
@@ -248,6 +248,6 @@ Add section:
 ## Handoff Complete
 
 The inception pipeline ends here. The work now follows the normal development workflow:
-- [issue:claim](../issue_claim/SKILL.md) to start work
-- [design:brainstorm](../design_brainstorm/SKILL.md) for per-issue design
-- [code:execute](../code_execute/SKILL.md) for implementation
+- [issue_claim](../issue_claim/SKILL.md) to start work
+- [design_brainstorm](../design_brainstorm/SKILL.md) for per-issue design
+- [code_execute](../code_execute/SKILL.md) for implementation

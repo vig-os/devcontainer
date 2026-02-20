@@ -33,7 +33,7 @@ Diagnose bugs, test failures, or unexpected behavior. Root cause first, fix seco
 
 ### Phase 4: Fix
 
-1. **Write a failing test** that reproduces the bug (following [code:tdd](../code_tdd/SKILL.md)).
+1. **Write a failing test** that reproduces the bug (following [code_tdd](../code_tdd/SKILL.md)).
 2. **Implement the fix** — address root cause, not symptoms. One change.
 3. **Verify** — test passes, no regressions.
 4. **If 3+ fixes failed** — stop. Question the architecture. Discuss with the user.

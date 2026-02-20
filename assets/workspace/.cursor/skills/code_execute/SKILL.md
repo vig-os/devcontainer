@@ -18,7 +18,7 @@ Before doing anything else, verify you are on an issue branch:
 3. Extract the `<issue_number>` from the branch name.
 4. If the branch does not match, **stop** and tell the user:
    - They need to be on an issue branch.
-   - Offer to run [issue:claim](../issue_claim/SKILL.md) to create one.
+   - Offer to run [issue_claim](../issue_claim/SKILL.md) to create one.
 
 ## Workflow Steps
 
@@ -33,7 +33,7 @@ Before doing anything else, verify you are on an issue branch:
    ```
 
 3. If multiple comments match, use the **most recent** one.
-4. If no comment contains `## Implementation Plan`, **stop** and tell the user to run [design:plan](../design_plan/SKILL.md) first.
+4. If no comment contains `## Implementation Plan`, **stop** and tell the user to run [design_plan](../design_plan/SKILL.md) first.
 5. Parse the task list from the comment body. `- [ ]` = pending, `- [x]` = done.
 6. Save the **comment ID** — you'll need it to edit the comment later.
 
@@ -42,7 +42,7 @@ Before doing anything else, verify you are on an issue branch:
 - Work through **unchecked** tasks sequentially, 2-3 tasks per batch.
 - For each task:
   1. Announce which task you're starting.
-  2. Implement the change (following [coding-principles](../../rules/coding-principles.mdc) and TDD). Commit each phase via [git:commit](../git_commit/SKILL.md).
+  2. Implement the change (following [coding-principles](../../rules/coding-principles.mdc) and TDD). Commit each phase via [git_commit](../git_commit/SKILL.md).
   3. Run the task's verification step.
   4. Report result (pass/fail with evidence).
 
@@ -75,7 +75,7 @@ After completing a batch, check off finished tasks by editing the plan comment:
 ### 5. Handle failures
 
 - If a verification step fails, stop the batch.
-- Diagnose using [code:debug](../code_debug/SKILL.md) principles if needed.
+- Diagnose using [code_debug](../code_debug/SKILL.md) principles if needed.
 - Fix the issue before continuing to the next task.
 - Do not skip failing tasks.
 
@@ -83,7 +83,7 @@ After completing a batch, check off finished tasks by editing the plan comment:
 
 - After all tasks are done, run the full test suite: `just test`
 - Report final status.
-- Suggest committing and proceeding to [pr:create](../pr_create/SKILL.md).
+- Suggest committing and proceeding to [pr_create](../pr_create/SKILL.md).
 
 ## Important Notes
 

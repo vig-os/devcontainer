@@ -13,14 +13,14 @@ Define what to build and what not to build through convergent scoping. This is t
 ## When to Use
 
 Use this skill when:
-- Problem is well-understood (from [inception:explore](../inception_explore/SKILL.md))
+- Problem is well-understood (from [inception_explore](../inception_explore/SKILL.md))
 - Need to define solution boundaries
 - Need to choose between multiple approaches
 - Need to size the work for planning
 
 Skip this skill when:
 - Problem isn't yet clear (go back to explore)
-- Solution is already scoped (jump to [inception:architect](../inception_architect/SKILL.md))
+- Solution is already scoped (jump to [inception_architect](../inception_architect/SKILL.md))
 
 ## Precondition: RFC Problem Brief Exists
 
@@ -177,7 +177,7 @@ Fill in the remaining RFC sections:
 **Prompt:**
 > "This RFC defines what to build. Should we continue to architecture design, or pause here?"
 
-**If continue:** Proceed to [inception:architect](../inception_architect/SKILL.md)
+**If continue:** Proceed to [inception_architect](../inception_architect/SKILL.md)
 
 **If pause:** Save RFC, create tracking issue if needed, hand off to human review
 
@@ -200,4 +200,4 @@ Fill in the remaining RFC sections:
 
 ## Next Phase
 
-After user approval, invoke [inception:architect](../inception_architect/SKILL.md) to define the system architecture.
+After user approval, invoke [inception_architect](../inception_architect/SKILL.md) to define the system architecture.

@@ -19,7 +19,7 @@ Before doing anything else, verify you are on an issue branch:
 3. Extract the `<issue_number>` from the branch name.
 4. If the branch does not match, **stop** and tell the user:
    - They need to be on an issue branch.
-   - Offer to run [issue:claim](../issue_claim/SKILL.md) to create one.
+   - Offer to run [issue_claim](../issue_claim/SKILL.md) to create one.
 
 ## Workflow Steps
 
@@ -65,7 +65,7 @@ After user approval, post the design as a **comment on the issue**. This is the 
 
 ### 6. Transition to planning
 
-- Hand off to the [design:plan](../design_plan/SKILL.md) skill to break the design into implementation tasks.
+- Hand off to the [design_plan](../design_plan/SKILL.md) skill to break the design into implementation tasks.
 
 ## Important Notes
 

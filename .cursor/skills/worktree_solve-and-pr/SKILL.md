@@ -44,18 +44,18 @@ The issue body is **always** read as the foundation — it contains the problem,
 
 Execute phases in order, starting from the detected state:
 
-1. **Design** → [worktree:brainstorm](../worktree_brainstorm/SKILL.md)
+1. **Design** → [worktree_brainstorm](../worktree_brainstorm/SKILL.md)
    - Reads issue body, explores context, posts `## Design` comment.
-2. **Plan** → [worktree:plan](../worktree_plan/SKILL.md)
+2. **Plan** → [worktree_plan](../worktree_plan/SKILL.md)
    - Reads issue body + design, posts `## Implementation Plan` comment.
-3. **Execute** → [worktree:execute](../worktree_execute/SKILL.md)
+3. **Execute** → [worktree_execute](../worktree_execute/SKILL.md)
    - Implements tasks from the plan, TDD, commits after each task.
-4. **Verify** → [worktree:verify](../worktree_verify/SKILL.md)
+4. **Verify** → [worktree_verify](../worktree_verify/SKILL.md)
    - Full test suite + lint + precommit. Loops back to fix on failure.
-5. **PR** → [worktree:pr](../worktree_pr/SKILL.md)
+5. **PR** → [worktree_pr](../worktree_pr/SKILL.md)
    - Creates pull request with auto-generated text.
-6. **CI** → [worktree:ci-check](../worktree_ci-check/SKILL.md)
-   - Polls remote CI until completion. On failure, invokes [worktree:ci-fix](../worktree_ci-fix/SKILL.md) which diagnoses, fixes, pushes, and loops back to ci-check.
+6. **CI** → [worktree_ci-check](../worktree_ci-check/SKILL.md)
+   - Polls remote CI until completion. On failure, invokes [worktree_ci-fix](../worktree_ci-fix/SKILL.md) which diagnoses, fixes, pushes, and loops back to ci-check.
 
 Each phase checks for its own completion marker before running. If the marker exists, it skips to the next phase.
 
@@ -89,5 +89,5 @@ Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
 
 - Never block for user input at any phase. Each sub-skill is autonomous.
 - The issue body is the primary input at every phase — never ignore it.
-- If any phase uses [worktree:ask](../worktree_ask/SKILL.md), the pipeline pauses until a reply is received (or timeout).
+- If any phase uses [worktree_ask](../worktree_ask/SKILL.md), the pipeline pauses until a reply is received (or timeout).
 - This skill is typically invoked via `just worktree-start <issue> "<prompt>"` where the prompt references this skill.

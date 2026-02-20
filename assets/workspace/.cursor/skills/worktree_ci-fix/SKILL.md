@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Autonomous CI Fix
 
-Diagnose and fix a failing CI run **without user interaction**. This is the worktree variant of [ci:fix](../ci_fix/SKILL.md) — it posts a lightweight diagnosis comment for traceability, then fixes, pushes, and re-checks autonomously.
+Diagnose and fix a failing CI run **without user interaction**. This is the worktree variant of [ci_fix](../ci_fix/SKILL.md) — it posts a lightweight diagnosis comment for traceability, then fixes, pushes, and re-checks autonomously.
 
 **Rule: no guessing. Fetch the log first. No blocking for feedback.**
 
@@ -72,14 +72,14 @@ Before making any fix, post a `## CI Diagnosis` comment on the issue for traceab
 git push
 ```
 
-- Invoke [worktree:ci-check](../worktree_ci-check/SKILL.md) to poll until CI completes again.
+- Invoke [worktree_ci-check](../worktree_ci-check/SKILL.md) to poll until CI completes again.
 
 ### 6. Handle repeated failures
 
 Track the attempt count across the ci-check → ci-fix loop:
 
 - **Attempt 2**: Return to step 1 with fresh investigation. Do not stack fixes — if the previous fix didn't work, understand why before trying again.
-- **Attempt 3**: If still failing, use [worktree:ask](../worktree_ask/SKILL.md) to post a question on the issue. Include the 3 diagnosis comments as context.
+- **Attempt 3**: If still failing, use [worktree_ask](../worktree_ask/SKILL.md) to post a question on the issue. Include the 3 diagnosis comments as context.
 
 If the failure is in a workflow you didn't modify, it may be a flaky test or upstream issue — report it via `worktree:ask` rather than attempting to "fix" it.
 

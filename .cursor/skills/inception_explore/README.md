@@ -22,7 +22,7 @@ Use inception skills when:
 - Work requires decomposition into multiple issues/milestones
 
 Skip inception skills when:
-- Problem and solution are already clear (use [issue:create](../issue_create/) and [design:brainstorm](../design_brainstorm/) directly)
+- Problem and solution are already clear (use [issue_create](../issue_create/) and [design_brainstorm](../design_brainstorm/) directly)
 - It's a small fix or enhancement (single issue sufficient)
 - You're extending existing patterns (use normal dev workflow)
 
@@ -141,8 +141,8 @@ Located in `docs/templates/`:
 ## Handoff to Development
 
 After `inception:plan` creates GitHub issues:
-1. Use [issue:claim](../issue_claim/) to start work on an issue
-2. Each issue goes through [design:brainstorm](../design_brainstorm/) → [code:execute](../code_execute/) workflow
+1. Use [issue_claim](../issue_claim/) to start work on an issue
+2. Each issue goes through [design_brainstorm](../design_brainstorm/) → [code_execute](../code_execute/) workflow
 3. Spikes feed findings back to RFC/Design docs
 
 ## Example Flow

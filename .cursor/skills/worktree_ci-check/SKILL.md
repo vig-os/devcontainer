@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Autonomous CI Check
 
-Poll CI pipeline status and react **without user interaction**. This is the worktree variant of [ci:check](../ci_check/SKILL.md) — it waits for CI to finish and auto-triggers fixes instead of reporting status and stopping.
+Poll CI pipeline status and react **without user interaction**. This is the worktree variant of [ci_check](../ci_check/SKILL.md) — it waits for CI to finish and auto-triggers fixes instead of reporting status and stopping.
 
 **Rule: no blocking for feedback. Poll until resolution.**
 
@@ -37,7 +37,7 @@ Check status with exponential backoff:
 3. If any check is still pending:
    - Wait with backoff: 30s → 60s → 120s → 120s (cap).
    - Re-check after each wait.
-   - Maximum total wait: **15 minutes**. If still pending after 15 minutes, post a note via [worktree:ask](../worktree_ask/SKILL.md) and stop.
+   - Maximum total wait: **15 minutes**. If still pending after 15 minutes, post a note via [worktree_ask](../worktree_ask/SKILL.md) and stop.
 4. If all checks pass → proceed to completion (step 4).
 5. If any check fails → proceed to failure handling (step 3).
 
@@ -52,7 +52,7 @@ On CI failure:
    gh run view <run-id> --log-failed
    ```
 
-3. Invoke [worktree:ci-fix](../worktree_ci-fix/SKILL.md) with the failure context.
+3. Invoke [worktree_ci-fix](../worktree_ci-fix/SKILL.md) with the failure context.
 
 ### 4. Report success
 

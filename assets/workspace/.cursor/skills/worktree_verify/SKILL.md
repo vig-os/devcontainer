@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Autonomous Verify
 
-Run full verification and provide evidence **without user interaction**. This is the worktree variant of [code:verify](../code_verify/SKILL.md). On failure, loop back to fix.
+Run full verification and provide evidence **without user interaction**. This is the worktree variant of [code_verify](../code_verify/SKILL.md). On failure, loop back to fix.
 
 **Rule: no "should work" or "looks correct". Evidence only. No blocking for feedback.**
 
@@ -52,11 +52,11 @@ If any check fails:
 4. Re-run verification from step 1.
 5. Repeat until all checks pass.
 
-If stuck after 3 attempts on the same failure, use [worktree:ask](../worktree_ask/SKILL.md) to post a question on the issue.
+If stuck after 3 attempts on the same failure, use [worktree_ask](../worktree_ask/SKILL.md) to post a question on the issue.
 
 ### 4. Proceed to PR
 
-Once all checks pass, invoke [worktree:pr](../worktree_pr/SKILL.md) to create the pull request.
+Once all checks pass, invoke [worktree_pr](../worktree_pr/SKILL.md) to create the pull request.
 
 ## Important Notes
 

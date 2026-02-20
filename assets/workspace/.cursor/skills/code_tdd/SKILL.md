@@ -30,7 +30,7 @@ Each phase is committed separately so the git history proves TDD compliance to a
 
 ### 4. Commit the failing test
 
-- **Commit** using [git:commit](../git_commit/SKILL.md) with type `test`, e.g. `test: add failing test for <behavior>`.
+- **Commit** using [git_commit](../git_commit/SKILL.md) with type `test`, e.g. `test: add failing test for <behavior>`.
 - Do **not** proceed to GREEN before this commit is created.
 - This creates an auditable record that the test was written first.
 
@@ -40,13 +40,13 @@ Each phase is committed separately so the git history proves TDD compliance to a
 - Do not add extra functionality, error handling, or optimizations yet.
 - Run the test again to confirm it **passes**.
 - Run the full relevant test suite to confirm no regressions.
-- **Commit the implementation** using [git:commit](../git_commit/SKILL.md), e.g. `feat: implement <behavior>`.
+- **Commit the implementation** using [git_commit](../git_commit/SKILL.md), e.g. `feat: implement <behavior>`.
 
 ### 6. REFACTOR — Clean up
 
 - Improve the code without changing behavior (rename, extract, simplify).
 - Run tests again after refactoring to confirm nothing broke.
-- **Commit the refactor** using [git:commit](../git_commit/SKILL.md) with type `refactor`, if there are meaningful changes. Skip if nothing changed.
+- **Commit the refactor** using [git_commit](../git_commit/SKILL.md) with type `refactor`, if there are meaningful changes. Skip if nothing changed.
 
 ## Important Notes
 

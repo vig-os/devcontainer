@@ -92,10 +92,10 @@ Return ONLY the review report. No preamble.
 When the subagent returns:
 
 - If **Critical** or **Important** issues found → fix them, then re-run from step 1.
-- If only **Minor** issues → note them and proceed to [pr:create](../pr_create/SKILL.md).
+- If only **Minor** issues → note them and proceed to [pr_create](../pr_create/SKILL.md).
 
 ## Important Notes
 
-- Run this before every PR submission. The [pr:create](../pr_create/SKILL.md) workflow should reference this as a prerequisite.
+- Run this before every PR submission. The [pr_create](../pr_create/SKILL.md) workflow should reference this as a prerequisite.
 - Do not skip the acceptance criteria check — it catches the most common agent failure (incomplete work).
 - The subagent runs readonly — it cannot modify files. All fixes are made by the calling agent.

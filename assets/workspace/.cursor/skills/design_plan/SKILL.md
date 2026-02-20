@@ -17,7 +17,7 @@ Before doing anything else, verify you are on an issue branch:
 3. Extract the `<issue_number>` from the branch name.
 4. If the branch does not match, **stop** and tell the user:
    - They need to be on an issue branch.
-   - Offer to run [issue:claim](../issue_claim/SKILL.md) to create one.
+   - Offer to run [issue_claim](../issue_claim/SKILL.md) to create one.
 
 ## Workflow Steps
 
@@ -81,4 +81,4 @@ After user approval, post the full detailed plan as a **comment on the issue**. 
 - If a task is too large to describe in one sentence, split it.
 - Reference specific `just` recipes for verification where applicable.
 - The issue comment is the **single source of truth** for the plan. No local plan files.
-- The plan comment is the input for [code:execute](../code_execute/SKILL.md).
+- The plan comment is the input for [code_execute](../code_execute/SKILL.md).

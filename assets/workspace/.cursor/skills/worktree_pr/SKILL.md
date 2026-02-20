@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Autonomous PR
 
-Create a pull request **without user interaction**. This is the worktree variant of [pr:create](../pr_create/SKILL.md).
+Create a pull request **without user interaction**. This is the worktree variant of [pr_create](../pr_create/SKILL.md).
 
 **Rule: no blocking for feedback. Auto-generate PR text from commits and issue.**
 

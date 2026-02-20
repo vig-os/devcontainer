@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Autonomous Plan
 
-Break an approved design into implementation tasks **without user interaction**. This is the worktree variant of [design:plan](../design_plan/SKILL.md).
+Break an approved design into implementation tasks **without user interaction**. This is the worktree variant of [design_plan](../design_plan/SKILL.md).
 
 **Rule: no implementation until a plan is posted. No blocking for feedback.**
 
@@ -28,7 +28,7 @@ gh issue view <issue_number> --json title,body,labels,comments
 - Parse the **body** for acceptance criteria and constraints.
 - Find the `## Design` comment for the approved architecture.
 - If an `## Implementation Plan` comment already exists, **skip** — the planning phase is done.
-- If no `## Design` comment exists, invoke [worktree:brainstorm](../worktree_brainstorm/SKILL.md) first.
+- If no `## Design` comment exists, invoke [worktree_brainstorm](../worktree_brainstorm/SKILL.md) first.
 
 ### 2. Break into tasks
 
@@ -68,7 +68,7 @@ gh issue view <issue_number> --json title,body,labels,comments
 
 ### 4. Proceed to execution
 
-- Invoke [worktree:execute](../worktree_execute/SKILL.md) to start implementing.
+- Invoke [worktree_execute](../worktree_execute/SKILL.md) to start implementing.
 
 ## Delegation
 

@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Autonomous Brainstorm
 
-Explore requirements and produce a design **without user interaction**. This is the worktree variant of [design:brainstorm](../design_brainstorm/SKILL.md) — it makes reasonable decisions autonomously instead of asking the user.
+Explore requirements and produce a design **without user interaction**. This is the worktree variant of [design_brainstorm](../design_brainstorm/SKILL.md) — it makes reasonable decisions autonomously instead of asking the user.
 
 **Rule: no code until a design is posted. No blocking for feedback.**
 
@@ -61,7 +61,7 @@ gh issue view <issue_number> --json title,body,labels,comments
 
 ### 6. Proceed to planning
 
-- Invoke [worktree:plan](../worktree_plan/SKILL.md) to break the design into tasks.
+- Invoke [worktree_plan](../worktree_plan/SKILL.md) to break the design into tasks.
 
 ## Delegation
 
@@ -77,7 +77,7 @@ Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
 
 ## When stuck
 
-If you cannot make a reasonable design decision (genuinely ambiguous, high-risk, or contradictory requirements), use [worktree:ask](../worktree_ask/SKILL.md) to post a question on the issue. Do not guess on critical decisions.
+If you cannot make a reasonable design decision (genuinely ambiguous, high-risk, or contradictory requirements), use [worktree_ask](../worktree_ask/SKILL.md) to post a question on the issue. Do not guess on critical decisions.
 
 ## Important Notes
 

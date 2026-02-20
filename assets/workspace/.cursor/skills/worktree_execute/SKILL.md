@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Autonomous Execute
 
-Work through an implementation plan **without user checkpoints**. This is the worktree variant of [code:execute](../code_execute/SKILL.md). Progress is tracked in the GitHub issue comment.
+Work through an implementation plan **without user checkpoints**. This is the worktree variant of [code_execute](../code_execute/SKILL.md). Progress is tracked in the GitHub issue comment.
 
 **Rule: no blocking for feedback. Commit after each task. Follow TDD.**
 
@@ -29,7 +29,7 @@ Work through an implementation plan **without user checkpoints**. This is the wo
      --jq '.[] | select(.body | contains("## Implementation Plan")) | {id, body}' | tail -1
    ```
 
-3. If no plan exists, invoke [worktree:plan](../worktree_plan/SKILL.md) first.
+3. If no plan exists, invoke [worktree_plan](../worktree_plan/SKILL.md) first.
 4. Parse the task list: `- [ ]` = pending, `- [x]` = done.
 5. Save the **comment ID** for progress updates.
 
@@ -39,9 +39,9 @@ For each unchecked task:
 
 1. Read the task description, files, and verification command.
 2. Implement the change following [coding-principles](../../rules/coding-principles.mdc) and TDD:
-   - **RED**: Write failing test, run it, confirm failure, commit via [git:commit](../git_commit/SKILL.md) (`test: ...`).
-   - **GREEN**: Write minimal code to pass, run test, confirm pass, commit via [git:commit](../git_commit/SKILL.md) (`feat: ...` or `fix: ...`).
-   - **REFACTOR**: Clean up if needed, run tests, commit via [git:commit](../git_commit/SKILL.md) (`refactor: ...`).
+   - **RED**: Write failing test, run it, confirm failure, commit via [git_commit](../git_commit/SKILL.md) (`test: ...`).
+   - **GREEN**: Write minimal code to pass, run test, confirm pass, commit via [git_commit](../git_commit/SKILL.md) (`feat: ...` or `fix: ...`).
+   - **REFACTOR**: Clean up if needed, run tests, commit via [git_commit](../git_commit/SKILL.md) (`refactor: ...`).
 3. Run the task's verification step.
 4. If verification fails, debug and fix before moving to the next task.
 
@@ -67,11 +67,11 @@ After completing a task, check it off in the plan comment:
 
 - If a verification step fails, diagnose and fix immediately.
 - Do not skip failing tasks.
-- If genuinely stuck after 2-3 attempts, use [worktree:ask](../worktree_ask/SKILL.md) to post a question on the issue.
+- If genuinely stuck after 2-3 attempts, use [worktree_ask](../worktree_ask/SKILL.md) to post a question on the issue.
 
 ### 5. Proceed to verification
 
-After all tasks are done, invoke [worktree:verify](../worktree_verify/SKILL.md) for full-suite verification.
+After all tasks are done, invoke [worktree_verify](../worktree_verify/SKILL.md) for full-suite verification.
 
 ## Important Notes
 

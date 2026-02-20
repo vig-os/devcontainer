@@ -19,7 +19,7 @@ Use this skill when:
 - Problem exists but isn't well-understood yet
 
 Skip this skill when:
-- Problem is already well-articulated (jump to [inception:scope](../inception_scope/SKILL.md))
+- Problem is already well-articulated (jump to [inception_scope](../inception_scope/SKILL.md))
 - It's a small, obvious fix (use existing issue workflow)
 
 ## Precondition: No Branch Required
@@ -148,7 +148,7 @@ Synthesize all findings into the early sections of an RFC document:
 **Prompt:**
 > "Based on this exploration, should we continue to scoping? Or is this not worth pursuing?"
 
-**If continue:** Proceed to [inception:scope](../inception_scope/SKILL.md)
+**If continue:** Proceed to [inception_scope](../inception_scope/SKILL.md)
 
 **If stop:** Document why in the RFC (status: rejected) and close gracefully.
 
@@ -168,4 +168,4 @@ Synthesize all findings into the early sections of an RFC document:
 
 ## Next Phase
 
-After user approval, invoke [inception:scope](../inception_scope/SKILL.md) to define what to build.
+After user approval, invoke [inception_scope](../inception_scope/SKILL.md) to define what to build.

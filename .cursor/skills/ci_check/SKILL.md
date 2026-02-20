@@ -32,7 +32,7 @@ CI Status for <branch/PR>:
 - Show the failing job name and step.
 - Run `gh run view <run-id> --log-failed` to fetch the failure log.
 - Summarize the error (first relevant error line, not the full log).
-- Suggest next steps: fix locally, or use [ci:fix](../ci_fix/SKILL.md) for deeper diagnosis.
+- Suggest next steps: fix locally, or use [ci_fix](../ci_fix/SKILL.md) for deeper diagnosis.
 
 ## Delegation
 
