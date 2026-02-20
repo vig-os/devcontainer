@@ -109,13 +109,10 @@ RUN set -eux; \
     rm "$FILE"; \
     just --version;
 
-# Install cursor-agent CLI
+# Install cursor-agent CLI (installs to ~/.local/bin)
+ENV PATH="/root/.local/bin:${PATH}"
 RUN set -eux; \
     curl -fsSL https://cursor.com/install | bash; \
-    if ! command -v agent >/dev/null 2>&1; then \
-        echo "cursor-agent installation failed"; \
-        exit 1; \
-    fi; \
     agent --version;
 
 # Install latest cargo-binstall from release archive with minisign signature verification
