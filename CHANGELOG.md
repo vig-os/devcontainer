@@ -55,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GitHub issue and PR templates in workspace template** ([#63](https://github.com/vig-os/devcontainer/issues/63))
   - Pull request template, issue templates, Dependabot config, and `.gitmessage` synced to `assets/workspace/`
   - Ground truth lives in repo root; `assets/workspace/` is generated output
+- **cursor-agent CLI pre-installed in devcontainer image** ([#108](https://github.com/vig-os/devcontainer/issues/108))
+  - Enables `just worktree-start` to work out of the box without manual installation
 
 ### Changed
 
