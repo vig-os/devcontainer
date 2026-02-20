@@ -57,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Linked branches fetched via a single GraphQL call
   - Ships to downstream workspaces via sync manifest (`.devcontainer/justfile.gh` + `.devcontainer/scripts/gh_issues.py`)
 - **Issue triage agent skill** ([#81](https://github.com/vig-os/devcontainer/issues/81))
-  - Cursor skill at `.cursor/skills/issue:triage/` for triaging open issues across priority, area, effort, SemVer impact, dependencies, and release readiness
+  - Cursor skill at `.cursor/skills/issue_triage/` for triaging open issues across priority, area, effort, SemVer impact, dependencies, and release readiness
   - Decision matrix groups issues into parent/sub-issue clusters with milestone suggestions
   - Predefined label taxonomy (`label-taxonomy.md`) for priority, area, effort, and SemVer dimensions
   - Sync manifest updated to propagate skill to workspace template

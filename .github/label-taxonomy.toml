@@ -1,8 +1,8 @@
 # Canonical repository labels.
 # Single source of truth — referenced by:
 #   - scripts/setup-labels.sh               (provision labels on a repo)
-#   - .cursor/skills/issue:triage/SKILL.md  (triage label check)
-#   - .cursor/skills/issue:create/SKILL.md  (agent label mapping)
+#   - .cursor/skills/issue_triage/SKILL.md  (triage label check)
+#   - .cursor/skills/issue_create/SKILL.md  (agent label mapping)
 #   - .github/ISSUE_TEMPLATE/*.yml          (template label values)
 #
 # Label reconciliation:
