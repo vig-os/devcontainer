@@ -66,12 +66,6 @@ gh issue view <issue_number> --json title,body,labels,comments
    ...
    ```
 
-5. Trigger the `sync-issues` workflow (fire-and-forget):
-
-   ```bash
-   gh workflow run sync-issues.yml -f target-branch=<current_branch>
-   ```
-
 ### 4. Proceed to execution
 
 - Invoke [worktree:execute](../worktree:execute/SKILL.md) to start implementing.
