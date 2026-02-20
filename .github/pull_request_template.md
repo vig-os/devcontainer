@@ -68,5 +68,5 @@ Refs:
 Please include GitHub issue references in the "Refs:" line above (e.g., `Refs: #42`).
 Every change must be traceable to an issue, per project rules.
 If not related to a specific issue, explain why (chore/documentation only).
-See CLAUDE.md and commit message standards for more details.
+See [commit-messages.mdc](../../rules/commit-messages.mdc) for more details.
 -->
