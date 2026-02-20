@@ -120,9 +120,7 @@ jobs:
           else
             COMMIT_MSG="chore: sync dev with main after merge"
             if [ -n "$PR_NUMBER" ]; then
-              COMMIT_MSG="$COMMIT_MSG
-
-          Refs: #$PR_NUMBER"
+              COMMIT_MSG=$(printf '%s\n\nRefs: #%s' "$COMMIT_MSG" "$PR_NUMBER")
             fi
             git commit -m "$COMMIT_MSG" --no-verify
             git push origin dev

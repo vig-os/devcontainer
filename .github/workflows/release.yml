@@ -851,7 +851,7 @@ jobs:
               repo: context.repo.repo,
               title,
               body,
-              labels: ['bug', 'release']
+              labels: ['bug', 'area:ci']
             });
 
             console.log(`Created issue: ${title}`);
