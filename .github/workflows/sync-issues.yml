@@ -22,6 +22,16 @@ on:  # yamllint disable-line rule:truthy
         required: false
         default: 'dev'
         type: string
+      output-dir:
+        description: 'Directory to write synced issue/PR files to.'
+        required: false
+        default: 'docs'
+        type: string
+      commit-msg:
+        description: 'Commit message for the sync commit.'
+        required: false
+        default: 'chore: sync issues and PRs'
+        type: string
 
 permissions: {}  # restrict default; job declares its own
 
@@ -50,7 +60,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
-          ref: ${{ github.event.inputs.target-branch }}
+          ref: ${{ github.event.inputs.target-branch || 'dev' }}
           persist-credentials: false
 
       - name: Restore sync state (last synced timestamp)
@@ -83,17 +93,16 @@ jobs:
 
       - name: Sync Issues and PRs
         id: sync
-        # Using local action for testing
         uses: vig-os/sync-issues-action@b4cdf371bb708230ce410a8203e6463e9e6caf2d  # v0.1.1
         with:
           app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
           app-private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
-          output-dir: 'docs'
+          output-dir: ${{ github.event.inputs.output-dir || 'docs' }}
           sync-issues: 'true'
           sync-prs: 'true'
           include-closed: 'true'
           state-file: '.sync-state/last-sync.txt'
-          updated-since: ${{ github.event.inputs.force-update == 'true' && '1970-01-01T00:00:00Z' || '' }}
+          updated-since: ${{ (github.event.inputs.force-update == 'true' && '1970-01-01T00:00:00Z') || '' }}
 
       - name: Commit and push changes via API
         id: commit
@@ -103,8 +112,8 @@ jobs:
           # Use App token so push can bypass branch protection when App is in bypass list
           GH_TOKEN: ${{ steps.generate-token.outputs.token || github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          TARGET_BRANCH: refs/heads/${{ github.event.inputs.target-branch }}
-          COMMIT_MESSAGE: "chore: sync issues and PRs"
+          TARGET_BRANCH: refs/heads/${{ github.event.inputs.target-branch || 'dev' }}
+          COMMIT_MESSAGE: "${{ github.event.inputs.commit-msg || 'chore: sync issues and PRs' }}"
           FILE_PATHS: ${{ steps.sync.outputs.modified-files }}
 
       - name: Save sync state
