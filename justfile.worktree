@@ -114,7 +114,7 @@ worktree-start issue prompt="":
     fi
 
     # Resolve the issue's linked branch (may already exist from issue:claim)
-    BRANCH=$(gh issue develop --list "$ISSUE" 2>/dev/null | grep -oE '[^ ]+$' | head -1)
+    BRANCH=$(gh issue develop --list "$ISSUE" 2>/dev/null | "$(pwd)/scripts/resolve-branch.sh")
 
     if [ -z "$BRANCH" ]; then
         echo "[*] No linked branch for issue #${ISSUE}. Creating one..."
@@ -151,7 +151,7 @@ worktree-start issue prompt="":
         OWNER_REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner')
         PARENT=$(gh api "repos/${OWNER_REPO}/issues/${ISSUE}/parent" --jq '.number' 2>/dev/null || true)
         if [ -n "$PARENT" ]; then
-            BASE=$(gh issue develop --list "$PARENT" 2>/dev/null | grep -oE '[^ ]+$' | head -1)
+            BASE=$(gh issue develop --list "$PARENT" 2>/dev/null | "$(pwd)/scripts/resolve-branch.sh")
             BASE="${BASE:-dev}"
         else
             BASE="dev"
