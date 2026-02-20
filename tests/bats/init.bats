@@ -381,3 +381,15 @@ setup() {
     run grep "NC=" "$INIT_SH"
     assert_success
 }
+
+# ── devcontainer local install ───────────────────────────────────────────────
+
+@test "requirements.yaml devcontainer check falls back to node_modules/.bin" {
+    run grep 'node_modules/.bin/devcontainer' "$REQUIREMENTS_YAML"
+    assert_success
+}
+
+@test "requirements.yaml devcontainer does not use npm install -g" {
+    run grep 'npm install -g.*devcontainer' "$REQUIREMENTS_YAML"
+    assert_failure
+}
