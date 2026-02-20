@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **hadolint pre-commit hook for Containerfile linting** ([#122](https://github.com/vig-os/devcontainer/issues/122))
+  - Add `hadolint` hook to `.pre-commit-config.yaml`, pinned by SHA (v2.9.3)
+  - Enforce Dockerfile best practices: pinned base image tags, consolidated `RUN` layers, shellcheck for inline scripts
+  - Fix `tests/fixtures/sidecar.Containerfile` to pass hadolint with no warnings
 - **Optional reviewer parameter for autonomous worktree pipeline** ([#102](https://github.com/vig-os/devcontainer/issues/102))
   - Support `reviewer` parameter in `just worktree-start`
   - Propagate `PR_REVIEWER` via tmux environment to the autonomous agent
