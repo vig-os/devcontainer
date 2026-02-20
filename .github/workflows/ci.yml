@@ -68,7 +68,7 @@ jobs:
           VERSION="dev-$(git rev-parse --short HEAD)"
           RELEASE_DATE=$(date -u +%Y-%m-%d)
           BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          RELEASE_URL="https://github.com/vig-os/devcontainer/commit/$(git rev-parse HEAD)"
+          RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/commit/$(git rev-parse HEAD)"
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
