@@ -881,11 +881,10 @@ def devcontainer_up(initialized_workspace):
     workspace_path, workspace_path_for_cli, in_container = (
         _resolve_devcontainer_cli_workspace(initialized_workspace)
     )
-    if not shutil.which("devcontainer"):
-        pytest.skip(
-            "devcontainer CLI not available. "
-            "Install with: npm install -g @devcontainers/cli"
-        )
+    if not shutil.which("devcontainer") and not (
+        Path("node_modules/.bin/devcontainer").is_file()
+    ):
+        pytest.skip("devcontainer CLI not available. Install with: npm install")
 
     docker_path = "podman"
     env, original_config = _prepare_devcontainer_env(
@@ -995,11 +994,10 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
     workspace_path, workspace_path_for_cli, in_container = (
         _resolve_devcontainer_cli_workspace(initialized_workspace)
     )
-    if not shutil.which("devcontainer"):
-        pytest.skip(
-            "devcontainer CLI not available. "
-            "Install with: npm install -g @devcontainers/cli"
-        )
+    if not shutil.which("devcontainer") and not (
+        Path("node_modules/.bin/devcontainer").is_file()
+    ):
+        pytest.skip("devcontainer CLI not available. Install with: npm install")
 
     docker_path = "podman"
     env, _ = _prepare_devcontainer_env(
