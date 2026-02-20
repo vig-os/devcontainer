@@ -75,9 +75,15 @@ gh issue view <issue_number> --json title,body
 ### 6. Create PR
 
 ```bash
+# Append reviewer if PR_REVIEWER is set in environment
+REVIEWER_ARG=""
+if [ -n "${PR_REVIEWER:-}" ]; then
+  REVIEWER_ARG="--reviewer $PR_REVIEWER"
+fi
+
 gh pr create --base <base_branch> --title "<type>: <description> (#<issue_number>)" \
   --body-file .github/pr-draft-<issue_number>.md \
-  --assignee @me
+  --assignee @me $REVIEWER_ARG
 ```
 
 ### 7. Clean up
