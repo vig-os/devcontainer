@@ -205,8 +205,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New CLI flag to mandate that all commits include at least one scope (e.g. `feat(api): ...`)
   - When enabled, scopeless commits (e.g. `feat: ...`) are rejected at the commit-msg stage
   - Comprehensive tests added to `test_validate_commit_msg.py`
+- **`post-start.sh` devcontainer lifecycle script** ([#60](https://github.com/vig-os/devcontainer/issues/60))
+  - New script runs on every container start (create + restart)
+  - Handles Docker socket permissions and dependency sync via `just sync`
+  - Replaces inline `postStartCommand` in `devcontainer.json`
 
 ### Changed
+
+- **Dependency sync delegated to `just sync` across all lifecycle hooks** ([#60](https://github.com/vig-os/devcontainer/issues/60))
+  - `post-create.sh`, `post-start.sh`, and `post-attach.sh` now call `just sync` instead of `uv sync` directly
+  - `justfile.base` `sync` recipe updated with `--all-extras --no-install-project` flags and `pyproject.toml` guard
+  - Abstracts toolchain details so future dependency managers only need a recipe change
 
 - **Git initialization default branch** ([#35](https://github.com/vig-os/devcontainer/issues/35))
   - Updated git initialization to set the default branch to 'main' instead of 'master'
@@ -260,6 +269,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Host-specific paths in `.gitconfig` and unreliable `postAttachCommand` lifecycle** ([#60](https://github.com/vig-os/devcontainer/issues/60))
+  - `copy-host-user-conf.sh` now generates a container-ready `.gitconfig` with `/root/...` paths and strips host-only entries (credential helpers, `excludesfile`, `includeIf`) at export time
+  - Refactored devcontainer lifecycle: moved all one-time setup (`init-git.sh`, `setup-git-conf.sh`, `init-precommit.sh`) from `postAttachCommand` into `postCreateCommand`
+  - New `verify-auth.sh` script for lightweight SSH agent and `gh` auth verification (read-only, no side effects)
+  - `postAttachCommand` now only runs auth verification and dependency sync — no longer depends on unreliable attach hook for critical setup
+  - `setup-git-conf.sh` simplified to one-time file placement (removed SSH agent scanning logic)
 - **GitHub CLI config copy target path** ([#35](https://github.com/vig-os/devcontainer/issues/35))
   - Corrected target path for copying GitHub CLI configuration in post-install step
 - **Install script terminal check in dry-run mode** ([#37](https://github.com/vig-os/devcontainer/issues/37))
@@ -278,6 +293,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pass `finalize_sha` to test actions ensuring tests always run against the correct built commit
   - Fix `install-just` conditional in `setup-env` to respect input flag; was unconditionally running
   - Remove dead macOS `stat` fallback from `build-image` verification step (action only runs on ubuntu-22.04)
+- **Release tag convention: `v` prefix removed** ([#57](https://github.com/vig-os/devcontainer/issues/57))
+  - Git tags now follow the bare `X.Y.Z` format (e.g. `1.0.0`) instead of `vX.Y.Z`
+  - `release.yml` and `prepare-release.yml` workflows updated to create, push, and validate tags without the `v` prefix
+  - `assets/workspace/.github/workflows/release.yml` template updated to match
+  - CHANGELOG historical release links updated to bare-version URLs (`0.2.1`, `0.2.0`, `0.1`)
+  - Existing repository tags (`v0.1`, `v0.2.0`, `v0.2.1`) renamed to bare versions and pushed
+  - Documentation and inline comments updated across `docs/RELEASE_CYCLE.md`, `CONTRIBUTE.md`, `README.md`, and `build-image` action
+- **`gh` version assertion in `test_gh_version`** ([#93](https://github.com/vig-os/devcontainer/issues/93))
+  - Updated expected version prefix from `2.86.` to `2.87.` to match GitHub CLI 2.87.0 (released 2026-02-18)
 
 ### Security
 
@@ -301,7 +325,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Workflow permissions hardened** with least-privilege principle and explicit token scoping ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Input sanitization** — inline expression interpolation replaced with environment variables in workflow run blocks to prevent injection ([#50](https://github.com/vig-os/devcontainer/issues/50))
 
-## [0.2.1](https://github.com/vig-os/devcontainer/releases/tag/v0.2.1) - 2026-01-28
+## [0.2.1](https://github.com/vig-os/devcontainer/releases/tag/0.2.1) - 2026-01-28
 
 ### Added
 
@@ -320,7 +344,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added tests to verify `just` installation and version in `test_image.py`
   - Added integration tests for `just` recipes (`test_just_default`, `test_just_help`, `test_just_info`, `test_just_pytest`)
 - **GitHub Actions workflow for multi-architecture container image publishing** (`.github/workflows/release.yml`)
-  - Automated build and publish workflow triggered on semantic version tags (vX.Y.Z)
+  - Automated build and publish workflow triggered on semantic version tags (X.Y.Z)
   - Multi-architecture support (amd64, arm64) with parallel builds on native runners
   - Image testing before push: runs `pytest tests/test_image.py` against built images
   - Manual dispatch support for testing workflow changes without pushing images (default version: 99.0.1)
@@ -409,7 +433,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed shellcheck warnings by properly quoting script paths
   - Improved debug output and error messages
 
-## [0.2.0](https://github.com/vig-os/devcontainer/releases/tag/v0.2.0) - 2026-01-06
+## [0.2.0](https://github.com/vig-os/devcontainer/releases/tag/0.2.0) - 2026-01-06
 
 ### Added
 
@@ -491,7 +515,7 @@ The previous v0.1 release is kept as-is for backwards compatibility.
 - macOS Podman socket mounting errors caused by SELinux `:Z` flag on socket files
 - Socket detection during tests now matches runtime behavior (Podman-first)
 
-## [0.1](https://github.com/vig-os/devcontainer/releases/tag/v0.1) - 2025-12-10
+## [0.1](https://github.com/vig-os/devcontainer/releases/tag/0.1) - 2025-12-10
 
 ### Core Image
 

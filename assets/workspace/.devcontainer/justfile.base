@@ -31,21 +31,21 @@ precommit:
 # Run tests with pytest
 [group('test')]
 test-pytest *args:
-    uv run pytest {{args}}
+    uv run pytest {{ args }}
 
 # Run tests with coverage
 [group('test')]
 test-cov *args:
-    uv run pytest --cov --cov-report=term-missing {{args}}
+    uv run pytest --cov --cov-report=term-missing {{ args }}
 
 # -------------------------------------------------------------------------------
 # DEPENDENCIES
 # -------------------------------------------------------------------------------
 
-# Sync dependencies from pyproject.toml
+# Sync all dependencies (idempotent, fast if nothing changed)
 [group('deps')]
 sync:
-    uv sync
+    @if [ -f pyproject.toml ]; then uv sync --all-extras --no-install-project; fi
 
 # Update all dependencies
 [group('deps')]
@@ -77,12 +77,12 @@ check *args:
         echo "Error: Could not locate .devcontainer/scripts directory"
         exit 1
     }
-    
+
     if [[ ! -f "$SCRIPT_DIR/version-check.sh" ]]; then
         echo "Error: version-check.sh not found at $SCRIPT_DIR"
         exit 1
     fi
-    
+
     if [[ $# -eq 0 ]]; then
         # No args provided - run in verbose check mode
         "$SCRIPT_DIR/version-check.sh" check
@@ -113,11 +113,11 @@ devcontainer-upgrade:
         echo ""
         exit 1
     fi
-    
+
     # We're on the host - proceed with upgrade
     echo "🚀 Upgrading devcontainer to latest version..."
     echo ""
-    
+
     # Check if podman or docker is available
     if command -v podman &> /dev/null; then
         RUNTIME="podman"
@@ -132,7 +132,7 @@ devcontainer-upgrade:
         echo ""
         exit 1
     fi
-    
+
     echo "✓ Using $RUNTIME"
     echo ""
     echo "Downloading and running install script..."
@@ -165,8 +165,8 @@ sidecars:
 
 # Execute a just recipe in a sidecar container
 # Usage: just sidecar <container-name> <recipe> [args...]
-# Example: just sidecar postgres migrate
-#          just sidecar redis flush
+
+# Example: just sidecar postgres migrate / just sidecar redis flush
 [group('sidecar')]
 sidecar name *args:
     #!/usr/bin/env bash
@@ -174,8 +174,8 @@ sidecar name *args:
     FORMAT=$(printf '\x7b\x7b.Names\x7d\x7d')
 
     # Check if container exists (running or stopped)
-    if ! podman ps -a --format "$FORMAT" 2>/dev/null | grep -q "^{{name}}$"; then
-        echo "[ERROR] Sidecar container '{{name}}' not found"
+    if ! podman ps -a --format "$FORMAT" 2>/dev/null | grep -q "^{{ name }}$"; then
+        echo "[ERROR] Sidecar container '{{ name }}' not found"
         echo ""
         echo "Available sidecars:"
         RUNNING=$(podman ps --format "$FORMAT" 2>/dev/null | grep -v "^devcontainer$" || true)
@@ -193,11 +193,11 @@ sidecar name *args:
     fi
 
     # Check if container is running
-    if ! podman ps --format "$FORMAT" 2>/dev/null | grep -q "^{{name}}$"; then
-        echo "[!]  Sidecar container '{{name}}' exists but is not running"
+    if ! podman ps --format "$FORMAT" 2>/dev/null | grep -q "^{{ name }}$"; then
+        echo "[!]  Sidecar container '{{ name }}' exists but is not running"
         echo "Starting container..."
-        podman start {{name}} || {
-            echo "[ERROR] Failed to start container '{{name}}'"
+        podman start {{ name }} || {
+            echo "[ERROR] Failed to start container '{{ name }}'"
             exit 1
         }
         # Wait a moment for container to be ready
@@ -205,4 +205,4 @@ sidecar name *args:
     fi
 
     # Execute the recipe in the sidecar
-    podman exec {{name}} just {{args}}
+    podman exec {{ name }} just {{ args }}

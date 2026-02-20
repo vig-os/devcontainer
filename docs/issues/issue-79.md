@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-18T13:30:08Z
-updated: 2026-02-18T19:29:22Z
+updated: 2026-02-19T16:03:14Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/79
-comments: 1
+comments: 2
 labels: feature, priority:medium, area:ci, effort:small, semver:patch
 assignees: none
 milestone: 0.3
 projects: none
 relationship: none
-synced: 2026-02-19T00:08:07.913Z
+synced: 2026-02-19T17:40:50.221Z
 ---
 
 # [Issue 79]: [[FEATURE] Automatic commit message for pull request merge](https://github.com/vig-os/devcontainer/issues/79)
@@ -86,4 +86,15 @@ Branch: `feature/79-auto-merge-commit-message`
 **TDD skipped for:** Tasks 1, 4, 5, 6 (config, workflow YAML, template, docs — not unit-testable).
 
 cc @c-vigo — does this plan look good to you?
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on February 19, 2026 at 04:03 PM_
+
+Looks good to me! COuple of points:
+
+- You might need a placeholder for `pr-title-check.yml` in `main` for this to work right away, not sure.
+- After implementing and merging, I would leave the issue open until we verify it and turn on `Auto merge` [here](https://github.com/vig-os/devcontainer/settings). The `gh-repo-merge-settings` recipe should also set this value.
 

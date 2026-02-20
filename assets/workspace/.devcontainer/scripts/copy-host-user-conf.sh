@@ -31,13 +31,19 @@ else
 	echo "Git signature verification may not work without this file"
 fi
 
-# Generate a valid .gitconfig from effective config in current directory
+# Generate a container-ready .gitconfig from the host's effective global config.
+# Host-specific paths are rewritten to their known container equivalents and
+# host-only sections (credential helpers, includeIf, excludesfile) are stripped
+# so that setup-git-conf.sh can apply the file with a simple cp.
 GITCONFIG_OUT="$CONF_DIR/.gitconfig"
 GITCONFIG_GLOBAL="$CONF_DIR/.gitconfig.global"
 git config --list --global --include >"$GITCONFIG_GLOBAL"
 
+# Container paths (must match what setup-git-conf.sh expects)
+CONTAINER_HOME="/root"
+
 # Parse key-value pairs and reconstruct .gitconfig with correct section/subsection syntax
-awk -F= '
+awk -F= -v container_home="$CONTAINER_HOME" '
   function print_section(section, subsection) {
     if (section != "") {
       if (subsection != "") {
@@ -50,15 +56,25 @@ awk -F= '
   {
     key = $1
     val = $2
+
+    # Skip host-only entries
     if (key ~ /^includeif\./) next
+    if (key ~ /^credential\./) next
+    if (key == "core.excludesfile") next
+
     split(key, arr, ".")
     section = arr[1]
-    # Handle subsection (e.g., filter.lfs.clean, gpg.ssh.allowedsignersfile, diff.lfs.textconv)
+
+    # Handle subsection (e.g., filter.lfs.clean, gpg.ssh.allowedsignersfile)
     # Any 3+ part key (section.subsection.key) becomes [section "subsection"] with key = value
     if (length(arr) > 2) {
       subsection = arr[2]
       subkey = arr[3]
-      # Handle all subsection cases generically
+
+      # Rewrite host path → container path
+      if (key == "gpg.ssh.allowedsignersfile")
+        val = container_home "/.config/git/allowed-signers"
+
       if (section != last_section || subsection != last_subsection) {
         if (last_section != "") print ""
         print_section(section, subsection)
@@ -68,8 +84,14 @@ awk -F= '
       print "    " subkey " = " val
       next
     }
+
     # Handle normal section.key
     subsection = ""
+
+    # Rewrite host path → container path
+    if (key == "user.signingkey")
+      val = container_home "/.ssh/id_ed25519_github.pub"
+
     if (section != last_section || subsection != last_subsection) {
       if (last_section != "") print ""
       print_section(section, subsection)
@@ -82,7 +104,7 @@ awk -F= '
   }
 ' "$GITCONFIG_GLOBAL" >"$GITCONFIG_OUT"
 
-echo "Generated valid .gitconfig at $GITCONFIG_OUT from effective config in current directory"
+echo "Generated container-ready .gitconfig at $GITCONFIG_OUT"
 
 # Copy GitHub CLI config from host to container (for settings, aliases, etc.)
 HOST_GITHUB_CLI_CONFIG_DIR="$HOME/.config/gh"
