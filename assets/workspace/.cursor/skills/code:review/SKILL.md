@@ -1,53 +1,75 @@
 ---
 name: code:review
-description: Performs a structured self-review of changes before submitting a PR.
+description: Spawns a fresh-context readonly subagent to review changes before PR.
 disable-model-invocation: true
 ---
 
 # Self-Review
 
-Structured self-review of changes before submitting a PR.
+Structured self-review of changes before submitting a PR, executed by a **readonly subagent** for unbiased, fresh-context analysis.
+
+## Why a Subagent?
+
+The agent that wrote the code is biased toward its own output. A subagent starts with zero context — it only sees the diff, the issue, and the project standards. This catches blind spots the implementation agent misses.
 
 ## Workflow Steps
 
-### 1. Gather context
+### 1. Collect inputs for the subagent
 
-Determine the base branch (the branch this PR will merge into):
+Before spawning the subagent, gather the raw data it needs:
 
 ```bash
-# If a PR exists for the current branch, use its base
+# Determine base branch
 BASE=$(gh pr view --json baseRefName --jq '.baseRefName' 2>/dev/null)
-# Otherwise fall back to the default branch
 : "${BASE:=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name')}"
-```
 
-Then review the diff:
-
-```bash
+# Get the diff stat and commit log
 git diff "$BASE"...HEAD --stat
 git log "$BASE"..HEAD --oneline
+
+# Get the linked issue number from the branch name
+BRANCH=$(git branch --show-current)
+ISSUE=$(echo "$BRANCH" | grep -oE '[0-9]+' | head -1)
+
+# Fetch issue details
+gh issue view "$ISSUE" --json title,body,labels
 ```
 
-- Read the linked issue's acceptance criteria.
+### 2. Spawn readonly review subagent
 
-### 2. Review diff against requirements
+Use the `Task` tool to launch a **readonly** subagent (`readonly: true`). Pass it a prompt containing:
 
-- For each acceptance criterion, verify it is addressed in the diff.
-- Flag any criterion that is not covered.
-- Flag any change that is not traceable to a requirement (scope creep).
+1. The diff stat and commit log from step 1.
+2. The issue title, body, and acceptance criteria.
+3. The review instructions below (copy them verbatim into the prompt).
 
-### 3. Check project standards
+The subagent must **not** modify any files. It only reads and reports.
 
-- **Changelog**: is `CHANGELOG.md` updated under `## Unreleased`? Does the entry match the changes?
-- **Commit messages**: do all commits follow [commit-messages.mdc](../../rules/commit-messages.mdc)?
-- **Tests**: are there tests for new/changed behavior?
-- **Docs**: are documentation changes needed? Were templates in `docs/templates/` edited (not generated files)?
-
-### 4. Produce review report
-
-Report findings in this structure:
+#### Review instructions to include in the subagent prompt
 
 ```
+You are a code reviewer. You have fresh context — you did not write this code.
+Review the changes on this branch against the linked issue and project standards.
+
+INPUTS (provided below):
+- Diff stat and commit log
+- Issue title, body, and acceptance criteria
+- Project root is the current working directory
+
+STEPS:
+
+1. Read the full diff: git diff <BASE>...HEAD
+2. Read the issue acceptance criteria provided above.
+3. For each acceptance criterion, verify it is addressed in the diff.
+   Flag any criterion NOT covered.
+   Flag any change NOT traceable to a requirement (scope creep).
+4. Check project standards:
+   - Changelog: is CHANGELOG.md updated under ## Unreleased? Does the entry match?
+   - Commit messages: do all commits follow the format in .cursor/rules/commit-messages.mdc?
+   - Tests: are there tests for new/changed behavior?
+   - Docs: are documentation changes needed?
+5. Produce your report in EXACTLY this structure:
+
 ## Review: <branch> → <base>
 
 ### Acceptance Criteria
@@ -61,14 +83,19 @@ Report findings in this structure:
 
 ### Assessment
 Ready to submit / Needs fixes before PR
+
+Return ONLY the review report. No preamble.
 ```
 
-### 5. Fix or proceed
+### 3. Act on the review report
 
-- If Critical or Important issues found, fix them before proceeding.
-- If only Minor issues, note them and proceed to [pr:create](../pr:create/SKILL.md).
+When the subagent returns:
+
+- If **Critical** or **Important** issues found → fix them, then re-run from step 1.
+- If only **Minor** issues → note them and proceed to [pr:create](../pr:create/SKILL.md).
 
 ## Important Notes
 
 - Run this before every PR submission. The [pr:create](../pr:create/SKILL.md) workflow should reference this as a prerequisite.
 - Do not skip the acceptance criteria check — it catches the most common agent failure (incomplete work).
+- The subagent runs readonly — it cannot modify files. All fixes are made by the calling agent.
