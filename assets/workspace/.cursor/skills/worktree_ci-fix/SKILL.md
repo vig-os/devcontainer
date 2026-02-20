@@ -81,7 +81,7 @@ Track the attempt count across the ci-check → ci-fix loop:
 - **Attempt 2**: Return to step 1 with fresh investigation. Do not stack fixes — if the previous fix didn't work, understand why before trying again.
 - **Attempt 3**: If still failing, use [worktree_ask](../worktree_ask/SKILL.md) to post a question on the issue. Include the 3 diagnosis comments as context.
 
-If the failure is in a workflow you didn't modify, it may be a flaky test or upstream issue — report it via `worktree:ask` rather than attempting to "fix" it.
+If the failure is in a workflow you didn't modify, it may be a flaky test or upstream issue — report it via `worktree_ask` rather than attempting to "fix" it.
 
 ## Important Notes
 

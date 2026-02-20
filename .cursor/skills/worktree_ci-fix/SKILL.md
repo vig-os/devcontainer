@@ -81,7 +81,7 @@ Track the attempt count across the ci-check → ci-fix loop:
 - **Attempt 2**: Return to step 1 with fresh investigation. Do not stack fixes — if the previous fix didn't work, understand why before trying again.
 - **Attempt 3**: If still failing, use [worktree_ask](../worktree_ask/SKILL.md) to post a question on the issue. Include the 3 diagnosis comments as context.
 
-If the failure is in a workflow you didn't modify, it may be a flaky test or upstream issue — report it via `worktree:ask` rather than attempting to "fix" it.
+If the failure is in a workflow you didn't modify, it may be a flaky test or upstream issue — report it via `worktree_ask` rather than attempting to "fix" it.
 
 ## Delegation
 
@@ -89,7 +89,7 @@ The following steps SHOULD be delegated to reduce token consumption:
 
 - **Steps 1, 4** (precondition check, investigate): Spawn a Task subagent with `model: "fast"` that validates the branch name, executes `gh run list` and `gh run view --log-failed`, and returns: issue number, failing workflow/job/step, full error log.
 - **Step 3** (post diagnosis comment): Spawn a Task subagent with `model: "fast"` that takes the formatted diagnosis content and posts it via `gh api`. Returns: comment URL.
-- **Step 5** (push and re-check): Spawn a Task subagent with `model: "fast"` that executes `git push` and then invokes `worktree:ci-check`. Returns: push confirmation, CI check status.
+- **Step 5** (push and re-check): Spawn a Task subagent with `model: "fast"` that executes `git push` and then invokes `worktree_ci-check`. Returns: push confirmation, CI check status.
 
 Steps 2 and 4 (analyze root cause, fix) should remain in the main agent as they require debugging and code changes.
 

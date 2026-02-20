@@ -34,9 +34,9 @@ Scan issue comments for these H2 headings:
 
 | Comment heading found          | Phase complete | Next phase        |
 |-------------------------------|----------------|-------------------|
-| *(none)*                       | —              | `worktree:brainstorm` |
-| `## Design`                   | Design         | `worktree:plan`   |
-| `## Implementation Plan`      | Planning       | `worktree:execute` |
+| *(none)*                       | —              | `worktree_brainstorm` |
+| `## Design`                   | Design         | `worktree_plan`   |
+| `## Implementation Plan`      | Planning       | `worktree_execute` |
 
 The issue body is **always** read as the foundation — it contains the problem, proposed solution, and acceptance criteria. Comments layer completed phases on top.
 

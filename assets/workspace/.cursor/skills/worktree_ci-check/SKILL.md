@@ -1,6 +1,6 @@
 ---
 name: worktree_ci-check
-description: Autonomous CI check — polls until CI finishes, invokes worktree:ci-fix on failure.
+description: Autonomous CI check — polls until CI finishes, invokes worktree_ci-fix on failure.
 disable-model-invocation: true
 ---
 

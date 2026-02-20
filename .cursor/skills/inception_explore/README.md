@@ -7,7 +7,7 @@ Pre-development product-thinking skills that bridge the gap between "I have an i
 The inception skill family covers four phases of product thinking:
 
 ```
-Signal → inception:explore → inception:scope → inception:architect → inception:plan → [development workflow]
+Signal → inception_explore → inception_scope → inception_architect → inception_plan → [development workflow]
          (diverge)           (converge)       (evaluate)            (decompose)
 ```
 
@@ -28,7 +28,7 @@ Skip inception skills when:
 
 ## Phases
 
-### 1. inception:explore (Divergent)
+### 1. inception_explore (Divergent)
 
 **Purpose:** Understand the problem space before jumping to solutions.
 
@@ -47,7 +47,7 @@ Skip inception skills when:
 
 ---
 
-### 2. inception:scope (Convergent)
+### 2. inception_scope (Convergent)
 
 **Purpose:** Define what to build and what not to build.
 
@@ -67,7 +67,7 @@ Skip inception skills when:
 
 ---
 
-### 3. inception:architect (Evaluative)
+### 3. inception_architect (Evaluative)
 
 **Purpose:** Define system architecture and validate against established patterns.
 
@@ -94,7 +94,7 @@ Skip inception skills when:
 
 ---
 
-### 4. inception:plan (Analytical)
+### 4. inception_plan (Analytical)
 
 **Purpose:** Decompose scoped design into actionable GitHub issues.
 
@@ -140,7 +140,7 @@ Located in `docs/templates/`:
 
 ## Handoff to Development
 
-After `inception:plan` creates GitHub issues:
+After `inception_plan` creates GitHub issues:
 1. Use [issue_claim](../issue_claim/) to start work on an issue
 2. Each issue goes through [design_brainstorm](../design_brainstorm/) → [code_execute](../code_execute/) workflow
 3. Spikes feed findings back to RFC/Design docs
@@ -151,16 +151,16 @@ After `inception:plan` creates GitHub issues:
 
 ```
 User: "Add a --debug flag to the install script"
-→ inception:scope (quick in/out) → create single issue → [dev workflow]
+→ inception_scope (quick in/out) → create single issue → [dev workflow]
 ```
 
 ### Medium idea
 
 ```
 User: "Add support for custom post-install hooks"
-→ inception:explore (problem framing)
-→ inception:scope (scope hook types, MVP vs full)
-→ inception:plan (parent issue + 3 sub-issues)
+→ inception_explore (problem framing)
+→ inception_scope (scope hook types, MVP vs full)
+→ inception_plan (parent issue + 3 sub-issues)
 → [dev workflow]
 ```
 
@@ -168,10 +168,10 @@ User: "Add support for custom post-install hooks"
 
 ```
 User: "Add multi-tenancy to the system"
-→ inception:explore (deep problem understanding, stakeholder mapping)
-→ inception:scope (phasing, MVP vs full vision)
-→ inception:architect (pattern comparison, blind spot check)
-→ inception:plan (parent issue + 15 sub-issues across 3 milestones)
+→ inception_explore (deep problem understanding, stakeholder mapping)
+→ inception_scope (phasing, MVP vs full vision)
+→ inception_architect (pattern comparison, blind spot check)
+→ inception_plan (parent issue + 15 sub-issues across 3 milestones)
 → [dev workflow]
 ```
 
