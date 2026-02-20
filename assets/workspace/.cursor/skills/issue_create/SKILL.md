@@ -32,6 +32,8 @@ Create a new GitHub issue using the appropriate issue template.
    - Draft a title following the template's prefix (e.g. `[FEATURE] ...`, `[BUG] ...`).
    - Draft the body with all required fields from the chosen template.
    - Include a Changelog Category value based on the issue type.
+   - For testable issue types (`feature`, `bug`, `refactor`), include a TDD acceptance criterion:
+     `- [ ] TDD compliance (see .cursor/rules/tdd.mdc)`
 
 4. **Show draft and ask for confirmation**
    - Present the title, labels, and body to the user.
