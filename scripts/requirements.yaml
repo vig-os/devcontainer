@@ -139,17 +139,17 @@ dependencies:
       all: npm install
       manual: https://bats-core.readthedocs.io/en/stable/installation.html#any-os-npm
 
-  # DevContainer CLI (auto-installed by setup.sh)
+  # DevContainer CLI (auto-installed by npm install)
   - name: devcontainer
     version: "0.81.1"
     purpose: DevContainer CLI for testing devcontainer functionality
     required: true
     check:
-      command: command -v devcontainer
-      version_command: devcontainer --version
+      command: command -v devcontainer || test -x node_modules/.bin/devcontainer
+      version_command: npx devcontainer --version
       version_regex: '(\d+\.\d+\.\d+)'
     install:
-      all: npm install -g @devcontainers/cli@{{version}}
+      all: npm install
       manual: https://github.com/devcontainers/cli
 
   # Parallel (auto-installed by npm install)
