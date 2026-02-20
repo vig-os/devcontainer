@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `issue_create` skill enhanced: gathers context via `just gh-issues` before drafting, suggests parent/child relationships and milestones
   - `issue_create` skill now includes TDD acceptance criterion for testable issue types
   - Remaining `sync-issues` workflow trigger references removed from skills
+  - `tdd.mdc` expanded with test scenario checklist and test type guidance; switched from always-on to glob-triggered on source/test files
+  - `code_tdd`, `code_execute`, and `worktree_execute` skills now reference `tdd.mdc` explicitly
 - **PR template aligned with canonical commit types** ([#115](https://github.com/vig-os/devcontainer/issues/115))
   - Replace ad-hoc Type of Change checkboxes with the 10 canonical commit types
   - Move breaking change from type to a separate modifier checkbox
