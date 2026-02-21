@@ -74,26 +74,27 @@ setup() {
     assert_success
 }
 
-@test "tmux send-keys delivers trust approval to session after launch" {
+@test "send-keys 'a' approves agent trust prompt in tmux session" {
     [ "${CI:-}" = "true" ] && skip "tmux integration tests require interactive TTY"
     command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
+    command -v agent >/dev/null 2>&1 || skip "cursor-agent not installed"
 
-    SESSION="wt-test-sendkeys-$$"
-    MARKER="/tmp/bats-sendkeys-$$"
-    rm -f "$MARKER"
+    SESSION="wt-test-trust-$$"
+    TESTDIR="/tmp/bats-trust-$$"
+    mkdir -p "$TESTDIR"
 
-    tmux new-session -d -s "$SESSION" \
-        "bash -c 'read -r -n1 key; echo \"\$key\" > ${MARKER}; sleep 2'"
-    sleep 2
+    tmux new-session -d -s "$SESSION" -c "$TESTDIR" \
+        "agent chat --yolo --approve-mcps 'say hello'"
+    sleep 5
     tmux send-keys -t "$SESSION" "a" 2>/dev/null || true
-    sleep 2
+    sleep 5
 
-    run cat "$MARKER"
+    run tmux capture-pane -t "$SESSION" -p
     tmux kill-session -t "$SESSION" 2>/dev/null || true
-    rm -f "$MARKER"
+    rm -rf "$TESTDIR"
 
     assert_success
-    assert_output "a"
+    assert_output --partial "Cursor Agent"
 }
 
 @test "worktree-attach errors when neither worktree dir nor session exists" {
