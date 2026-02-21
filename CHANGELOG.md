@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Consolidate sync_manifest.py and utils.py into manifest-as-config architecture** ([#89](https://github.com/vig-os/devcontainer/issues/89))
+  - Extract transform classes (Sed, RemoveLines, etc.) to `scripts/transforms.py`
+  - Unify sed logic: `substitute_in_file()` in utils shared by sed_inplace and Sed transform
+  - Convert MANIFEST from Python code to declarative `scripts/manifest.toml`
 - **PR template aligned with canonical commit types** ([#115](https://github.com/vig-os/devcontainer/issues/115))
   - Replace ad-hoc Type of Change checkboxes with the 10 canonical commit types
   - Move breaking change from type to a separate modifier checkbox
