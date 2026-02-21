@@ -102,6 +102,8 @@ setup() {
     # git worktree list --porcelain | grep "branch refs/heads/$BRANCH"
     TMPDIR_TEST="$(mktemp -d)"
     git init "$TMPDIR_TEST/repo" >/dev/null 2>&1
+    git -C "$TMPDIR_TEST/repo" config user.email "test@test.local"
+    git -C "$TMPDIR_TEST/repo" config user.name "Test"
     git -C "$TMPDIR_TEST/repo" commit --allow-empty -m "init" >/dev/null 2>&1
     git -C "$TMPDIR_TEST/repo" checkout -b "feature/999997-test-branch" >/dev/null 2>&1
 
