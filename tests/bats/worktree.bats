@@ -73,6 +73,27 @@ setup() {
     assert_success
 }
 
+@test "tmux send-keys delivers trust approval to session after launch" {
+    command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
+
+    SESSION="wt-test-sendkeys-$$"
+    MARKER="/tmp/bats-sendkeys-$$"
+    rm -f "$MARKER"
+
+    tmux new-session -d -s "$SESSION" \
+        "bash -c 'read -r -n1 key; echo \"\$key\" > ${MARKER}; sleep 2'"
+    sleep 2
+    tmux send-keys -t "$SESSION" "a" 2>/dev/null || true
+    sleep 2
+
+    run cat "$MARKER"
+    tmux kill-session -t "$SESSION" 2>/dev/null || true
+    rm -f "$MARKER"
+
+    assert_success
+    assert_output "a"
+}
+
 @test "worktree-attach errors when neither worktree dir nor session exists" {
     command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
     command -v just >/dev/null 2>&1 || skip "just not installed"
