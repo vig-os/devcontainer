@@ -16,6 +16,7 @@ def _load_transforms():
         "transforms", scripts_dir / "transforms.py"
     )
     module = importlib.util.module_from_spec(spec)
+    sys.modules["transforms"] = module
     spec.loader.exec_module(module)
     return module
 
@@ -31,7 +32,7 @@ class TestTransformsModule:
 
         transforms.Sed(
             pattern=r"just test-image", replace="just test", target=""
-        ).apply(tmp_path)
+        ).apply(f)
 
         assert f.read_text() == "just test\nline2"
 
@@ -41,6 +42,6 @@ class TestTransformsModule:
         f = tmp_path / "test.txt"
         f.write_text("keep\nremove me\nkeep\n")
 
-        transforms.RemoveLines(pattern=r"remove me").apply(tmp_path)
+        transforms.RemoveLines(pattern=r"remove me").apply(f)
 
         assert f.read_text() == "keep\nkeep\n"
