@@ -24,6 +24,25 @@ _extract_reviewers = gh_issues._extract_reviewers
 _build_cross_refs = gh_issues._build_cross_refs
 
 
+class TestGhLink:
+    """Test _gh_link helper for clickable issue/PR numbers."""
+
+    def test_issue_link_format(self):
+        """Issue number renders as Rich hyperlink to GitHub issues URL."""
+        result = gh_issues._gh_link("vig-os/devcontainer", 104, "issues")
+        assert (
+            result
+            == "[link=https://github.com/vig-os/devcontainer/issues/104]104[/link]"
+        )
+
+    def test_pr_link_format(self):
+        """PR number renders as Rich hyperlink to GitHub pull URL."""
+        result = gh_issues._gh_link("vig-os/devcontainer", 42, "pull")
+        assert (
+            result == "[link=https://github.com/vig-os/devcontainer/pull/42]42[/link]"
+        )
+
+
 class TestStyled:
     def test_wraps_value_in_markup(self):
         assert _styled("hello", "bold red") == "[bold red]hello[/]"
