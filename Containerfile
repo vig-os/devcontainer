@@ -59,6 +59,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nano \
     minisign \
     podman \
+    tmux \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Generate en_US.UTF-8 locale

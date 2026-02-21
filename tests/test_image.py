@@ -27,7 +27,7 @@ EXPECTED_VERSIONS = {
     "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),
     "typstyle": "0.14.",  # Minor version check (installed from latest release)
     "vig_utils": "0.1.",  # Minor version check (installed via uv pip)
-    "tmux": "3.5",  # Major.minor version check (from apt package)
+    "tmux": "3.3",  # Major.minor version check (from apt package)
 }
 
 
