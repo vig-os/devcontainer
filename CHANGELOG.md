@@ -50,6 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pr_solve skill — diagnose PR failures, plan fixes, execute** ([#133](https://github.com/vig-os/devcontainer/issues/133))
   - Single entry point that gathers CI failures, review feedback, and merge state into a consolidated diagnosis
   - Presents diagnosis for approval before any fixes, plans fixes using design_plan conventions, executes with TDD discipline
+  - Pre-commit hook `check-skill-names` enforces `[a-z0-9][a-z0-9_-]*` naming for skill directories
+  - BATS test suite with canary test that injects a bad name into the real repo
+  - TDD scenario checklist expanded with canary, idempotency, and concurrency categories
 - **Optional reviewer parameter for autonomous worktree pipeline** ([#102](https://github.com/vig-os/devcontainer/issues/102))
   - Support `reviewer` parameter in `just worktree-start`
   - Propagate `PR_REVIEWER` via tmux environment to the autonomous agent
