@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Extract transform classes (Sed, RemoveLines, etc.) to `scripts/transforms.py`
   - Unify sed logic: `substitute_in_file()` in utils shared by sed_inplace and Sed transform
   - Convert MANIFEST from Python code to declarative `scripts/manifest.toml`
+- **Clickable issue and PR numbers in gh-issues table** ([#104](https://github.com/vig-os/devcontainer/issues/104))
+  - `#` column in issue and PR tables now uses Rich OSC 8 hyperlinks to GitHub URLs
+  - Clicking an issue or PR number opens it in the browser (or Cursor's integrated terminal)
 - **PR template aligned with canonical commit types** ([#115](https://github.com/vig-os/devcontainer/issues/115))
   - Replace ad-hoc Type of Change checkboxes with the 10 canonical commit types
   - Move breaking change from type to a separate modifier checkbox

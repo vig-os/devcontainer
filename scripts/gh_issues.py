@@ -149,6 +149,11 @@ def _styled(value: str, style: str) -> str:
     return f"[{style}]{value}[/]"
 
 
+def _gh_link(owner_repo: str, num: int, kind: str) -> str:
+    """Return Rich hyperlink markup for issue or PR number."""
+    return f"[link=https://github.com/{owner_repo}/{kind}/{num}]{num}[/link]"
+
+
 def _extract_label(labels: list[dict], prefix: str) -> str:
     for lbl in labels:
         name = lbl["name"]
@@ -230,6 +235,7 @@ def _build_table(
     issue_to_pr: dict[int, int],
     child_to_parent: dict[int, int],
     parent_to_children: dict[int, list[int]],
+    owner_repo: str,
 ) -> Table:
     from rich.table import Table
 
@@ -287,7 +293,7 @@ def _build_table(
             title_text = _styled(f"▸ {title_text}", "bright_cyan")
 
         table.add_row(
-            str(num),
+            _gh_link(owner_repo, num, "issues"),
             _extract_type(labels),
             title_text,
             _format_assignees(issue["assignees"]),
@@ -394,6 +400,7 @@ def _build_pr_table(
     title: str,
     prs: list[dict],
     pr_to_issues: dict[int, list[int]],
+    owner_repo: str,
 ) -> Table:
     from rich.table import Table
 
@@ -440,7 +447,7 @@ def _build_pr_table(
         )
 
         table.add_row(
-            str(pr["number"]),
+            _gh_link(owner_repo, pr["number"], "pull"),
             _clean_title(pr["title"]) + draft_marker,
             f"[bright_white]{pr['author']['login']}[/]",
             _format_assignees(pr.get("assignees", [])),
@@ -498,6 +505,7 @@ def main() -> int:
                 issue_to_pr,
                 child_to_parent,
                 parent_to_children,
+                owner_repo,
             )
             console.print()
             console.print(table)
@@ -510,6 +518,7 @@ def main() -> int:
                 issue_to_pr,
                 child_to_parent,
                 parent_to_children,
+                owner_repo,
             )
             console.print()
             console.print(table)
@@ -525,6 +534,7 @@ def main() -> int:
             f"[green]▸ Pull Requests[/]  [dim]({len(prs)} open)[/]",
             prs,
             pr_to_issues,
+            owner_repo,
         )
         console.print()
         console.print(table)
