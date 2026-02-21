@@ -47,7 +47,7 @@ class TestFormatCiStatus:
         assert "link=https://github.com/vig-os/devcontainer/pull/42/checks" in result
 
     def test_failures_shows_red_with_failed_check_names(self):
-        """Failed checks: ✗ 2/3 in red with failed check names."""
+        """Failed checks: ✗ 1/3 in red with failed check names (Build passed, Test+Lint failed)."""
         pr = {
             "number": 10,
             "statusCheckRollup": [
@@ -58,7 +58,7 @@ class TestFormatCiStatus:
         }
         result = gh_issues._format_ci_status(pr, "owner/repo")
         assert "✗" in result
-        assert "2/3" in result
+        assert "1/3" in result
         assert "red" in result
         assert "Test" in result
         assert "Lint" in result
