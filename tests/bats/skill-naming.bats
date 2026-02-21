@@ -122,3 +122,15 @@ setup() {
     run "$CHECK_SCRIPT" "$PROJECT_ROOT/.cursor/skills"
     assert_success
 }
+
+@test "canary: injecting a bad name into real skills dir is caught and cleaned up" {
+    local canary="$PROJECT_ROOT/.cursor/skills/bad:canary"
+    mkdir -p "$canary"
+    touch "$canary/SKILL.md"
+
+    run "$CHECK_SCRIPT" "$PROJECT_ROOT/.cursor/skills"
+    rm -rf "$canary"
+
+    assert_failure
+    assert_output --partial "bad:canary"
+}
