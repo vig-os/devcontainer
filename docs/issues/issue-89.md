@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-19T12:32:46Z
-updated: 2026-02-20T15:02:18Z
+updated: 2026-02-21T01:27:07Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/89
-comments: 1
+comments: 2
 labels: refactor, priority:medium, area:workspace, effort:large, semver:minor
-assignees: none
+assignees: gerchowl
 milestone: 0.4
 projects: none
 relationship: none
-synced: 2026-02-20T15:25:37.513Z
+synced: 2026-02-21T04:11:20.142Z
 ---
 
 # [Issue 89]: [[REFACTOR] Consolidate sync_manifest.py and utils.py into manifest-as-config architecture](https://github.com/vig-os/devcontainer/issues/89)
@@ -28,15 +28,16 @@ Both define text-replacement logic independently. The manifest's `Sed` transform
 
 ### Proposed refactoring
 
-1. **Extract transform classes** from `sync_manifest.py` into `utils.py` (or a new `scripts/transforms.py`) so they are reusable outside the sync context.
-2. **Make the manifest data-only** — convert `MANIFEST` from a Python list to a declarative config file (TOML or YAML), parsed by a thin loader. The manifest becomes pure configuration, not code.
+1. **Extract transform classes** from `sync_manifest.py` into a new `scripts/transforms.py` so they are reusable outside the sync context.
+2. **Keep manifest as declarative Python** — the `MANIFEST` list stays in `sync_manifest.py` as Python dataclass instances (pure data, no logic). TOML/YAML conversion was evaluated and rejected: the transforms have complex parameters (multi-line replacements, regex patterns, lists) that map poorly to config formats, and the file changes rarely. Declarative Python dataclasses with behavior extracted to `transforms.py` achieves the same separation-of-concerns goal.
 3. **Unify sed logic** — `utils.py`'s `sed_inplace` and the manifest's `Sed` transform both do regex/string replacement. Consolidate into one implementation.
 4. **Keep `utils.py` CLI** — `utils.py` is called directly by workflows (`version`, `sed` subcommands). Its CLI interface must be preserved.
 
 ### Acceptance Criteria
 
 - [ ] No duplicate text-replacement logic between the two files
-- [ ] `sync_manifest.py` manifest entries are declarative config (not Python code defining data)
+- [ ] Transform classes live in `scripts/transforms.py`, separate from the manifest data and sync engine
+- [ ] `sync_manifest.py` manifest entries are declarative data (dataclass instances importing transforms from `transforms.py`)
 - [ ] `utils.py` CLI (`version`, `sed` subcommands) continues to work unchanged
 - [ ] `just sync-workspace` produces identical output before and after
 - [ ] All existing tests pass
@@ -82,4 +83,33 @@ The `files:` pattern would need to cover all manifest source paths (`.github/pul
 - **Unscoped hook (runs on every commit)**: Works but adds unnecessary latency to commits that don't touch manifest sources.
 
 This fits naturally into the manifest-as-config refactor scope.
+
+---
+
+# [Comment #2]() by [gerchowl]()
+
+_Posted on February 21, 2026 at 01:27 AM_
+
+## Implementation Plan
+
+Issue: #89
+Branch: feature/89-consolidate-sync-manifest-utils
+
+### Tasks
+
+- [ ] Task 1: Write tests for all existing transform classes (`Sed`, `RemoveLines`, `StripTrailingBlankLines`, `RemoveBlock`, `RemovePrecommitHooks`, `ReplaceBlock`) — `tests/test_transforms.py` — verify: `uv run pytest tests/test_transforms.py -v`
+- [ ] Task 2: Extract transform classes and `_resolve` helper from `sync_manifest.py` into `scripts/transforms.py`; update `sync_manifest.py` to import from it — `scripts/transforms.py`, `scripts/sync_manifest.py` — verify: `uv run pytest tests/ -v` + `just sync-workspace`
+- [ ] Task 3: Write test that `sed_inplace` handles regex patterns (new behavior) — `tests/test_utils.py` — verify: `uv run pytest tests/test_utils.py::TestSedInplace -v`
+- [ ] Task 4: Unify `sed_inplace` to use `re.sub` internally while preserving the `s|old|new|g` CLI interface — `scripts/utils.py` — verify: `uv run pytest tests/test_utils.py -v`
+- [ ] Task 5: Write snapshot test — capture `just sync-workspace` output and diff against a golden reference to prove no behavioral change — `tests/test_sync_manifest.py` — verify: `uv run pytest tests/test_sync_manifest.py -v`
+- [ ] Task 6: Update `CHANGELOG.md` under `## Unreleased` — `CHANGELOG.md` — verify: visual review
+
+### Notes
+
+- Tasks 1-2 handle the transform extraction (the main structural change)
+- Tasks 3-4 handle the sed unification (DRY)
+- Task 5 is the safety net proving identical output
+- TDD: test tasks (1, 3, 5) come before or alongside their implementation tasks (2, 4)
+- `conftest.py`'s `parse_manifest` fixture continues to work since it imports `MANIFEST` dynamically
+- TOML/YAML manifest was evaluated and rejected — transforms have complex parameters (multi-line replacements, regex patterns, lists) that map poorly to config formats, and the file changes rarely. Declarative Python dataclasses with behavior in `transforms.py` achieves the same separation goal.
 
