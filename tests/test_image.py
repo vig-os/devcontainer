@@ -27,6 +27,7 @@ EXPECTED_VERSIONS = {
     "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),
     "typstyle": "0.14.",  # Minor version check (installed from latest release)
     "vig_utils": "0.1.",  # Minor version check (installed via uv pip)
+    "tmux": "3.3",  # Major.minor version check (from apt package)
 }
 
 
@@ -170,6 +171,42 @@ class TestSystemTools:
         assert "just-lsp" in result.stdout.lower(), (
             f"Expected just-lsp version output, got: {result.stdout}"
         )
+
+    def test_tmux_installed(self, host):
+        """Test that tmux is installed."""
+        assert host.package("tmux").is_installed, "tmux is not installed"
+
+    def test_tmux_version(self, host):
+        """Test that tmux version is correct."""
+        result = host.run("tmux -V")
+        assert result.rc == 0, "tmux -V failed"
+        expected = EXPECTED_VERSIONS["tmux"]
+        assert expected in result.stdout, (
+            f"Expected tmux {expected}, got: {result.stdout}"
+        )
+
+    def test_tmux_detached_session_survives(self, host):
+        """Test that tmux can create a detached session with a background process."""
+        session = "test-session"
+        host.run(f"tmux kill-session -t {session} 2>/dev/null")
+        try:
+            result = host.run(f"tmux new-session -d -s {session} 'sleep 60'")
+            assert result.rc == 0, f"Failed to create tmux session: {result.stderr}"
+
+            result = host.run("tmux list-sessions")
+            assert result.rc == 0, "tmux list-sessions failed"
+            assert session in result.stdout, (
+                f"Session '{session}' not found in: {result.stdout}"
+            )
+
+            result = host.run(f"tmux list-panes -t {session} -F '#{{pane_pid}}'")
+            assert result.rc == 0, "Failed to get pane PID"
+            pid = result.stdout.strip()
+            assert pid, "No PID returned for tmux pane"
+            result = host.run(f"kill -0 {pid}")
+            assert result.rc == 0, f"Process {pid} is not running"
+        finally:
+            host.run(f"tmux kill-session -t {session} 2>/dev/null")
 
 
 class TestPythonEnvironment:
