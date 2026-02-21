@@ -4,11 +4,20 @@
 from __future__ import annotations
 
 import re
+import sys
 from dataclasses import dataclass
+from pathlib import Path as _Path
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+# Ensure scripts dir on path for utils import when loaded via importlib
+_scripts_dir = _Path(__file__).resolve().parent
+if str(_scripts_dir) not in sys.path:
+    sys.path.insert(0, str(_scripts_dir))
+
+from utils import substitute_in_file  # noqa: E402
 
 
 class Transform(Protocol):
@@ -37,9 +46,7 @@ class Sed:
         path = _resolve(file_path, self.target)
         if path is None:
             return
-        content = path.read_text()
-        content = re.sub(self.pattern, self.replace, content)
-        path.write_text(content)
+        substitute_in_file(path, self.pattern, self.replace, regex=True)
 
 
 @dataclass

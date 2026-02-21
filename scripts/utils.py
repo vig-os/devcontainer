@@ -10,15 +10,37 @@ from pathlib import Path
 VERSION_PATTERN = re.compile(r"^- \*\*Version\*\*:.*$", re.MULTILINE)
 
 
+def substitute_in_file(
+    path: Path | str,
+    pattern: str,
+    replacement: str,
+    *,
+    regex: bool = False,
+    global_replace: bool = True,
+) -> None:
+    """Apply substitution to file. Shared by sed_inplace and Sed transform."""
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"File not found: {p}")
+    content = p.read_text()
+    if regex:
+        content = re.sub(pattern, replacement, content)
+    else:
+        if global_replace:
+            content = content.replace(pattern, replacement)
+        else:
+            content = content.replace(pattern, replacement, 1)
+    p.write_text(content)
+
+
 def sed_inplace(pattern: str, file_path: Path | str) -> None:
     """Cross-platform sed in-place editing.
 
     Supports sed substitution patterns like: s|old|new|g
     The delimiter can be any character (typically |, /, #, etc.)
+    Uses literal (non-regex) replacement.
     """
     path = Path(file_path)
-    if not path.exists():
-        raise FileNotFoundError(f"File not found: {path}")
 
     # Parse sed substitution pattern: s<delimiter><pattern><delimiter><replacement><delimiter>[flags]
     # Example: s|{{IMAGE_TAG}}|0.2.0|g
@@ -36,11 +58,8 @@ def sed_inplace(pattern: str, file_path: Path | str) -> None:
     delimiter = pattern[1]
 
     # Find all delimiter positions after 's'
-    # Pattern format: s<delim><pattern><delim><replacement><delim>[flags]
-    # We need to find the last delimiter (before flags) and second-to-last (end of replacement)
-    # Start searching from position 2 (after 's' and first delimiter)
     delim_positions = []
-    pos = 1  # Start at the first delimiter (position 1)
+    pos = 1
     while True:
         pos = pattern.find(delimiter, pos + 1)
         if pos == -1:
@@ -52,37 +71,18 @@ def sed_inplace(pattern: str, file_path: Path | str) -> None:
             f"Invalid sed pattern: {pattern} (expected format: s<delim><pattern><delim><replacement>[<delim><flags>])"
         )
 
-    # Extract components
-    # Pattern is between first delimiter (pos 1) and second delimiter
-    # Replacement is between second delimiter and third delimiter (or end if no flags)
-    # Flags are after last delimiter
-    search_pattern = pattern[
-        2 : delim_positions[0]
-    ]  # After 's' and first delim, up to second delim
-    replacement = pattern[
-        delim_positions[0] + 1 : delim_positions[1]
-    ]  # Between second and third delim
+    search_pattern = pattern[2 : delim_positions[0]]
+    replacement = pattern[delim_positions[0] + 1 : delim_positions[1]]
     flags = (
         pattern[delim_positions[1] + 1 :]
         if delim_positions[1] + 1 < len(pattern)
         else ""
     )
-
-    # Read file
-    text = path.read_text()
-
-    # Determine if global replacement (g flag)
     global_replace = "g" in flags
 
-    # Perform substitution
-    if global_replace:
-        updated_text = text.replace(search_pattern, replacement)
-    else:
-        # Replace only first occurrence
-        updated_text = text.replace(search_pattern, replacement, 1)
-
-    # Write back
-    path.write_text(updated_text)
+    substitute_in_file(
+        path, search_pattern, replacement, regex=False, global_replace=global_replace
+    )
 
 
 def update_version_line(
