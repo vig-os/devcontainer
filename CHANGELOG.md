@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CI status column in just gh-issues PR table** ([#143](https://github.com/vig-os/devcontainer/issues/143))
+  - PR table shows CI column with pass/fail/pending summary (✓ 6/6, ⏳ 3/6, ✗ 5/6)
+  - Failed check names visible when checks fail
+  - CI cell links to GitHub PR checks page
 - **Config-driven model tier assignments for agent skills** ([#103](https://github.com/vig-os/devcontainer/issues/103))
   - Extended `.cursor/agent-models.toml` with `standard` tier (sonnet-4.5) and `[skill-tiers]` mapping for skill categories (data-gathering, formatting, review, orchestration)
   - New rule `.cursor/rules/subagent-delegation.mdc` documenting when and how to delegate mechanical sub-steps to lightweight subagents via the Task tool

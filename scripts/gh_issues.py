@@ -337,7 +337,7 @@ def _fetch_prs() -> list[dict]:
             "number,title,author,assignees,isDraft,reviewDecision,"
             "baseRefName,headRefName,additions,deletions,changedFiles,"
             "labels,milestone,createdAt,body,"
-            "reviewRequests,latestReviews",
+            "reviewRequests,latestReviews,statusCheckRollup",
         ],
         capture_output=True,
         text=True,
@@ -367,6 +367,40 @@ def _infer_review(pr: dict) -> tuple[str, str]:
     if pr.get("reviewRequests"):
         return ("REVIEW_REQUIRED", "pending")
     return ("", "—")
+
+
+def _format_ci_status(pr: dict, owner_repo: str) -> str:
+    """Return Rich markup for CI status cell: pass/fail/pending summary with link.
+
+    Uses statusCheckRollup from gh pr list. Links to PR checks tab.
+    Ref: #143
+    """
+    rollup = pr.get("statusCheckRollup") or []
+    if not rollup:
+        return _styled("—", "dim")
+
+    total = len(rollup)
+    passed = sum(1 for c in rollup if c.get("conclusion") == "SUCCESS")
+    failed = sum(1 for c in rollup if c.get("conclusion") in ("FAILURE", "ERROR"))
+    pending = total - passed - failed
+
+    url = f"https://github.com/{owner_repo}/pull/{pr['number']}/checks"
+    link_prefix = f"[link={url}]"
+    link_suffix = "[/link]"
+
+    if failed > 0:
+        failed_names = [
+            c.get("name", "?")
+            for c in rollup
+            if c.get("conclusion") in ("FAILURE", "ERROR")
+        ]
+        text = f"✗ {passed}/{total} {', '.join(failed_names)}"
+        return link_prefix + _styled(text, "red") + link_suffix
+    if pending > 0:
+        text = f"⏳ {passed}/{total}"
+        return link_prefix + _styled(text, "yellow") + link_suffix
+    text = f"✓ {passed}/{total}"
+    return link_prefix + _styled(text, "green") + link_suffix
 
 
 def _extract_reviewers(pr: dict) -> str:
@@ -419,6 +453,7 @@ def _build_pr_table(
     table.add_column("Assignee", no_wrap=True, width=12)
     table.add_column("Issues", no_wrap=True, width=10)
     table.add_column("Branch", no_wrap=True, overflow="ellipsis", max_width=30)
+    table.add_column("CI", no_wrap=True, justify="center", width=14)
     table.add_column("Review", no_wrap=True, justify="center", width=8)
     table.add_column("Reviewer", no_wrap=True, width=12)
     table.add_column("Delta", no_wrap=True, justify="right", width=14)
@@ -446,6 +481,8 @@ def _build_pr_table(
             " ".join(_styled(f"#{n}", "cyan") for n in sorted(linked)) if linked else ""
         )
 
+        ci_cell = _format_ci_status(pr, owner_repo)
+
         table.add_row(
             _gh_link(owner_repo, pr["number"], "pull"),
             _clean_title(pr["title"]) + draft_marker,
@@ -453,6 +490,7 @@ def _build_pr_table(
             _format_assignees(pr.get("assignees", [])),
             issues_cell,
             branch,
+            ci_cell,
             review,
             reviewer,
             delta,
