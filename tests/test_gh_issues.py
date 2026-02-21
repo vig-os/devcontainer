@@ -309,7 +309,7 @@ class TestExtractReviewers:
             "latestReviews": [],
             "reviewRequests": [{"login": "carol"}],
         }
-        assert _extract_reviewers(pr) == "[yellow]carol[/]"
+        assert _extract_reviewers(pr) == "[dim italic]?carol[/]"
 
     def test_mixed_reviewers(self):
         pr = {
