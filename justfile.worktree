@@ -101,6 +101,7 @@ worktree-start issue prompt="" reviewer="":
             else
                 tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --approve-mcps"
             fi
+            sleep 2 && tmux send-keys -t "$SESSION" "a" 2>/dev/null || true
             echo "[OK] tmux session '$SESSION' started. Use: just worktree-attach $ISSUE"
         fi
         exit 0
@@ -193,6 +194,7 @@ worktree-start issue prompt="" reviewer="":
     else
         tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --approve-mcps"
     fi
+    sleep 2 && tmux send-keys -t "$SESSION" "a" 2>/dev/null || true
 
     echo ""
     echo "[OK] Worktree created at $WT_DIR"
@@ -287,6 +289,7 @@ worktree-attach issue:
             else
                 tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --approve-mcps"
             fi
+            sleep 2 && tmux send-keys -t "$SESSION" "a" 2>/dev/null || true
             echo "[OK] tmux session '$SESSION' restarted"
         else
             echo "[ERROR] No tmux session '$SESSION' found."
