@@ -29,9 +29,19 @@ Prepare and submit a pull request for **feature or bugfix work**.
 
 ### 4. Prepare PR text following template
 
-- Use the structure of [.github/pull_request_template.md](.github/pull_request_template.md).
-- Populate **Description**, **Related Issue(s)** (e.g. Closes #NN), **Type of Change**, **Changes Made** (from `git log base..HEAD` and `git diff --stat base...HEAD`), **Testing**, and **Checklist** from the current branch and your knowledge of the changes.
-- Write the body to a file (e.g. `.github/pr-draft-<issue>-into-<base>.md` or similar) so the user can edit it if needed.
+1. **Read the template**: `cat .github/pull_request_template.md`
+2. **Use it as the literal skeleton** — keep every heading, every checkbox line, every sub-heading. Strip only the HTML comments (`<!-- ... -->`).
+3. **Section-by-section mapping**:
+   - **Description**: Summarize what the PR does from the issue body and commit messages.
+   - **Type of Change**: Check the single box matching the branch type / commit types. Check `Breaking change` modifier only if commits contain `!`.
+   - **Changes Made**: List changed files with bullet sub-details (from `git diff --stat base...HEAD` and `git log base..HEAD`).
+   - **Changelog Entry**: Paste the exact `## Unreleased` diff from CHANGELOG.md. If no changelog update, write "No changelog needed" and explain.
+   - **Testing**: Check `Tests pass locally` if tests were run. Check `Manual testing performed` only if actually done. Fill `Manual Testing Details` or write "N/A".
+   - **Checklist**: Check only items that are genuinely true. Leave unchecked items unchecked — do not remove them.
+   - **Additional Notes**: Add design links, context, or write "N/A".
+   - **Refs**: `Refs: #<issue_number>`
+4. **Explicit prohibitions**: Do not invent new sections. Do not rename headings. Do not omit sections. Do not remove unchecked boxes.
+5. Write the body to a file (e.g. `.github/pr-draft-<issue>-into-<base>.md` or similar) so the user can edit it if needed.
 
 ### 5. Ask user to review and choose assignee and reviewers
 
