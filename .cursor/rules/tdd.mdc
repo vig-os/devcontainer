@@ -38,7 +38,9 @@ Before writing a test, evaluate which scenarios apply. Not every category applie
 | Edge cases | Empty input, single element, max values, boundary values |
 | Error paths | Invalid input, missing dependencies, network/IO failures |
 | Input validation | Null, undefined, wrong type, malformed data |
-| State & side effects | Does it modify state correctly? Idempotent? Cleanup? |
+| State & side effects | Does it modify state correctly? Cleanup? |
+| Idempotency | Does running the operation twice produce the same result as once? |
+| Concurrency | Do parallel or overlapping executions corrupt state or race? |
 | Regression | If fixing a bug, does the test prove the bug is fixed? |
 | Canary | Inject a known-bad state into the real environment, confirm the guard catches it, clean up |
 | Smoke | After integration, does the system start and key flows work? |
