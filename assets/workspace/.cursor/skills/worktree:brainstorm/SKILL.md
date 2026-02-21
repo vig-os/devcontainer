@@ -58,15 +58,22 @@ gh issue view <issue_number> --json title,body,labels,comments
    ```
 
 3. The comment **must** start with `## Design` (H2) — this is how other skills detect that the design phase is complete.
-4. Trigger the `sync-issues` workflow (fire-and-forget):
-
-   ```bash
-   gh workflow run sync-issues.yml -f target-branch=<current_branch>
-   ```
 
 ### 6. Proceed to planning
 
 - Invoke [worktree:plan](../worktree:plan/SKILL.md) to break the design into tasks.
+
+## Delegation
+
+The following steps SHOULD be delegated to reduce token consumption:
+
+- **Steps 1, 4** (precondition check, read issue): Spawn a Task subagent with `model: "fast"` that validates the branch name, executes `gh issue view`, and checks for an existing `## Design` comment. Returns: issue number, parsed body/comments, design-exists flag.
+- **Step 5** (publish design, trigger workflow): Spawn a Task subagent with `model: "fast"` that takes the formatted design content, posts it via `gh api`, and triggers the sync-issues workflow. Returns: comment URL.
+- **Step 6** (invoke next skill): Can remain in main agent (simple skill invocation).
+
+Steps 2-3 (explore context, make design decisions) should remain in the main agent as they require architectural reasoning and decision-making.
+
+Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
 
 ## When stuck
 

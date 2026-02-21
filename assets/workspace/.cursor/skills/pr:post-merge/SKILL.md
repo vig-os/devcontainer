@@ -34,6 +34,23 @@ After opening a PR from a feature branch (e.g. `feature/34-...`) into a base bra
    `git branch -d <feature-branch>`
    Use the branch name the user indicates (e.g. "branch 34" → `feature/34-...`; list with `git branch` if needed).
 
+## Delegation
+
+All steps in this skill are mechanical cleanup operations and SHOULD be delegated:
+
+Spawn a Task subagent with `model: "fast"` that:
+1. Identifies and deletes the PR draft file (if it exists)
+2. Determines the base branch name (via user input or `gh issue develop --list`)
+3. Checks out the base branch
+4. Pulls updates from origin
+5. Identifies and deletes the feature branch locally (via `git branch -d`)
+
+Returns: confirmation of each step (file deleted, branch switched, branch updated, branch deleted) or errors if any step fails.
+
+This entire workflow is data-gathering and CLI execution, making it ideal for lightweight delegation.
+
+Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
+
 ## Notes
 
 - Confirm which PR file, base branch, and feature branch to use from the user's message or ask if ambiguous.

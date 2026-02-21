@@ -74,6 +74,17 @@ After the PR is created, post a summary comment on the issue:
 - CI: all checks pass
 ```
 
+## Delegation
+
+The following steps SHOULD be delegated to reduce token consumption:
+
+- **Steps 1-2** (precondition check, read issue, detect state): Spawn a Task subagent with `model: "fast"` that runs the branch validation, executes `gh issue view`, parses the JSON output, and scans comments for H2 headings. Returns: issue number, parsed body/comments, detected phase state.
+- **Step 4** (report completion): Spawn a Task subagent with `model: "fast"` that formats and posts the summary comment via `gh api`.
+
+Step 3 (orchestration) should remain in the main agent as it requires understanding skill dependencies and phase transitions.
+
+Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
+
 ## Important Notes
 
 - Never block for user input at any phase. Each sub-skill is autonomous.

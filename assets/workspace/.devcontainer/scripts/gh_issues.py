@@ -79,6 +79,48 @@ def _fetch_linked_branches() -> dict[int, str]:
     return mapping
 
 
+def _fetch_sub_issue_tree(
+    issues: list[dict],
+    owner_repo: str,
+) -> tuple[dict[int, int], dict[int, list[int]]]:
+    """Return (child_to_parent, parent_to_children) for open issues.
+
+    Queries each issue's parent endpoint in parallel. Output format is one
+    ``child:parent`` pair per line; 404s (no parent) are silently skipped.
+    """
+    child_to_parent: dict[int, int] = {}
+    parent_to_children: dict[int, list[int]] = {}
+
+    nums = " ".join(str(i["number"]) for i in issues)
+    script = (
+        f'echo {nums} | tr " " "\\n" | '
+        "xargs -P8 -I{} sh -c '"
+        "p=$(gh api repos/" + owner_repo + "/issues/{}/parent "
+        "--jq .number 2>/dev/null) && "
+        '[ -n "$p" ] && echo "{}:$p" || true\''
+    )
+    result = subprocess.run(
+        ["sh", "-c", script],
+        capture_output=True,
+        text=True,
+    )
+
+    for line in result.stdout.strip().split("\n"):
+        line = line.strip()
+        if ":" not in line:
+            continue
+        parts = line.split(":", 1)
+        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+            child, parent = int(parts[0]), int(parts[1])
+            child_to_parent[child] = parent
+            parent_to_children.setdefault(parent, []).append(child)
+
+    for parent in parent_to_children:
+        parent_to_children[parent].sort()
+
+    return child_to_parent, parent_to_children
+
+
 LABEL_STYLES: dict[str, str] = {
     "priority:critical": "bold red",
     "priority:high": "red",
@@ -147,11 +189,14 @@ def _format_assignees(assignees: list[dict]) -> str:
     return ", ".join(f"[bright_white]{a['login']}[/]" for a in assignees)
 
 
+_CLOSING_RE = re.compile(r"(?:closes|fixes|resolves)\s+#(\d+)", re.IGNORECASE)
+
+
 def _build_cross_refs(
     branches: dict[int, str],
     prs: list[dict],
 ) -> tuple[dict[int, int], dict[int, list[int]]]:
-    """Build issue↔PR cross-references via matching branch names.
+    """Build issue-PR cross-references from branch names and PR body keywords.
 
     Returns (issue_to_pr, pr_to_issues) mappings.
     """
@@ -159,11 +204,22 @@ def _build_cross_refs(
     issue_to_pr: dict[int, int] = {}
     pr_to_issues: dict[int, list[int]] = {}
     for pr in prs:
+        pr_num = pr["number"]
+        linked: set[int] = set()
+
         head = pr["headRefName"]
         issue_num = branch_to_issue.get(head)
         if issue_num is not None:
-            issue_to_pr[issue_num] = pr["number"]
-            pr_to_issues.setdefault(pr["number"], []).append(issue_num)
+            linked.add(issue_num)
+
+        body = pr.get("body") or ""
+        for match in _CLOSING_RE.finditer(body):
+            linked.add(int(match.group(1)))
+
+        for inum in linked:
+            issue_to_pr[inum] = pr_num
+        if linked:
+            pr_to_issues[pr_num] = sorted(linked)
     return issue_to_pr, pr_to_issues
 
 
@@ -172,6 +228,8 @@ def _build_table(
     issues: list[dict],
     branches: dict[int, str],
     issue_to_pr: dict[int, int],
+    child_to_parent: dict[int, int],
+    parent_to_children: dict[int, list[int]],
 ) -> Table:
     from rich.table import Table
 
@@ -186,26 +244,52 @@ def _build_table(
     )
     table.add_column("#", style="bold cyan", no_wrap=True, justify="right", width=4)
     table.add_column("Type", no_wrap=True, width=7)
-    table.add_column("Title", no_wrap=True, overflow="ellipsis", ratio=1)
-    table.add_column("Assignee", no_wrap=True, max_width=16)
     table.add_column(
-        "Branch", style="dim", no_wrap=True, overflow="ellipsis", max_width=24
+        "Title",
+        no_wrap=True,
+        overflow="ellipsis",
+        min_width=20,
+        ratio=1,
+    )
+    table.add_column("Assignee", no_wrap=True, max_width=14)
+    table.add_column(
+        "Branch",
+        style="dim",
+        no_wrap=True,
+        overflow="ellipsis",
+        max_width=24,
     )
     table.add_column("PR", no_wrap=True, justify="right", width=4)
     table.add_column("Prio", no_wrap=True, justify="center", width=7)
-    table.add_column("Scope", no_wrap=True, width=10)
+    table.add_column("Scope", no_wrap=True, width=9)
     table.add_column("Effort", no_wrap=True, justify="center", width=6)
     table.add_column("SemVer", no_wrap=True, justify="center", width=5)
 
-    for issue in sorted(issues, key=lambda i: i["number"]):
+    issue_by_num = {i["number"]: i for i in issues}
+
+    rendered: set[int] = set()
+    sorted_issues = sorted(issues, key=lambda i: i["number"])
+
+    def _add_row(issue: dict, *, indent: int = 0) -> None:
+        num = issue["number"]
+        if num in rendered:
+            return
+        rendered.add(num)
         labels = issue.get("labels", [])
-        branch = branches.get(issue["number"], "")
-        pr_num = issue_to_pr.get(issue["number"])
+        branch = branches.get(num, "")
+        pr_num = issue_to_pr.get(num)
         pr_cell = _styled(f"#{pr_num}", "green") if pr_num else ""
+
+        title_text = _clean_title(issue["title"])
+        if indent > 0:
+            title_text = _styled(f"└ {title_text}", "dim")
+        elif num in parent_to_children:
+            title_text = _styled(f"▸ {title_text}", "bright_cyan")
+
         table.add_row(
-            str(issue["number"]),
+            str(num),
             _extract_type(labels),
-            _clean_title(issue["title"]),
+            title_text,
             _format_assignees(issue["assignees"]),
             branch,
             pr_cell,
@@ -214,6 +298,22 @@ def _build_table(
             _extract_label(labels, "effort:"),
             _extract_label(labels, "semver:"),
         )
+
+    for issue in sorted_issues:
+        num = issue["number"]
+        if num in rendered:
+            continue
+        if num in child_to_parent and child_to_parent[num] in issue_by_num:
+            continue
+        _add_row(issue, indent=0)
+        for child_num in parent_to_children.get(num, []):
+            if child_num in issue_by_num:
+                _add_row(issue_by_num[child_num], indent=1)
+
+    for issue in sorted_issues:
+        if issue["number"] not in rendered:
+            _add_row(issue, indent=0)
+
     return table
 
 
@@ -228,9 +328,10 @@ def _fetch_prs() -> list[dict]:
             "--limit",
             "100",
             "--json",
-            "number,title,author,isDraft,reviewDecision,"
+            "number,title,author,assignees,isDraft,reviewDecision,"
             "baseRefName,headRefName,additions,deletions,changedFiles,"
-            "labels,milestone,createdAt",
+            "labels,milestone,createdAt,body,"
+            "reviewRequests,latestReviews",
         ],
         capture_output=True,
         text=True,
@@ -244,6 +345,49 @@ REVIEW_STYLES: dict[str, tuple[str, str]] = {
     "CHANGES_REQUESTED": ("red", "changes"),
     "REVIEW_REQUIRED": ("yellow", "pending"),
 }
+
+
+def _infer_review(pr: dict) -> tuple[str, str]:
+    """Return (state, label) using reviewDecision, falling back to latestReviews."""
+    decision = pr.get("reviewDecision") or ""
+    if decision:
+        entry = REVIEW_STYLES.get(decision)
+        return (decision, entry[1]) if entry else (decision, decision.lower())
+    latest = pr.get("latestReviews") or []
+    if latest:
+        best = latest[-1].get("state", "")
+        entry = REVIEW_STYLES.get(best)
+        return (best, entry[1]) if entry else (best, best.lower())
+    if pr.get("reviewRequests"):
+        return ("REVIEW_REQUIRED", "pending")
+    return ("", "—")
+
+
+def _extract_reviewers(pr: dict) -> str:
+    """Build a compact reviewer string from latestReviews and reviewRequests."""
+    seen: dict[str, str] = {}
+    for r in pr.get("latestReviews") or []:
+        login = (r.get("author") or {}).get("login", "")
+        if login:
+            state = r.get("state", "")
+            seen[login] = state
+    for r in pr.get("reviewRequests") or []:
+        login = r.get("login") or ""
+        if not login:
+            login = r.get("name") or ""
+        if login and login not in seen:
+            seen[login] = "REQUESTED"
+    if not seen:
+        return _styled("—", "dim")
+    parts = []
+    for login, state in seen.items():
+        if state == "APPROVED":
+            parts.append(_styled(login, "green"))
+        elif state == "CHANGES_REQUESTED":
+            parts.append(_styled(login, "red"))
+        else:
+            parts.append(_styled(login, "yellow"))
+    return " ".join(parts)
 
 
 def _build_pr_table(
@@ -265,15 +409,21 @@ def _build_pr_table(
     table.add_column("#", style="bold cyan", no_wrap=True, justify="right", width=4)
     table.add_column("Title", no_wrap=True, overflow="ellipsis", ratio=1)
     table.add_column("Author", no_wrap=True, width=12)
+    table.add_column("Assignee", no_wrap=True, width=12)
     table.add_column("Issues", no_wrap=True, width=10)
     table.add_column("Branch", no_wrap=True, overflow="ellipsis", max_width=30)
     table.add_column("Review", no_wrap=True, justify="center", width=8)
+    table.add_column("Reviewer", no_wrap=True, width=12)
     table.add_column("Delta", no_wrap=True, justify="right", width=14)
 
     for pr in sorted(prs, key=lambda p: p["number"]):
-        review_raw = pr.get("reviewDecision") or ""
-        style, label = REVIEW_STYLES.get(review_raw, ("dim", review_raw.lower() or "—"))
+        review_state, review_label = _infer_review(pr)
+        style, label = REVIEW_STYLES.get(
+            review_state,
+            ("dim", review_label or "—"),
+        )
         review = _styled(label, style)
+        reviewer = _extract_reviewers(pr)
 
         draft_marker = _styled(" draft", "dim italic") if pr.get("isDraft") else ""
 
@@ -293,9 +443,11 @@ def _build_pr_table(
             str(pr["number"]),
             _clean_title(pr["title"]) + draft_marker,
             f"[bright_white]{pr['author']['login']}[/]",
+            _format_assignees(pr.get("assignees", [])),
             issues_cell,
             branch,
             review,
+            reviewer,
             delta,
         )
     return table
@@ -308,6 +460,17 @@ def main() -> int:
     prs = _fetch_prs()
     branches = _fetch_linked_branches() if issues else {}
     issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
+
+    owner_result = subprocess.run(
+        ["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    owner_repo = owner_result.stdout.strip()
+    child_to_parent, parent_to_children = (
+        _fetch_sub_issue_tree(issues, owner_repo) if issues else ({}, {})
+    )
 
     console = Console()
 
@@ -333,6 +496,8 @@ def main() -> int:
                 group,
                 branches,
                 issue_to_pr,
+                child_to_parent,
+                parent_to_children,
             )
             console.print()
             console.print(table)
@@ -343,6 +508,8 @@ def main() -> int:
                 no_milestone,
                 branches,
                 issue_to_pr,
+                child_to_parent,
+                parent_to_children,
             )
             console.print()
             console.print(table)

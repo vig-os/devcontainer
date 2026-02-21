@@ -13,8 +13,21 @@ justfile.worktree               @gerchowl
 .github/workflows/              @c-vigo
 .github/actions/                @c-vigo
 
-# Build and release tooling
-scripts/                        @c-vigo
+# Build and release scripts
+scripts/build.sh                @c-vigo
+scripts/prepare-build.sh        @c-vigo
+scripts/clean.sh                @c-vigo
+scripts/sync_manifest.py        @c-vigo
+scripts/utils.py                @c-vigo
+
+# Developer tooling scripts
+scripts/gh_issues.py            @gerchowl
+scripts/setup-labels.sh         @gerchowl
+scripts/resolve-branch.sh       @gerchowl
+
+# Dev environment setup
+scripts/init.sh                 @c-vigo
+scripts/requirements.yaml       @c-vigo
 
 # Security-sensitive configuration
 .github/dependabot.yml          @c-vigo
