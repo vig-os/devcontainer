@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Devcontainer and git recipes in justfile.base** ([#71](https://github.com/vig-os/devcontainer/issues/71))
+  - Devcontainer group (host-side only): `up`, `down`, `status`, `logs`, `shell`, `restart`, `open`
+  - Auto-detect podman/docker compose; graceful failure if run inside container
+  - Git group: `log` (pretty one-line, last 20), `branch` (current + recent)
 - **CI status column in just gh-issues PR table** ([#143](https://github.com/vig-os/devcontainer/issues/143))
   - PR table shows CI column with pass/fail/pending summary (✓ 6/6, ⏳ 3/6, ✗ 5/6)
   - Failed check names visible when checks fail
