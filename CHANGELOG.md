@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **worktree-attach restarts stopped tmux session when worktree dir exists** ([#132](https://github.com/vig-os/devcontainer/issues/132))
   - Detect when worktree directory exists but tmux session has terminated
   - Automatically restart session in existing worktree before attaching
-  - BATS integration tests for restart and error paths
+  - Guard `worktree-start` against branches already checked out elsewhere with an informative error
+  - BATS integration tests for restart, error paths, and checkout detection
 
 ### Changed
 
@@ -20,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Extract transform classes (Sed, RemoveLines, etc.) to `scripts/transforms.py`
   - Unify sed logic: `substitute_in_file()` in utils shared by sed_inplace and Sed transform
   - Convert MANIFEST from Python code to declarative `scripts/manifest.toml`
+- **Rename skill namespace separator from colon to underscore** ([#128](https://github.com/vig-os/devcontainer/issues/128))
+  - All skill directories under `.cursor/skills/` and `assets/workspace/.cursor/skills/` renamed (e.g. `issue:create` → `issue_create`)
+  - All internal cross-references, frontmatter, prose, `CLAUDE.md` command table, and label taxonomy updated
+  - `issue_create` skill enhanced: gathers context via `just gh-issues` before drafting, suggests parent/child relationships and milestones
+  - `issue_create` skill now includes TDD acceptance criterion for testable issue types
+  - Remaining `sync-issues` workflow trigger references removed from skills
+  - `tdd.mdc` expanded with test scenario checklist and test type guidance; switched from always-on to glob-triggered on source/test files
+  - `code_tdd`, `code_execute`, and `worktree_execute` skills now reference `tdd.mdc` explicitly
 - **Clickable issue and PR numbers in gh-issues table** ([#104](https://github.com/vig-os/devcontainer/issues/104))
   - `#` column in issue and PR tables now uses Rich OSC 8 hyperlinks to GitHub URLs
   - Clicking an issue or PR number opens it in the browser (or Cursor's integrated terminal)
@@ -34,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Extended `.cursor/agent-models.toml` with `standard` tier (sonnet-4.5) and `[skill-tiers]` mapping for skill categories (data-gathering, formatting, review, orchestration)
   - New rule `.cursor/rules/subagent-delegation.mdc` documenting when and how to delegate mechanical sub-steps to lightweight subagents via the Task tool
   - Added `## Delegation` sections to 12 skills identifying steps that should spawn lightweight/standard-tier subagents to reduce token consumption on the primary autonomous model
-  - Skills updated: `worktree:solve-and-pr`, `worktree:brainstorm`, `worktree:plan`, `worktree:execute`, `worktree:verify`, `worktree:pr`, `worktree:ci-check`, `worktree:ci-fix`, `code:review`, `issue:triage`, `pr:post-merge`, `ci:check`
+  - Skills updated: `worktree_solve-and-pr`, `worktree_brainstorm`, `worktree_plan`, `worktree_execute`, `worktree_verify`, `worktree_pr`, `worktree_ci-check`, `worktree_ci-fix`, `code_review`, `issue_triage`, `pr_post-merge`, `ci_check`
 - **hadolint pre-commit hook for Containerfile linting** ([#122](https://github.com/vig-os/devcontainer/issues/122))
   - Add `hadolint` hook to `.pre-commit-config.yaml`, pinned by SHA (v2.9.3)
   - Enforce Dockerfile best practices: pinned base image tags, consolidated `RUN` layers, shellcheck for inline scripts
@@ -45,12 +54,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Optional reviewer parameter for autonomous worktree pipeline** ([#102](https://github.com/vig-os/devcontainer/issues/102))
   - Support `reviewer` parameter in `just worktree-start`
   - Propagate `PR_REVIEWER` via tmux environment to the autonomous agent
-  - Update `worktree:pr` skill to automatically request review when `PR_REVIEWER` is set
+  - Update `worktree_pr` skill to automatically request review when `PR_REVIEWER` is set
 - **Inception skill family for pre-development product thinking** ([#90](https://github.com/vig-os/devcontainer/issues/90))
-  - Four-phase pipeline: `inception:explore` (divergent problem understanding), `inception:scope` (convergent scoping), `inception:architect` (pattern-validated design), `inception:plan` (decomposition into GitHub issues)
+  - Four-phase pipeline: `inception_explore` (divergent problem understanding), `inception_scope` (convergent scoping), `inception_architect` (pattern-validated design), `inception_plan` (decomposition into GitHub issues)
   - Document templates: `docs/templates/RFC.md` (Problem Statement, Proposed Solution, Alternatives, Impact, Phasing) and `docs/templates/DESIGN.md` (Architecture, Components, Data Flow, Technology Stack, Testing)
   - Document directories: `docs/rfcs/` and `docs/designs/` for durable artifacts
-  - Certified architecture reference repos embedded in `inception:architect` skill: ByteByteGoHq/system-design-101, donnemartin/system-design-primer, karanpratapsingh/system-design, binhnguyennus/awesome-scalability, mehdihadeli/awesome-software-architecture
+  - Certified architecture reference repos embedded in `inception_architect` skill: ByteByteGoHq/system-design-101, donnemartin/system-design-primer, karanpratapsingh/system-design, binhnguyennus/awesome-scalability, mehdihadeli/awesome-software-architecture
   - Fills the gap between "I have an idea" and "I have issues ready for design"
 - **Automatic update notifications on devcontainer attach** ([#73](https://github.com/vig-os/devcontainer/issues/73))
   - Wire `version-check.sh` into `post-attach.sh` for automatic update checks
@@ -66,7 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cursor worktree support for parallel agent development** ([#64](https://github.com/vig-os/devcontainer/issues/64))
   - `.cursor/worktrees.json` for native Cursor worktree initialization (macOS/Linux local)
   - `justfile.worktree` with tmux + cursor-agent CLI recipes (`worktree-start`, `worktree-list`, `worktree-attach`, `worktree-stop`, `worktree-clean`) for devcontainer environments
-  - Autonomous worktree skills: `worktree:brainstorm`, `worktree:plan`, `worktree:execute`, `worktree:verify`, `worktree:pr`, `worktree:ask`, `worktree:solve-and-pr`
+  - Autonomous worktree skills: `worktree_brainstorm`, `worktree_plan`, `worktree_execute`, `worktree_verify`, `worktree_pr`, `worktree_ask`, `worktree_solve-and-pr`
   - Sync manifest updated to propagate worktree config and recipes to downstream projects
 - **GitHub issue and PR dashboard recipe** ([#84](https://github.com/vig-os/devcontainer/issues/84))
   - `just gh-issues` displays open issues grouped by milestone in rich tables with columns for type, title, assignee, linked branch, priority, scope, effort, and semver
@@ -74,7 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Linked branches fetched via a single GraphQL call
   - Ships to downstream workspaces via sync manifest (`.devcontainer/justfile.gh` + `.devcontainer/scripts/gh_issues.py`)
 - **Issue triage agent skill** ([#81](https://github.com/vig-os/devcontainer/issues/81))
-  - Cursor skill at `.cursor/skills/issue:triage/` for triaging open issues across priority, area, effort, SemVer impact, dependencies, and release readiness
+  - Cursor skill at `.cursor/skills/issue_triage/` for triaging open issues across priority, area, effort, SemVer impact, dependencies, and release readiness
   - Decision matrix groups issues into parent/sub-issue clusters with milestone suggestions
   - Predefined label taxonomy (`label-taxonomy.md`) for priority, area, effort, and SemVer dimensions
   - Sync manifest updated to propagate skill to workspace template
