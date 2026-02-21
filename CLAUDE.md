@@ -5,34 +5,34 @@
 Available slash commands (symlinked from `.cursor/skills/`):
 | Command | Description |
 |---------|-------------|
-| `/ci:check` | Check CI pipeline status for current branch/PR |
-| `/ci:fix` | Diagnose and fix failing CI runs |
-| `/code:debug` | Systematic debugging: root cause first, fix second |
-| `/code:execute` | Work through implementation plan in batches with checkpoints |
-| `/code:review` | Structured self-review before submitting a PR |
-| `/code:tdd` | Strict RED-GREEN-REFACTOR discipline |
-| `/code:verify` | Run verification and provide evidence before claiming done |
-| `/design:brainstorm` | Explore requirements and design before writing code |
-| `/design:plan` | Break approved design into implementation tasks |
-| `/git:commit` | Commit workflow following project conventions |
-| `/inception:explore` | Divergent exploration — understand the problem space |
-| `/inception:scope` | Convergent scoping — define what to build and what not to build |
-| `/inception:architect` | Architecture evaluation — validate design against established patterns |
-| `/inception:plan` | Decomposition — turn scoped design into actionable GitHub issues |
-| `/issue:claim` | Set up local environment to work on a GitHub issue |
-| `/issue:create` | Create a new GitHub issue using templates |
-| `/issue:triage` | Triage and label GitHub issues |
-| `/pr:create` | Prepare and submit a pull request |
-| `/pr:post-merge` | Cleanup after PR merge |
-| `/worktree:ci-check` | Autonomous CI check — polls until completion, triggers fix on failure |
-| `/worktree:ci-fix` | Autonomous CI fix — diagnose, post diagnosis, fix, push, re-check |
-| `/worktree:brainstorm` | Autonomous design — reads issue, posts design, never blocks |
-| `/worktree:plan` | Autonomous planning — posts implementation plan, never blocks |
-| `/worktree:execute` | Autonomous TDD implementation — no user checkpoints |
-| `/worktree:verify` | Autonomous verification — evidence only, loops on failure |
-| `/worktree:pr` | Autonomous PR creation from worktree branch |
-| `/worktree:ask` | Post question to issue when autonomous agent is stuck |
-| `/worktree:solve-and-pr` | Full autonomous pipeline: detect state → design → plan → execute → verify → PR |
+| `/ci_check` | Check CI pipeline status for current branch/PR |
+| `/ci_fix` | Diagnose and fix failing CI runs |
+| `/code_debug` | Systematic debugging: root cause first, fix second |
+| `/code_execute` | Work through implementation plan in batches with checkpoints |
+| `/code_review` | Structured self-review before submitting a PR |
+| `/code_tdd` | Strict RED-GREEN-REFACTOR discipline |
+| `/code_verify` | Run verification and provide evidence before claiming done |
+| `/design_brainstorm` | Explore requirements and design before writing code |
+| `/design_plan` | Break approved design into implementation tasks |
+| `/git_commit` | Commit workflow following project conventions |
+| `/inception_explore` | Divergent exploration — understand the problem space |
+| `/inception_scope` | Convergent scoping — define what to build and what not to build |
+| `/inception_architect` | Architecture evaluation — validate design against established patterns |
+| `/inception_plan` | Decomposition — turn scoped design into actionable GitHub issues |
+| `/issue_claim` | Set up local environment to work on a GitHub issue |
+| `/issue_create` | Create a new GitHub issue using templates |
+| `/issue_triage` | Triage and label GitHub issues |
+| `/pr_create` | Prepare and submit a pull request |
+| `/pr_post-merge` | Cleanup after PR merge |
+| `/worktree_ci-check` | Autonomous CI check — polls until completion, triggers fix on failure |
+| `/worktree_ci-fix` | Autonomous CI fix — diagnose, post diagnosis, fix, push, re-check |
+| `/worktree_brainstorm` | Autonomous design — reads issue, posts design, never blocks |
+| `/worktree_plan` | Autonomous planning — posts implementation plan, never blocks |
+| `/worktree_execute` | Autonomous TDD implementation — no user checkpoints |
+| `/worktree_verify` | Autonomous verification — evidence only, loops on failure |
+| `/worktree_pr` | Autonomous PR creation from worktree branch |
+| `/worktree_ask` | Post question to issue when autonomous agent is stuck |
+| `/worktree_solve-and-pr` | Full autonomous pipeline: detect state → design → plan → execute → verify → PR |
 ---
 
 ## Always-Apply Rules
@@ -85,7 +85,7 @@ Use `gh issue develop` to create and link branches. Always confirm branch name w
 
 Every piece of knowledge lives in exactly one place. Reference it everywhere else. Don't copy -- link. Applies to docs, config, infra, rules, and comments.
 
-### TDD
+### TDD (glob-triggered on source/test files, see `.cursor/rules/tdd.mdc`)
 
 1. Write the failing test first. Run it. Confirm it fails.
 2. **Commit** the failing test (`test: ...`) following the Commit Message Standard above. Do not proceed before committing.
@@ -95,3 +95,5 @@ Every piece of knowledge lives in exactly one place. Reference it everywhere els
 All commits must follow the Commit Message Standard. Never use `--no-verify`.
 
 Each phase gets its own commit. Do not write implementation before its test. Skip TDD only for non-testable changes (config, templates, docs) -- note why.
+
+Before writing tests, use the **scenario checklist** in `tdd.mdc`: happy path, edge cases, error paths, input validation, state/side effects, regression, smoke. Use the narrowest test type (unit > integration > smoke > E2E) that covers the behavior.
