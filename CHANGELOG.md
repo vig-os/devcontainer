@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **worktree-attach restarts stopped tmux session when worktree dir exists** ([#132](https://github.com/vig-os/devcontainer/issues/132))
   - Detect when worktree directory exists but tmux session has terminated
   - Automatically restart session in existing worktree before attaching
-  - BATS integration tests for restart and error paths
+  - Guard `worktree-start` against branches already checked out elsewhere with an informative error
+  - BATS integration tests for restart, error paths, and checkout detection
 
 ### Changed
 

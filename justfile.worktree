@@ -169,6 +169,18 @@ worktree-start issue prompt="" reviewer="":
 
     # Fetch and create worktree on the linked branch
     git fetch origin "$BRANCH"
+
+    # Guard: fail early if the branch is already checked out somewhere
+    CHECKED_OUT_AT=$(git worktree list --porcelain \
+        | awk -v branch="branch refs/heads/$BRANCH" '$0 == branch { print path } /^worktree / { path = substr($0, 10) }')
+    if [ -n "$CHECKED_OUT_AT" ]; then
+        echo "[ERROR] Branch '$BRANCH' is already checked out at: $CHECKED_OUT_AT"
+        echo "        Switch to a different branch there, or remove the checkout first:"
+        echo "          git -C \"$CHECKED_OUT_AT\" checkout dev"
+        echo "          # or: git worktree remove \"$CHECKED_OUT_AT\""
+        exit 1
+    fi
+
     echo "Creating worktree at $WT_DIR (branch: $BRANCH)..."
     git worktree add "$WT_DIR" "$BRANCH"
 
