@@ -40,6 +40,7 @@ Before writing a test, evaluate which scenarios apply. Not every category applie
 | Input validation | Null, undefined, wrong type, malformed data |
 | State & side effects | Does it modify state correctly? Idempotent? Cleanup? |
 | Regression | If fixing a bug, does the test prove the bug is fixed? |
+| Canary | Inject a known-bad state into the real environment, confirm the guard catches it, clean up |
 | Smoke | After integration, does the system start and key flows work? |
 
 ## Test types
