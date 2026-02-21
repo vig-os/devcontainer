@@ -59,6 +59,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nano \
     minisign \
     podman \
+    tmux \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Generate en_US.UTF-8 locale
@@ -174,6 +175,7 @@ RUN set -eux; \
 # and upgrade pip to fix CVE-2025-8869 (symbolic link extraction vulnerability)
 RUN uv pip install --system \
     pre-commit \
+    rich \
     ruff \
     pip-licenses && \
     uv pip install --system --upgrade pip

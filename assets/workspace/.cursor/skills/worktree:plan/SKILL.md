@@ -66,15 +66,21 @@ gh issue view <issue_number> --json title,body,labels,comments
    ...
    ```
 
-5. Trigger the `sync-issues` workflow (fire-and-forget):
-
-   ```bash
-   gh workflow run sync-issues.yml -f target-branch=<current_branch>
-   ```
-
 ### 4. Proceed to execution
 
 - Invoke [worktree:execute](../worktree:execute/SKILL.md) to start implementing.
+
+## Delegation
+
+The following steps SHOULD be delegated to reduce token consumption:
+
+- **Steps 1, 4** (precondition check, read issue/design): Spawn a Task subagent with `model: "fast"` that validates the branch name, executes `gh issue view`, checks for existing `## Design` and `## Implementation Plan` comments. Returns: issue number, parsed body/design, plan-exists flag.
+- **Step 3** (publish plan, trigger workflow): Spawn a Task subagent with `model: "fast"` that takes the formatted plan content, posts it via `gh api`, and triggers the sync-issues workflow. Returns: comment URL.
+- **Step 4** (invoke next skill): Can remain in main agent (simple skill invocation).
+
+Step 2 (break into tasks) should remain in the main agent as it requires task decomposition and dependency analysis.
+
+Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
 
 ## Important Notes
 

@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-20T10:03:02Z
-updated: 2026-02-20T10:03:02Z
+updated: 2026-02-21T01:33:39Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/104
-comments: 0
+comments: 2
 labels: feature
-assignees: none
+assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-20T13:17:16.911Z
+synced: 2026-02-21T04:11:19.127Z
 ---
 
 # [Issue 104]: [[FEATURE] Make issue numbers in just gh-issues table clickable links](https://github.com/vig-os/devcontainer/issues/104)
@@ -57,3 +57,40 @@ The `owner_repo` string is already fetched in `main()` and can be threaded to `_
 ### Changelog Category
 
 Changed
+---
+
+# [Comment #1]() by [gerchowl]()
+
+_Posted on February 20, 2026 at 03:42 PM_
+
+The PR table should also display its CI status (e.g. passing/failing/pending) alongside the clickable link, so developers can see at a glance whether a PR's checks are green without leaving the terminal.
+
+---
+
+# [Comment #2]() by [gerchowl]()
+
+_Posted on February 21, 2026 at 01:33 AM_
+
+## Implementation Plan
+
+Issue: #104
+Branch: `feature/104-clickable-issue-numbers`
+
+### Tasks
+
+- [ ] Task 1: **RED** — Write test asserting `_build_table` renders issue numbers as `[link=https://github.com/{owner_repo}/issues/{num}]` hyperlinks — `tests/test_gh_issues.py` (new) — verify: `just test` (test fails)
+- [ ] Task 2: **GREEN** — Thread `owner_repo` into `_build_table` and wrap `#` column value with Rich `[link=...]` markup — `scripts/gh_issues.py` — verify: `just test` (test passes)
+- [ ] Task 3: **RED** — Write test asserting `_build_pr_table` renders PR numbers as `[link=https://github.com/{owner_repo}/pull/{num}]` hyperlinks — `tests/test_gh_issues.py` — verify: `just test` (test fails)
+- [ ] Task 4: **GREEN** — Thread `owner_repo` into `_build_pr_table` and wrap `#` column value with Rich `[link=...]` markup — `scripts/gh_issues.py` — verify: `just test` (test passes)
+- [ ] Task 5: **RED** — Write test asserting issue cross-ref cells (`Issues` column) in the PR table are clickable links — `tests/test_gh_issues.py` — verify: `just test` (test fails)
+- [ ] Task 6: **GREEN** — Thread `owner_repo` into the issues-cell rendering in `_build_pr_table` and wrap each `#N` with `[link=...]` — `scripts/gh_issues.py` — verify: `just test` (test passes)
+- [ ] Task 7: Update `CHANGELOG.md` — add entry under `## Unreleased` / `Changed` — verify: visual check
+
+### Notes
+
+- Link format for issues: `https://github.com/{owner_repo}/issues/{num}`
+- Link format for PRs: `https://github.com/{owner_repo}/pull/{num}`
+- `owner_repo` is already fetched in `main()` — just needs to be passed down to `_build_table` and `_build_pr_table`
+- The PR table's `Issues` column currently renders `#N` styled text — these should also become clickable links to the corresponding issues
+- CI status in the PR table (from issue comment) is out of scope — suggest a separate issue
+

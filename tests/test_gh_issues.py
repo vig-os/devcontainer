@@ -1,14 +1,27 @@
-"""Unit tests for scripts/gh_issues.py."""
+"""Unit tests for pure-logic functions in scripts/gh_issues.py.
+
+No subprocess mocking, no Rich rendering tests — just data in, data out.
+
+Refs: #99
+"""
 
 import importlib.util
 from pathlib import Path
 
 scripts_dir = Path(__file__).parent.parent / "scripts"
-gh_issues_spec = importlib.util.spec_from_file_location(
-    "gh_issues", scripts_dir / "gh_issues.py"
-)
-gh_issues = importlib.util.module_from_spec(gh_issues_spec)
-gh_issues_spec.loader.exec_module(gh_issues)
+spec = importlib.util.spec_from_file_location("gh_issues", scripts_dir / "gh_issues.py")
+gh_issues = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(gh_issues)
+
+_styled = gh_issues._styled
+_extract_label = gh_issues._extract_label
+_extract_type = gh_issues._extract_type
+_extract_scope = gh_issues._extract_scope
+_clean_title = gh_issues._clean_title
+_format_assignees = gh_issues._format_assignees
+_infer_review = gh_issues._infer_review
+_extract_reviewers = gh_issues._extract_reviewers
+_build_cross_refs = gh_issues._build_cross_refs
 
 
 class TestGhLink:
@@ -28,3 +41,305 @@ class TestGhLink:
         assert (
             result == "[link=https://github.com/vig-os/devcontainer/pull/42]42[/link]"
         )
+
+
+class TestStyled:
+    def test_wraps_value_in_markup(self):
+        assert _styled("hello", "bold red") == "[bold red]hello[/]"
+
+    def test_empty_value(self):
+        assert _styled("", "dim") == "[dim][/]"
+
+    def test_empty_style(self):
+        assert _styled("text", "") == "[]text[/]"
+
+
+class TestExtractLabel:
+    def test_matching_prefix(self):
+        labels = [{"name": "priority:high"}]
+        assert _extract_label(labels, "priority:") == "[red]high[/]"
+
+    def test_no_matching_prefix(self):
+        labels = [{"name": "feature"}]
+        assert _extract_label(labels, "priority:") == ""
+
+    def test_empty_labels(self):
+        assert _extract_label([], "priority:") == ""
+
+    def test_unknown_label_uses_dim(self):
+        labels = [{"name": "priority:unknown"}]
+        assert _extract_label(labels, "priority:") == "[dim]unknown[/]"
+
+    def test_first_match_wins(self):
+        labels = [{"name": "priority:high"}, {"name": "priority:low"}]
+        result = _extract_label(labels, "priority:")
+        assert result == "[red]high[/]"
+
+    def test_effort_label(self):
+        labels = [{"name": "effort:small"}]
+        assert _extract_label(labels, "effort:") == "[green]small[/]"
+
+    def test_semver_label(self):
+        labels = [{"name": "semver:patch"}]
+        assert _extract_label(labels, "semver:") == "[green]patch[/]"
+
+
+class TestExtractType:
+    def test_feature_label(self):
+        labels = [{"name": "feature"}]
+        assert _extract_type(labels) == "[cyan]feature[/]"
+
+    def test_bug_label(self):
+        labels = [{"name": "bug"}]
+        assert _extract_type(labels) == "[bold red]bug[/]"
+
+    def test_discussion_label(self):
+        labels = [{"name": "discussion"}]
+        assert _extract_type(labels) == "[bright_magenta]discussion[/]"
+
+    def test_chore_label(self):
+        labels = [{"name": "chore"}]
+        assert _extract_type(labels) == "[dim]chore[/]"
+
+    def test_no_type_label(self):
+        labels = [{"name": "priority:high"}, {"name": "area:ci"}]
+        assert _extract_type(labels) == ""
+
+    def test_empty_labels(self):
+        assert _extract_type([]) == ""
+
+
+class TestExtractScope:
+    def test_single_area(self):
+        labels = [{"name": "area:ci"}]
+        assert _extract_scope(labels) == "[blue]ci[/]"
+
+    def test_multiple_areas(self):
+        labels = [{"name": "area:ci"}, {"name": "area:docs"}]
+        assert _extract_scope(labels) == "[blue]ci[/], [blue]docs[/]"
+
+    def test_no_area_labels(self):
+        labels = [{"name": "feature"}, {"name": "priority:high"}]
+        assert _extract_scope(labels) == ""
+
+    def test_empty_labels(self):
+        assert _extract_scope([]) == ""
+
+
+class TestCleanTitle:
+    def test_strips_feature_prefix(self):
+        assert _clean_title("[FEATURE] Add tests") == "Add tests"
+
+    def test_strips_bug_prefix(self):
+        assert _clean_title("[BUG] Fix crash") == "Fix crash"
+
+    def test_strips_task_prefix(self):
+        assert _clean_title("[TASK] Update deps") == "Update deps"
+
+    def test_strips_discussion_prefix(self):
+        assert _clean_title("[DISCUSSION] API design") == "API design"
+
+    def test_strips_chore_prefix(self):
+        assert _clean_title("[CHORE] Bump versions") == "Bump versions"
+
+    def test_no_prefix_unchanged(self):
+        assert _clean_title("Plain title") == "Plain title"
+
+    def test_empty_title(self):
+        assert _clean_title("") == ""
+
+
+class TestFormatAssignees:
+    def test_empty_list(self):
+        assert _format_assignees([]) == "[dim]—[/]"
+
+    def test_single_assignee(self):
+        assignees = [{"login": "alice"}]
+        assert _format_assignees(assignees) == "[bright_white]alice[/]"
+
+    def test_multiple_assignees(self):
+        assignees = [{"login": "alice"}, {"login": "bob"}]
+        result = _format_assignees(assignees)
+        assert result == "[bright_white]alice[/], [bright_white]bob[/]"
+
+
+class TestInferReview:
+    def test_approved_decision(self):
+        pr = {"reviewDecision": "APPROVED"}
+        assert _infer_review(pr) == ("APPROVED", "approved")
+
+    def test_changes_requested_decision(self):
+        pr = {"reviewDecision": "CHANGES_REQUESTED"}
+        assert _infer_review(pr) == ("CHANGES_REQUESTED", "changes")
+
+    def test_review_required_decision(self):
+        pr = {"reviewDecision": "REVIEW_REQUIRED"}
+        assert _infer_review(pr) == ("REVIEW_REQUIRED", "pending")
+
+    def test_unknown_decision_uses_lowercase(self):
+        pr = {"reviewDecision": "DISMISSED"}
+        assert _infer_review(pr) == ("DISMISSED", "dismissed")
+
+    def test_fallback_to_latest_reviews(self):
+        pr = {
+            "reviewDecision": "",
+            "latestReviews": [{"state": "APPROVED"}],
+        }
+        assert _infer_review(pr) == ("APPROVED", "approved")
+
+    def test_fallback_latest_reviews_last_wins(self):
+        pr = {
+            "reviewDecision": "",
+            "latestReviews": [
+                {"state": "APPROVED"},
+                {"state": "CHANGES_REQUESTED"},
+            ],
+        }
+        assert _infer_review(pr) == ("CHANGES_REQUESTED", "changes")
+
+    def test_fallback_to_review_requests(self):
+        pr = {
+            "reviewDecision": "",
+            "latestReviews": [],
+            "reviewRequests": [{"login": "alice"}],
+        }
+        assert _infer_review(pr) == ("REVIEW_REQUIRED", "pending")
+
+    def test_no_review_info(self):
+        pr = {"reviewDecision": "", "latestReviews": [], "reviewRequests": []}
+        assert _infer_review(pr) == ("", "—")
+
+    def test_empty_pr_dict(self):
+        assert _infer_review({}) == ("", "—")
+
+
+class TestExtractReviewers:
+    def test_no_reviews_or_requests(self):
+        pr = {"latestReviews": [], "reviewRequests": []}
+        assert _extract_reviewers(pr) == "[dim]—[/]"
+
+    def test_approved_reviewer(self):
+        pr = {
+            "latestReviews": [{"author": {"login": "alice"}, "state": "APPROVED"}],
+            "reviewRequests": [],
+        }
+        assert _extract_reviewers(pr) == "[green]alice[/]"
+
+    def test_changes_requested_reviewer(self):
+        pr = {
+            "latestReviews": [
+                {"author": {"login": "bob"}, "state": "CHANGES_REQUESTED"},
+            ],
+            "reviewRequests": [],
+        }
+        assert _extract_reviewers(pr) == "[red]bob[/]"
+
+    def test_requested_reviewer(self):
+        pr = {
+            "latestReviews": [],
+            "reviewRequests": [{"login": "carol"}],
+        }
+        assert _extract_reviewers(pr) == "[yellow]carol[/]"
+
+    def test_mixed_reviewers(self):
+        pr = {
+            "latestReviews": [{"author": {"login": "alice"}, "state": "APPROVED"}],
+            "reviewRequests": [{"login": "bob"}],
+        }
+        result = _extract_reviewers(pr)
+        assert "[green]alice[/]" in result
+        assert "[yellow]bob[/]" in result
+
+    def test_review_request_with_name_fallback(self):
+        pr = {
+            "latestReviews": [],
+            "reviewRequests": [{"login": "", "name": "team-review"}],
+        }
+        assert _extract_reviewers(pr) == "[yellow]team-review[/]"
+
+    def test_empty_pr_dict(self):
+        assert _extract_reviewers({}) == "[dim]—[/]"
+
+    def test_reviewer_already_in_latest_not_duplicated(self):
+        pr = {
+            "latestReviews": [{"author": {"login": "alice"}, "state": "APPROVED"}],
+            "reviewRequests": [{"login": "alice"}],
+        }
+        result = _extract_reviewers(pr)
+        assert result.count("alice") == 1
+
+
+class TestBuildCrossRefs:
+    def test_branch_match(self):
+        branches = {42: "feature/42-add-tests"}
+        prs = [{"number": 100, "headRefName": "feature/42-add-tests", "body": ""}]
+        issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
+        assert issue_to_pr == {42: 100}
+        assert pr_to_issues == {100: [42]}
+
+    def test_closing_keyword_match(self):
+        branches = {}
+        prs = [{"number": 100, "headRefName": "some-branch", "body": "Closes #42"}]
+        issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
+        assert issue_to_pr == {42: 100}
+        assert pr_to_issues == {100: [42]}
+
+    def test_fixes_keyword(self):
+        branches = {}
+        prs = [{"number": 100, "headRefName": "x", "body": "Fixes #7"}]
+        issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
+        assert issue_to_pr == {7: 100}
+
+    def test_resolves_keyword(self):
+        branches = {}
+        prs = [{"number": 100, "headRefName": "x", "body": "Resolves #7"}]
+        issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
+        assert issue_to_pr == {7: 100}
+
+    def test_case_insensitive_keywords(self):
+        branches = {}
+        prs = [{"number": 100, "headRefName": "x", "body": "closes #7"}]
+        issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
+        assert issue_to_pr == {7: 100}
+
+    def test_both_branch_and_keyword(self):
+        branches = {42: "feature/42-stuff"}
+        prs = [
+            {
+                "number": 100,
+                "headRefName": "feature/42-stuff",
+                "body": "Closes #42\nAlso fixes #43",
+            },
+        ]
+        issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
+        assert issue_to_pr[42] == 100
+        assert issue_to_pr[43] == 100
+        assert pr_to_issues[100] == [42, 43]
+
+    def test_no_matches(self):
+        branches = {42: "feature/42-stuff"}
+        prs = [{"number": 100, "headRefName": "unrelated-branch", "body": "No refs"}]
+        issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
+        assert issue_to_pr == {}
+        assert pr_to_issues == {}
+
+    def test_empty_inputs(self):
+        issue_to_pr, pr_to_issues = _build_cross_refs({}, [])
+        assert issue_to_pr == {}
+        assert pr_to_issues == {}
+
+    def test_none_body(self):
+        branches = {}
+        prs = [{"number": 100, "headRefName": "x", "body": None}]
+        issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
+        assert issue_to_pr == {}
+
+    def test_multiple_prs(self):
+        branches = {42: "feature/42-stuff", 43: "feature/43-other"}
+        prs = [
+            {"number": 100, "headRefName": "feature/42-stuff", "body": ""},
+            {"number": 101, "headRefName": "feature/43-other", "body": ""},
+        ]
+        issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
+        assert issue_to_pr == {42: 100, 43: 101}
+        assert pr_to_issues == {100: [42], 101: [43]}
