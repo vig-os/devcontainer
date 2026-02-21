@@ -111,6 +111,23 @@ This reduces token consumption on the primary model while maintaining review qua
 
 Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
 
+## Delegation
+
+The subagent spawned in step 2 SHOULD use `model: "fast"` since code review is a structured analysis task with clear inputs (diff, issue, standards) and a fixed output format.
+
+Update step 2's Task tool invocation to include:
+
+```markdown
+Task tool parameters:
+- `readonly: true` (already specified)
+- `model: "fast"` (add this — review fits the "standard" tier pattern)
+- `description: "Code review: branch vs base"`
+```
+
+This reduces token consumption on the primary model while maintaining review quality, as the review checklist is well-defined and the subagent has all necessary context.
+
+Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
+
 ## Important Notes
 
 - Run this before every PR submission. The [pr_create](../pr_create/SKILL.md) workflow should reference this as a prerequisite.

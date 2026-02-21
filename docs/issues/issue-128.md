@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-20T16:18:37Z
-updated: 2026-02-20T16:48:23Z
+updated: 2026-02-20T23:04:04Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/128
-comments: 1
+comments: 3
 labels: chore, area:workflow
 assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-20T16:48:51.266Z
+synced: 2026-02-21T04:11:18.189Z
 ---
 
 # [Issue 128]: [[CHORE] Improve agent skills DX: rename colon namespace to underscore and enhance issue_create workflow](https://github.com/vig-os/devcontainer/issues/128)
@@ -84,30 +84,30 @@ TDD: Skipped — all changes are config/template/docs with no testable behavior.
 
 #### Part 1: Directory Renames
 
-- [ ] Task 1: Rename all 28 colon-style skill directories under `.cursor/skills/` to use `_` separator (e.g. `issue:create` → `issue_create`) — `git mv` each directory — verify: `ls .cursor/skills/ | grep ':'` returns nothing
-- [ ] Task 2: Rename all 28 colon-style skill directories under `assets/workspace/.cursor/skills/` likewise — `git mv` each directory — verify: `ls assets/workspace/.cursor/skills/ | grep ':'` returns nothing
+- [x] Task 1: Rename all 28 colon-style skill directories under `.cursor/skills/` to use `_` separator (e.g. `issue:create` → `issue_create`) — `git mv` each directory — verify: `ls .cursor/skills/ | grep ':'` returns nothing
+- [x] Task 2: Rename all 28 colon-style skill directories under `assets/workspace/.cursor/skills/` likewise — `git mv` each directory — verify: `ls assets/workspace/.cursor/skills/ | grep ':'` returns nothing
 
 #### Part 2: Update Internal References
 
-- [ ] Task 3: Update `name:` frontmatter field in all 28 SKILL.md files under `.cursor/skills/` (e.g. `name: issue:create` → `name: issue_create`) — verify: `grep -r 'name: .*:' .cursor/skills/*/SKILL.md` returns nothing
-- [ ] Task 4: Update all cross-reference relative links in SKILL.md files under `.cursor/skills/` (e.g. `../issue:claim/SKILL.md` → `../issue_claim/SKILL.md`) — verify: `grep -r '\.\./[a-z]*:[a-z]' .cursor/skills/` returns nothing
-- [ ] Task 5: Update `name:` frontmatter field in all mirrored SKILL.md files under `assets/workspace/.cursor/skills/` — verify: `grep -r 'name: .*:' assets/workspace/.cursor/skills/*/SKILL.md` returns nothing
-- [ ] Task 6: Update all cross-reference relative links in SKILL.md files under `assets/workspace/.cursor/skills/` — verify: `grep -r '\.\./[a-z]*:[a-z]' assets/workspace/.cursor/skills/` returns nothing
+- [x] Task 3: Update `name:` frontmatter field in all 28 SKILL.md files under `.cursor/skills/` (e.g. `name: issue:create` → `name: issue_create`) — verify: `grep -r 'name: .*:' .cursor/skills/*/SKILL.md` returns nothing
+- [x] Task 4: Update all cross-reference relative links in SKILL.md files under `.cursor/skills/` (e.g. `../issue:claim/SKILL.md` → `../issue_claim/SKILL.md`) — verify: `grep -r '\.\./[a-z]*:[a-z]' .cursor/skills/` returns nothing
+- [x] Task 5: Update `name:` frontmatter field in all mirrored SKILL.md files under `assets/workspace/.cursor/skills/` — verify: `grep -r 'name: .*:' assets/workspace/.cursor/skills/*/SKILL.md` returns nothing
+- [x] Task 6: Update all cross-reference relative links in SKILL.md files under `assets/workspace/.cursor/skills/` — verify: `grep -r '\.\./[a-z]*:[a-z]' assets/workspace/.cursor/skills/` returns nothing
 
 #### Part 3: Update External References
 
-- [ ] Task 7: Update `CLAUDE.md` command table — change all `/namespace:action` entries to `/namespace_action` (26 entries) — verify: `grep '/[a-z]*:[a-z]' CLAUDE.md` returns nothing
-- [ ] Task 8: Update `.github/label-taxonomy.toml` — change 2 skill path references from colon to underscore — verify: `grep 'skills/.*:' .github/label-taxonomy.toml` returns nothing
-- [ ] Task 9: Update `assets/workspace/.github/label-taxonomy.toml` — same 2 references — verify: `grep 'skills/.*:' assets/workspace/.github/label-taxonomy.toml` returns nothing
-- [ ] Task 10: Update `CHANGELOG.md` — change 1 reference in Unreleased section (`skills/issue:triage/` → `skills/issue_triage/`) — verify: `grep 'skills/.*:' CHANGELOG.md` returns nothing
+- [x] Task 7: Update `CLAUDE.md` command table — change all `/namespace:action` entries to `/namespace_action` (26 entries) — verify: `grep '/[a-z]*:[a-z]' CLAUDE.md` returns nothing
+- [x] Task 8: Update `.github/label-taxonomy.toml` — change 2 skill path references from colon to underscore — verify: `grep 'skills/.*:' .github/label-taxonomy.toml` returns nothing
+- [x] Task 9: Update `assets/workspace/.github/label-taxonomy.toml` — same 2 references — verify: `grep 'skills/.*:' assets/workspace/.github/label-taxonomy.toml` returns nothing
+- [x] Task 10: Update `CHANGELOG.md` — change 1 reference in Unreleased section (`skills/issue:triage/` → `skills/issue_triage/`) — verify: `grep 'skills/.*:' CHANGELOG.md` returns nothing
 
 #### Part 4: Enhance `issue_create` Skill
 
-- [ ] Task 11: Add a new step to `.cursor/skills/issue_create/SKILL.md` (post-rename) that runs `just gh-issues` before drafting to gather open issues overview, and instructs the agent to suggest parent/child issue relationships and an appropriate milestone — `.cursor/skills/issue_create/SKILL.md`, `assets/workspace/.cursor/skills/issue_create/SKILL.md` — verify: read updated SKILL.md contains the new step
+- [x] Task 11: Add a new step to `.cursor/skills/issue_create/SKILL.md` (post-rename) that runs `just gh-issues` before drafting to gather open issues overview, and instructs the agent to suggest parent/child issue relationships and an appropriate milestone — `.cursor/skills/issue_create/SKILL.md`, `assets/workspace/.cursor/skills/issue_create/SKILL.md` — verify: read updated SKILL.md contains the new step
 
 #### Part 5: Final Verification
 
-- [ ] Task 12: Global sweep — confirm no remaining colon-style skill directory references outside of historical docs (`docs/issues/`, `docs/pull-requests/`) — verify: `rg 'skills/[a-z]+:[a-z]' --glob '!docs/issues/*' --glob '!docs/pull-requests/*'` returns nothing
+- [x] Task 12: Global sweep — confirm no remaining colon-style skill directory references outside of historical docs (`docs/issues/`, `docs/pull-requests/`) — verify: `rg 'skills/[a-z]+:[a-z]' --glob '!docs/issues/*' --glob '!docs/pull-requests/*'` returns nothing
 
 ### Notes
 
@@ -115,4 +115,130 @@ TDD: Skipped — all changes are config/template/docs with no testable behavior.
 - `worktree:*` directories use colons and are included in the rename scope (→ `worktree_*`).
 - Historical docs under `docs/issues/` and `docs/pull-requests/` are snapshots and will not be updated.
 - The `inception:explore/README.md` file also contains cross-references that need updating (covered by Tasks 4 and 6).
+
+---
+
+# [Comment #2]() by [gerchowl]()
+
+_Posted on February 20, 2026 at 10:46 PM_
+
+## Design
+
+### Expand `tdd.mdc` into comprehensive testing guide
+
+**Goal:** Make `tdd.mdc` the single reference for TDD process *and* test-scenario guidance, triggered when writing code (not always-on). Skills reference it instead of inlining TDD steps.
+
+### Changes
+
+#### 1. `tdd.mdc` frontmatter
+
+Switch from `alwaysApply: true` to glob-triggered:
+
+```yaml
+description: TDD discipline and test scenario guidance when writing code
+alwaysApply: false
+globs:
+  - "**/*.py"
+  - "**/*.ts"
+  - "**/*.js"
+  - "**/*.sh"
+  - "**/test_*"
+  - "**/*_test.*"
+  - "**/tests/**"
+```
+
+#### 2. `tdd.mdc` content structure
+
+Three sections in the rule:
+
+**Section 1: RED-GREEN-REFACTOR process** — existing content, kept as-is.
+
+**Section 2: Test scenario checklist** (new — inception_architect blind-spot pattern)
+
+Before writing a test, evaluate which scenarios apply:
+
+| Category | Consider |
+|---|---|
+| Happy path | Does the expected input produce the expected output? |
+| Edge cases | Empty input, single element, max values, boundary values |
+| Error paths | Invalid input, missing dependencies, network/IO failures |
+| Input validation | Null, undefined, wrong type, malformed data |
+| State & side effects | Does it modify state correctly? Idempotent? Cleanup? |
+| Regression | If fixing a bug, does the test prove the bug is fixed? |
+| Smoke | After integration, does the system start and key flows work? |
+
+Not every category applies to every change. Skip with a note.
+
+**Section 3: Test types** (new — when to use what)
+
+- **Unit** — isolated function behavior, fast, no external deps
+- **Integration** — components working together, may need fixtures/containers
+- **Smoke** — system starts, critical paths respond (post-deploy or post-build)
+- **E2E** — full user flow through the system
+
+Use the narrowest type that covers the behavior. Prefer unit tests. Escalate to integration/smoke only when the behavior crosses boundaries.
+
+#### 3. Skill cross-references
+
+Add explicit `tdd.mdc` links to these skills:
+
+| Skill | Change |
+|---|---|
+| `code_tdd/SKILL.md` | Add link: "Follow [tdd.mdc](../../rules/tdd.mdc) for process and scenario checklist" |
+| `code_execute/SKILL.md` | Add link: "(following [tdd.mdc](../../rules/tdd.mdc))" |
+| `worktree_execute/SKILL.md` | Add link: "following [tdd.mdc](../../rules/tdd.mdc)" |
+| `code_debug/SKILL.md` | No change (transitive via code_tdd) |
+| `issue_create/SKILL.md` | No change (already references tdd.mdc) |
+
+#### 4. `CLAUDE.md`
+
+Update TDD summary to mention scenario checklist and the activation change.
+
+#### 5. Mirror to `assets/workspace/`
+
+Handled by `just sync-workspace` (via `scripts/sync_manifest.py`). No manual mirroring needed — the manifest already syncs `.cursor/rules/` and `.cursor/skills/` as directories.
+
+### Files touched (source only)
+
+| File | Change |
+|---|---|
+| `.cursor/rules/tdd.mdc` | Expand content, flip `alwaysApply`, add `globs` |
+| `.cursor/skills/code_tdd/SKILL.md` | Add `tdd.mdc` reference |
+| `.cursor/skills/code_execute/SKILL.md` | Add `tdd.mdc` reference |
+| `.cursor/skills/worktree_execute/SKILL.md` | Add `tdd.mdc` reference |
+| `CLAUDE.md` | Update TDD summary |
+
+Then: `just sync-workspace` to propagate.
+
+### What stays the same
+
+- `code_tdd/SKILL.md` keeps its detailed procedural workflow (verify baseline, RED, commit, GREEN, commit, REFACTOR, commit)
+- Commit discipline (separate commits per TDD phase) unchanged
+- "Skip TDD for non-testable changes" escape clause unchanged
+
+### TDD applicability
+
+Skipped — all changes are config/templates/docs with no testable behavior.
+
+---
+
+# [Comment #3]() by [gerchowl]()
+
+_Posted on February 20, 2026 at 10:54 PM_
+
+## Implementation Plan
+
+Issue: #128
+Branch: chore/128-rename-skill-namespace-enhance-issue-create
+
+TDD: Skipped — all changes are config/templates/docs with no testable behavior.
+
+### Tasks
+
+- [x] Task 1: Expand `.cursor/rules/tdd.mdc` — change frontmatter to `alwaysApply: false` with code-generation globs, add "Test scenario checklist" section (table with 7 categories), add "Test types" section (unit/integration/smoke/E2E guidance) — `.cursor/rules/tdd.mdc` — verify: read file, confirm `alwaysApply: false`, globs present, both new sections exist
+- [x] Task 2: Add `tdd.mdc` reference to `code_tdd/SKILL.md` — in "Understand what to test" step (step 1), add a line referencing `tdd.mdc` for scenario checklist — `.cursor/skills/code_tdd/SKILL.md` — verify: `grep 'tdd.mdc' .cursor/skills/code_tdd/SKILL.md` returns a match
+- [x] Task 3: Add `tdd.mdc` reference to `code_execute/SKILL.md` — in step 2 where it says "following ... and TDD", add explicit link to `tdd.mdc` — `.cursor/skills/code_execute/SKILL.md` — verify: `grep 'tdd.mdc' .cursor/skills/code_execute/SKILL.md` returns a match
+- [x] Task 4: Add `tdd.mdc` reference to `worktree_execute/SKILL.md` — in step 2 where it says "and TDD:", add explicit link to `tdd.mdc` — `.cursor/skills/worktree_execute/SKILL.md` — verify: `grep 'tdd.mdc' .cursor/skills/worktree_execute/SKILL.md` returns a match
+- [x] Task 5: Update `CLAUDE.md` TDD summary — update the TDD subsection under "Always-Apply Rules" to reflect that the rule is now glob-triggered (not always-on) and mention the scenario checklist — `CLAUDE.md` — verify: read file, confirm TDD section mentions glob-triggered and scenario checklist
+- [x] Task 6: Run `just sync-workspace` to propagate all changes to `assets/workspace/` — verify: `diff .cursor/rules/tdd.mdc assets/workspace/.cursor/rules/tdd.mdc` shows no diff (or expected transform diffs only)
 

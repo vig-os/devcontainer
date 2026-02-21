@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Fixed
+
+- **worktree-attach restarts stopped tmux session when worktree dir exists** ([#132](https://github.com/vig-os/devcontainer/issues/132))
+  - Detect when worktree directory exists but tmux session has terminated
+  - Automatically restart session in existing worktree before attaching
+  - BATS integration tests for restart and error paths
+
 ### Changed
 
 - **Rename skill namespace separator from colon to underscore** ([#128](https://github.com/vig-os/devcontainer/issues/128))
@@ -33,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Add `hadolint` hook to `.pre-commit-config.yaml`, pinned by SHA (v2.9.3)
   - Enforce Dockerfile best practices: pinned base image tags, consolidated `RUN` layers, shellcheck for inline scripts
   - Fix `tests/fixtures/sidecar.Containerfile` to pass hadolint with no warnings
+- **tmux installed in container image for worktree session persistence** ([#130](https://github.com/vig-os/devcontainer/issues/130))
+  - Add `tmux` to the Containerfile `apt-get install` block
+  - Enables autonomous worktree agents to survive Cursor session disconnects
 - **Optional reviewer parameter for autonomous worktree pipeline** ([#102](https://github.com/vig-os/devcontainer/issues/102))
   - Support `reviewer` parameter in `just worktree-start`
   - Propagate `PR_REVIEWER` via tmux environment to the autonomous agent
