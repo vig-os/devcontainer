@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Autonomous PR skills use pull request template** ([#147](https://github.com/vig-os/devcontainer/issues/147))
+  - `pr_create` and `worktree_pr` now read `.github/pull_request_template.md` and fill each section from available context
+  - Explicit read-then-fill procedure with section-by-section mapping (Description, Type of Change, Changelog Entry, Testing, Checklist, Refs)
+  - Ensures autonomous PRs match manual PR structure and include all checklist items
 - **Rename skill namespace separator from colon to underscore** ([#128](https://github.com/vig-os/devcontainer/issues/128))
   - All skill directories under `.cursor/skills/` and `assets/workspace/.cursor/skills/` renamed (e.g. `issue:create` → `issue_create`)
   - All internal cross-references, frontmatter, prose, `CLAUDE.md` command table, and label taxonomy updated
