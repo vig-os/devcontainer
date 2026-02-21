@@ -118,6 +118,16 @@ repos:
         types: [python]
         pass_filenames: false
 
+  # Skill directory naming convention
+  - repo: local
+    hooks:
+      - id: check-skill-names
+        name: check-skill-names (enforce naming convention)
+        entry: scripts/check-skill-names.sh .cursor/skills
+        language: script
+        files: ^\.cursor/skills/
+        pass_filenames: false
+
   # Commit message validation (commit-msg stage)
   - repo: local
     hooks:

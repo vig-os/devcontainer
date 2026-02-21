@@ -38,7 +38,7 @@ Skills are markdown playbooks that live in `.cursor/skills/`. Each one defines a
   │  git_commit              │                              │            ├─ worktree_execute              │
   │  pr_create               │                              │            ├─ worktree_verify               │
   │  ci_check / ci_fix       │                              │            ├─ worktree_pr                   │
-  │                          │                              │            └─ worktree_ci-check / ci-fix    │
+  │  pr_solve                │                              │            └─ worktree_ci-check / ci-fix    │
   └─────────────▼────────────┘                              │                                             │
                 |                                           │  worktree_ask  (escape hatch: post          │
                 |                                           │                 question on issue)          │
@@ -50,8 +50,8 @@ Skills are markdown playbooks that live in `.cursor/skills/`. Each one defines a
                                                   |
                              ┌────────────────────▼──────────────────────┐
                              │            RELEASE MANAGEMENT             │
-              │             pr_create                     │
-              │             pr_post-merge                 │
+                             │             pr_create                     │
+                             │             pr_post-merge                 │
                              └───────────────────────────────────────────┘
 
 
@@ -106,6 +106,7 @@ Run when starting a new repo or major initiative. Explores the problem space, sc
 | `git_commit` | `/git-commit` | Executes the commit workflow following the project's commit message conventions. |
 | `pr_create` | `/pr-create` | Prepares and submits a pull request for feature or bugfix work. |
 | `pr_post-merge` | `/pr-post-merge` | Performs cleanup and branch switching after a PR merge. |
+| `pr_solve` | `/pr-solve` | Diagnoses all PR failures (CI, reviews, merge state), plans fixes, executes them. |
 
 
 ### CI
