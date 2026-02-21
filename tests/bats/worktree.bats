@@ -63,8 +63,8 @@ setup() {
         skip "tmux session did not exit after 'true' (timing)"
     fi
 
-    env WORKTREE_ATTACH_RESTART_CMD="sleep 5" timeout 2 just worktree-attach "$ISSUE" 2>/dev/null &
-    sleep 1.5
+    env WORKTREE_ATTACH_RESTART_CMD="sleep 5" timeout 3 just worktree-attach "$ISSUE" 2>/dev/null &
+    sleep 2
     run tmux has-session -t "$SESSION" 2>/dev/null
     tmux kill-session -t "$SESSION" 2>/dev/null || true
     rm -rf "$WT_DIR"

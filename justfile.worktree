@@ -248,17 +248,51 @@ worktree-list:
 # ATTACH
 # -------------------------------------------------------------------------------
 
-# Attach to a worktree's tmux session
+# Attach to a worktree's tmux session.
+# When the worktree dir exists but the tmux session has stopped, restarts the session
+# before attaching. See tests/bats/worktree.bats for integration tests.
 [group('worktree')]
 worktree-attach issue:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    SESSION="wt-{{ issue }}"
+    _wt_ensure_trust() {
+        local dir_abs
+        dir_abs=$(cd "$1" && pwd)
+        local cfg="${HOME}/.cursor/cli-config.json"
+        mkdir -p "$(dirname "$cfg")"
+        if [ ! -f "$cfg" ]; then
+            echo '{}' > "$cfg"
+        fi
+        if ! jq -e --arg d "$dir_abs" '.trustedDirectories // [] | index($d)' "$cfg" >/dev/null 2>&1; then
+            jq --arg d "$dir_abs" '.trustedDirectories = ((.trustedDirectories // []) + [$d])' "$cfg" > "${cfg}.tmp" \
+                && mv "${cfg}.tmp" "$cfg"
+            echo "[OK] Trusted directory added: $dir_abs"
+        else
+            echo "[OK] Directory already trusted: $dir_abs"
+        fi
+    }
+
+    ISSUE="{{ issue }}"
+    SESSION="wt-${ISSUE}"
+    WT_DIR="{{ _wt_base }}/${ISSUE}"
+
     if ! tmux has-session -t "$SESSION" 2>/dev/null; then
-        echo "[ERROR] No tmux session '$SESSION' found."
-        echo "Start one with: just worktree-start {{ issue }}"
-        exit 1
+        if [ -d "$WT_DIR" ]; then
+            echo "[!] tmux session '$SESSION' stopped. Restarting..."
+            _wt_ensure_trust "$WT_DIR"
+            REVIEWER=$(gh api user --jq '.login' 2>/dev/null || echo "")
+            if [ -n "${WORKTREE_ATTACH_RESTART_CMD:-}" ]; then
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "$WORKTREE_ATTACH_RESTART_CMD"
+            else
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --approve-mcps"
+            fi
+            echo "[OK] tmux session '$SESSION' restarted"
+        else
+            echo "[ERROR] No tmux session '$SESSION' found."
+            echo "Start one with: just worktree-start {{ issue }}"
+            exit 1
+        fi
     fi
     tmux attach-session -t "$SESSION"
 
