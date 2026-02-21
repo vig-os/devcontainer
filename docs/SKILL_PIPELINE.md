@@ -106,6 +106,7 @@ Run when starting a new repo or major initiative. Explores the problem space, sc
 | `git_commit` | `/git-commit` | Executes the commit workflow following the project's commit message conventions. |
 | `pr_create` | `/pr-create` | Prepares and submits a pull request for feature or bugfix work. |
 | `pr_post-merge` | `/pr-post-merge` | Performs cleanup and branch switching after a PR merge. |
+| `pr_solve` | `/pr-solve` | Diagnoses all PR failures (CI, reviews, merge state), plans fixes, executes them. |
 
 
 ### CI

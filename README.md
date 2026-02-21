@@ -171,7 +171,7 @@ Available recipes:
     test-vig-utils                             # Run check action pins tests only
 
     [worktree]
-    worktree-attach issue                      # Attach to a worktree's tmux session [alias: wt-attach]
+    worktree-attach issue                      # before attaching. See tests/bats/worktree.bats for integration tests. [alias: wt-attach]
     worktree-clean                             # Remove all cursor-managed worktrees and tmux sessions [alias: wt-clean]
     worktree-list                              # List active worktrees and their tmux sessions [alias: wt-list]
     worktree-start issue prompt="" reviewer="" # Create a worktree for an issue, open tmux session, launch cursor-agent [alias: wt-start]
