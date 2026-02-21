@@ -494,6 +494,36 @@ class TestFileStructure:
                         verify_file_identity(host, str(rel), dest_file_path)
 
 
+class TestGhIssuesDeployment:
+    """Test that gh_issues.py runtime dependencies are available in the image."""
+
+    def test_rich_importable(self, host):
+        """Test that the rich library is importable (runtime dep of gh_issues.py).
+
+        rich is installed system-wide (not in the project venv) because it is
+        a devcontainer tool, not a user project dependency.
+        """
+        result = host.run("python3 -c \"from rich.table import Table; print('OK')\"")
+        assert result.rc == 0, f"rich is not importable: {result.stderr}"
+        assert "OK" in result.stdout
+
+    def test_gh_issues_importable(self, host):
+        """Test that gh_issues.py is importable (catches syntax errors, missing imports).
+
+        Uses system Python because gh_issues.py depends on rich, which is
+        installed system-wide as a devcontainer tool.
+        """
+        result = host.run(
+            'python3 -c "'
+            "import sys; "
+            "sys.path.insert(0, '/root/assets/workspace/.devcontainer/scripts'); "
+            "import gh_issues; "
+            "print('OK')\""
+        )
+        assert result.rc == 0, f"gh_issues.py is not importable: {result.stderr}"
+        assert "OK" in result.stdout
+
+
 class TestPlaceholders:
     """Test that placeholders are replaced correctly."""
 

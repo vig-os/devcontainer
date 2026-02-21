@@ -274,6 +274,19 @@ Print a summary of all changes made:
 - Milestones assigned
 - Issues left unchanged (and why)
 
+## Delegation
+
+The following phases SHOULD be delegated to reduce token consumption:
+
+- **Phase 1** (collect all data): Spawn a Task subagent with `model: "fast"` that executes all the gh/git commands listed in Phase 1 (issues, PRs, milestones, labels, sub-issue relationships). Returns: all raw JSON outputs combined into a structured response.
+- **Phase 2** (check label taxonomy): Spawn a Task subagent with `model: "fast"` that reads `.github/label-taxonomy.toml`, compares against repo labels, and identifies missing labels grouped by category. Returns: missing label list formatted for user approval.
+- **Phase 4** (present and wait): Can remain in main agent (user interaction, file writing).
+- **Phase 5** (apply changes): Spawn a Task subagent with `model: "fast"` for each batch after approval is received. The subagent executes the gh commands and returns confirmation/error messages. Process batches sequentially, waiting for approval between each.
+
+Phase 3 (analyze and build decision matrix) should remain in the main agent as it requires multi-dimensional analysis, clustering logic, and dependency inference.
+
+Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
+
 ## Error Handling
 
 - **404 on sub-issue endpoints**: Warn user that sub-issues may not be enabled. Skip sub-issue batches, continue with labels and milestones.

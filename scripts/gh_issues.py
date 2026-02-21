@@ -328,9 +328,10 @@ def _fetch_prs() -> list[dict]:
             "--limit",
             "100",
             "--json",
-            "number,title,author,isDraft,reviewDecision,"
+            "number,title,author,assignees,isDraft,reviewDecision,"
             "baseRefName,headRefName,additions,deletions,changedFiles,"
-            "labels,milestone,createdAt,body",
+            "labels,milestone,createdAt,body,"
+            "reviewRequests,latestReviews",
         ],
         capture_output=True,
         text=True,
@@ -344,6 +345,49 @@ REVIEW_STYLES: dict[str, tuple[str, str]] = {
     "CHANGES_REQUESTED": ("red", "changes"),
     "REVIEW_REQUIRED": ("yellow", "pending"),
 }
+
+
+def _infer_review(pr: dict) -> tuple[str, str]:
+    """Return (state, label) using reviewDecision, falling back to latestReviews."""
+    decision = pr.get("reviewDecision") or ""
+    if decision:
+        entry = REVIEW_STYLES.get(decision)
+        return (decision, entry[1]) if entry else (decision, decision.lower())
+    latest = pr.get("latestReviews") or []
+    if latest:
+        best = latest[-1].get("state", "")
+        entry = REVIEW_STYLES.get(best)
+        return (best, entry[1]) if entry else (best, best.lower())
+    if pr.get("reviewRequests"):
+        return ("REVIEW_REQUIRED", "pending")
+    return ("", "—")
+
+
+def _extract_reviewers(pr: dict) -> str:
+    """Build a compact reviewer string from latestReviews and reviewRequests."""
+    seen: dict[str, str] = {}
+    for r in pr.get("latestReviews") or []:
+        login = (r.get("author") or {}).get("login", "")
+        if login:
+            state = r.get("state", "")
+            seen[login] = state
+    for r in pr.get("reviewRequests") or []:
+        login = r.get("login") or ""
+        if not login:
+            login = r.get("name") or ""
+        if login and login not in seen:
+            seen[login] = "REQUESTED"
+    if not seen:
+        return _styled("—", "dim")
+    parts = []
+    for login, state in seen.items():
+        if state == "APPROVED":
+            parts.append(_styled(login, "green"))
+        elif state == "CHANGES_REQUESTED":
+            parts.append(_styled(login, "red"))
+        else:
+            parts.append(_styled(login, "yellow"))
+    return " ".join(parts)
 
 
 def _build_pr_table(
@@ -365,15 +409,21 @@ def _build_pr_table(
     table.add_column("#", style="bold cyan", no_wrap=True, justify="right", width=4)
     table.add_column("Title", no_wrap=True, overflow="ellipsis", ratio=1)
     table.add_column("Author", no_wrap=True, width=12)
+    table.add_column("Assignee", no_wrap=True, width=12)
     table.add_column("Issues", no_wrap=True, width=10)
     table.add_column("Branch", no_wrap=True, overflow="ellipsis", max_width=30)
     table.add_column("Review", no_wrap=True, justify="center", width=8)
+    table.add_column("Reviewer", no_wrap=True, width=12)
     table.add_column("Delta", no_wrap=True, justify="right", width=14)
 
     for pr in sorted(prs, key=lambda p: p["number"]):
-        review_raw = pr.get("reviewDecision") or ""
-        style, label = REVIEW_STYLES.get(review_raw, ("dim", review_raw.lower() or "—"))
+        review_state, review_label = _infer_review(pr)
+        style, label = REVIEW_STYLES.get(
+            review_state,
+            ("dim", review_label or "—"),
+        )
         review = _styled(label, style)
+        reviewer = _extract_reviewers(pr)
 
         draft_marker = _styled(" draft", "dim italic") if pr.get("isDraft") else ""
 
@@ -393,9 +443,11 @@ def _build_pr_table(
             str(pr["number"]),
             _clean_title(pr["title"]) + draft_marker,
             f"[bright_white]{pr['author']['login']}[/]",
+            _format_assignees(pr.get("assignees", [])),
             issues_cell,
             branch,
             review,
+            reviewer,
             delta,
         )
     return table
