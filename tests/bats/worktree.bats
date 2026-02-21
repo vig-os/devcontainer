@@ -46,6 +46,7 @@ setup() {
 # directory exists. Uses WORKTREE_ATTACH_RESTART_CMD to avoid agent dependency.
 
 @test "worktree-attach restarts stopped session when worktree dir exists" {
+    [ "${CI:-}" = "true" ] && skip "tmux integration tests require interactive TTY"
     command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
     command -v just >/dev/null 2>&1 || skip "just not installed"
 
@@ -74,6 +75,7 @@ setup() {
 }
 
 @test "tmux send-keys delivers trust approval to session after launch" {
+    [ "${CI:-}" = "true" ] && skip "tmux integration tests require interactive TTY"
     command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
 
     SESSION="wt-test-sendkeys-$$"
@@ -95,6 +97,7 @@ setup() {
 }
 
 @test "worktree-attach errors when neither worktree dir nor session exists" {
+    [ "${CI:-}" = "true" ] && skip "tmux integration tests require interactive TTY"
     command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
     command -v just >/dev/null 2>&1 || skip "just not installed"
 
