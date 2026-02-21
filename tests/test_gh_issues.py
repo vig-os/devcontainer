@@ -24,6 +24,76 @@ _extract_reviewers = gh_issues._extract_reviewers
 _build_cross_refs = gh_issues._build_cross_refs
 
 
+class TestFormatCiStatus:
+    """Test _format_ci_status for CI column in PR table.
+
+    Ref: #143
+    """
+
+    def test_all_passed_shows_green_check(self):
+        """All checks passed: ✓ 6/6 in green."""
+        pr = {
+            "number": 42,
+            "statusCheckRollup": [
+                {"name": "Build", "conclusion": "SUCCESS"},
+                {"name": "Test", "conclusion": "SUCCESS"},
+                {"name": "Lint", "conclusion": "SUCCESS"},
+            ],
+        }
+        result = gh_issues._format_ci_status(pr, "vig-os/devcontainer")
+        assert "✓" in result
+        assert "3/3" in result
+        assert "green" in result
+        assert "link=https://github.com/vig-os/devcontainer/pull/42/checks" in result
+
+    def test_failures_shows_red_with_failed_check_names(self):
+        """Failed checks: ✗ 2/3 in red with failed check names."""
+        pr = {
+            "number": 10,
+            "statusCheckRollup": [
+                {"name": "Build", "conclusion": "SUCCESS"},
+                {"name": "Test", "conclusion": "FAILURE"},
+                {"name": "Lint", "conclusion": "ERROR"},
+            ],
+        }
+        result = gh_issues._format_ci_status(pr, "owner/repo")
+        assert "✗" in result
+        assert "2/3" in result
+        assert "red" in result
+        assert "Test" in result
+        assert "Lint" in result
+        assert "link=https://github.com/owner/repo/pull/10/checks" in result
+
+    def test_in_progress_shows_yellow(self):
+        """Some checks pending: ⏳ 2/3 in yellow."""
+        pr = {
+            "number": 5,
+            "statusCheckRollup": [
+                {"name": "Build", "conclusion": "SUCCESS"},
+                {"name": "Test", "conclusion": "SUCCESS"},
+                {"name": "Lint", "conclusion": None},
+            ],
+        }
+        result = gh_issues._format_ci_status(pr, "x/y")
+        assert "⏳" in result
+        assert "2/3" in result
+        assert "yellow" in result
+
+    def test_empty_rollup_shows_dim_dash(self):
+        """No checks: — in dim."""
+        pr = {"number": 1, "statusCheckRollup": []}
+        result = gh_issues._format_ci_status(pr, "a/b")
+        assert "—" in result
+        assert "dim" in result
+
+    def test_missing_rollup_shows_dim_dash(self):
+        """Missing statusCheckRollup: — in dim."""
+        pr = {"number": 1}
+        result = gh_issues._format_ci_status(pr, "a/b")
+        assert "—" in result
+        assert "dim" in result
+
+
 class TestGhLink:
     """Test _gh_link helper for clickable issue/PR numbers."""
 
