@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **justfile.base is canonical at repo root, synced via manifest** ([#71](https://github.com/vig-os/devcontainer/issues/71))
+  - Root `justfile.base` is now the single source of truth; synced to `assets/workspace/.devcontainer/justfile.base` via `sync_manifest.py`
+  - `just sync-workspace` and prepare-build keep workspace template in sync
 - **Autonomous PR skills use pull request template** ([#147](https://github.com/vig-os/devcontainer/issues/147))
   - `pr_create` and `worktree_pr` now read `.github/pull_request_template.md` and fill each section from available context
   - Explicit read-then-fill procedure with section-by-section mapping (Description, Type of Change, Changelog Entry, Testing, Checklist, Refs)
