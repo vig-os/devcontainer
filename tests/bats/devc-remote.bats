@@ -141,3 +141,32 @@ setup() {
     assert_failure
     assert_output --partial "Neither cursor nor code"
 }
+
+# ── check_ssh ────────────────────────────────────────────────────────────────
+
+@test "check_ssh succeeds when ssh connects" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    # Need cursor for detect_editor_cli
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
+    chmod +x "$mock_bin/cursor"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" anyhost 2>&1
+    # Should get past check_ssh; will fail at remote_preflight (mock ssh just exits)
+    refute_output --partial "Cannot connect to"
+    rm -rf "$mock_bin"
+}
+
+@test "check_ssh fails when ssh returns non-zero" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
+    chmod +x "$mock_bin/cursor"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" badhost 2>&1
+    assert_failure
+    assert_output --partial "Cannot connect to"
+    rm -rf "$mock_bin"
+}

@@ -109,7 +109,10 @@ detect_editor_cli() {
 }
 
 check_ssh() {
-    :
+    if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "$SSH_HOST" true 2>/dev/null; then
+        log_error "Cannot connect to $SSH_HOST. Check your SSH config and network."
+        exit 1
+    fi
 }
 
 remote_preflight() {
