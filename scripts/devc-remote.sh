@@ -116,7 +116,77 @@ check_ssh() {
 }
 
 remote_preflight() {
-    :
+    local preflight_output
+    # shellcheck disable=SC2029
+    preflight_output=$(ssh "$SSH_HOST" "bash -s" "$REMOTE_PATH" << 'REMOTEEOF'
+REPO_PATH="${1:-$HOME}"
+if command -v podman &>/dev/null; then
+    echo "RUNTIME=podman"
+elif command -v docker &>/dev/null; then
+    echo "RUNTIME=docker"
+else
+    echo "RUNTIME="
+fi
+if (command -v podman &>/dev/null && podman compose version &>/dev/null) || \
+   (command -v docker &>/dev/null && docker compose version &>/dev/null); then
+    echo "COMPOSE_AVAILABLE=1"
+else
+    echo "COMPOSE_AVAILABLE=0"
+fi
+if [ -d "$REPO_PATH" ]; then
+    echo "REPO_PATH_EXISTS=1"
+else
+    echo "REPO_PATH_EXISTS=0"
+fi
+if [ -d "$REPO_PATH/.devcontainer" ]; then
+    echo "DEVCONTAINER_EXISTS=1"
+else
+    echo "DEVCONTAINER_EXISTS=0"
+fi
+AVAIL_GB=$(df -BG "$REPO_PATH" 2>/dev/null | awk 'NR==2 {gsub(/G/,""); print $4}')
+echo "DISK_AVAILABLE_GB=${AVAIL_GB:-0}"
+if [ "$(uname -s)" = "Darwin" ]; then
+    echo "OS_TYPE=macos"
+else
+    echo "OS_TYPE=linux"
+fi
+REMOTEEOF
+    )
+
+    while IFS= read -r line; do
+        [[ "$line" =~ ^([A-Z_]+)=(.*)$ ]] || continue
+        case "${BASH_REMATCH[1]}" in
+            RUNTIME) RUNTIME="${BASH_REMATCH[2]}" ;;
+            COMPOSE_AVAILABLE) COMPOSE_AVAILABLE="${BASH_REMATCH[2]}" ;;
+            REPO_PATH_EXISTS) REPO_PATH_EXISTS="${BASH_REMATCH[2]}" ;;
+            DEVCONTAINER_EXISTS) DEVCONTAINER_EXISTS="${BASH_REMATCH[2]}" ;;
+            DISK_AVAILABLE_GB) DISK_AVAILABLE_GB="${BASH_REMATCH[2]}" ;;
+            OS_TYPE) OS_TYPE="${BASH_REMATCH[2]}" ;;
+        esac
+    done <<< "$preflight_output"
+
+    if [[ -z "${RUNTIME:-}" ]]; then
+        log_error "No container runtime found on $SSH_HOST. Install podman or docker."
+        exit 1
+    fi
+    if [[ "${COMPOSE_AVAILABLE:-0}" != "1" ]]; then
+        log_error "Compose not available on $SSH_HOST. Install docker-compose or podman-compose."
+        exit 1
+    fi
+    if [[ "${REPO_PATH_EXISTS:-0}" != "1" ]]; then
+        log_error "Repository not found at $REMOTE_PATH on $SSH_HOST."
+        exit 1
+    fi
+    if [[ "${DEVCONTAINER_EXISTS:-0}" != "1" ]]; then
+        log_error "No .devcontainer/ found in $REMOTE_PATH. Is this a devcontainer-enabled project?"
+        exit 1
+    fi
+    if [[ "${DISK_AVAILABLE_GB:-0}" -lt 2 ]] 2>/dev/null; then
+        log_warning "Low disk space on $SSH_HOST (${DISK_AVAILABLE_GB:-0}GB). At least 2GB recommended."
+    fi
+    if [[ "${OS_TYPE:-}" == "macos" ]]; then
+        log_warning "Remote host is macOS. Devcontainer support may be limited."
+    fi
 }
 
 remote_compose_up() {

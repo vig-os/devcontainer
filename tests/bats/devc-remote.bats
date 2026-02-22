@@ -170,3 +170,48 @@ setup() {
     assert_output --partial "Cannot connect to"
     rm -rf "$mock_bin"
 }
+
+# ── remote_preflight ─────────────────────────────────────────────────────────
+
+@test "remote_preflight parses structured KEY=value output" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/ssh" << 'SSHEOF'
+#!/bin/sh
+echo "RUNTIME=podman"
+echo "COMPOSE_AVAILABLE=1"
+echo "REPO_PATH_EXISTS=1"
+echo "DEVCONTAINER_EXISTS=1"
+echo "DISK_AVAILABLE_GB=5"
+echo "OS_TYPE=linux"
+exit 0
+SSHEOF
+    chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
+    chmod +x "$mock_bin/cursor"
+    # Will fail at remote_compose_up or open_editor; we verify we get past preflight
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" host 2>&1
+    refute_output --partial "No container runtime"
+    refute_output --partial "Compose not available"
+    refute_output --partial "Repository not found"
+    refute_output --partial "No .devcontainer"
+    rm -rf "$mock_bin"
+}
+
+@test "remote_preflight fails when runtime missing" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/ssh" << 'SSHEOF'
+#!/bin/sh
+echo "RUNTIME="
+echo "COMPOSE_AVAILABLE=0"
+exit 0
+SSHEOF
+    chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
+    chmod +x "$mock_bin/cursor"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" host 2>&1
+    assert_failure
+    assert_output --partial "No container runtime"
+    rm -rf "$mock_bin"
+}
