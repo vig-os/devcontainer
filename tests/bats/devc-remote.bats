@@ -99,7 +99,7 @@ setup() {
 
 @test "devc-remote.sh --help shows usage" {
     run "$DEVC_REMOTE" --help
-    assert_output --partial "usage"
+    assert_output --partial "USAGE"
 }
 
 # ── parse_args: unknown flag ──────────────────────────────────────────────────

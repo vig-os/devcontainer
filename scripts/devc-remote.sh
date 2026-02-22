@@ -49,12 +49,50 @@ log_error() {
     echo -e "${RED}✗${NC}  $1"
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# ORCHESTRATION FUNCTIONS
-# ═══════════════════════════════════════════════════════════════════════════════
+show_help() {
+    sed -n '/^###############################################################################$/,/^###############################################################################$/p' "$0" | sed '1d;$d'
+    exit 0
+}
 
 parse_args() {
-    :
+    SSH_HOST=""
+    REMOTE_PATH="$HOME"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --help|-h)
+                show_help
+                ;;
+            --path)
+                if [[ $# -lt 2 ]]; then
+                    log_error "Missing value for --path"
+                    exit 1
+                fi
+                # shellcheck disable=SC2034
+                REMOTE_PATH="$2"
+                shift 2
+                ;;
+            -*)
+                log_error "Unknown option: $1"
+                echo "Use --help for usage information"
+                exit 1
+                ;;
+            *)
+                if [[ -n "$SSH_HOST" ]]; then
+                    log_error "Unexpected argument: $1"
+                    exit 1
+                fi
+                SSH_HOST="$1"
+                shift
+                ;;
+        esac
+    done
+
+    if [[ -z "$SSH_HOST" ]]; then
+        log_error "Missing required argument: <ssh-host>"
+        echo "Use --help for usage information"
+        exit 1
+    fi
 }
 
 detect_editor_cli() {
