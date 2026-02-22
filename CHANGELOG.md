@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **devc_remote_uri.py — Cursor URI construction for remote devcontainers** ([#153](https://github.com/vig-os/devcontainer/issues/153))
+  - Standalone Python module with `hex_encode()` and `build_uri()` for vscode-remote URIs
+  - CLI: `devc_remote_uri.py <workspace_path> <ssh_host> <container_workspace>` prints URI to stdout
+  - Stdlib only (json, argparse); called by devc-remote.sh (sibling sub-issue)
 - **CI status column in just gh-issues PR table** ([#143](https://github.com/vig-os/devcontainer/issues/143))
   - PR table shows CI column with pass/fail/pending summary (✓ 6/6, ⏳ 3/6, ✗ 5/6)
   - Failed check names visible when checks fail
