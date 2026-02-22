@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-18T01:45:43Z
-updated: 2026-02-18T07:53:30Z
+updated: 2026-02-21T23:57:28Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/70
-comments: 0
-labels: feature
-assignees: none
-milestone: none
+comments: 1
+labels: feature, priority:low, area:workspace, effort:large, semver:minor
+assignees: gerchowl
+milestone: Backlog
 projects: none
 relationship: none
-synced: 2026-02-18T08:56:30.135Z
+synced: 2026-02-22T04:23:24.592Z
 ---
 
 # [Issue 70]: [[FEATURE] Remote devcontainer orchestration via just recipe](https://github.com/vig-os/devcontainer/issues/70)
@@ -337,3 +337,91 @@ This follows the existing `devcontainer_with_sidecar` fixture pattern from `conf
 ### Changelog Category
 
 Added
+---
+
+# [Comment #1]() by [gerchowl]()
+
+_Posted on February 21, 2026 at 11:57 PM_
+
+## Design
+
+### Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Dependency on #71 | **Wait** — do not implement until #71 lands | #70 needs shared compose patterns from `justfile.base` that #71 introduces |
+| Phased delivery | **Yes** — 3 sub-issues for v1, follow-ups for `--clone`, signal traps, etc. | Effort:large; incremental delivery reduces risk |
+| Script language | **Hybrid** — bash orchestrator + Python URI helper | Bash is natural for SSH/compose; Python is cleaner for JSON/hex encoding |
+| File placement | Canonical files in repo root (`scripts/`), synced to `assets/workspace/.devcontainer/scripts/` via manifest | Follows existing pattern (cf. `justfile.gh`, `scripts/gh_issues.py`) |
+| Recipe location | `assets/workspace/.devcontainer/justfile.base` | Works in both this repo and deployed workspaces |
+
+### Architecture
+
+```
+just devc-remote <ssh-host> [--path <remote-repo-path>]
+  └── .devcontainer/scripts/devc-remote.sh
+        ├── detect_editor_cli()        → cursor > code (local)
+        ├── check_ssh()                → connectivity + auth (local)
+        ├── remote_preflight()         → single SSH call batching all remote checks
+        │   ├── detect runtime         → podman > docker
+        │   ├── check compose          → podman compose / docker compose
+        │   ├── check repo path        → exists? has .devcontainer/?
+        │   └── check disk space       → warn if < 2GB
+        ├── remote_compose_up()        → container state detection + compose up + health poll
+        └── python3 devc_remote_uri.py → hex encode + build URI → $EDITOR_CLI --folder-uri
+```
+
+**Key design choices:**
+- **Single SSH session for remote pre-flight** — heredoc-based `ssh <host> bash -s` batching all checks to avoid repeated connection overhead.
+- **No remote dependencies** beyond shell, git, container runtime — Python helper runs locally.
+- **Idempotent by design** — every step checks existing state before acting. Safe to re-run.
+- Compose commands will use patterns from #71 once it lands.
+
+### File Layout
+
+| File | Purpose |
+|------|---------|
+| `scripts/devc-remote.sh` | Main bash orchestrator (SSH, pre-flight, compose, open editor) |
+| `scripts/devc_remote_uri.py` | Python helper: hex encoding + Cursor URI construction |
+| `assets/workspace/.devcontainer/justfile.base` | `devc-remote` recipe (thin wrapper) |
+| `scripts/sync_manifest.py` | New entries to sync both scripts into `assets/workspace/` |
+
+### Sub-Issue Decomposition (v1)
+
+#### Sub-issue A: Script scaffold + pre-flight checks
+- `devc-remote.sh` with `parse_args()`, `usage()`, `set -euo pipefail`
+- Arguments: `<ssh-host>` (required), `--path <remote-repo-path>` (optional, default `~/`)
+- Local pre-flight: `detect_editor_cli()` (cursor > code), `check_ssh()` (connectivity + auth via `ssh -o BatchMode=yes`)
+- Remote pre-flight: single SSH call returning structured key=value output (runtime, repo_exists, devcontainer_exists, disk_gb, os_type)
+- BATS tests: argument parsing, pre-flight checks with mocked commands
+
+#### Sub-issue B: Container state + compose + URI construction
+- Container state detection from `compose ps --format json` (6-state matrix from issue spec)
+- Health polling: 30s timeout, 5s interval, log tail on failure
+- `devc_remote_uri.py`: `hex_encode()`, `build_uri()` with CLI interface
+- Pytest unit tests for URI construction (known inputs → exact outputs)
+- BATS tests for state detection (mocked compose output for each state)
+
+#### Sub-issue C: End-to-end wiring
+- `justfile.base` recipe: `devc-remote host *args`
+- Manifest entries for both scripts
+- Smoke/integration test (script runs `--help` successfully)
+- Defer full SSH loopback sidecar tests to follow-up issue
+
+### Follow-Up Issues (post-v1)
+- `--clone <url>` flag for remote repo cloning (+ SSH agent forwarding with `ssh -A`)
+- Signal trapping (`trap` for SIGINT/SIGTERM)
+- macOS remote host detection + warning
+- ProxyJump / bastion host testing
+- `--force` flag (always `compose down && compose up -d`)
+- Full SSH loopback integration tests (sshd sidecar in CI)
+
+### Testing Strategy (v1)
+
+| Layer | Tool | Coverage |
+|-------|------|----------|
+| Argument parsing, pre-flight, state matrix | BATS | Mocked commands, no SSH needed |
+| Hex encoding, URI assembly | Pytest | Pure functions, known input/output |
+| Smoke test | Pytest or BATS | `devc-remote.sh --help` exits 0 |
+| End-to-end (deferred) | Pytest + sshd sidecar | Full SSH loopback, follow-up issue |
+
