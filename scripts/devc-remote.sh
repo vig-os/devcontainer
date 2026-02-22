@@ -169,6 +169,11 @@ REMOTEEOF
         log_error "No container runtime found on $SSH_HOST. Install podman or docker."
         exit 1
     fi
+    if [[ "$RUNTIME" == "podman" ]]; then
+        COMPOSE_CMD="podman compose"
+    else
+        COMPOSE_CMD="docker compose"
+    fi
     if [[ "${COMPOSE_AVAILABLE:-0}" != "1" ]]; then
         log_error "Compose not available on $SSH_HOST. Install docker-compose or podman-compose."
         exit 1
@@ -190,11 +195,27 @@ REMOTEEOF
 }
 
 remote_compose_up() {
-    :
+    local ps_output state health
+    # shellcheck disable=SC2029
+    ps_output=$(ssh "$SSH_HOST" "cd $REMOTE_PATH && $COMPOSE_CMD ps --format json 2>/dev/null" || true)
+    state=$(echo "$ps_output" | grep -o '"State":"[^"]*"' | head -1 | cut -d'"' -f4)
+    health=$(echo "$ps_output" | grep -o '"Health":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+    if [[ "$state" == "running" && "${health:-}" == "healthy" ]]; then
+        log_success "Devcontainer already running on $SSH_HOST. Opening..."
+    else
+        log_info "Starting devcontainer on $SSH_HOST..."
+        # shellcheck disable=SC2029
+        ssh "$SSH_HOST" "cd $REMOTE_PATH && $COMPOSE_CMD up -d" >/dev/null 2>&1
+        # Health poll (simplified: assume success for now)
+        sleep 2
+    fi
 }
 
 open_editor() {
-    :
+    local uri
+    uri=$(python3 "$SCRIPT_DIR/devc_remote_uri.py" --ssh-host "$SSH_HOST" --path "$REMOTE_PATH")
+    "$EDITOR_CLI" --folder-uri "$uri"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════

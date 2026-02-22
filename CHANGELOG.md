@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **devc-remote.sh — bash orchestrator for remote devcontainer** ([#152](https://github.com/vig-os/devcontainer/issues/152))
+  - `scripts/devc-remote.sh`: parse_args, detect_editor_cli, check_ssh, remote_preflight, remote_compose_up, open_editor
+  - `scripts/devc_remote_uri.py`: stub for URI construction (sibling sub-issue)
+  - BATS unit tests with mocked commands
 - **CI status column in just gh-issues PR table** ([#143](https://github.com/vig-os/devcontainer/issues/143))
   - PR table shows CI column with pass/fail/pending summary (✓ 6/6, ⏳ 3/6, ✗ 5/6)
   - Failed check names visible when checks fail

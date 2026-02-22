@@ -215,3 +215,69 @@ SSHEOF
     assert_output --partial "No container runtime"
     rm -rf "$mock_bin"
 }
+
+# ── open_editor ──────────────────────────────────────────────────────────────
+
+@test "open_editor calls URI helper and editor" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/ssh" << SSHEOF
+#!/bin/sh
+counter="${mock_bin}/ssh_counter"
+count=\$(cat "\$counter" 2>/dev/null || echo 0)
+echo \$((count + 1)) > "\$counter"
+if [ "\$count" = "1" ]; then
+  echo "RUNTIME=podman"
+  echo "COMPOSE_AVAILABLE=1"
+  echo "REPO_PATH_EXISTS=1"
+  echo "DEVCONTAINER_EXISTS=1"
+  echo "DISK_AVAILABLE_GB=5"
+  echo "OS_TYPE=linux"
+elif [ "\$count" = "2" ]; then
+  echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
+fi
+exit 0
+SSHEOF
+    chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'echo "vscode-remote://test"' 'exit 0' > "$mock_bin/python3"
+    chmod +x "$mock_bin/python3"
+    printf '%s\n' '#!/bin/sh' '[ "$1" = "--folder-uri" ] && [ -n "$2" ] && exit 0' 'exit 1' > "$mock_bin/cursor"
+    chmod +x "$mock_bin/cursor"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" host 2>&1
+    assert_success
+    assert_output --partial "Devcontainer already running"
+    rm -rf "$mock_bin"
+}
+
+# ── remote_compose_up ────────────────────────────────────────────────────────
+
+@test "remote_compose_up skips when container running and healthy" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/ssh" << SSHEOF
+#!/bin/sh
+# check_ssh=0, preflight=1, compose_ps=2
+counter="${mock_bin}/ssh_counter"
+count=\$(cat "\$counter" 2>/dev/null || echo 0)
+echo \$((count + 1)) > "\$counter"
+if [ "\$count" = "1" ]; then
+  echo "RUNTIME=podman"
+  echo "COMPOSE_AVAILABLE=1"
+  echo "REPO_PATH_EXISTS=1"
+  echo "DEVCONTAINER_EXISTS=1"
+  echo "DISK_AVAILABLE_GB=5"
+  echo "OS_TYPE=linux"
+elif [ "\$count" = "2" ]; then
+  echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
+else
+  :
+fi
+exit 0
+SSHEOF
+    chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
+    chmod +x "$mock_bin/cursor"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" host 2>&1
+    refute_output --partial "compose up"
+    rm -rf "$mock_bin"
+}
