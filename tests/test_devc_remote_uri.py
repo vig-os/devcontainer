@@ -3,9 +3,23 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
+import sys
 from pathlib import Path
 
 scripts_dir = Path(__file__).parent.parent / "scripts"
+script_path = scripts_dir / "devc_remote_uri.py"
+
+
+def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:
+    """Run devc_remote_uri.py with given args."""
+    return subprocess.run(
+        [sys.executable, str(script_path), *args],
+        capture_output=True,
+        text=True,
+    )
+
+
 devc_spec = importlib.util.spec_from_file_location(
     "devc_remote_uri", scripts_dir / "devc_remote_uri.py"
 )
@@ -57,3 +71,34 @@ class TestBuildUri:
         )
         assert uri.endswith("/workspace")
         assert "@ssh-remote+host" in uri
+
+
+class TestCli:
+    """Test CLI interface."""
+
+    def test_cli_prints_uri_to_stdout(self):
+        """CLI with valid args prints URI to stdout."""
+        result = _run_cli("/repo", "host", "/workspace")
+        assert result.returncode == 0
+        assert result.stdout.startswith("vscode-remote://dev-container+")
+        assert "@ssh-remote+host" in result.stdout
+        assert result.stderr == ""
+
+    def test_cli_with_devcontainer_path_arg(self):
+        """CLI accepts optional devcontainer path."""
+        result = _run_cli(
+            "/repo",
+            "host",
+            "/workspace",
+            "--devcontainer-path",
+            "/custom/devcontainer.json",
+        )
+        assert result.returncode == 0
+        assert result.stdout.startswith("vscode-remote://dev-container+")
+        assert "@ssh-remote+host" in result.stdout
+
+    def test_cli_missing_args_exits_nonzero(self):
+        """CLI with missing args exits with code 2."""
+        result = _run_cli("/repo")
+        assert result.returncode == 2
+        assert "usage" in result.stderr.lower() or "error" in result.stderr.lower()
