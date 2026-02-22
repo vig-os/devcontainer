@@ -96,7 +96,16 @@ parse_args() {
 }
 
 detect_editor_cli() {
-    :
+    if command -v cursor &>/dev/null; then
+        # shellcheck disable=SC2034
+        EDITOR_CLI="cursor"
+    elif command -v code &>/dev/null; then
+        # shellcheck disable=SC2034
+        EDITOR_CLI="code"
+    else
+        log_error "Neither cursor nor code CLI found. Install Cursor or VS Code and enable the shell command."
+        exit 1
+    fi
 }
 
 check_ssh() {

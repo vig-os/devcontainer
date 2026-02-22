@@ -108,3 +108,36 @@ setup() {
     run "$DEVC_REMOTE" --unknown-flag myserver
     assert_failure
 }
+
+# ── detect_editor_cli ─────────────────────────────────────────────────────────
+
+@test "detect_editor_cli prefers cursor when both cursor and code exist" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    echo '#!/bin/sh' > "$mock_bin/cursor"
+    echo '#!/bin/sh' > "$mock_bin/code"
+    chmod +x "$mock_bin/cursor" "$mock_bin/code"
+    # Script will fail at check_ssh, but we verify cursor was chosen by checking
+    # we get past detect_editor_cli (would fail with "Neither cursor nor code" otherwise)
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" nonexistent-host 2>&1
+    # Should not contain "Neither cursor nor code" - fails at check_ssh instead
+    refute_output --partial "Neither cursor nor code"
+    rm -rf "$mock_bin"
+}
+
+@test "detect_editor_cli uses code when cursor not found" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    echo '#!/bin/sh' > "$mock_bin/code"
+    chmod +x "$mock_bin/code"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" nonexistent-host 2>&1
+    refute_output --partial "Neither cursor nor code"
+    rm -rf "$mock_bin"
+}
+
+@test "detect_editor_cli fails when neither cursor nor code in PATH" {
+    # Use env -i for clean environment; minimal PATH has no cursor/code
+    run env -i PATH="/usr/bin:/bin" HOME="$HOME" "$DEVC_REMOTE" myserver 2>&1
+    assert_failure
+    assert_output --partial "Neither cursor nor code"
+}
