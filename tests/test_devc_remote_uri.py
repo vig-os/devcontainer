@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 scripts_dir = Path(__file__).parent.parent / "scripts"
 script_path = scripts_dir / "devc_remote_uri.py"
 
@@ -102,3 +104,39 @@ class TestCli:
         result = _run_cli("/repo")
         assert result.returncode == 2
         assert "usage" in result.stderr.lower() or "error" in result.stderr.lower()
+
+
+class TestEdgeCases:
+    """Edge cases: special chars, spaces, empty strings."""
+
+    def test_build_uri_special_chars_in_paths(self):
+        """Paths with special characters are hex-encoded correctly."""
+        uri = devc_remote_uri.build_uri(
+            workspace_path="/home/user/repo (dev)",
+            devcontainer_path="/home/user/repo (dev)/.devcontainer/devcontainer.json",
+            ssh_host="host",
+            container_workspace="/workspace",
+        )
+        assert uri.startswith("vscode-remote://dev-container+")
+        assert "@ssh-remote+host" in uri
+        assert uri.endswith("/workspace")
+
+    def test_build_uri_spaces_in_ssh_host(self):
+        """SSH host with spaces is passed through (for full SSH spec)."""
+        uri = devc_remote_uri.build_uri(
+            workspace_path="/repo",
+            devcontainer_path="/repo/.devcontainer/devcontainer.json",
+            ssh_host="user@1.2.3.4 -p 22",
+            container_workspace="/workspace",
+        )
+        assert "user@1.2.3.4 -p 22" in uri
+
+    def test_build_uri_empty_string_raises(self):
+        """Empty workspace_path raises ValueError."""
+        with pytest.raises(ValueError, match="workspace_path"):
+            devc_remote_uri.build_uri(
+                workspace_path="",
+                devcontainer_path="/repo/.devcontainer/devcontainer.json",
+                ssh_host="host",
+                container_workspace="/workspace",
+            )
