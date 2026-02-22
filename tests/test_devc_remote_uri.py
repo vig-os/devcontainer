@@ -27,3 +27,33 @@ class TestHexEncode:
     def test_hex_encode_unicode(self):
         """Unicode string is UTF-8 encoded then hexed."""
         assert devc_remote_uri.hex_encode("é") == "c3a9"
+
+
+class TestBuildUri:
+    """Test build_uri function."""
+
+    def test_build_uri_matches_cursor_format(self):
+        """Known inputs produce exact URI matching Cursor docs."""
+        uri = devc_remote_uri.build_uri(
+            workspace_path="/home/user/repo",
+            devcontainer_path="/home/user/repo/.devcontainer/devcontainer.json",
+            ssh_host="loginnode",
+            container_workspace="/workspace",
+        )
+        expected = (
+            "vscode-remote://dev-container+"
+            "7b2273657474696e6754797065223a22636f6e666967222c22776f726b737061636550617468223a222f686f6d652f757365722f7265706f222c22646576636f6e7461696e657250617468223a222f686f6d652f757365722f7265706f2f2e646576636f6e7461696e65722f646576636f6e7461696e65722e6a736f6e227d"
+            "@ssh-remote+loginnode/workspace"
+        )
+        assert uri == expected
+
+    def test_build_uri_container_workspace_without_leading_slash(self):
+        """container_workspace without leading slash is normalized."""
+        uri = devc_remote_uri.build_uri(
+            workspace_path="/repo",
+            devcontainer_path="/repo/.devcontainer/devcontainer.json",
+            ssh_host="host",
+            container_workspace="workspace",
+        )
+        assert uri.endswith("/workspace")
+        assert "@ssh-remote+host" in uri
