@@ -5,5 +5,5 @@ from __future__ import annotations
 
 
 def hex_encode(s: str) -> str:
-    """Hex-encode a string (UTF-8). Stub for TDD."""
-    raise NotImplementedError
+    """Hex-encode a string (UTF-8)."""
+    return s.encode().hex()
