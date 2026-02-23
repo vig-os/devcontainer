@@ -317,6 +317,8 @@ MANIFEST: list[Entry] = [
     Entry(src=".github/workflows/scorecard.yml"),
     Entry(src=".github/workflows/sync-issues.yml"),
     Entry(src=".github/workflows/codeql.yml"),
+    # ── Base recipes (managed, replaced on upgrade) ──────────────────────
+    Entry(src="justfile.base", dest=".devcontainer/justfile.base"),
     # ── GitHub CLI recipes (managed, replaced on upgrade) ────────────────
     Entry(src="justfile.gh", dest=".devcontainer/justfile.gh"),
     Entry(src="scripts/gh_issues.py", dest=".devcontainer/scripts/gh_issues.py"),
