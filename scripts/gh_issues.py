@@ -536,6 +536,62 @@ def _extract_reviewers(pr: dict) -> str:
     return " ".join(parts)
 
 
+def _format_review(pr: dict) -> str:
+    """Format merged Review+Reviewer column with icons and reviewer names.
+
+    Combines review state and reviewer information into a single column:
+    - Review requested: ?alice (dim)
+    - Commented/pending: ◎bob (yellow)
+    - Approved: ✓carol (green)
+    - Changes requested: ✗dave (red)
+
+    Multiple reviewers are space-separated. If reviewDecision exists but no
+    reviewers are found, show the decision state. Otherwise show individual
+    reviewer states.
+
+    Ref: #157
+    """
+    seen: dict[str, str] = {}
+    # Collect reviewers from latestReviews
+    for r in pr.get("latestReviews") or []:
+        login = (r.get("author") or {}).get("login", "")
+        if login:
+            state = r.get("state", "")
+            seen[login] = state
+    # Add review requests (not already in latestReviews)
+    for r in pr.get("reviewRequests") or []:
+        login = r.get("login") or ""
+        if not login:
+            login = r.get("name") or ""
+        if login and login not in seen:
+            seen[login] = "REQUESTED"
+
+    # If no reviewers but reviewDecision exists, show decision
+    decision = pr.get("reviewDecision") or ""
+    if not seen:
+        if decision == "APPROVED":
+            return _styled("approved", "green")
+        if decision == "CHANGES_REQUESTED":
+            return _styled("changes", "red")
+        if decision == "REVIEW_REQUIRED":
+            return _styled("pending", "yellow")
+        return _styled("—", "dim")
+
+    # Show individual reviewer states
+    parts = []
+    for login, state in seen.items():
+        if state == "APPROVED":
+            parts.append(_styled(f"✓{login}", "green"))
+        elif state == "CHANGES_REQUESTED":
+            parts.append(_styled(f"✗{login}", "red"))
+        elif state == "REQUESTED":
+            parts.append(_styled(f"?{login}", "dim"))
+        else:
+            # COMMENTED or other pending states
+            parts.append(_styled(f"◎{login}", "yellow"))
+    return " ".join(parts)
+
+
 def _build_pr_table(
     title: str,
     prs: list[dict],
