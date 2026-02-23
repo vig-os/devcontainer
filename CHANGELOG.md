@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **just gh-issues fails locally — rich not in .venv dependencies** ([#159](https://github.com/vig-os/devcontainer/issues/159))
+  - Add `rich>=13.0.0` to dev dependency group in `pyproject.toml` so `uv sync` installs it into `.venv`
 - **gh-issues cross-ref detects Refs: #N in PR bodies** ([#121](https://github.com/vig-os/devcontainer/issues/121))
   - `_build_cross_refs` now parses `Refs: #102` and comma-separated variants (`Refs: #102, #103`) alongside Closes/Fixes/Resolves
 - **PR table Reviewer column distinguishes requested vs completed reviewers** ([#105](https://github.com/vig-os/devcontainer/issues/105))
