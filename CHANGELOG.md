@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Consolidate sync_manifest.py and utils.py into manifest-as-config architecture** ([#89](https://github.com/vig-os/devcontainer/issues/89))
+  - Extract transform classes (Sed, RemoveLines, etc.) to `scripts/transforms.py`
+  - Unify sed logic: `substitute_in_file()` in utils shared by sed_inplace and Sed transform
+  - Convert MANIFEST from Python code to declarative `scripts/manifest.toml`
 - **justfile.base is canonical at repo root, synced via manifest** ([#71](https://github.com/vig-os/devcontainer/issues/71))
   - Root `justfile.base` is now the single source of truth; synced to `assets/workspace/.devcontainer/justfile.base` via `sync_manifest.py`
   - `just sync-workspace` and prepare-build keep workspace template in sync
