@@ -33,7 +33,7 @@ def _fetch_issues() -> list[dict]:
     return json.loads(result.stdout)
 
 
-_LINKED_BRANCHES_QUERY = """
+_LINKED_BRANCHES_AND_COMMENTS_QUERY = """
 {
   repository(owner: "%s", name: "%s") {
     issues(states: OPEN, first: 100) {
@@ -42,6 +42,9 @@ _LINKED_BRANCHES_QUERY = """
         linkedBranches(first: 5) {
           nodes { ref { name } }
         }
+        comments(first: 20) {
+          nodes { body }
+        }
       }
     }
   }
@@ -49,8 +52,16 @@ _LINKED_BRANCHES_QUERY = """
 """
 
 
-def _fetch_linked_branches() -> dict[int, str]:
-    """Return {issue_number: branch_name} for issues with a linked branch."""
+def _fetch_linked_branches_and_comments() -> tuple[
+    dict[int, str], dict[int, list[dict]]
+]:
+    """Return (branches, comments) mappings for open issues.
+
+    Returns:
+        Tuple of:
+        - {issue_number: branch_name} for issues with linked branches
+        - {issue_number: [comment_dicts]} for all issues (empty list if no comments)
+    """
     owner_result = subprocess.run(
         ["gh", "repo", "view", "--json", "owner,name"],
         capture_output=True,
@@ -58,7 +69,10 @@ def _fetch_linked_branches() -> dict[int, str]:
         check=True,
     )
     repo_info = json.loads(owner_result.stdout)
-    query = _LINKED_BRANCHES_QUERY % (repo_info["owner"]["login"], repo_info["name"])
+    query = _LINKED_BRANCHES_AND_COMMENTS_QUERY % (
+        repo_info["owner"]["login"],
+        repo_info["name"],
+    )
 
     result = subprocess.run(
         ["gh", "api", "graphql", "-f", f"query={query}"],
@@ -67,16 +81,23 @@ def _fetch_linked_branches() -> dict[int, str]:
         check=True,
     )
     data = json.loads(result.stdout)
-    mapping: dict[int, str] = {}
+    branches: dict[int, str] = {}
+    comments: dict[int, list[dict]] = {}
     for node in data["data"]["repository"]["issues"]["nodes"]:
-        branches = [
+        issue_num = node["number"]
+        # Extract branches
+        branch_nodes = node.get("linkedBranches", {}).get("nodes", [])
+        branch_names = [
             b["ref"]["name"]
-            for b in node["linkedBranches"]["nodes"]
+            for b in branch_nodes
             if b.get("ref") and b["ref"].get("name")
         ]
-        if branches:
-            mapping[node["number"]] = branches[0]
-    return mapping
+        if branch_names:
+            branches[issue_num] = branch_names[0]
+        # Extract comments
+        comment_nodes = node.get("comments", {}).get("nodes", [])
+        comments[issue_num] = [{"body": c.get("body", "")} for c in comment_nodes]
+    return branches, comments
 
 
 def _fetch_sub_issue_tree(
@@ -310,6 +331,7 @@ def _build_table(
     child_to_parent: dict[int, int],
     parent_to_children: dict[int, list[int]],
     owner_repo: str,
+    comments: dict[int, list[dict]],
 ) -> Table:
     from rich.table import Table
 
@@ -340,6 +362,7 @@ def _build_table(
         max_width=24,
     )
     table.add_column("PR", no_wrap=True, justify="right", width=4)
+    table.add_column("Phase", no_wrap=True, width=11)
     table.add_column("Prio", no_wrap=True, justify="center", width=7)
     table.add_column("Scope", no_wrap=True, width=9)
     table.add_column("Effort", no_wrap=True, justify="center", width=6)
@@ -360,6 +383,12 @@ def _build_table(
         pr_num = issue_to_pr.get(num)
         pr_cell = _styled(f"#{pr_num}", "green") if pr_num else ""
 
+        issue_comments = comments.get(num, [])
+        phase_label, phase_style = _detect_phase(
+            num, issue_comments, branches, issue_to_pr
+        )
+        phase_cell = _styled(phase_label, phase_style)
+
         title_text = _clean_title(issue["title"])
         if indent > 0:
             title_text = _styled(f"└ {title_text}", "dim")
@@ -373,6 +402,7 @@ def _build_table(
             _format_assignees(issue["assignees"]),
             branch,
             pr_cell,
+            phase_cell,
             _extract_label(labels, "priority:"),
             _extract_scope(labels),
             _extract_label(labels, "effort:"),
@@ -579,7 +609,7 @@ def main() -> int:
 
     issues = _fetch_issues()
     prs = _fetch_prs()
-    branches = _fetch_linked_branches() if issues else {}
+    branches, comments = _fetch_linked_branches_and_comments() if issues else ({}, {})
     issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
 
     owner_result = subprocess.run(
@@ -620,6 +650,7 @@ def main() -> int:
                 child_to_parent,
                 parent_to_children,
                 owner_repo,
+                comments,
             )
             console.print()
             console.print(table)
@@ -633,6 +664,7 @@ def main() -> int:
                 child_to_parent,
                 parent_to_children,
                 owner_repo,
+                comments,
             )
             console.print()
             console.print(table)
