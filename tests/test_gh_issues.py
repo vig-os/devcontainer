@@ -23,6 +23,7 @@ _infer_review = gh_issues._infer_review
 _extract_reviewers = gh_issues._extract_reviewers
 _build_cross_refs = gh_issues._build_cross_refs
 _detect_phase = gh_issues._detect_phase
+_format_review = gh_issues._format_review
 
 
 class TestFormatCiStatus:
@@ -544,3 +545,126 @@ class TestDetectPhase:
         label, style = gh_issues._detect_phase(42, comments, branches, {})
         assert label == "Design"
         assert style == "yellow"
+
+
+class TestFormatReview:
+    """Test _format_review for merged Review+Reviewer column in PR table.
+
+    Ref: #157
+    """
+
+    def test_no_reviews_or_requests(self):
+        """No reviewers: — in dim."""
+        pr = {"latestReviews": [], "reviewRequests": []}
+        result = gh_issues._format_review(pr)
+        assert "—" in result
+        assert "dim" in result
+
+    def test_review_requested_shows_dim_question_mark(self):
+        """Review requested: ?alice in dim."""
+        pr = {
+            "latestReviews": [],
+            "reviewRequests": [{"login": "alice"}],
+        }
+        result = gh_issues._format_review(pr)
+        assert "?alice" in result
+        assert "dim" in result
+
+    def test_approved_shows_green_check(self):
+        """Approved: ✓carol in green."""
+        pr = {
+            "latestReviews": [{"author": {"login": "carol"}, "state": "APPROVED"}],
+            "reviewRequests": [],
+        }
+        result = gh_issues._format_review(pr)
+        assert "✓carol" in result
+        assert "green" in result
+
+    def test_changes_requested_shows_red_x(self):
+        """Changes requested: ✗dave in red."""
+        pr = {
+            "latestReviews": [
+                {"author": {"login": "dave"}, "state": "CHANGES_REQUESTED"},
+            ],
+            "reviewRequests": [],
+        }
+        result = gh_issues._format_review(pr)
+        assert "✗dave" in result
+        assert "red" in result
+
+    def test_pending_shows_yellow_circle(self):
+        """Pending/commented: ◎bob in yellow."""
+        pr = {
+            "latestReviews": [{"author": {"login": "bob"}, "state": "COMMENTED"}],
+            "reviewRequests": [],
+        }
+        result = gh_issues._format_review(pr)
+        assert "◎bob" in result
+        assert "yellow" in result
+
+    def test_multiple_reviewers_space_separated(self):
+        """Multiple reviewers: space-separated."""
+        pr = {
+            "latestReviews": [
+                {"author": {"login": "alice"}, "state": "APPROVED"},
+                {"author": {"login": "bob"}, "state": "COMMENTED"},
+            ],
+            "reviewRequests": [],
+        }
+        result = gh_issues._format_review(pr)
+        assert "✓alice" in result
+        assert "◎bob" in result
+
+    def test_review_decision_approved(self):
+        """ReviewDecision APPROVED takes precedence."""
+        pr = {
+            "reviewDecision": "APPROVED",
+            "latestReviews": [],
+            "reviewRequests": [],
+        }
+        result = gh_issues._format_review(pr)
+        assert "approved" in result.lower() or "✓" in result
+
+    def test_review_decision_changes_requested(self):
+        """ReviewDecision CHANGES_REQUESTED takes precedence."""
+        pr = {
+            "reviewDecision": "CHANGES_REQUESTED",
+            "latestReviews": [],
+            "reviewRequests": [],
+        }
+        result = gh_issues._format_review(pr)
+        assert "changes" in result.lower() or "✗" in result
+
+    def test_mixed_states(self):
+        """Mixed states: approved + requested."""
+        pr = {
+            "latestReviews": [{"author": {"login": "alice"}, "state": "APPROVED"}],
+            "reviewRequests": [{"login": "bob"}],
+        }
+        result = gh_issues._format_review(pr)
+        assert "✓alice" in result
+        assert "?bob" in result
+
+    def test_review_request_name_fallback(self):
+        """Review request with name fallback."""
+        pr = {
+            "latestReviews": [],
+            "reviewRequests": [{"login": "", "name": "team-review"}],
+        }
+        result = gh_issues._format_review(pr)
+        assert "?team-review" in result
+
+    def test_empty_pr_dict(self):
+        """Empty PR dict: — in dim."""
+        result = gh_issues._format_review({})
+        assert "—" in result
+        assert "dim" in result
+
+    def test_reviewer_not_duplicated(self):
+        """Reviewer already in latestReviews not duplicated from reviewRequests."""
+        pr = {
+            "latestReviews": [{"author": {"login": "alice"}, "state": "APPROVED"}],
+            "reviewRequests": [{"login": "alice"}],
+        }
+        result = gh_issues._format_review(pr)
+        assert result.count("alice") == 1
