@@ -16,6 +16,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "vig-utils",
+    "rich>=13.0.0",
     {include-group = "lint"},
     {include-group = "test"},
 ]
