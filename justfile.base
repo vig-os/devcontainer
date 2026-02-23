@@ -131,3 +131,15 @@ sidecar name *args:
 
     # Execute the recipe in the sidecar
     podman exec {{name}} just {{args}}
+
+# -------------------------------------------------------------------------------
+# REMOTE DEVCONTAINER
+# -------------------------------------------------------------------------------
+
+# Start a devcontainer on a remote host and open Cursor/VS Code
+# Usage: just devc-remote <ssh-host> [--path <remote-path>]
+# Example: just devc-remote myserver
+#          just devc-remote user@host --path /opt/projects/myrepo
+[group('devcontainer')]
+devc-remote host *args:
+    bash scripts/devc-remote.sh {{host}} {{args}}

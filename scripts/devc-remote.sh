@@ -213,8 +213,23 @@ remote_compose_up() {
 }
 
 open_editor() {
-    local uri
-    uri=$(python3 "$SCRIPT_DIR/devc_remote_uri.py" --ssh-host "$SSH_HOST" --path "$REMOTE_PATH")
+    local container_workspace uri
+    # Read workspaceFolder from devcontainer.json on remote host
+    # shellcheck disable=SC2029
+    container_workspace=$(ssh "$SSH_HOST" \
+        "grep -o '\"workspaceFolder\"[[:space:]]*:[[:space:]]*\"[^\"]*\"' \
+         ${REMOTE_PATH}/.devcontainer/devcontainer.json 2>/dev/null" \
+        | sed 's/.*: *"//;s/"//' || echo "/workspace")
+
+    # Default to /workspace if workspaceFolder not found
+    container_workspace="${container_workspace:-/workspace}"
+
+    # Build URI using Python helper
+    uri=$(python3 "$SCRIPT_DIR/devc_remote_uri.py" \
+        "$REMOTE_PATH" \
+        "$SSH_HOST" \
+        "$container_workspace")
+
     "$EDITOR_CLI" --folder-uri "$uri"
 }
 
