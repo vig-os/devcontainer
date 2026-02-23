@@ -22,6 +22,7 @@ _format_assignees = gh_issues._format_assignees
 _infer_review = gh_issues._infer_review
 _extract_reviewers = gh_issues._extract_reviewers
 _build_cross_refs = gh_issues._build_cross_refs
+_detect_phase = gh_issues._detect_phase
 
 
 class TestFormatCiStatus:
@@ -427,3 +428,119 @@ class TestBuildCrossRefs:
         issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
         assert issue_to_pr == {102: 100, 103: 100}
         assert pr_to_issues == {100: [102, 103]}
+
+
+class TestDetectPhase:
+    """Test _detect_phase for Phase column in issues table.
+
+    Ref: #157
+    """
+
+    def test_backlog_no_branch_no_comments(self):
+        """Backlog: no branch, no comments."""
+        label, style = gh_issues._detect_phase(42, [], {}, {})
+        assert label == "Backlog"
+        assert style == "dim"
+
+    def test_claimed_branch_exists_no_comments(self):
+        """Claimed: branch exists, no design/plan comments."""
+        branches = {42: "feature/42-test"}
+        label, style = gh_issues._detect_phase(42, [], branches, {})
+        assert label == "Claimed"
+        assert style == "cyan"
+
+    def test_claimed_branch_exists_other_comments(self):
+        """Claimed: branch exists, comments but no design/plan headings."""
+        comments = [{"body": "Some random comment\nNo headings here"}]
+        branches = {42: "feature/42-test"}
+        label, style = gh_issues._detect_phase(42, comments, branches, {})
+        assert label == "Claimed"
+        assert style == "cyan"
+
+    def test_design_comment_found(self):
+        """Design: ## Design comment found."""
+        comments = [{"body": "## Design\n\nSome design content"}]
+        branches = {}
+        label, style = gh_issues._detect_phase(42, comments, branches, {})
+        assert label == "Design"
+        assert style == "yellow"
+
+    def test_design_with_branch(self):
+        """Design: ## Design comment found, even if branch exists."""
+        comments = [{"body": "## Design\n\nSome design content"}]
+        branches = {42: "feature/42-test"}
+        label, style = gh_issues._detect_phase(42, comments, branches, {})
+        assert label == "Design"
+        assert style == "yellow"
+
+    def test_planned_comment_found(self):
+        """Planned: ## Implementation Plan comment found."""
+        comments = [{"body": "## Implementation Plan\n\n- Task 1\n- Task 2"}]
+        branches = {}
+        label, style = gh_issues._detect_phase(42, comments, branches, {})
+        assert label == "Planned"
+        assert style == "yellow"
+
+    def test_in_progress_plan_and_branch(self):
+        """In Progress: ## Implementation Plan + branch exists."""
+        comments = [{"body": "## Implementation Plan\n\n- Task 1"}]
+        branches = {42: "feature/42-test"}
+        label, style = gh_issues._detect_phase(42, comments, branches, {})
+        assert label == "In Progress"
+        assert style == "green"
+
+    def test_in_review_linked_pr_exists(self):
+        """In Review: linked PR exists (highest priority)."""
+        comments = []
+        branches = {}
+        issue_to_pr = {42: 100}
+        label, style = gh_issues._detect_phase(42, comments, branches, issue_to_pr)
+        assert label == "In Review"
+        assert style == "bold green"
+
+    def test_in_review_overrides_other_phases(self):
+        """In Review takes priority over In Progress."""
+        comments = [{"body": "## Implementation Plan\n\n- Task 1"}]
+        branches = {42: "feature/42-test"}
+        issue_to_pr = {42: 100}
+        label, style = gh_issues._detect_phase(42, comments, branches, issue_to_pr)
+        assert label == "In Review"
+        assert style == "bold green"
+
+    def test_planned_overrides_design(self):
+        """Planned takes priority over Design."""
+        comments = [
+            {"body": "## Design\n\nSome design"},
+            {"body": "## Implementation Plan\n\n- Task 1"},
+        ]
+        branches = {}
+        label, style = gh_issues._detect_phase(42, comments, branches, {})
+        assert label == "Planned"
+        assert style == "yellow"
+
+    def test_comment_heading_case_sensitive(self):
+        """Comment headings must match exactly: ## Design, ## Implementation Plan."""
+        comments = [{"body": "### Design\n\nNot a match"}]
+        branches = {}
+        label, style = gh_issues._detect_phase(42, comments, branches, {})
+        assert label == "Backlog"
+        assert style == "dim"
+
+    def test_comment_heading_in_middle_of_text(self):
+        """Comment headings found anywhere in comment body."""
+        comments = [{"body": "Some text\n## Design\nMore text"}]
+        branches = {}
+        label, style = gh_issues._detect_phase(42, comments, branches, {})
+        assert label == "Design"
+        assert style == "yellow"
+
+    def test_multiple_comments_scan_all(self):
+        """Scan all comments, not just the first."""
+        comments = [
+            {"body": "First comment\nNo headings"},
+            {"body": "Second comment\n## Design\nFound it"},
+        ]
+        branches = {}
+        label, style = gh_issues._detect_phase(42, comments, branches, {})
+        assert label == "Design"
+        assert style == "yellow"
