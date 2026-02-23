@@ -18,207 +18,24 @@ Called by:
 from __future__ import annotations
 
 import argparse
-import re
 import shutil
 import sys
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
 
-# ── Transform types ──────────────────────────────────────────────────────────
+# Ensure scripts dir is on path for transforms import
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-
-class Transform(Protocol):
-    """A post-copy transformation applied to a synced file."""
-
-    def apply(self, file_path: Path) -> None: ...
-
-
-def _resolve(file_path: Path, target: str) -> Path | None:
-    """Resolve a transform target path, returning None if it doesn't exist."""
-    path = file_path / target if target else file_path
-    if not path.exists():
-        return None
-    return path
-
-
-@dataclass
-class Sed:
-    """Regex substitution on a file (or a specific file within a directory entry)."""
-
-    pattern: str
-    replace: str
-    target: str = ""
-
-    def apply(self, file_path: Path) -> None:
-        path = _resolve(file_path, self.target)
-        if path is None:
-            return
-        content = path.read_text()
-        content = re.sub(self.pattern, self.replace, content)
-        path.write_text(content)
-
-
-@dataclass
-class RemoveLines:
-    """Remove lines matching a regex pattern."""
-
-    pattern: str
-    target: str = ""
-
-    def apply(self, file_path: Path) -> None:
-        path = _resolve(file_path, self.target)
-        if path is None:
-            return
-        content = path.read_text()
-        lines = content.splitlines(keepends=True)
-        filtered = [line for line in lines if not re.search(self.pattern, line)]
-        path.write_text("".join(filtered))
-
-
-@dataclass
-class StripTrailingBlankLines:
-    """Remove trailing blank lines from a file, keeping a single final newline."""
-
-    target: str = ""
-
-    def apply(self, file_path: Path) -> None:
-        path = _resolve(file_path, self.target)
-        if path is None:
-            return
-        content = path.read_text()
-        path.write_text(content.rstrip() + "\n")
-
-
-@dataclass
-class RemoveBlock:
-    """Remove a block of lines from start_pattern through end_pattern (inclusive)."""
-
-    start_pattern: str
-    end_pattern: str
-    target: str = ""
-
-    def apply(self, file_path: Path) -> None:
-        path = _resolve(file_path, self.target)
-        if path is None:
-            return
-        content = path.read_text()
-        lines = content.splitlines(keepends=True)
-        result = []
-        skipping = False
-        for line in lines:
-            if not skipping and re.search(self.start_pattern, line):
-                skipping = True
-                continue
-            if skipping:
-                if re.search(self.end_pattern, line):
-                    skipping = False
-                continue
-            result.append(line)
-        path.write_text("".join(result))
-
-
-@dataclass
-class RemovePrecommitHooks:
-    """Remove pre-commit hooks by id and clean up empty repo blocks."""
-
-    hook_ids: list[str]
-
-    def apply(self, file_path: Path) -> None:
-        content = file_path.read_text()
-        lines = content.splitlines(keepends=True)
-        result: list[str] = []
-        i = 0
-        while i < len(lines):
-            line = lines[i]
-            # Check if this line starts a hook we want to remove
-            if any(f"id: {hid}" in line for hid in self.hook_ids):
-                # Skip until next hook (- id:) or next repo (- repo:) or blank line after block
-                i += 1
-                while i < len(lines):
-                    next_line = lines[i]
-                    # Stop before next hook or repo definition
-                    if re.match(r"^      - id:", next_line) or re.match(
-                        r"^  - repo:", next_line
-                    ):
-                        break
-                    i += 1
-                    # If we hit a blank line, consume it and stop
-                    if next_line.strip() == "":
-                        break
-                continue
-            result.append(line)
-            i += 1
-
-        # Second pass: remove empty repo blocks (repo: local with hooks: but no actual hooks)
-        final: list[str] = []
-        i = 0
-        result_lines = result
-        while i < len(result_lines):
-            line = result_lines[i]
-            if re.match(r"^  - repo: local", line):
-                # Buffer this repo block header
-                buf = [line]
-                i += 1
-                while i < len(result_lines) and not re.match(
-                    r"^  - repo:", result_lines[i]
-                ):
-                    buf.append(result_lines[i])
-                    i += 1
-                # Check if buffer has any actual hooks
-                has_hooks = any(re.match(r"^      - id:", b) for b in buf)
-                if has_hooks:
-                    final.extend(buf)
-                # If no hooks, discard the entire block (including comment above)
-                # Check if last line in final is a comment for this section
-                elif final and final[-1].strip().startswith("#"):
-                    final.pop()  # Remove the section comment too
-                continue
-            final.append(line)
-            i += 1
-
-        file_path.write_text("".join(final))
-
-
-@dataclass
-class ReplaceBlock:
-    """Replace a block of lines (start through end, inclusive) with new content.
-
-    If keep_start is True, the start line is preserved and replacement is
-    inserted after it.  Otherwise the start line is also replaced.
-    """
-
-    start_pattern: str
-    end_pattern: str
-    replacement: str
-    target: str = ""
-    keep_start: bool = False
-
-    def apply(self, file_path: Path) -> None:
-        path = _resolve(file_path, self.target)
-        if path is None:
-            return
-        content = path.read_text()
-        lines = content.splitlines(keepends=True)
-        result = []
-        skipping = False
-        replaced = False
-        for line in lines:
-            if not skipping and re.search(self.start_pattern, line):
-                skipping = True
-                if self.keep_start:
-                    result.append(line)
-                if not replaced:
-                    result.append(self.replacement)
-                    replaced = True
-                continue
-            if skipping:
-                if re.search(self.end_pattern, line):
-                    skipping = False
-                continue
-            result.append(line)
-        path.write_text("".join(result))
-
+from transforms import (
+    RemoveBlock,
+    RemoveLines,
+    RemovePrecommitHooks,
+    ReplaceBlock,
+    Sed,
+    StripTrailingBlankLines,
+    Transform,
+)
 
 # ── Manifest entry ───────────────────────────────────────────────────────────
 
@@ -246,104 +63,48 @@ class Entry:
         return len(self.transforms) > 0
 
 
+# ── Transform registry (type name -> constructor) ─────────────────────────────
+
+_TRANSFORM_REGISTRY: dict[str, type] = {
+    "Sed": Sed,
+    "RemoveLines": RemoveLines,
+    "StripTrailingBlankLines": StripTrailingBlankLines,
+    "RemoveBlock": RemoveBlock,
+    "RemovePrecommitHooks": RemovePrecommitHooks,
+    "ReplaceBlock": ReplaceBlock,
+}
+
+
+def _build_transform(spec: dict) -> Transform:
+    """Build a transform instance from config spec."""
+    type_name = spec.pop("type")
+    cls = _TRANSFORM_REGISTRY.get(type_name)
+    if cls is None:
+        raise ValueError(f"Unknown transform type: {type_name}")
+    return cls(**spec)
+
+
+def _load_manifest(manifest_path: Path) -> list[Entry]:
+    """Load manifest from TOML config file."""
+    with manifest_path.open("rb") as f:
+        data = tomllib.load(f)
+    entries: list[Entry] = []
+    for raw in data.get("entries", []):
+        src = raw["src"]
+        dest = raw.get("dest", "")
+        transforms: list[Transform] = []
+        for t_spec in raw.get("transforms", []):
+            # Copy spec to avoid mutating the original
+            spec = dict(t_spec)
+            transforms.append(_build_transform(spec))
+        entries.append(Entry(src=src, dest=dest, transforms=transforms))
+    return entries
+
+
 # ── The manifest ─────────────────────────────────────────────────────────────
 
-VALIDATE_COMMIT_MSG_ARGS_REPLACEMENT = (
-    "        # Optional: customize commit types, scopes, or refs-optional types via CLI arguments.\n"
-    "        # By default, scopes are not enforced. Set --scopes to require specific scopes.\n"
-    "        # Examples (choose one args line):\n"
-    '        #   args: ["--types", "feat,fix,docs,chore"]\n'
-    '        #   args: ["--scopes", "api,cli,utils"]\n'
-    '        #   args: ["--refs-optional-types", "chore"]\n'
-    '        #   args: ["--types", "feat,fix,docs", "--scopes", "api,cli,utils",'
-    ' "--refs-optional-types", "chore"]\n'
-)
-
-MANIFEST: list[Entry] = [
-    # ── Docs ─────────────────────────────────────────────────────────────
-    Entry(src="docs/COMMIT_MESSAGE_STANDARD.md"),
-    # ── Cursor rules ─────────────────────────────────────────────────────
-    Entry(
-        src=".cursor/rules/",
-        transforms=[
-            RemoveLines(
-                pattern=r"Full reference: \[docs/COMMIT_MESSAGE_STANDARD\.md\]",
-                target="commit-messages.mdc",
-            ),
-        ],
-    ),
-    # ── Cursor skills ───────────────────────────────────────────────────
-    Entry(
-        src=".cursor/skills/",
-        transforms=[
-            # code:verify: generalize devcontainer-specific test recipes
-            Sed(
-                pattern=r"just test-image",
-                replace="just test",
-                target="code:verify/SKILL.md",
-            ),
-            # design:plan: generalize devcontainer-specific test recipes
-            Sed(
-                pattern=r"just test-image",
-                replace="just test",
-                target="design:plan/SKILL.md",
-            ),
-        ],
-    ),
-    # ── Cursor worktree config ────────────────────────────────────────────
-    Entry(src=".cursor/worktrees.json"),
-    # ── Project config ───────────────────────────────────────────────────
-    Entry(src=".gitmessage"),
-    Entry(src=".yamllint"),
-    Entry(src=".pymarkdown"),
-    Entry(src=".pymarkdown.config.md"),
-    Entry(src=".hadolint.yaml"),
-    # ── GitHub templates & config ────────────────────────────────────────
-    Entry(src=".github/label-taxonomy.toml"),
-    Entry(src=".github/pull_request_template.md"),
-    Entry(src=".github/ISSUE_TEMPLATE/"),
-    Entry(src=".github/actions/setup-env/"),
-    Entry(
-        src=".github/dependabot.yml",
-        transforms=[
-            # Remove Docker ecosystem section (devcontainer-specific)
-            RemoveBlock(
-                start_pattern=r"^\s+# Docker",
-                end_pattern=r"^$",
-            ),
-            StripTrailingBlankLines(),
-        ],
-    ),
-    Entry(src=".github/workflows/scorecard.yml"),
-    Entry(src=".github/workflows/sync-issues.yml"),
-    Entry(src=".github/workflows/codeql.yml"),
-    # ── Base recipes (managed, replaced on upgrade) ──────────────────────
-    Entry(src="justfile.base", dest=".devcontainer/justfile.base"),
-    # ── GitHub CLI recipes (managed, replaced on upgrade) ────────────────
-    Entry(src="justfile.gh", dest=".devcontainer/justfile.gh"),
-    Entry(src="scripts/gh_issues.py", dest=".devcontainer/scripts/gh_issues.py"),
-    # ── Worktree recipes (managed, replaced on upgrade) ───────────────
-    Entry(src="justfile.worktree", dest=".devcontainer/justfile.worktree"),
-    # ── Pre-commit config ────────────────────────────────────────────────
-    Entry(
-        src=".pre-commit-config.yaml",
-        transforms=[
-            # Remove devcontainer-repo-specific hooks
-            RemovePrecommitHooks(hook_ids=["generate-docs"]),
-            # Generalize Bandit paths for downstream projects
-            Sed(
-                pattern=r"bandit -r packages/vig-utils/src/ scripts/ assets/workspace/",
-                replace="bandit -r src/",
-            ),
-            # Replace validate-commit-msg args with commented examples
-            ReplaceBlock(
-                start_pattern=r"^\s+args: \[$",
-                end_pattern=r"^\s+\]$",
-                replacement=VALIDATE_COMMIT_MSG_ARGS_REPLACEMENT,
-            ),
-        ],
-    ),
-]
+_MANIFEST_PATH = Path(__file__).resolve().parent / "manifest.toml"
+MANIFEST: list[Entry] = _load_manifest(_MANIFEST_PATH)
 
 
 # ── Sync logic ───────────────────────────────────────────────────────────────

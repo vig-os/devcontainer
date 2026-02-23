@@ -38,9 +38,28 @@ utils_spec = importlib.util.spec_from_file_location("utils", scripts_dir / "util
 utils = importlib.util.module_from_spec(utils_spec)
 utils_spec.loader.exec_module(utils)
 sed_inplace = utils.sed_inplace
+substitute_in_file = utils.substitute_in_file
 update_version_line = utils.update_version_line
 parse_args = utils.parse_args
 utils_main = utils.main
+
+
+class TestSubstituteInFile:
+    """Test substitute_in_file (shared substitution used by sed_inplace and Sed transform)."""
+
+    def test_literal_replacement_global(self, tmp_path):
+        """Literal replacement replaces all occurrences."""
+        f = tmp_path / "test.txt"
+        f.write_text("foo bar foo")
+        substitute_in_file(f, "foo", "bar", regex=False)
+        assert f.read_text() == "bar bar bar"
+
+    def test_regex_replacement(self, tmp_path):
+        """Regex replacement uses re.sub."""
+        f = tmp_path / "test.txt"
+        f.write_text("just test-image")
+        substitute_in_file(f, r"just test-image", "just test", regex=True)
+        assert f.read_text() == "just test"
 
 
 class TestSedInplace:
