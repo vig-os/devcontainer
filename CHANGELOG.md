@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **devc-remote.sh — bash orchestrator for remote devcontainer** ([#152](https://github.com/vig-os/devcontainer/issues/152))
+  - `scripts/devc-remote.sh`: parse_args, detect_editor_cli, check_ssh, remote_preflight, remote_compose_up, open_editor
+  - `scripts/devc_remote_uri.py`: stub for URI construction (sibling sub-issue)
+  - BATS unit tests with mocked commands
 - **devc_remote_uri.py — Cursor URI construction for remote devcontainers** ([#153](https://github.com/vig-os/devcontainer/issues/153))
   - Standalone Python module with `hex_encode()` and `build_uri()` for vscode-remote URIs
   - CLI: `devc_remote_uri.py <workspace_path> <ssh_host> <container_workspace>` prints URI to stdout
