@@ -430,6 +430,8 @@ def _extract_reviewers(pr: dict) -> str:
             parts.append(_styled(login, "green"))
         elif state == "CHANGES_REQUESTED":
             parts.append(_styled(login, "red"))
+        elif state == "REQUESTED":
+            parts.append(_styled(f"?{login}", "dim italic"))
         else:
             parts.append(_styled(login, "yellow"))
     return " ".join(parts)

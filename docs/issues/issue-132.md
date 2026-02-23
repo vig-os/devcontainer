@@ -1,18 +1,18 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-20T22:14:35Z
-updated: 2026-02-21T00:47:36Z
+updated: 2026-02-21T23:29:31Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/132
-comments: 1
+comments: 2
 labels: bug, area:workflow
 assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-21T04:11:17.295Z
+synced: 2026-02-22T04:23:21.555Z
 ---
 
 # [Issue 132]: [[BUG] worktree-attach fails when tmux session stopped but worktree exists](https://github.com/vig-os/devcontainer/issues/132)
@@ -110,7 +110,7 @@ The `--trust` flag is incompatible with interactive `agent chat` mode. All 4 `ag
 
 ### Tasks
 
-- [ ] **Task 1 (RED): Write BATS integration tests for worktree-attach restart logic** — `tests/bats/worktree.bats` — verify: `just test-bats` (new tests fail)
+- [x] **Task 1 (RED): Write BATS integration tests for worktree-attach restart logic** — `tests/bats/worktree.bats` — verify: `just test-bats` (new tests fail)
   - Skip if tmux not available (`command -v tmux || skip`)
   - Setup: create a temp directory simulating a worktree, start a tmux session with a fast-exit command (`true`), wait for session to die
   - Test cases:
@@ -121,17 +121,17 @@ The `--trust` flag is incompatible with interactive `agent chat` mode. All 4 `ag
   - Teardown: kill sessions, remove temp dirs, restore trust config
   - **No `agent` CLI or `gh` needed** — tests use `tmux`, `jq`, and filesystem ops only → fully CI-compatible once #130 merges
 
-- [ ] **Task 2 (GREEN): Remove `--trust` from `agent chat` invocations** — `justfile.worktree` — verify: `just test-bats`
+- [x] **Task 2 (GREEN): Remove `--trust` from `agent chat` invocations** — `justfile.worktree` — verify: `just test-bats`
   - Remove `--trust` from all 4 `agent chat` command lines (lines 100, 102, 192, 194)
   - `_wt_ensure_trust` already handles workspace trust via `cli-config.json` before session launch — `--trust` flag was redundant and incompatible with chat mode
 
-- [ ] **Task 3 (GREEN): Fix `worktree-attach` to restart stopped sessions** — `justfile.worktree` (recipe `worktree-attach`) — verify: `just test-bats` (all tests pass)
+- [x] **Task 3 (GREEN): Fix `worktree-attach` to restart stopped sessions** — `justfile.worktree` (recipe `worktree-attach`) — verify: `just test-bats` (all tests pass)
   - When `tmux has-session` fails, check if `_wt_base/<issue>` directory exists
   - If worktree dir exists: restart a tmux session in that directory (reuse pattern from `worktree-start` lines 95–104), then attach
   - If worktree dir does not exist: keep current error message
   - Add comment above the recipe referencing `tests/bats/worktree.bats` for future maintainers
 
-- [ ] **Task 4: Update CHANGELOG.md** — `CHANGELOG.md` — verify: visual inspection
+- [x] **Task 4: Update CHANGELOG.md** — `CHANGELOG.md` — verify: visual inspection
   - Add "Fixed" entry under `## Unreleased` for the worktree-attach bug
 
 ### Design Decisions
@@ -141,4 +141,23 @@ The `--trust` flag is incompatible with interactive `agent chat` mode. All 4 `ag
 - Tests skip gracefully when tmux is unavailable (`command -v tmux || skip`), so CI works before #130 merges.
 - `tmux new-session -d` always returns exit 0 regardless of inner command success — error detection for failed agent sessions is out of scope (potential follow-up issue).
 - A comment in `justfile.worktree` on the `worktree-attach` recipe points to the test file, so recipe changes trigger test awareness.
+
+---
+
+# [Comment #2]() by [gerchowl]()
+
+_Posted on February 21, 2026 at 05:40 PM_
+
+## Implementation Plan (branch-already-checked-out guard)
+
+Issue: #132
+Branch: `bugfix/132-worktree-attach-stopped-session`
+
+The existing commits on this branch address the main issue (attach restart + `--trust` removal). This plan covers the remaining gap: `git worktree add` in `worktree-start` fails with a fatal error when the branch is already checked out in another working tree (e.g., the main repo). The fix adds detection and an informative error message.
+
+### Tasks
+
+- [x] **Task 1 (RED):** Write BATS test for `worktree-start` when branch is already checked out — `tests/bats/worktree.bats` — verify: `just test-bats` (new test fails)
+- [x] **Task 2 (GREEN):** Add branch-already-checked-out detection before `git worktree add` in `worktree-start`, printing an informative error with the path where the branch is checked out — `justfile.worktree` — verify: `just test-bats` (all tests pass)
+- [x] **Task 3:** Update CHANGELOG entry under `## Unreleased` to mention the improved error message — `CHANGELOG.md` — verify: visual inspection
 

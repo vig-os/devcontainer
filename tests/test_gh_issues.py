@@ -309,7 +309,7 @@ class TestExtractReviewers:
             "latestReviews": [],
             "reviewRequests": [{"login": "carol"}],
         }
-        assert _extract_reviewers(pr) == "[yellow]carol[/]"
+        assert _extract_reviewers(pr) == "[dim italic]?carol[/]"
 
     def test_mixed_reviewers(self):
         pr = {
@@ -318,14 +318,14 @@ class TestExtractReviewers:
         }
         result = _extract_reviewers(pr)
         assert "[green]alice[/]" in result
-        assert "[yellow]bob[/]" in result
+        assert "[dim italic]?bob[/]" in result
 
     def test_review_request_with_name_fallback(self):
         pr = {
             "latestReviews": [],
             "reviewRequests": [{"login": "", "name": "team-review"}],
         }
-        assert _extract_reviewers(pr) == "[yellow]team-review[/]"
+        assert _extract_reviewers(pr) == "[dim italic]?team-review[/]"
 
     def test_empty_pr_dict(self):
         assert _extract_reviewers({}) == "[dim]—[/]"
