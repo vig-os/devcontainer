@@ -64,6 +64,10 @@ src = ".github/workflows/sync-issues.yml"
 src = ".github/workflows/codeql.yml"
 
 [[entries]]
+src = "justfile.base"
+dest = ".devcontainer/justfile.base"
+
+[[entries]]
 src = "justfile.gh"
 dest = ".devcontainer/justfile.gh"
 
