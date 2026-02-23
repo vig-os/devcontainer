@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **validate-commit-msg rejects AI agent identity fingerprints** ([#163](https://github.com/vig-os/devcontainer/issues/163))
+  - Commit-msg hook now rejects commits containing Co-authored-by, cursoragent, claude, codex, chatgpt, copilot
+  - Enforced before other validation; applies to full message including subject-only mode
 - **gh-issues cross-ref detects Refs: #N in PR bodies** ([#121](https://github.com/vig-os/devcontainer/issues/121))
   - `_build_cross_refs` now parses `Refs: #102` and comma-separated variants (`Refs: #102, #103`) alongside Closes/Fixes/Resolves
 - **PR table Reviewer column distinguishes requested vs completed reviewers** ([#105](https://github.com/vig-os/devcontainer/issues/105))
