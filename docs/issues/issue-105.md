@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-20T10:11:58Z
-updated: 2026-02-20T10:11:58Z
+updated: 2026-02-21T23:24:14Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/105
-comments: 0
+comments: 3
 labels: bug
-assignees: none
+assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-20T13:17:16.451Z
+synced: 2026-02-22T04:23:22.996Z
 ---
 
 # [Issue 105]: [[BUG] PR table Reviewer column shows requested reviewers instead of actual reviewers](https://github.com/vig-os/devcontainer/issues/105)
@@ -71,3 +71,63 @@ Merge both data sources into the Reviewer column:
 ### Changelog Category
 
 Fixed
+---
+
+# [Comment #1]() by [gerchowl]()
+
+_Posted on February 21, 2026 at 11:16 PM_
+
+## Design
+
+### Problem
+`_extract_reviewers` in `scripts/gh_issues.py` merges `latestReviews` and `reviewRequests` but displays both with similar styling. Requested reviewers (no review submitted) appear indistinguishable from actual reviewers.
+
+### Solution
+Distinguish the two states in a single column:
+
+| State | Display | Style |
+|-------|---------|-------|
+| **Reviewed** (from `latestReviews`) | `login` | green (APPROVED), red (CHANGES_REQUESTED) — unchanged |
+| **Requested** (from `reviewRequests`, not yet reviewed) | `?login` | dim italic |
+
+### Implementation
+- Modify `_extract_reviewers`: when `state == "REQUESTED"`, render `?{login}` with `dim italic` instead of `yellow`.
+- Update existing tests: `test_requested_reviewer`, `test_mixed_reviewers`, `test_review_request_with_name_fallback` to assert `?` prefix and dim italic style.
+- Add regression test: PR with only `reviewRequests` (no `latestReviews`) shows `?login` not plain `login`.
+
+### Data flow
+- `_fetch_prs` already includes `reviewRequests` and `latestReviews` in `--json`.
+- No API changes required.
+
+---
+
+# [Comment #2]() by [gerchowl]()
+
+_Posted on February 21, 2026 at 11:16 PM_
+
+## Implementation Plan
+
+Issue: #105
+Branch: bugfix/105-pr-table-actual-reviewers
+
+### Tasks
+
+- [x] Task 1: Add failing test for requested reviewer with `?` prefix and dim italic — `tests/test_gh_issues.py` — verify: `just test tests/test_gh_issues.py::TestExtractReviewers::test_requested_reviewer` fails with assertion on `?` prefix
+- [x] Task 2: Update `_extract_reviewers` to render REQUESTED state as `?login` with dim italic — `scripts/gh_issues.py` — verify: `just test tests/test_gh_issues.py`
+- [x] Task 3: Update test_mixed_reviewers and test_review_request_with_name_fallback for new format — `tests/test_gh_issues.py` — verify: `just test tests/test_gh_issues.py`
+
+---
+
+# [Comment #3]() by [gerchowl]()
+
+_Posted on February 21, 2026 at 11:24 PM_
+
+## Autonomous Run Complete
+
+- Design: posted
+- Plan: posted (3 tasks)
+- Execute: all tasks done
+- Verify: gh_issues tests pass, lint pass
+- PR: https://github.com/vig-os/devcontainer/pull/149
+- CI: all checks pass
+

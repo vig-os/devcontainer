@@ -38,7 +38,7 @@ Skills are markdown playbooks that live in `.cursor/skills/`. Each one defines a
   │  git_commit              │                              │            ├─ worktree_execute              │
   │  pr_create               │                              │            ├─ worktree_verify               │
   │  ci_check / ci_fix       │                              │            ├─ worktree_pr                   │
-  │                          │                              │            └─ worktree_ci-check / ci-fix    │
+  │  pr_solve                │                              │            └─ worktree_ci-check / ci-fix    │
   └─────────────▼────────────┘                              │                                             │
                 |                                           │  worktree_ask  (escape hatch: post          │
                 |                                           │                 question on issue)          │
@@ -50,8 +50,8 @@ Skills are markdown playbooks that live in `.cursor/skills/`. Each one defines a
                                                   |
                              ┌────────────────────▼──────────────────────┐
                              │            RELEASE MANAGEMENT             │
-              │             pr_create                     │
-              │             pr_post-merge                 │
+                             │             pr_create                     │
+                             │             pr_post-merge                 │
                              └───────────────────────────────────────────┘
 
 

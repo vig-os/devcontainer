@@ -101,10 +101,98 @@ def _load_manifest(manifest_path: Path) -> list[Entry]:
     return entries
 
 
+<<<<<<< feature/89-consolidate-sync-manifest-utils
 # ── The manifest ─────────────────────────────────────────────────────────────
 
 _MANIFEST_PATH = Path(__file__).resolve().parent / "manifest.toml"
 MANIFEST: list[Entry] = _load_manifest(_MANIFEST_PATH)
+=======
+MANIFEST: list[Entry] = [
+    # ── Docs ─────────────────────────────────────────────────────────────
+    Entry(src="docs/COMMIT_MESSAGE_STANDARD.md"),
+    # ── Cursor rules ─────────────────────────────────────────────────────
+    Entry(
+        src=".cursor/rules/",
+        transforms=[
+            RemoveLines(
+                pattern=r"Full reference: \[docs/COMMIT_MESSAGE_STANDARD\.md\]",
+                target="commit-messages.mdc",
+            ),
+        ],
+    ),
+    # ── Cursor skills ───────────────────────────────────────────────────
+    Entry(
+        src=".cursor/skills/",
+        transforms=[
+            # code:verify: generalize devcontainer-specific test recipes
+            Sed(
+                pattern=r"just test-image",
+                replace="just test",
+                target="code:verify/SKILL.md",
+            ),
+            # design:plan: generalize devcontainer-specific test recipes
+            Sed(
+                pattern=r"just test-image",
+                replace="just test",
+                target="design:plan/SKILL.md",
+            ),
+        ],
+    ),
+    # ── Cursor worktree config ────────────────────────────────────────────
+    Entry(src=".cursor/worktrees.json"),
+    # ── Project config ───────────────────────────────────────────────────
+    Entry(src=".gitmessage"),
+    Entry(src=".yamllint"),
+    Entry(src=".pymarkdown"),
+    Entry(src=".pymarkdown.config.md"),
+    Entry(src=".hadolint.yaml"),
+    # ── GitHub templates & config ────────────────────────────────────────
+    Entry(src=".github/label-taxonomy.toml"),
+    Entry(src=".github/pull_request_template.md"),
+    Entry(src=".github/ISSUE_TEMPLATE/"),
+    Entry(src=".github/actions/setup-env/"),
+    Entry(
+        src=".github/dependabot.yml",
+        transforms=[
+            # Remove Docker ecosystem section (devcontainer-specific)
+            RemoveBlock(
+                start_pattern=r"^\s+# Docker",
+                end_pattern=r"^$",
+            ),
+            StripTrailingBlankLines(),
+        ],
+    ),
+    Entry(src=".github/workflows/scorecard.yml"),
+    Entry(src=".github/workflows/sync-issues.yml"),
+    Entry(src=".github/workflows/codeql.yml"),
+    # ── Base recipes (managed, replaced on upgrade) ──────────────────────
+    Entry(src="justfile.base", dest=".devcontainer/justfile.base"),
+    # ── GitHub CLI recipes (managed, replaced on upgrade) ────────────────
+    Entry(src="justfile.gh", dest=".devcontainer/justfile.gh"),
+    Entry(src="scripts/gh_issues.py", dest=".devcontainer/scripts/gh_issues.py"),
+    # ── Worktree recipes (managed, replaced on upgrade) ───────────────
+    Entry(src="justfile.worktree", dest=".devcontainer/justfile.worktree"),
+    # ── Pre-commit config ────────────────────────────────────────────────
+    Entry(
+        src=".pre-commit-config.yaml",
+        transforms=[
+            # Remove devcontainer-repo-specific hooks
+            RemovePrecommitHooks(hook_ids=["generate-docs"]),
+            # Generalize Bandit paths for downstream projects
+            Sed(
+                pattern=r"bandit -r packages/vig-utils/src/ scripts/ assets/workspace/",
+                replace="bandit -r src/",
+            ),
+            # Replace validate-commit-msg args with commented examples
+            ReplaceBlock(
+                start_pattern=r"^\s+args: \[$",
+                end_pattern=r"^\s+\]$",
+                replacement=VALIDATE_COMMIT_MSG_ARGS_REPLACEMENT,
+            ),
+        ],
+    ),
+]
+>>>>>>> dev
 
 
 # ── Sync logic ───────────────────────────────────────────────────────────────

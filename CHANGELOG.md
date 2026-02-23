@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **PR table Reviewer column distinguishes requested vs completed reviewers** ([#105](https://github.com/vig-os/devcontainer/issues/105))
+  - Requested reviewers (no review yet) display as `?login` with dim italic style
+  - Actual reviewers (submitted review) display as plain login with green/red
 - **worktree-attach restarts stopped tmux session when worktree dir exists** ([#132](https://github.com/vig-os/devcontainer/issues/132))
   - Detect when worktree directory exists but tmux session has terminated
   - Automatically restart session in existing worktree before attaching
@@ -17,10 +20,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+<<<<<<< feature/89-consolidate-sync-manifest-utils
 - **Consolidate sync_manifest.py and utils.py into manifest-as-config architecture** ([#89](https://github.com/vig-os/devcontainer/issues/89))
   - Extract transform classes (Sed, RemoveLines, etc.) to `scripts/transforms.py`
   - Unify sed logic: `substitute_in_file()` in utils shared by sed_inplace and Sed transform
   - Convert MANIFEST from Python code to declarative `scripts/manifest.toml`
+=======
+- **justfile.base is canonical at repo root, synced via manifest** ([#71](https://github.com/vig-os/devcontainer/issues/71))
+  - Root `justfile.base` is now the single source of truth; synced to `assets/workspace/.devcontainer/justfile.base` via `sync_manifest.py`
+  - `just sync-workspace` and prepare-build keep workspace template in sync
+- **Autonomous PR skills use pull request template** ([#147](https://github.com/vig-os/devcontainer/issues/147))
+  - `pr_create` and `worktree_pr` now read `.github/pull_request_template.md` and fill each section from available context
+  - Explicit read-then-fill procedure with section-by-section mapping (Description, Type of Change, Changelog Entry, Testing, Checklist, Refs)
+  - Ensures autonomous PRs match manual PR structure and include all checklist items
+>>>>>>> dev
 - **Rename skill namespace separator from colon to underscore** ([#128](https://github.com/vig-os/devcontainer/issues/128))
   - All skill directories under `.cursor/skills/` and `assets/workspace/.cursor/skills/` renamed (e.g. `issue:create` → `issue_create`)
   - All internal cross-references, frontmatter, prose, `CLAUDE.md` command table, and label taxonomy updated
@@ -39,6 +52,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Devcontainer and git recipes in justfile.base** ([#71](https://github.com/vig-os/devcontainer/issues/71))
+  - Devcontainer group (host-side only): `up`, `down`, `status`, `logs`, `shell`, `restart`, `open`
+  - Auto-detect podman/docker compose; graceful failure if run inside container
+  - Git group: `log` (pretty one-line, last 20), `branch` (current + recent)
+- **CI status column in just gh-issues PR table** ([#143](https://github.com/vig-os/devcontainer/issues/143))
+  - PR table shows CI column with pass/fail/pending summary (✓ 6/6, ⏳ 3/6, ✗ 5/6)
+  - Failed check names visible when checks fail
+  - CI cell links to GitHub PR checks page
 - **Config-driven model tier assignments for agent skills** ([#103](https://github.com/vig-os/devcontainer/issues/103))
   - Extended `.cursor/agent-models.toml` with `standard` tier (sonnet-4.5) and `[skill-tiers]` mapping for skill categories (data-gathering, formatting, review, orchestration)
   - New rule `.cursor/rules/subagent-delegation.mdc` documenting when and how to delegate mechanical sub-steps to lightweight subagents via the Task tool
@@ -51,6 +72,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **tmux installed in container image for worktree session persistence** ([#130](https://github.com/vig-os/devcontainer/issues/130))
   - Add `tmux` to the Containerfile `apt-get install` block
   - Enables autonomous worktree agents to survive Cursor session disconnects
+- **pr_solve skill — diagnose PR failures, plan fixes, execute** ([#133](https://github.com/vig-os/devcontainer/issues/133))
+  - Single entry point that gathers CI failures, review feedback, and merge state into a consolidated diagnosis
+  - Presents diagnosis for approval before any fixes, plans fixes using design_plan conventions, executes with TDD discipline
+  - Pre-commit hook `check-skill-names` enforces `[a-z0-9][a-z0-9_-]*` naming for skill directories
+  - BATS test suite with canary test that injects a bad name into the real repo
+  - TDD scenario checklist expanded with canary, idempotency, and concurrency categories
 - **Optional reviewer parameter for autonomous worktree pipeline** ([#102](https://github.com/vig-os/devcontainer/issues/102))
   - Support `reviewer` parameter in `just worktree-start`
   - Propagate `PR_REVIEWER` via tmux environment to the autonomous agent
