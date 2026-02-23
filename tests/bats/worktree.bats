@@ -128,3 +128,37 @@ setup() {
     assert_output --partial "[ERROR]"
     assert_output --partial "No tmux session"
 }
+
+# ── worktree-clean filter mode (#158) ────────────────────────────────────────
+# Default (stopped-only): clean only worktrees with no running tmux session.
+# Mode "all": clean all worktrees (current behavior).
+
+@test "worktree-clean stopped-only skips worktrees with running tmux session" {
+    [ "${CI:-}" = "true" ] && skip "tmux integration tests require interactive TTY"
+    command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
+    command -v just >/dev/null 2>&1 || skip "just not installed"
+
+    ISSUE_SKIP=999996
+    ISSUE_CLEAN=999995
+    REPO=$(basename "$(cd "$PROJECT_ROOT" && git rev-parse --show-toplevel)")
+    WT_BASE="$(dirname "$PROJECT_ROOT")/${REPO}-worktrees"
+    DIR_SKIP="${WT_BASE}/${ISSUE_SKIP}"
+    DIR_CLEAN="${WT_BASE}/${ISSUE_CLEAN}"
+    SESSION_SKIP="wt-${ISSUE_SKIP}"
+
+    mkdir -p "$DIR_SKIP" "$DIR_CLEAN"
+    tmux new-session -d -s "$SESSION_SKIP" -c "$DIR_SKIP" "sleep 60"
+
+    run just worktree-clean 2>&1
+
+    tmux kill-session -t "$SESSION_SKIP" 2>/dev/null || true
+    rm -rf "$DIR_SKIP" "$DIR_CLEAN"
+    rmdir "$WT_BASE" 2>/dev/null || true
+
+    assert_success
+    assert_output --partial "[SKIP]"
+    assert_output --partial "999996"
+    assert_output --partial "999995"
+    assert [ ! -d "$DIR_CLEAN" ]
+    assert [ -d "$DIR_SKIP" ]
+}
