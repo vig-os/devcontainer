@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-18T01:45:43Z
-updated: 2026-02-21T23:57:28Z
+updated: 2026-02-22T09:22:29Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/70
-comments: 1
+comments: 2
 labels: feature, priority:low, area:workspace, effort:large, semver:minor
 assignees: gerchowl
 milestone: Backlog
 projects: none
 relationship: none
-synced: 2026-02-22T04:23:24.592Z
+synced: 2026-02-23T04:30:08.741Z
 ---
 
 # [Issue 70]: [[FEATURE] Remote devcontainer orchestration via just recipe](https://github.com/vig-os/devcontainer/issues/70)
@@ -349,7 +349,7 @@ _Posted on February 21, 2026 at 11:57 PM_
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Dependency on #71 | **Wait** — do not implement until #71 lands | #70 needs shared compose patterns from `justfile.base` that #71 introduces |
+| Dependency on #71 | **Decoupled** — #71 is implemented (PR #151), not yet merged. #70 proceeds independently; shared compose patterns are simple enough (runtime detection, compose file flags) that remote SSH execution reimplements them. Verify consistency when #71 merges. | No code-level coupling — only pattern consistency |
 | Phased delivery | **Yes** — 3 sub-issues for v1, follow-ups for `--clone`, signal traps, etc. | Effort:large; incremental delivery reduces risk |
 | Script language | **Hybrid** — bash orchestrator + Python URI helper | Bash is natural for SSH/compose; Python is cleaner for JSON/hex encoding |
 | File placement | Canonical files in repo root (`scripts/`), synced to `assets/workspace/.devcontainer/scripts/` via manifest | Follows existing pattern (cf. `justfile.gh`, `scripts/gh_issues.py`) |
@@ -375,7 +375,7 @@ just devc-remote <ssh-host> [--path <remote-repo-path>]
 - **Single SSH session for remote pre-flight** — heredoc-based `ssh <host> bash -s` batching all checks to avoid repeated connection overhead.
 - **No remote dependencies** beyond shell, git, container runtime — Python helper runs locally.
 - **Idempotent by design** — every step checks existing state before acting. Safe to re-run.
-- Compose commands will use patterns from #71 once it lands.
+- Compose patterns (runtime detection, file flags) are consistent with #71 but reimplemented for remote SSH context.
 
 ### File Layout
 
@@ -424,4 +424,58 @@ just devc-remote <ssh-host> [--path <remote-repo-path>]
 | Hex encoding, URI assembly | Pytest | Pure functions, known input/output |
 | Smoke test | Pytest or BATS | `devc-remote.sh --help` exits 0 |
 | End-to-end (deferred) | Pytest + sshd sidecar | Full SSH loopback, follow-up issue |
+
+---
+
+# [Comment #2]() by [gerchowl]()
+
+_Posted on February 22, 2026 at 09:22 AM_
+
+## Implementation Plan
+
+Issue: #70
+Branch: `feature/70-remote-devc-orchestration`
+
+### Structure
+
+Two parallel sub-issues, then wiring on the parent branch:
+
+| Sub-issue | Scope | Parallelism |
+|-----------|-------|-------------|
+| #152 — `devc-remote.sh` bash orchestrator | Script scaffold, pre-flight checks, container state detection, compose up, health poll, BATS tests | Parallel with #153 |
+| #153 — `devc_remote_uri.py` Python URI helper | Hex encoding, URI construction, CLI interface, pytest tests | Parallel with #152 |
+| #70 (final phase) | Just recipe, manifest entries, wiring, smoke test | Sequential after #152 + #153 merge |
+
+### Sub-issue #152 Tasks — `devc-remote.sh`
+
+- [ ] Test: BATS tests for argument parsing (missing host, `--path`, `--help`, unknown flags) — `tests/bats/devc-remote.bats` — verify: `npx bats tests/bats/devc-remote.bats`
+- [ ] Impl: `parse_args()` + `usage()` + `set -euo pipefail` scaffold — `scripts/devc-remote.sh` — verify: BATS pass
+- [ ] Test: BATS tests for `detect_editor_cli()` (cursor found, code found, neither) — `tests/bats/devc-remote.bats` — verify: BATS pass
+- [ ] Impl: `detect_editor_cli()` — `scripts/devc-remote.sh` — verify: BATS pass
+- [ ] Test: BATS tests for `check_ssh()` (success, connection fail, auth fail) — `tests/bats/devc-remote.bats` — verify: BATS pass
+- [ ] Impl: `check_ssh()` — `scripts/devc-remote.sh` — verify: BATS pass
+- [ ] Test: BATS tests for `remote_preflight()` structured output parsing — `tests/bats/devc-remote.bats` — verify: BATS pass
+- [ ] Impl: `remote_preflight()` — single SSH heredoc returning key=value output — `scripts/devc-remote.sh` — verify: BATS pass
+- [ ] Test: BATS tests for container state matrix (6 states → correct actions, mocked `compose ps`) — `tests/bats/devc-remote.bats` — verify: BATS pass
+- [ ] Impl: `remote_compose_up()` — state detection + compose up + health poll — `scripts/devc-remote.sh` — verify: BATS pass
+- [ ] Impl: `open_editor()` — call `devc_remote_uri.py`, then `$EDITOR_CLI --folder-uri` — `scripts/devc-remote.sh` — verify: BATS pass
+- [ ] Wire: main function connecting all stages — `scripts/devc-remote.sh` — verify: `bash scripts/devc-remote.sh --help` exits 0
+
+### Sub-issue #153 Tasks — `devc_remote_uri.py`
+
+- [ ] Test: pytest for `hex_encode()` — known inputs → exact hex output — `tests/test_devc_remote_uri.py` — verify: `uv run pytest tests/test_devc_remote_uri.py -v`
+- [ ] Impl: `hex_encode()` — `scripts/devc_remote_uri.py` — verify: pytest pass
+- [ ] Test: pytest for `build_uri()` — known inputs → exact URI — `tests/test_devc_remote_uri.py` — verify: pytest pass
+- [ ] Impl: `build_uri()` — `scripts/devc_remote_uri.py` — verify: pytest pass
+- [ ] Test: pytest for CLI interface — subprocess call, verify stdout — `tests/test_devc_remote_uri.py` — verify: pytest pass
+- [ ] Impl: CLI `__main__` block with argparse — `scripts/devc_remote_uri.py` — verify: pytest pass
+- [ ] Test: edge cases — special chars in paths, empty strings, missing args — `tests/test_devc_remote_uri.py` — verify: pytest pass
+
+### #70 Wiring Tasks (after #152 + #153 merge)
+
+- [ ] Add `devc-remote` recipe to `assets/workspace/.devcontainer/justfile.base` — verify: `just --list` shows recipe
+- [ ] Add manifest entries for both scripts to `scripts/sync_manifest.py` — verify: `uv run python scripts/sync_manifest.py list` shows entries
+- [ ] Run manifest sync — verify: files in `assets/workspace/.devcontainer/scripts/`
+- [ ] Smoke test: `bash scripts/devc-remote.sh --help` exits 0 with usage output
+- [ ] Update CHANGELOG.md Unreleased section
 
