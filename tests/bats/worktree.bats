@@ -148,12 +148,10 @@ setup() {
 
     mkdir -p "$DIR_SKIP" "$DIR_CLEAN"
     tmux new-session -d -s "$SESSION_SKIP" -c "$DIR_SKIP" "sleep 60"
+    sleep 1
+    tmux has-session -t "$SESSION_SKIP" || skip "tmux session did not start"
 
     run just worktree-clean 2>&1
-
-    tmux kill-session -t "$SESSION_SKIP" 2>/dev/null || true
-    rm -rf "$DIR_SKIP" "$DIR_CLEAN"
-    rmdir "$WT_BASE" 2>/dev/null || true
 
     assert_success
     assert_output --partial "[SKIP]"
@@ -161,4 +159,55 @@ setup() {
     assert_output --partial "999995"
     assert [ ! -d "$DIR_CLEAN" ]
     assert [ -d "$DIR_SKIP" ]
+
+    tmux kill-session -t "$SESSION_SKIP" 2>/dev/null || true
+    rm -rf "$DIR_SKIP" "$DIR_CLEAN"
+    rmdir "$WT_BASE" 2>/dev/null || true
+}
+
+@test "worktree-clean all removes worktrees with running tmux sessions" {
+    [ "${CI:-}" = "true" ] && skip "tmux integration tests require interactive TTY"
+    command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
+    command -v just >/dev/null 2>&1 || skip "just not installed"
+
+    ISSUE=999994
+    REPO=$(basename "$(cd "$PROJECT_ROOT" && git rev-parse --show-toplevel)")
+    WT_BASE="$(dirname "$PROJECT_ROOT")/${REPO}-worktrees"
+    DIR="${WT_BASE}/${ISSUE}"
+    SESSION="wt-${ISSUE}"
+
+    mkdir -p "$DIR"
+    tmux new-session -d -s "$SESSION" -c "$DIR" "sleep 60"
+    sleep 1
+    tmux has-session -t "$SESSION" || skip "tmux session did not start"
+
+    run just worktree-clean all 2>&1
+
+    assert_success
+    assert_output --partial "[WARNING]"
+    assert_output --partial "Removed worktree"
+    assert [ ! -d "$DIR" ]
+
+    tmux kill-session -t "$SESSION" 2>/dev/null || true
+    rm -rf "$DIR"
+    rmdir "$WT_BASE" 2>/dev/null || true
+}
+
+@test "wt-clean alias works for stopped-only and all" {
+    command -v just >/dev/null 2>&1 || skip "just not installed"
+
+    run just wt-clean 2>&1
+    assert_success
+
+    run just wt-clean all 2>&1
+    assert_success
+}
+
+@test "worktree-clean rejects invalid mode" {
+    command -v just >/dev/null 2>&1 || skip "just not installed"
+
+    run just worktree-clean invalid 2>&1
+    assert_failure
+    assert_output --partial "[ERROR]"
+    assert_output --partial "Invalid mode"
 }

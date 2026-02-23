@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **worktree-clean: add filter mode for stopped-only vs all** ([#158](https://github.com/vig-os/devcontainer/issues/158))
+  - Default `just worktree-clean` (no args) now cleans only stopped worktrees, skips running tmux sessions
+  - `just worktree-clean all` retains previous behavior (clean all worktrees) with warning
+  - Summary output shows cleaned vs skipped worktrees
+  - `just wt-clean` alias unchanged
 - **justfile.base is canonical at repo root, synced via manifest** ([#71](https://github.com/vig-os/devcontainer/issues/71))
   - Root `justfile.base` is now the single source of truth; synced to `assets/workspace/.devcontainer/justfile.base` via `sync_manifest.py`
   - `just sync-workspace` and prepare-build keep workspace template in sync
