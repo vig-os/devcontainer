@@ -194,6 +194,75 @@ def _format_assignees(assignees: list[dict]) -> str:
     return ", ".join(f"[bright_white]{a['login']}[/]" for a in assignees)
 
 
+def _has_comment_heading(comments: list[dict], heading: str) -> bool:
+    """Check if any comment contains the specified H2 heading.
+
+    Args:
+        comments: List of comment dicts with 'body' keys.
+        heading: Exact heading text to search for (e.g., "## Design").
+
+    Returns:
+        True if any comment body contains a line starting with the heading.
+    """
+    for comment in comments:
+        body = comment.get("body", "")
+        for line in body.split("\n"):
+            if line.strip() == heading:
+                return True
+    return False
+
+
+def _detect_phase(
+    issue_number: int,
+    comments: list[dict],
+    branches: dict[int, str],
+    issue_to_pr: dict[int, int],
+) -> tuple[str, str]:
+    """Detect pipeline phase for an issue based on comments, branch, and PR state.
+
+    Priority order (highest wins):
+    1. Linked PR exists → "In Review" (bold green)
+    2. Implementation Plan + branch → "In Progress" (green)
+    3. Implementation Plan → "Planned" (yellow)
+    4. Design → "Design" (yellow)
+    5. Branch exists → "Claimed" (cyan)
+    6. None → "Backlog" (dim)
+
+    Args:
+        issue_number: Issue number.
+        comments: List of comment dicts with 'body' keys.
+        branches: Mapping of issue_number to branch name.
+        issue_to_pr: Mapping of issue_number to PR number.
+
+    Returns:
+        Tuple of (phase_label, style) for Rich formatting.
+    """
+    # Priority 1: Linked PR exists
+    if issue_number in issue_to_pr:
+        return ("In Review", "bold green")
+
+    # Priority 2: Implementation Plan + branch
+    has_plan = _has_comment_heading(comments, "## Implementation Plan")
+    has_branch = issue_number in branches
+    if has_plan and has_branch:
+        return ("In Progress", "green")
+
+    # Priority 3: Implementation Plan
+    if has_plan:
+        return ("Planned", "yellow")
+
+    # Priority 4: Design
+    if _has_comment_heading(comments, "## Design"):
+        return ("Design", "yellow")
+
+    # Priority 5: Branch exists
+    if has_branch:
+        return ("Claimed", "cyan")
+
+    # Priority 6: Backlog
+    return ("Backlog", "dim")
+
+
 _CLOSING_RE = re.compile(r"(?:closes|fixes|resolves)\s+#(\d+)", re.IGNORECASE)
 _REFS_RE = re.compile(r"Refs:\s*((?:#\d+(?:\s*,\s*)?)+)", re.IGNORECASE)
 
