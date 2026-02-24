@@ -61,7 +61,7 @@ show_help() {
 
 parse_args() {
     SSH_HOST=""
-    REMOTE_PATH="$HOME"
+    REMOTE_PATH="~"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -84,8 +84,8 @@ parse_args() {
                     REMOTE_PATH="${BASH_REMATCH[2]}"
                 else
                     SSH_HOST="$1"
-                    # Default to $HOME if no path specified
-                    REMOTE_PATH="$HOME"
+                    # Default to ~ (expanded by remote shell) if no path specified
+                    REMOTE_PATH="~"
                 fi
                 shift
                 ;;
