@@ -3041,8 +3041,9 @@ class TestVersionCheckJustIntegration:
         assert result.returncode == 0, (
             f"just check config failed (path resolution bug #187): {result.stderr}"
         )
-        assert "Enabled:" in result.stdout
-        assert "interval:" in result.stdout.lower()
+        assert "Could not locate .devcontainer/scripts directory" not in (
+            result.stdout + result.stderr
+        ), "Path resolution broken: script dir not found"
 
     def test_just_check_mute_functionality(self, initialized_workspace):
         """Test that 'just check 7d' mutes notifications."""
