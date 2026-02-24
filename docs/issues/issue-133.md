@@ -1,18 +1,18 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-20T23:28:42Z
-updated: 2026-02-20T23:28:42Z
+updated: 2026-02-21T23:29:51Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/133
-comments: 0
+comments: 1
 labels: feature, area:workflow, effort:medium, semver:minor
-assignees: none
+assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-21T04:11:16.837Z
+synced: 2026-02-22T04:23:21.200Z
 ---
 
 # [Issue 133]: [[FEATURE] Add pr_solve skill — diagnose PR failures, plan fixes, execute](https://github.com/vig-os/devcontainer/issues/133)
@@ -63,3 +63,39 @@ The skill reuses existing skills by reference (SSoT) rather than duplicating the
 ### Changelog Category
 
 Added
+---
+
+# [Comment #1]() by [gerchowl]()
+
+_Posted on February 21, 2026 at 08:58 PM_
+
+## Implementation Plan
+
+Issue: #133
+Branch: `feature/133-pr-solve-skill`
+
+### Tasks
+
+- [x] Task 1: Create `pr:solve` skill file with full workflow (identify PR, gather problems, present diagnosis, plan fixes, execute, verify) — `.cursor/skills/pr:solve/SKILL.md` — verify: `test -f .cursor/skills/pr:solve/SKILL.md && head -5 .cursor/skills/pr:solve/SKILL.md`
+- [x] Task 2: Register `/pr:solve` in `CLAUDE.md` command table in alphabetical order — `CLAUDE.md` — verify: `grep 'pr:solve' CLAUDE.md`
+- [x] Task 3: Run workspace sync to propagate the new skill to `assets/workspace/` — `just sync-workspace` — verify: `test -f assets/workspace/.cursor/skills/pr:solve/SKILL.md`
+- [x] Task 4: Add changelog entry under `## Unreleased` / `### Added` — `CHANGELOG.md` — verify: `grep 'pr.solve' CHANGELOG.md`
+
+### Skill Design (Task 1 detail)
+
+**Frontmatter:** `name: pr:solve`, `description`, `disable-model-invocation: true`
+
+**Workflow (6 steps):**
+
+1. **Identify the PR** — user provides PR number; `gh pr view` for metadata; derive issue number from PR body (`Closes #N` / `Refs: #N`).
+2. **Gather all problems** — three parallel data sources, each separated:
+   - CI failures: `gh pr checks` + `gh run view --log-failed` (composes ci:check pattern)
+   - Review feedback: `gh api` for reviews and inline comments — only unresolved threads
+   - Merge state: `gh pr view --json mergeable,mergeStateStatus` — report but never auto-rebase
+3. **Present diagnosis** — structured summary, each finding cites source. Explicit "clean PR" exit if no problems.
+4. **Plan fixes** — design:plan conventions (ordered tasks, files, verification). User must approve. Merge conflicts flagged as manual action.
+5. **Execute fixes** — code:tdd discipline, git:commit after each task, push after each fix.
+6. **Verify** — ci:check after push. Max 2 loops then escalate to user.
+
+**Key guardrails:** no fixes without diagnosis first; no guessing; no auto-rebase; no stacking fixes; max loop count; delegation section for data-gathering.
+

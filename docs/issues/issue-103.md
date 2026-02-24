@@ -1,8 +1,8 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-20T10:00:14Z
-updated: 2026-02-20T15:25:13Z
+updated: 2026-02-21T23:11:15Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/103
@@ -12,7 +12,7 @@ assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-20T15:25:35.960Z
+synced: 2026-02-22T04:23:23.703Z
 ---
 
 # [Issue 103]: [[FEATURE] Enhance worktree workflow and autonomous agent integration](https://github.com/vig-os/devcontainer/issues/103)
@@ -86,18 +86,19 @@ Branch: `feature/103-worktree-workflow-enhancements`
 
 **Scope:** Goal 2 — Fix branch resolution for tab-separated `gh issue develop --list` output. (Goals 1 and 3 are already done.)
 
-**Bug:** `gh issue develop --list` returns `branch<TAB>URL`. The current parsing `grep -oE '[^ ]+$'` treats tab as non-space, capturing the entire line instead of just the branch name. Fix: replace with `head -1 | cut -f1`.
+**Bug:** `gh issue develop --list` returns `branch<TAB>URL`. The current parsing `grep -oE '[^ ]+$'` treats tab as non-space, capturing the entire line instead of just the branch name.
+
+**Approach:** Extract the parsing into `scripts/resolve-branch.sh` (SSoT). Both justfile call sites pipe through it. BATS tests exercise the actual script.
 
 ### Tasks (TDD)
 
-- [ ] Task 1 (RED): Write BATS test asserting tab-separated `gh issue develop` output is parsed to extract only the branch name — `tests/bats/worktree.bats` — verify: `bats tests/bats/worktree.bats` fails
-- [ ] Task 2 (GREEN): Fix line 117 of `justfile.worktree` — replace `grep -oE '[^ ]+$' | head -1` with `head -1 | cut -f1` for issue branch resolution — `justfile.worktree` — verify: `bats tests/bats/worktree.bats` passes
-- [ ] Task 3 (GREEN): Fix line 154 of `justfile.worktree` — same replacement for parent branch resolution — `justfile.worktree` — verify: `bats tests/bats/worktree.bats` passes
-- [ ] Task 4: Update CHANGELOG — add entry under `## Unreleased` > `Fixed` — `CHANGELOG.md` — verify: visual check
+- [x] Task 1 (RED): Write BATS tests for `scripts/resolve-branch.sh` — `tests/bats/worktree.bats` — verify: `bats tests/bats/worktree.bats` fails
+- [x] Task 2 (GREEN): Create `scripts/resolve-branch.sh` and update both call sites in `justfile.worktree` to use it — `scripts/resolve-branch.sh`, `justfile.worktree` — verify: `bats tests/bats/worktree.bats` passes
+- [x] Task 3: Update CHANGELOG — add entry under `## Unreleased` > `Fixed` — `CHANGELOG.md` — verify: visual check
 
 ### Commit sequence
 
-1. `test: add BATS test for tab-separated branch resolution parsing` (RED)
-2. `fix: parse tab-separated gh issue develop output in worktree recipes` (GREEN, tasks 2+3)
-3. `docs: update CHANGELOG for branch resolution fix` (task 4)
+1. `test: add BATS tests for resolve-branch script` (RED) ✓
+2. `fix: extract branch resolution to script and fix tab-separated parsing` (GREEN) ✓
+3. `docs: update CHANGELOG for branch resolution fix` ✓
 

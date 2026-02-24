@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **gh-issues cross-ref detects Refs: #N in PR bodies** ([#121](https://github.com/vig-os/devcontainer/issues/121))
+  - `_build_cross_refs` now parses `Refs: #102` and comma-separated variants (`Refs: #102, #103`) alongside Closes/Fixes/Resolves
+- **PR table Reviewer column distinguishes requested vs completed reviewers** ([#105](https://github.com/vig-os/devcontainer/issues/105))
+  - Requested reviewers (no review yet) display as `?login` with dim italic style
+  - Actual reviewers (submitted review) display as plain login with green/red
 - **worktree-attach restarts stopped tmux session when worktree dir exists** ([#132](https://github.com/vig-os/devcontainer/issues/132))
   - Detect when worktree directory exists but tmux session has terminated
   - Automatically restart session in existing worktree before attaching
@@ -17,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Consolidate sync_manifest.py and utils.py into manifest-as-config architecture** ([#89](https://github.com/vig-os/devcontainer/issues/89))
+  - Extract transform classes (Sed, RemoveLines, etc.) to `scripts/transforms.py`
+  - Unify sed logic: `substitute_in_file()` in utils shared by sed_inplace and Sed transform
+  - Convert MANIFEST from Python code to declarative `scripts/manifest.toml`
+- **justfile.base is canonical at repo root, synced via manifest** ([#71](https://github.com/vig-os/devcontainer/issues/71))
+  - Root `justfile.base` is now the single source of truth; synced to `assets/workspace/.devcontainer/justfile.base` via `sync_manifest.py`
+  - `just sync-workspace` and prepare-build keep workspace template in sync
 - **Autonomous PR skills use pull request template** ([#147](https://github.com/vig-os/devcontainer/issues/147))
   - `pr_create` and `worktree_pr` now read `.github/pull_request_template.md` and fill each section from available context
   - Explicit read-then-fill procedure with section-by-section mapping (Description, Type of Change, Changelog Entry, Testing, Checklist, Refs)
@@ -47,6 +59,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Standalone Python module with `hex_encode()` and `build_uri()` for vscode-remote URIs
   - CLI: `devc_remote_uri.py <workspace_path> <ssh_host> <container_workspace>` prints URI to stdout
   - Stdlib only (json, argparse); called by devc-remote.sh (sibling sub-issue)
+- **Devcontainer and git recipes in justfile.base** ([#71](https://github.com/vig-os/devcontainer/issues/71))
+  - Devcontainer group (host-side only): `up`, `down`, `status`, `logs`, `shell`, `restart`, `open`
+  - Auto-detect podman/docker compose; graceful failure if run inside container
+  - Git group: `log` (pretty one-line, last 20), `branch` (current + recent)
 - **CI status column in just gh-issues PR table** ([#143](https://github.com/vig-os/devcontainer/issues/143))
   - PR table shows CI column with pass/fail/pending summary (✓ 6/6, ⏳ 3/6, ✗ 5/6)
   - Failed check names visible when checks fail

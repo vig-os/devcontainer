@@ -195,6 +195,7 @@ def _format_assignees(assignees: list[dict]) -> str:
 
 
 _CLOSING_RE = re.compile(r"(?:closes|fixes|resolves)\s+#(\d+)", re.IGNORECASE)
+_REFS_RE = re.compile(r"Refs:\s*((?:#\d+(?:\s*,\s*)?)+)", re.IGNORECASE)
 
 
 def _build_cross_refs(
@@ -220,6 +221,10 @@ def _build_cross_refs(
         body = pr.get("body") or ""
         for match in _CLOSING_RE.finditer(body):
             linked.add(int(match.group(1)))
+        refs_match = _REFS_RE.search(body)
+        if refs_match:
+            for m in re.finditer(r"#(\d+)", refs_match.group(1)):
+                linked.add(int(m.group(1)))
 
         for inum in linked:
             issue_to_pr[inum] = pr_num
@@ -425,6 +430,8 @@ def _extract_reviewers(pr: dict) -> str:
             parts.append(_styled(login, "green"))
         elif state == "CHANGES_REQUESTED":
             parts.append(_styled(login, "red"))
+        elif state == "REQUESTED":
+            parts.append(_styled(f"?{login}", "dim italic"))
         else:
             parts.append(_styled(login, "yellow"))
     return " ".join(parts)

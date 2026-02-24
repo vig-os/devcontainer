@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-18T01:46:51Z
-updated: 2026-02-18T01:46:51Z
+updated: 2026-02-22T09:33:32Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/71
-comments: 0
-labels: feature
-assignees: none
-milestone: none
+comments: 4
+labels: feature, priority:medium, area:workspace, effort:large, semver:minor
+assignees: gerchowl
+milestone: 0.4
 projects: none
 relationship: none
-synced: 2026-02-18T08:56:29.804Z
+synced: 2026-02-23T04:30:08.422Z
 ---
 
 # [Issue 71]: [[FEATURE] Expand justfile.base with devcontainer, quality, security, docs, info, and git recipes](https://github.com/vig-os/devcontainer/issues/71)
@@ -82,3 +82,100 @@ Container runtime auto-detection: try `podman compose` first, fall back to `dock
 ### Changelog Category
 
 Added
+---
+
+# [Comment #1]() by [gerchowl]()
+
+_Posted on February 21, 2026 at 11:48 PM_
+
+## Implementation Plan
+
+Issue: #71
+Branch: `feature/71-expand-justfile-base-recipes`
+Scope: Devcontainer lifecycle (7 host-side recipes) + Git helpers (2 recipes). All other groups deferred per YAGNI.
+
+### Tasks
+
+- [ ] Task 1: Add compose detection variable and host-only guard — `assets/workspace/.devcontainer/justfile.base` — verify: `just --list` shows no errors
+- [ ] Task 2: Add `up` recipe (start devcontainer + sidecars via compose) — `assets/workspace/.devcontainer/justfile.base` — verify: `just --list | grep up`
+- [ ] Task 3: Add `down` recipe (stop and remove containers) — same file — verify: `just --list | grep down`
+- [ ] Task 4: Add `status` recipe (show container status) — same file — verify: `just --list | grep status`
+- [ ] Task 5: Add `logs` recipe (tail container logs) — same file — verify: `just --list | grep logs`
+- [ ] Task 6: Add `shell` recipe (open bash in running container) — same file — verify: `just --list | grep shell`
+- [ ] Task 7: Add `restart` recipe (restart services) — same file — verify: `just --list | grep restart`
+- [ ] Task 8: Add `open` recipe (open Cursor/VS Code attached to container) — same file — verify: `just --list | grep open`
+- [ ] Task 9: Add `log` recipe (pretty one-line git log) — same file — verify: `just --list | grep log`
+- [ ] Task 10: Add `branch` recipe (current branch + recent branches) — same file — verify: `just --list | grep branch`
+- [ ] Task 11: Update CHANGELOG.md — `CHANGELOG.md` — verify: grep Unreleased section has new entries
+
+### Notes
+
+- TDD skipped: justfile recipes are config/templates, not testable code.
+- All devcontainer recipes use a host-only guard (exit if running inside container).
+- Compose command auto-detected: `podman compose` preferred, fallback to `docker compose`.
+- Tasks 1–8 can be batched into a single commit (devcontainer group).
+- Tasks 9–10 can be a second commit (git group).
+- Task 11 is a separate changelog commit.
+
+---
+
+# [Comment #2]() by [gerchowl]()
+
+_Posted on February 21, 2026 at 11:58 PM_
+
+## Autonomous Run Complete
+
+- Design: posted (scoped plan in comments)
+- Plan: posted (11 tasks)
+- Execute: all tasks done
+- Verify: all checks pass
+- PR: https://github.com/vig-os/devcontainer/pull/151
+- CI: all checks pass
+
+---
+
+# [Comment #3]() by [gerchowl]()
+
+_Posted on February 22, 2026 at 09:22 AM_
+
+## Implementation Plan (SSoT Refactor)
+
+**Why this change:** The first implementation edited `assets/workspace/.devcontainer/justfile.base` directly, leaving root `justfile.base` minimal. That created two separate sources of truth: root had fewer recipes than the workspace template, and sync never touched justfile.base. Developers working on the devcontainer repo itself missed useful recipes (log, branch, etc.), and any future edits required manual sync between the two files. This refactor makes root `justfile.base` the canonical source and adds it to the sync manifest, so there is one source of truth and `just sync-workspace` / prepare-build keep the workspace template in sync.
+
+---
+
+Issue: #71
+Branch: `feature/71-expand-justfile-base-recipes`
+Scope: Make root `justfile.base` the canonical source and sync it into the workspace template via the manifest.
+
+### Context
+
+- Root `justfile.base` is minimal; `assets/workspace/.devcontainer/justfile.base` has the full recipes (devcontainer, git, check, devcontainer-upgrade).
+- Both are maintained separately; `justfile.base` is not in the sync manifest.
+- Goal: single source of truth at repo root, synced to workspace template.
+
+### Tasks
+
+- [ ] Task 1: Replace root `justfile.base` with full content from `assets/workspace/.devcontainer/justfile.base` — `justfile.base` — verify: `just --list` shows all recipes (devcontainer, git, check, etc.)
+- [ ] Task 2: Add manifest entry for `justfile.base` — `scripts/sync_manifest.py` — add `Entry(src="justfile.base", dest=".devcontainer/justfile.base")` next to justfile.gh/justfile.worktree — verify: `just sync-workspace` runs; `uv run python scripts/sync_manifest.py list` shows entry
+- [ ] Task 3: Run sync and confirm no diff — `just sync-workspace` — verify: `git diff assets/workspace/.devcontainer/justfile.base` is empty
+- [ ] Task 4: Update CHANGELOG.md — add entry under Unreleased that justfile.base is now canonical and synced via manifest — verify: `grep -A2 justfile.base CHANGELOG.md`
+
+### Notes
+
+- TDD skipped: manifest/config change only.
+- Devcontainer recipes (up, down, check) assume `.devcontainer/` exists; they may fail when run from devcontainer repo root. Git recipes (log, branch) work from any directory.
+
+---
+
+# [Comment #4]() by [gerchowl]()
+
+_Posted on February 22, 2026 at 09:33 AM_
+
+## Autonomous Run Complete (SSoT Refactor)
+
+- Execute: all 4 tasks done
+- Verify: lint passed
+- PR: https://github.com/vig-os/devcontainer/pull/151 (updated with new commit)
+- CI: most checks pass; Security Scan still pending
+
