@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - BATS integration tests for restart, error paths, and checkout detection
 - **Issue numbers in PR table are now clickable hyperlinks** ([#174](https://github.com/vig-os/devcontainer/issues/174))
   - Replace plain styled text with Rich hyperlink markup in the Issues column of the PR table
+- **Synced justfiles reference scripts not included in workspace manifest** ([#190](https://github.com/vig-os/devcontainer/issues/190))
+  - Add manifest entries for resolve-branch.sh, derive-branch-summary.sh, check-skill-names.sh → `.devcontainer/scripts/`
+  - Update justfile.worktree to use `source_directory() / "scripts"` for portable path resolution
+  - Add Sed transform for check-skill-names.sh path in synced `.pre-commit-config.yaml`
 
 ### Changed
 

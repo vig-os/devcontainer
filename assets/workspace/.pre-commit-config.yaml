@@ -123,7 +123,7 @@ repos:
     hooks:
       - id: check-skill-names
         name: check-skill-names (enforce naming convention)
-        entry: scripts/check-skill-names.sh .cursor/skills
+        entry: .devcontainer/scripts/check-skill-names.sh .cursor/skills
         language: script
         files: ^\.cursor/skills/
         pass_filenames: false
