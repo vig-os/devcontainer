@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **worktree-start swallows derive-branch-summary error messages** ([#183](https://github.com/vig-os/devcontainer/issues/183))
+  - Remove stderr suppression so error messages from derive-branch-summary.sh are visible
+  - Retry with standard model when lightweight model fails; print manual workaround hint if both fail
+  - Add optional MODEL_TIER parameter to derive-branch-summary.sh; BATS test for retry path
 - **validate-commit-msg rejects AI agent identity fingerprints** ([#163](https://github.com/vig-os/devcontainer/issues/163))
   - Commit-msg hook now rejects commits containing Co-authored-by, cursoragent, cursor.com, claude, codex, chatgpt, copilot
   - Blocks "Made with [Cursor](https://cursor.com)" and similar branding
