@@ -94,6 +94,46 @@ class TestFormatCiStatus:
         assert "—" in result
         assert "dim" in result
 
+    def test_dedup_by_name_latest_completed_at_wins(self):
+        """Duplicate check names: keep latest by completedAt. Ref: #176."""
+        pr = {
+            "number": 1,
+            "statusCheckRollup": [
+                {
+                    "name": "Validate PR Title",
+                    "conclusion": "FAILURE",
+                    "completedAt": "2026-02-24T12:52:49Z",
+                },
+                {
+                    "name": "Validate PR Title",
+                    "conclusion": "FAILURE",
+                    "completedAt": "2026-02-24T12:53:39Z",
+                },
+                {
+                    "name": "Validate PR Title",
+                    "conclusion": "SUCCESS",
+                    "completedAt": "2026-02-24T12:53:52Z",
+                },
+            ],
+        }
+        result = gh_issues._format_ci_status(pr, "a/b")
+        assert "✓" in result
+        assert "1/1" in result
+        assert "green" in result
+
+    def test_dedup_by_name_without_completed_at_last_wins(self):
+        """Duplicate check names without completedAt: last in list wins. Ref: #176."""
+        pr = {
+            "number": 1,
+            "statusCheckRollup": [
+                {"name": "Lint", "conclusion": "FAILURE"},
+                {"name": "Lint", "conclusion": "SUCCESS"},
+            ],
+        }
+        result = gh_issues._format_ci_status(pr, "a/b")
+        assert "✓" in result
+        assert "1/1" in result
+
 
 class TestGhLink:
     """Test _gh_link helper for clickable issue/PR numbers."""

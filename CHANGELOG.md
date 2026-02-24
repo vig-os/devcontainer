@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **gh-issues CI status deduplicates re-run checks** ([#176](https://github.com/vig-os/devcontainer/issues/176))
+  - Deduplicate `statusCheckRollup` by check name, keeping only the latest result (by `completedAt`)
+  - CI column now matches GitHub PR page when checks are re-run
 - **worktree-start swallows derive-branch-summary error messages** ([#183](https://github.com/vig-os/devcontainer/issues/183))
   - Remove stderr suppression so error messages from derive-branch-summary.sh are visible
   - Retry with standard model when lightweight model fails; print manual workaround hint if both fail
