@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatically restart session in existing worktree before attaching
   - Guard `worktree-start` against branches already checked out elsewhere with an informative error
   - BATS integration tests for restart, error paths, and checkout detection
+- **Issue numbers in PR table are now clickable hyperlinks** ([#174](https://github.com/vig-os/devcontainer/issues/174))
+  - Replace plain styled text with Rich hyperlink markup in the Issues column of the PR table
 
 ### Changed
 
