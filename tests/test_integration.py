@@ -3022,6 +3022,28 @@ class TestVersionCheckJustIntegration:
         assert "Enabled:" in result.stdout
         assert "interval:" in result.stdout.lower()
 
+    def test_just_check_config_via_just_command(self, initialized_workspace):
+        """Regression: 'just check config' resolves path correctly (issue #187)."""
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        if not justfile_base.exists():
+            pytest.skip("justfile.base not found")
+        if "check" not in justfile_base.read_text():
+            pytest.skip("check recipe not found")
+
+        result = subprocess.run(
+            ["just", "check", "config"],
+            capture_output=True,
+            text=True,
+            cwd=str(initialized_workspace),
+            timeout=10,
+        )
+
+        assert result.returncode == 0, (
+            f"just check config failed (path resolution bug #187): {result.stderr}"
+        )
+        assert "Enabled:" in result.stdout
+        assert "interval:" in result.stdout.lower()
+
     def test_just_check_mute_functionality(self, initialized_workspace):
         """Test that 'just check 7d' mutes notifications."""
         script_path = (
