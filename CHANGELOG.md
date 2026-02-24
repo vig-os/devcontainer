@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **validate-commit-msg rejects AI agent identity fingerprints** ([#163](https://github.com/vig-os/devcontainer/issues/163))
+  - Commit-msg hook now rejects commits containing Co-authored-by, cursoragent, cursor.com, claude, codex, chatgpt, copilot
+  - Blocks "Made with [Cursor](https://cursor.com)" and similar branding
+  - Enforced before other validation; applies to full message including subject-only mode
 - **worktree-start preflight gaps — agent hang and gh repo set-default** ([#154](https://github.com/vig-os/devcontainer/issues/154))
   - Add timeout (30s) to agent-based branch summary derivation; failure produces clear error with manual workaround
   - Add gh repo set-default preflight before any gh API calls; auto-resolve from origin or fail with instructions
