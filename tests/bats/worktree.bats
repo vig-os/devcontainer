@@ -118,6 +118,38 @@ setup() {
     rm -rf "$TMPDIR_TEST"
 }
 
+# ── derive-branch-summary.sh (#154) ───────────────────────────────────────────
+
+@test "derive-branch-summary.sh outputs summary when BRANCH_SUMMARY_CMD succeeds" {
+    DERIVE_SCRIPT="$PROJECT_ROOT/scripts/derive-branch-summary.sh"
+    assert_file_exists "$DERIVE_SCRIPT"
+    run test -x "$DERIVE_SCRIPT"
+    assert_success
+
+    run env BRANCH_SUMMARY_CMD="echo fix-login-bug" "$DERIVE_SCRIPT" "Fix login bug"
+    assert_success
+    assert_output "fix-login-bug"
+}
+
+@test "derive-branch-summary.sh times out when mock hangs" {
+    DERIVE_SCRIPT="$PROJECT_ROOT/scripts/derive-branch-summary.sh"
+    run env BRANCH_SUMMARY_CMD="sleep 5" DERIVE_BRANCH_TIMEOUT=2 "$DERIVE_SCRIPT" "Some title" 2>&1
+    assert_failure
+    assert_output --partial "[ERROR]"
+    assert_output --partial "Failed to derive branch summary"
+}
+
+@test "derive-branch-summary.sh prints error with workaround when mock fails" {
+    DERIVE_SCRIPT="$PROJECT_ROOT/scripts/derive-branch-summary.sh"
+    run env BRANCH_SUMMARY_CMD="false" "$DERIVE_SCRIPT" "Some title" 2>&1
+    assert_failure
+    assert_output --partial "[ERROR]"
+    assert_output --partial "Create one manually"
+    assert_output --partial "gh issue develop"
+}
+
+# ── worktree-attach ───────────────────────────────────────────────────────────
+
 @test "worktree-attach errors when neither worktree dir nor session exists" {
     [ "${CI:-}" = "true" ] && skip "tmux integration tests require interactive TTY"
     command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
@@ -127,4 +159,87 @@ setup() {
     assert_failure
     assert_output --partial "[ERROR]"
     assert_output --partial "No tmux session"
+}
+
+# ── worktree-clean filter mode (#158) ────────────────────────────────────────
+# Default (stopped-only): clean only worktrees with no running tmux session.
+# Mode "all": clean all worktrees (current behavior).
+
+@test "worktree-clean stopped-only skips worktrees with running tmux session" {
+    [ "${CI:-}" = "true" ] && skip "tmux integration tests require interactive TTY"
+    command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
+    command -v just >/dev/null 2>&1 || skip "just not installed"
+
+    ISSUE_SKIP=999996
+    ISSUE_CLEAN=999995
+    REPO=$(basename "$(cd "$PROJECT_ROOT" && git rev-parse --show-toplevel)")
+    WT_BASE="$(dirname "$PROJECT_ROOT")/${REPO}-worktrees"
+    DIR_SKIP="${WT_BASE}/${ISSUE_SKIP}"
+    DIR_CLEAN="${WT_BASE}/${ISSUE_CLEAN}"
+    SESSION_SKIP="wt-${ISSUE_SKIP}"
+
+    mkdir -p "$DIR_SKIP" "$DIR_CLEAN"
+    tmux new-session -d -s "$SESSION_SKIP" -c "$DIR_SKIP" "sleep 60"
+    sleep 1
+    tmux has-session -t "$SESSION_SKIP" || skip "tmux session did not start"
+
+    run just worktree-clean 2>&1
+
+    assert_success
+    assert_output --partial "[SKIP]"
+    assert_output --partial "999996"
+    assert_output --partial "999995"
+    assert [ ! -d "$DIR_CLEAN" ]
+    assert [ -d "$DIR_SKIP" ]
+
+    tmux kill-session -t "$SESSION_SKIP" 2>/dev/null || true
+    rm -rf "$DIR_SKIP" "$DIR_CLEAN"
+    rmdir "$WT_BASE" 2>/dev/null || true
+}
+
+@test "worktree-clean all removes worktrees with running tmux sessions" {
+    [ "${CI:-}" = "true" ] && skip "tmux integration tests require interactive TTY"
+    command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
+    command -v just >/dev/null 2>&1 || skip "just not installed"
+
+    ISSUE=999994
+    REPO=$(basename "$(cd "$PROJECT_ROOT" && git rev-parse --show-toplevel)")
+    WT_BASE="$(dirname "$PROJECT_ROOT")/${REPO}-worktrees"
+    DIR="${WT_BASE}/${ISSUE}"
+    SESSION="wt-${ISSUE}"
+
+    mkdir -p "$DIR"
+    tmux new-session -d -s "$SESSION" -c "$DIR" "sleep 60"
+    sleep 1
+    tmux has-session -t "$SESSION" || skip "tmux session did not start"
+
+    run just worktree-clean all 2>&1
+
+    assert_success
+    assert_output --partial "[WARNING]"
+    assert_output --partial "Removed worktree"
+    assert [ ! -d "$DIR" ]
+
+    tmux kill-session -t "$SESSION" 2>/dev/null || true
+    rm -rf "$DIR"
+    rmdir "$WT_BASE" 2>/dev/null || true
+}
+
+@test "wt-clean alias works for stopped-only and all" {
+    command -v just >/dev/null 2>&1 || skip "just not installed"
+
+    run just wt-clean 2>&1
+    assert_success
+
+    run just wt-clean all 2>&1
+    assert_success
+}
+
+@test "worktree-clean rejects invalid mode" {
+    command -v just >/dev/null 2>&1 || skip "just not installed"
+
+    run just worktree-clean invalid 2>&1
+    assert_failure
+    assert_output --partial "[ERROR]"
+    assert_output --partial "Invalid mode"
 }

@@ -44,6 +44,29 @@ DEFAULT_APPROVED_TYPES = frozenset[str](
 # Default types where the Refs line is optional (maintenance commits that may not relate to an issue)
 DEFAULT_REFS_OPTIONAL_TYPES = frozenset[str]({"chore"})
 
+# Agent identity fingerprints (case-insensitive). Commit messages containing these are rejected.
+# Refs: #163
+_AGENT_FINGERPRINT_PATTERNS: list[tuple[str, int]] = [
+    (r"Co-authored-by", re.IGNORECASE),
+    (r"cursoragent", re.IGNORECASE),
+    (r"cursor\.com", re.IGNORECASE),  # "Made with [Cursor](https://cursor.com)" etc.
+    (r"\bclaude\b", re.IGNORECASE),
+    (r"\bcodex\b", re.IGNORECASE),
+    (r"\bchatgpt\b", re.IGNORECASE),
+    (r"\bcopilot\b", re.IGNORECASE),
+]
+_AGENT_FINGERPRINT_PATTERNS_COMPILED = [
+    re.compile(pattern, flags) for pattern, flags in _AGENT_FINGERPRINT_PATTERNS
+]
+
+
+def _contains_agent_fingerprint(content: str) -> bool:
+    """Check if content contains AI agent identity fingerprints."""
+    for pattern_re in _AGENT_FINGERPRINT_PATTERNS_COMPILED:
+        if pattern_re.search(content):
+            return True
+    return False
+
 
 # Build regex patterns dynamically based on approved types and optional refs types
 def _build_patterns(
@@ -112,6 +135,14 @@ def validate_commit_message(
         return (
             False,
             "require_scope=True requires approved_scopes to be configured.",
+        )
+
+    # Reject agent identity fingerprints (Refs: #163)
+    if _contains_agent_fingerprint(content):
+        return (
+            False,
+            "Commit message contains AI agent fingerprint (e.g. Co-authored-by, "
+            "cursoragent, claude). Remove agent identity from commit.",
         )
 
     subject_pattern, ref_pattern, issue_ref_pattern = _build_patterns(approved_types)

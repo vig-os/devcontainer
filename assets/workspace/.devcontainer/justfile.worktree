@@ -74,6 +74,24 @@ worktree-start issue prompt="" reviewer="":
         fi
     fi
 
+    # Preflight: ensure gh has a default repo (required when multiple remotes exist)
+    if ! gh repo set-default --view 2>/dev/null; then
+        ORIGIN_URL=$(git remote get-url origin 2>/dev/null || true)
+        if [ -n "$ORIGIN_URL" ]; then
+            OWNER_REPO=$(echo "$ORIGIN_URL" | sed -E 's|.*[:/]([^/]+)/([^/.]+)(\.git)?$|\1/\2|')
+            if gh repo set-default "$OWNER_REPO" 2>/dev/null; then
+                echo "[OK] Set default repo: $OWNER_REPO"
+            else
+                echo "[ERROR] Multiple remotes detected. No default repository set."
+                echo "        Run: gh repo set-default <owner/repo>"
+                exit 1
+            fi
+        else
+            echo "[ERROR] No origin remote. Run: gh repo set-default <owner/repo>"
+            exit 1
+        fi
+    fi
+
     # Resolve the local gh user as the reviewer (person launching the worktree)
     REVIEWER=$(gh api user --jq '.login' 2>/dev/null || echo "")
     if [ -n "$REVIEWER" ]; then
@@ -127,16 +145,10 @@ worktree-start issue prompt="" reviewer="":
 
         # Use agent ONLY for the intelligent part: deriving the short summary
         NAMING_RULE="$(pwd)/.cursor/rules/branch-naming.mdc"
-        SUMMARY=$(agent --print --yolo --trust --model $(_read_model lightweight) \
-            "Read the branch naming rules in ${NAMING_RULE}. " \
-            "The issue title is: ${TITLE} " \
-            "Output ONLY a kebab-case short summary suitable for a branch name (a few words). " \
-            "Omit prefixes like FEATURE, BUG, Add, Implement, Support. " \
-            "Example: 'Standardize and Enforce Commit Message Format' -> 'standardize-commit-messages'. " \
-            "No explanation. No quotes. Just the summary." | tail -1 | tr -d '[:space:]')
+        SUMMARY=$("$(pwd)/scripts/derive-branch-summary.sh" "$TITLE" "$NAMING_RULE" 2>/dev/null) || true
 
         if [ -z "$SUMMARY" ]; then
-            echo "[ERROR] Agent failed to derive a branch summary from title: ${TITLE}"
+            "$(pwd)/scripts/derive-branch-summary.sh" "$TITLE" "$NAMING_RULE" >/dev/null || true
             echo "        Create one manually: gh issue develop ${ISSUE} --base dev --name ${TYPE}/${ISSUE}-<summary>"
             exit 1
         fi
@@ -348,17 +360,31 @@ worktree-stop issue:
 # CLEAN
 # -------------------------------------------------------------------------------
 
-# Remove all cursor-managed worktrees and tmux sessions
+# Remove cursor-managed worktrees and tmux sessions.
+# Default (no args): clean only stopped worktrees. Use 'all' to clean everything.
 [group('worktree')]
-worktree-clean:
+worktree-clean mode="":
     #!/usr/bin/env bash
     set -euo pipefail
 
+    MODE="{{ mode }}"
     WT_BASE="{{ _wt_base }}"
+
+    if [ -n "$MODE" ] && [ "$MODE" != "stopped" ] && [ "$MODE" != "all" ]; then
+        echo "[ERROR] Invalid mode: '$MODE'. Use 'just worktree-clean' (stopped-only) or 'just worktree-clean all'"
+        exit 1
+    fi
 
     if [ ! -d "$WT_BASE" ]; then
         echo "[*] No worktrees to clean"
         exit 0
+    fi
+
+    CLEANED=()
+    SKIPPED=()
+
+    if [ "$MODE" = "all" ]; then
+        echo "[WARNING] Cleaning ALL worktrees including running sessions. Use 'just worktree-clean' for stopped-only."
     fi
 
     for dir in "$WT_BASE"/*/; do
@@ -366,27 +392,34 @@ worktree-clean:
         issue=$(basename "$dir")
         session="wt-${issue}"
 
-        # Kill tmux session
-        if tmux has-session -t "$session" 2>/dev/null; then
-            tmux kill-session -t "$session"
-            echo "[OK] Killed session '$session'"
+        if [ "$MODE" != "all" ] && tmux has-session -t "$session" 2>/dev/null; then
+            SKIPPED+=("$issue")
+            echo "[SKIP] Skipped (running): $issue"
+            continue
         fi
 
-        # Remove worktree
+        if tmux has-session -t "$session" 2>/dev/null; then
+            tmux kill-session -t "$session"
+        fi
+
         branch=$(git -C "$dir" branch --show-current 2>/dev/null || true)
         git worktree remove "$dir" --force 2>/dev/null || rm -rf "$dir"
+        CLEANED+=("$issue")
         echo "[OK] Removed worktree: $dir"
 
-        # Clean up branch
         if [ -n "$branch" ]; then
             git branch -D "$branch" 2>/dev/null && echo "[OK] Deleted branch '$branch'" || true
         fi
     done
 
-    # Remove base dir if empty
     rmdir "$WT_BASE" 2>/dev/null || true
-
-    # Prune stale worktree references
     git worktree prune
+
     echo ""
-    echo "[OK] All worktrees cleaned"
+    if [ ${#CLEANED[@]} -gt 0 ]; then
+        echo "[OK] Cleaned: ${CLEANED[*]}"
+    fi
+    if [ ${#SKIPPED[@]} -gt 0 ]; then
+        echo "[SKIP] Skipped (running): ${SKIPPED[*]}"
+    fi
+    echo "Summary: ${#CLEANED[@]} cleaned, ${#SKIPPED[@]} skipped"
