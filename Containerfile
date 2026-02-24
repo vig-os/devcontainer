@@ -171,14 +171,13 @@ RUN set -eux; \
     tar -xzf "$FILE" -C /usr/local/bin --strip-components=1; \
     rm "$FILE";
 
-# Install Python development tools directly into system using uv
+# Install Python development tools from root pyproject.toml (SSoT)
 # and upgrade pip to fix CVE-2025-8869 (symbolic link extraction vulnerability)
-RUN uv pip install --system \
-    pre-commit \
-    rich \
-    ruff \
-    pip-licenses && \
-    uv pip install --system --upgrade pip
+COPY pyproject.toml uv.lock ./
+RUN uv export --only-group devcontainer --no-emit-project -o /tmp/devcontainer-reqs.txt && \
+    uv pip install --system -r /tmp/devcontainer-reqs.txt && \
+    uv pip install --system --upgrade pip && \
+    rm /tmp/devcontainer-reqs.txt
 
 # Copy vig-utils package and install system-wide
 COPY packages/vig-utils /root/packages/vig-utils
