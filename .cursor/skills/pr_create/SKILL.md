@@ -17,6 +17,7 @@ Prepare and submit a pull request for **feature or bugfix work**.
 
 - Run `git status` and `git fetch origin`. If the current branch has a remote tracking branch, run `git pull --rebase origin <current-branch>` (or `git pull` if the user prefers merge) so the branch is up to date with the remote.
 - If there are uncommitted changes, list them and ask the user to commit or stash before submitting the PR. Do not prepare the PR until the working tree is clean (or the user explicitly says to proceed with uncommitted changes).
+- **Merge the base branch:** Once the base branch is confirmed (step 2), run `git merge origin/<base_branch>` to integrate the latest base before creating the PR. **Conflict handling:** If merge conflicts occur, list the conflicting files and ask the user to resolve them manually before proceeding.
 
 ### 2. Verify target branch
 
