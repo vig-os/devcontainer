@@ -1,0 +1,72 @@
+\documentclass[border=5pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, fit, backgrounds}
+
+\definecolor{inceptionbg}{HTML}{E8F5E9}
+\definecolor{inceptionfg}{HTML}{388E3C}
+\definecolor{devbg}{HTML}{E3F2FD}
+\definecolor{devfg}{HTML}{1565C0}
+\definecolor{deliverybg}{HTML}{FFF3E0}
+\definecolor{deliveryfg}{HTML}{E65100}
+\definecolor{triggerbg}{HTML}{FFFDE7}
+
+\begin{document}
+\begin{tikzpicture}[
+    >=Stealth,
+    node distance=6mm,
+    skill/.style={
+        rectangle, draw=gray, fill=white,
+        minimum height=10mm, minimum width=22mm,
+        font=\footnotesize, align=center, rounded corners=2pt
+    },
+    trigger/.style={
+        ellipse, draw=gray, fill=triggerbg,
+        minimum height=9mm, minimum width=16mm,
+        font=\footnotesize, align=center
+    },
+    phase/.style={
+        rounded corners=4pt, inner sep=6pt,
+        label={[font=\scriptsize\bfseries, anchor=south]above:#1}
+    },
+    arr/.style={->, thick, gray}
+]
+
+% Nodes
+\node[trigger]  (signal)    {Signal};
+\node[skill, right=of signal]    (explore)   {inception:explore\\(diverge)};
+\node[skill, right=of explore]   (scope)     {inception:scope\\(converge)};
+\node[skill, right=of scope]     (architect) {inception:architect\\(evaluate)};
+\node[skill, right=of architect] (plan)      {inception:plan\\(decompose)};
+\node[skill, right=of plan]      (brainstorm){design:brainstorm};
+\node[skill, right=of brainstorm](issue)     {issue:*};
+\node[skill, right=of issue]     (design)    {design:*};
+\node[skill, right=of design]    (code)      {code:*};
+\node[skill, right=of code]      (git)       {git:*};
+\node[skill, right=of git]       (ci)        {ci:*};
+\node[skill, right=of ci]        (pr)        {pr:*};
+
+% Edges
+\draw[arr] (signal)    -- (explore);
+\draw[arr] (explore)   -- (scope);
+\draw[arr] (scope)     -- (architect);
+\draw[arr] (architect) -- (plan);
+\draw[arr] (plan)      -- (brainstorm);
+\draw[arr] (brainstorm)-- (issue);
+\draw[arr] (issue)     -- (design);
+\draw[arr] (design)    -- (code);
+\draw[arr] (code)      -- (git);
+\draw[arr] (git)       -- (ci);
+\draw[arr] (ci)        -- (pr);
+
+% Phase backgrounds
+\begin{scope}[on background layer]
+    \node[phase={{\color{inceptionfg}Inception Phase}},
+          fill=inceptionbg, draw=inceptionfg, fit=(signal)(plan)] {};
+    \node[phase={{\color{devfg}Development Phase}},
+          fill=devbg, draw=devfg, fit=(brainstorm)(code)] {};
+    \node[phase={{\color{deliveryfg}Delivery Phase}},
+          fill=deliverybg, draw=deliveryfg, fit=(git)(pr)] {};
+\end{scope}
+
+\end{tikzpicture}
+\end{document}

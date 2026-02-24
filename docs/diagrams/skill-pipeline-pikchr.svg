@@ -1,0 +1,58 @@
+<svg xmlns='http://www.w3.org/2000/svg' style='font-size:initial;' class="pikchr" viewBox="0 0 2308.32 163.008">
+<path d="M2.16,160.848L952.56,160.848L952.56,16.848L2.16,16.848Z"  style="fill:rgb(232,245,233);stroke-width:1.4472;stroke:rgb(56,142,60);" />
+<text x="477.36" y="15.264" text-anchor="middle" font-weight="bold" fill="rgb(56,142,60)" font-size="80%" dominant-baseline="central">Inception Phase</text>
+<ellipse cx="88.56" cy="88.848" rx="57.6" ry="28.8"  style="fill:rgb(255,253,231);stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="88.56" y="88.848" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">Signal</text>
+<polygon points="189.36,88.848 177.84,93.168 177.84,84.528" style="fill:rgb(0,0,0)"/>
+<path d="M146.16,88.848L183.6,88.848"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M189.36,114.048L347.76,114.048L347.76,63.648L189.36,63.648Z"  style="fill:rgb(255,255,255);stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="268.56" y="78.768" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">inception:explore</text>
+<text x="268.56" y="98.928" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">(diverge)</text>
+<polygon points="390.96,88.848 379.44,93.168 379.44,84.528" style="fill:rgb(0,0,0)"/>
+<path d="M347.76,88.848L385.2,88.848"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M390.96,114.048L534.614,114.048L534.614,63.648L390.96,63.648Z"  style="fill:rgb(255,255,255);stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="462.787" y="78.768" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">inception:scope</text>
+<text x="462.787" y="98.928" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">(converge)</text>
+<polygon points="577.814,88.848 566.294,93.168 566.294,84.528" style="fill:rgb(0,0,0)"/>
+<path d="M534.614,88.848L572.054,88.848"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M577.814,114.048L748.771,114.048L748.771,63.648L577.814,63.648Z"  style="fill:rgb(255,255,255);stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="663.293" y="78.768" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">inception:architect</text>
+<text x="663.293" y="98.928" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">(evaluate)</text>
+<polygon points="791.971,88.848 780.451,93.168 780.451,84.528" style="fill:rgb(0,0,0)"/>
+<path d="M748.771,88.848L786.211,88.848"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M791.971,114.048L924.106,114.048L924.106,63.648L791.971,63.648Z"  style="fill:rgb(255,255,255);stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="858.038" y="78.768" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">inception:plan</text>
+<text x="858.038" y="98.928" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">(decompose)</text>
+<path d="M981.36,160.848L1730.16,160.848L1730.16,16.848L981.36,16.848Z"  style="fill:rgb(227,242,253);stroke-width:1.4472;stroke:rgb(21,101,192);" />
+<text x="1355.76" y="15.264" text-anchor="middle" font-weight="bold" fill="rgb(21,101,192)" font-size="80%" dominant-baseline="central">Development Phase</text>
+<polygon points="967.306,88.848 955.786,93.168 955.786,84.528" style="fill:rgb(0,0,0)"/>
+<path d="M924.106,88.848L961.546,88.848"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M1013.5,103.968L1179.62,103.968L1179.62,73.728L1013.5,73.728Z"  style="fill:rgb(255,255,255);stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="1096.56" y="88.848" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">design:brainstorm</text>
+<polygon points="1222.82,88.848 1211.3,93.168 1211.3,84.528" style="fill:rgb(0,0,0)"/>
+<path d="M1179.62,88.848L1217.06,88.848"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M1222.82,103.968L1291.36,103.968L1291.36,73.728L1222.82,73.728Z"  style="fill:rgb(255,255,255);stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="1257.09" y="88.848" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">issue:*</text>
+<polygon points="1334.56,88.848 1323.04,93.168 1323.04,84.528" style="fill:rgb(0,0,0)"/>
+<path d="M1291.36,88.848L1328.8,88.848"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M1334.56,103.968L1415.66,103.968L1415.66,73.728L1334.56,73.728Z"  style="fill:rgb(255,255,255);stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="1375.11" y="88.848" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">design:*</text>
+<polygon points="1458.86,88.848 1447.34,93.168 1447.34,84.528" style="fill:rgb(0,0,0)"/>
+<path d="M1415.66,88.848L1453.1,88.848"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M1458.86,103.968L1523.84,103.968L1523.84,73.728L1458.86,73.728Z"  style="fill:rgb(255,255,255);stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="1491.35" y="88.848" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">code:*</text>
+<path d="M1758.96,160.848L2306.16,160.848L2306.16,16.848L1758.96,16.848Z"  style="fill:rgb(255,243,224);stroke-width:1.4472;stroke:rgb(230,81,0);" />
+<text x="2032.56" y="15.264" text-anchor="middle" font-weight="bold" fill="rgb(230,81,0)" font-size="80%" dominant-baseline="central">Delivery Phase</text>
+<polygon points="1567.04,88.848 1555.52,93.168 1555.52,84.528" style="fill:rgb(0,0,0)"/>
+<path d="M1523.84,88.848L1561.28,88.848"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M1821.28,103.968L1869.44,103.968L1869.44,73.728L1821.28,73.728Z"  style="fill:rgb(255,255,255);stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="1845.36" y="88.848" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">git:*</text>
+<polygon points="1912.64,88.848 1901.12,93.168 1901.12,84.528" style="fill:rgb(0,0,0)"/>
+<path d="M1869.44,88.848L1906.88,88.848"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M1912.64,103.968L1952.73,103.968L1952.73,73.728L1912.64,73.728Z"  style="fill:rgb(255,255,255);stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="1932.68" y="88.848" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">ci:*</text>
+<polygon points="1995.93,88.848 1984.41,93.168 1984.41,84.528" style="fill:rgb(0,0,0)"/>
+<path d="M1952.73,88.848L1990.17,88.848"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
+<path d="M1995.93,103.968L2039.93,103.968L2039.93,73.728L1995.93,73.728Z"  style="fill:rgb(255,255,255);stroke-width:2.16;stroke:rgb(0,0,0);" />
+<text x="2017.93" y="88.848" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">pr:*</text>
+</svg>

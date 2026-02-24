@@ -1,0 +1,60 @@
+    linewid = 0.3in
+    boxwid = 1.2in
+    boxht = 0.5in
+
+    # Inception Phase background
+    I: box width 6.6in height 1.0in fill 0xE8F5E9 color 0x388E3C \
+       with .nw at (-0.1in, 0.6in) thin
+    "Inception Phase" bold small color 0x388E3C with .s at I.n + (0, -0.08in)
+
+    # Signal (ellipse trigger)
+    S: ellipse "Signal" width 0.8in height 0.4in fill 0xFFFDE7 \
+       at I.w + (0.6in, 0)
+
+    arrow right linewid from S.e
+
+    E: box "inception:explore" "(diverge)" fit fill white
+    arrow right linewid from E.e
+
+    SC: box "inception:scope" "(converge)" fit fill white
+    arrow right linewid from SC.e
+
+    A: box "inception:architect" "(evaluate)" fit fill white
+    arrow right linewid from A.e
+
+    P: box "inception:plan" "(decompose)" fit fill white
+
+    # Development Phase background
+    D: box width 5.2in height 1.0in fill 0xE3F2FD color 0x1565C0 \
+       with .nw at I.ne + (0.2in, 0) thin
+    "Development Phase" bold small color 0x1565C0 with .s at D.n + (0, -0.08in)
+
+    arrow right linewid from P.e
+
+    B: box "design:brainstorm" fit fill white \
+       at D.w + (0.8in, 0)
+    arrow right linewid from B.e
+
+    IS: box "issue:*" fit fill white
+    arrow right linewid from IS.e
+
+    DE: box "design:*" fit fill white
+    arrow right linewid from DE.e
+
+    CO: box "code:*" fit fill white
+
+    # Delivery Phase background
+    DL: box width 3.8in height 1.0in fill 0xFFF3E0 color 0xE65100 \
+        with .nw at D.ne + (0.2in, 0) thin
+    "Delivery Phase" bold small color 0xE65100 with .s at DL.n + (0, -0.08in)
+
+    arrow right linewid from CO.e
+
+    G: box "git:*" fit fill white \
+       at DL.w + (0.6in, 0)
+    arrow right linewid from G.e
+
+    CI: box "ci:*" fit fill white
+    arrow right linewid from CI.e
+
+    PR: box "pr:*" fit fill white
