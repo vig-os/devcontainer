@@ -1,18 +1,18 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-21T21:23:24Z
-updated: 2026-02-21T21:58:59Z
+updated: 2026-02-23T23:59:40Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/143
-comments: 1
+comments: 2
 labels: feature, area:workflow, effort:small, semver:patch
 assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-22T04:23:20.233Z
+synced: 2026-02-24T04:24:10.704Z
 ---
 
 # [Issue 143]: [[FEATURE] Show CI status and failure details in just gh-issues PR table](https://github.com/vig-os/devcontainer/issues/143)
@@ -143,4 +143,12 @@ Pure unit tests (no mocking), matching existing test style:
 |---|---|
 | `scripts/gh_issues.py` | Add `statusCheckRollup` to `_fetch_prs`, add `_summarize_ci`, `_failed_check_names`, add CI column + cell in `_build_pr_table` |
 | `tests/test_gh_issues.py` | Add `TestSummarizeCi` and `TestFailedCheckNames` test classes |
+
+---
+
+# [Comment #2]() by [gerchowl]()
+
+_Posted on February 23, 2026 at 11:59 PM_
+
+Implemented in PR #146 (merged 2026-02-21). CI status column is live in `just gh-issues`.
 

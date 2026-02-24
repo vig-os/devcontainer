@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Commit-msg hook now rejects commits containing Co-authored-by, cursoragent, cursor.com, claude, codex, chatgpt, copilot
   - Blocks "Made with [Cursor](https://cursor.com)" and similar branding
   - Enforced before other validation; applies to full message including subject-only mode
+- **worktree-start preflight gaps — agent hang and gh repo set-default** ([#154](https://github.com/vig-os/devcontainer/issues/154))
+  - Add timeout (30s) to agent-based branch summary derivation; failure produces clear error with manual workaround
+  - Add gh repo set-default preflight before any gh API calls; auto-resolve from origin or fail with instructions
+  - Extract derive-branch-summary.sh with BRANCH_SUMMARY_CMD mock for tests; BATS tests for timeout and error paths
 - **gh-issues cross-ref detects Refs: #N in PR bodies** ([#121](https://github.com/vig-os/devcontainer/issues/121))
   - `_build_cross_refs` now parses `Refs: #102` and comma-separated variants (`Refs: #102, #103`) alongside Closes/Fixes/Resolves
 - **PR table Reviewer column distinguishes requested vs completed reviewers** ([#105](https://github.com/vig-os/devcontainer/issues/105))
@@ -26,6 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **worktree-clean: add filter mode for stopped-only vs all** ([#158](https://github.com/vig-os/devcontainer/issues/158))
+  - Default `just worktree-clean` (no args) now cleans only stopped worktrees, skips running tmux sessions
+  - `just worktree-clean all` retains previous behavior (clean all worktrees) with warning
+  - Summary output shows cleaned vs skipped worktrees
+  - `just wt-clean` alias unchanged
 - **Consolidate sync_manifest.py and utils.py into manifest-as-config architecture** ([#89](https://github.com/vig-os/devcontainer/issues/89))
   - Extract transform classes (Sed, RemoveLines, etc.) to `scripts/transforms.py`
   - Unify sed logic: `substitute_in_file()` in utils shared by sed_inplace and Sed transform
