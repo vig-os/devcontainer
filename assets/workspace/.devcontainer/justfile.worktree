@@ -144,11 +144,16 @@ worktree-start issue prompt="" reviewer="":
         fi
 
         # Use agent ONLY for the intelligent part: deriving the short summary
+        # Try lightweight first; on failure retry with standard model (#183)
         NAMING_RULE="$(pwd)/.cursor/rules/branch-naming.mdc"
-        SUMMARY=$("$(pwd)/scripts/derive-branch-summary.sh" "$TITLE" "$NAMING_RULE" 2>/dev/null) || true
+        SUMMARY=$("$(pwd)/scripts/derive-branch-summary.sh" "$TITLE" "$NAMING_RULE" "lightweight") || true
 
         if [ -z "$SUMMARY" ]; then
-            "$(pwd)/scripts/derive-branch-summary.sh" "$TITLE" "$NAMING_RULE" >/dev/null || true
+            echo "[!] Lightweight model failed. Retrying with standard model..."
+            SUMMARY=$("$(pwd)/scripts/derive-branch-summary.sh" "$TITLE" "$NAMING_RULE" "standard") || true
+        fi
+
+        if [ -z "$SUMMARY" ]; then
             echo "        Create one manually: gh issue develop ${ISSUE} --base dev --name ${TYPE}/${ISSUE}-<summary>"
             exit 1
         fi

@@ -506,7 +506,9 @@ def _build_pr_table(
 
         linked = pr_to_issues.get(pr["number"], [])
         issues_cell = (
-            " ".join(_styled(f"#{n}", "cyan") for n in sorted(linked)) if linked else ""
+            " ".join(_gh_link(owner_repo, n, "issues") for n in sorted(linked))
+            if linked
+            else ""
         )
 
         ci_cell = _format_ci_status(pr, owner_repo)
