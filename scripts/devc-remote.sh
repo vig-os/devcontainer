@@ -210,8 +210,11 @@ remote_compose_up() {
     else
         log_info "Starting devcontainer on $SSH_HOST..."
         # shellcheck disable=SC2029
-        ssh "$SSH_HOST" "cd $REMOTE_PATH && $COMPOSE_CMD up -d" >/dev/null 2>&1
-        # Health poll (simplified: assume success for now)
+        if ! ssh "$SSH_HOST" "cd $REMOTE_PATH && $COMPOSE_CMD up -d"; then
+            log_error "Failed to start devcontainer on $SSH_HOST."
+            log_error "Debug with: ssh $SSH_HOST 'cd $REMOTE_PATH && $COMPOSE_CMD logs'"
+            exit 1
+        fi
         sleep 2
     fi
 }

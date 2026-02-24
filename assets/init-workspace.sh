@@ -150,7 +150,7 @@ if [[ "$FORCE" == "true" ]]; then
                 CONFLICTS+=("$rel_path")
             fi
         fi
-    done < <(find "$TEMPLATE_DIR" -type f ! -path "*/.git/*" -print0)
+    done < <(find "$TEMPLATE_DIR" -type f ! -path "*/.git/*" ! -path "*/.venv/*" -print0)
 
     # Show preserved files
     if [[ ${#PRESERVED[@]} -gt 0 ]]; then
@@ -255,6 +255,9 @@ fi
 # Rename template_project directory to match project short name
 if [[ -d "$WORKSPACE_DIR/src/template_project" ]]; then
     echo "Renaming src/template_project to src/${SHORT_NAME}..."
+    if [[ -d "$WORKSPACE_DIR/src/${SHORT_NAME}" ]]; then
+        rm -rf "$WORKSPACE_DIR/src/${SHORT_NAME}"
+    fi
     mv "$WORKSPACE_DIR/src/template_project" "$WORKSPACE_DIR/src/${SHORT_NAME}"
 fi
 

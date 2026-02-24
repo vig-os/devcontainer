@@ -92,6 +92,18 @@ src = "scripts/check-skill-names.sh"
 dest = ".devcontainer/scripts/check-skill-names.sh"
 
 [[entries]]
+src = "scripts/setup-labels.sh"
+dest = "scripts/setup-labels.sh"
+
+[[entries]]
+src = "scripts/devc-remote.sh"
+dest = "scripts/devc-remote.sh"
+
+[[entries]]
+src = "scripts/devc_remote_uri.py"
+dest = "scripts/devc_remote_uri.py"
+
+[[entries]]
 src = "justfile.worktree"
 dest = ".devcontainer/justfile.worktree"
 

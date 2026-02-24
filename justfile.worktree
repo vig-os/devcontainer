@@ -117,10 +117,11 @@ worktree-start issue prompt="" reviewer="":
             echo "    tmux session '$SESSION' is running. Use: just worktree-attach $ISSUE"
         else
             echo "    No tmux session found. Starting one..."
+            AGENT_MODEL=$(_read_model "autonomous")
             if [ -n "$PROMPT" ]; then
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --yolo --approve-mcps \"$PROMPT\""
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --model $AGENT_MODEL --yolo --approve-mcps \"$PROMPT\""
             else
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --approve-mcps"
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --model $AGENT_MODEL --approve-mcps"
             fi
             sleep 2 && tmux send-keys -t "$SESSION" "a" 2>/dev/null || true
             echo "[OK] tmux session '$SESSION' started. Use: just worktree-attach $ISSUE"
@@ -221,10 +222,11 @@ worktree-start issue prompt="" reviewer="":
 
     # Start tmux session
     # --yolo: auto-approve all shell commands (autonomous agent, no human at the terminal)
+    AGENT_MODEL=$(_read_model "autonomous")
     if [ -n "$PROMPT" ]; then
-        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --yolo --approve-mcps \"$PROMPT\""
+        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --model $AGENT_MODEL --yolo --approve-mcps \"$PROMPT\""
     else
-        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --approve-mcps"
+        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --model $AGENT_MODEL --approve-mcps"
     fi
     sleep 2 && tmux send-keys -t "$SESSION" "a" 2>/dev/null || true
 
@@ -307,6 +309,12 @@ worktree-attach issue:
         fi
     }
 
+    _read_model() {
+        local tier="$1"
+        local cfg="$(git rev-parse --show-toplevel)/.cursor/agent-models.toml"
+        grep "^${tier}" "$cfg" | sed 's/.*= *"//' | sed 's/".*//'
+    }
+
     ISSUE="{{ issue }}"
     SESSION="wt-${ISSUE}"
     WT_DIR="{{ _wt_base }}/${ISSUE}"
@@ -315,11 +323,12 @@ worktree-attach issue:
         if [ -d "$WT_DIR" ]; then
             echo "[!] tmux session '$SESSION' stopped. Restarting..."
             _wt_ensure_trust "$WT_DIR"
-            REVIEWER=$(gh api user --jq '.login' 2>/dev/null || echo "")
             if [ -n "${WORKTREE_ATTACH_RESTART_CMD:-}" ]; then
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "$WORKTREE_ATTACH_RESTART_CMD"
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" "$WORKTREE_ATTACH_RESTART_CMD"
             else
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --approve-mcps"
+                REVIEWER=$(gh api user --jq '.login' 2>/dev/null || echo "")
+                AGENT_MODEL=$(_read_model "autonomous")
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --model $AGENT_MODEL --approve-mcps"
             fi
             sleep 2 && tmux send-keys -t "$SESSION" "a" 2>/dev/null || true
             echo "[OK] tmux session '$SESSION' restarted"
