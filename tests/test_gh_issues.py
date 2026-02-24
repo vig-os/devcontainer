@@ -413,3 +413,17 @@ class TestBuildCrossRefs:
         issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
         assert issue_to_pr == {42: 100, 43: 101}
         assert pr_to_issues == {100: [42], 101: [43]}
+
+    def test_refs_keyword_match(self):
+        branches = {}
+        prs = [{"number": 100, "headRefName": "some-branch", "body": "Refs: #102"}]
+        issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
+        assert issue_to_pr == {102: 100}
+        assert pr_to_issues == {100: [102]}
+
+    def test_refs_comma_separated(self):
+        branches = {}
+        prs = [{"number": 100, "headRefName": "x", "body": "Refs: #102, #103"}]
+        issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
+        assert issue_to_pr == {102: 100, 103: 100}
+        assert pr_to_issues == {100: [102, 103]}

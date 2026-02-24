@@ -139,6 +139,167 @@ devcontainer-upgrade:
     curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- --force .
 
 # -------------------------------------------------------------------------------
+# DEVCONTAINER (host-side only)
+# -------------------------------------------------------------------------------
+# These recipes must be run from the host, not inside the container.
+# Compose command: podman compose preferred, fallback to docker compose.
+
+# Start devcontainer + sidecars via compose
+[group('devcontainer')]
+up:
+    #!/usr/bin/env bash
+    if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
+        echo "[ERROR] Run this from the host: just up"
+        exit 1
+    fi
+    cd .devcontainer || exit 1
+    COMPOSE_OPTS="-f docker-compose.yml -f docker-compose.project.yaml"
+    [ -f docker-compose.local.yaml ] && COMPOSE_OPTS="$COMPOSE_OPTS -f docker-compose.local.yaml"
+    if command -v podman &>/dev/null && podman compose version &>/dev/null 2>&1; then
+        podman compose $COMPOSE_OPTS up -d
+    elif command -v docker &>/dev/null && docker compose version &>/dev/null 2>&1; then
+        docker compose $COMPOSE_OPTS up -d
+    else
+        echo "[ERROR] Need podman or docker with compose"
+        exit 1
+    fi
+
+# Stop and remove containers
+[group('devcontainer')]
+down:
+    #!/usr/bin/env bash
+    if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
+        echo "[ERROR] Run this from the host: just down"
+        exit 1
+    fi
+    cd .devcontainer || exit 1
+    COMPOSE_OPTS="-f docker-compose.yml -f docker-compose.project.yaml"
+    [ -f docker-compose.local.yaml ] && COMPOSE_OPTS="$COMPOSE_OPTS -f docker-compose.local.yaml"
+    if command -v podman &>/dev/null && podman compose version &>/dev/null 2>&1; then
+        podman compose $COMPOSE_OPTS down
+    elif command -v docker &>/dev/null && docker compose version &>/dev/null 2>&1; then
+        docker compose $COMPOSE_OPTS down
+    else
+        echo "[ERROR] Need podman or docker with compose"
+        exit 1
+    fi
+
+# Show container status
+[group('devcontainer')]
+status:
+    #!/usr/bin/env bash
+    if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
+        echo "[ERROR] Run this from the host: just status"
+        exit 1
+    fi
+    cd .devcontainer || exit 1
+    COMPOSE_OPTS="-f docker-compose.yml -f docker-compose.project.yaml"
+    [ -f docker-compose.local.yaml ] && COMPOSE_OPTS="$COMPOSE_OPTS -f docker-compose.local.yaml"
+    if command -v podman &>/dev/null && podman compose version &>/dev/null 2>&1; then
+        podman compose $COMPOSE_OPTS ps
+    elif command -v docker &>/dev/null && docker compose version &>/dev/null 2>&1; then
+        docker compose $COMPOSE_OPTS ps
+    else
+        echo "[ERROR] Need podman or docker with compose"
+        exit 1
+    fi
+
+# Tail container logs
+[group('devcontainer')]
+logs *args:
+    #!/usr/bin/env bash
+    if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
+        echo "[ERROR] Run this from the host: just logs"
+        exit 1
+    fi
+    cd .devcontainer || exit 1
+    COMPOSE_OPTS="-f docker-compose.yml -f docker-compose.project.yaml"
+    [ -f docker-compose.local.yaml ] && COMPOSE_OPTS="$COMPOSE_OPTS -f docker-compose.local.yaml"
+    if command -v podman &>/dev/null && podman compose version &>/dev/null 2>&1; then
+        podman compose $COMPOSE_OPTS logs {{ args }}
+    elif command -v docker &>/dev/null && docker compose version &>/dev/null 2>&1; then
+        docker compose $COMPOSE_OPTS logs {{ args }}
+    else
+        echo "[ERROR] Need podman or docker with compose"
+        exit 1
+    fi
+
+# Open bash in running devcontainer
+[group('devcontainer')]
+shell:
+    #!/usr/bin/env bash
+    if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
+        echo "[ERROR] Run this from the host: just shell"
+        exit 1
+    fi
+    cd .devcontainer || exit 1
+    COMPOSE_OPTS="-f docker-compose.yml -f docker-compose.project.yaml"
+    [ -f docker-compose.local.yaml ] && COMPOSE_OPTS="$COMPOSE_OPTS -f docker-compose.local.yaml"
+    if command -v podman &>/dev/null && podman compose version &>/dev/null 2>&1; then
+        podman compose $COMPOSE_OPTS exec devcontainer bash
+    elif command -v docker &>/dev/null && docker compose version &>/dev/null 2>&1; then
+        docker compose $COMPOSE_OPTS exec devcontainer bash
+    else
+        echo "[ERROR] Need podman or docker with compose"
+        exit 1
+    fi
+
+# Restart service(s)
+[group('devcontainer')]
+restart *args:
+    #!/usr/bin/env bash
+    if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
+        echo "[ERROR] Run this from the host: just restart"
+        exit 1
+    fi
+    cd .devcontainer || exit 1
+    COMPOSE_OPTS="-f docker-compose.yml -f docker-compose.project.yaml"
+    [ -f docker-compose.local.yaml ] && COMPOSE_OPTS="$COMPOSE_OPTS -f docker-compose.local.yaml"
+    if command -v podman &>/dev/null && podman compose version &>/dev/null 2>&1; then
+        podman compose $COMPOSE_OPTS restart {{ args }}
+    elif command -v docker &>/dev/null && docker compose version &>/dev/null 2>&1; then
+        docker compose $COMPOSE_OPTS restart {{ args }}
+    else
+        echo "[ERROR] Need podman or docker with compose"
+        exit 1
+    fi
+
+# Open Cursor/VS Code attached to the running container
+[group('devcontainer')]
+open:
+    #!/usr/bin/env bash
+    if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
+        echo "[ERROR] Run this from the host: just open"
+        exit 1
+    fi
+    if command -v cursor &>/dev/null; then
+        cursor .
+    elif command -v code &>/dev/null; then
+        code .
+    else
+        echo "[ERROR] Neither cursor nor code found. Install Cursor or VS Code."
+        exit 1
+    fi
+
+# -------------------------------------------------------------------------------
+# GIT
+# -------------------------------------------------------------------------------
+
+# Pretty one-line git log (last 20 commits)
+[group('git')]
+log:
+    git log --oneline -20
+
+# Show current branch + list recent branches
+[group('git')]
+branch:
+    #!/usr/bin/env bash
+    echo "Current: $(git branch --show-current)"
+    echo ""
+    echo "Recent branches:"
+    git branch -a | head -15
+
+# -------------------------------------------------------------------------------
 # SIDECAR
 # -------------------------------------------------------------------------------
 
