@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **just check uses wrong path — justfile_directory() resolves incorrectly in imported justfile.base** ([#187](https://github.com/vig-os/devcontainer/issues/187))
+  - Replace `dirname(justfile_directory())` with `source_directory()/scripts` to correctly locate version-check.sh in deployed workspaces and devcontainer repo
+  - Regression test: `just check config` runs successfully from workspace
 - **worktree-start swallows derive-branch-summary error messages** ([#183](https://github.com/vig-os/devcontainer/issues/183))
   - Remove stderr suppression so error messages from derive-branch-summary.sh are visible
   - Retry with standard model when lightweight model fails; print manual workaround hint if both fail
