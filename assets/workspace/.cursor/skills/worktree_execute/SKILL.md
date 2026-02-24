@@ -85,22 +85,10 @@ Steps 2 and 4 (execute tasks, handle failures) should remain in the main agent a
 
 Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
 
-## Delegation
-
-The following steps SHOULD be delegated to reduce token consumption:
-
-- **Step 1** (precondition check, load plan): Spawn a Task subagent with `model: "fast"` that validates the branch name, fetches the `## Implementation Plan` comment via `gh api`, parses the task list, and returns: issue number, comment ID, list of pending/completed tasks.
-- **Step 3** (update progress): Spawn a Task subagent with `model: "fast"` that re-fetches the comment, performs the checkbox replacement, and updates the comment via `gh api`. Returns: success confirmation.
-- **Step 5** (invoke next skill): Can remain in main agent (simple skill invocation).
-
-Steps 2 and 4 (execute tasks, handle failures) should remain in the main agent as they require code generation, TDD discipline, and debugging.
-
-Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
-
 ## Important Notes
 
 - Never block waiting for user input. Execute tasks continuously.
 - Each task should leave the codebase in a working, testable state.
 - Skip TDD for non-testable changes (config, templates, docs) — note why in the commit.
 - The plan comment is the single source of truth for progress.
-- **NEVER add 'Co-authored-by: Cursor <cursoragent@cursor.com>'** to commit messages.
+- Never add Co-authored-by trailers. Never set git author/committer to an AI agent identity. Never mention AI agent names in commit messages or PR descriptions. The pre-commit hooks will reject violations.
