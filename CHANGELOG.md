@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Container image missing bandit and check-skill-names.sh for workspace pre-commit hooks** ([#186](https://github.com/vig-os/devcontainer/issues/186))
+  - Add bandit to system-wide pip install in Containerfile
+  - Deploy scripts/check-skill-names.sh to workspace template via manifest
 - **validate-commit-msg rejects AI agent identity fingerprints** ([#163](https://github.com/vig-os/devcontainer/issues/163))
   - Commit-msg hook now rejects commits containing Co-authored-by, cursoragent, cursor.com, claude, codex, chatgpt, copilot
   - Blocks "Made with [Cursor](https://cursor.com)" and similar branding
