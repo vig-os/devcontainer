@@ -22,6 +22,7 @@ _format_assignees = gh_issues._format_assignees
 _infer_review = gh_issues._infer_review
 _extract_reviewers = gh_issues._extract_reviewers
 _build_cross_refs = gh_issues._build_cross_refs
+_build_pr_table = gh_issues._build_pr_table
 
 
 class TestFormatCiStatus:
@@ -92,6 +93,46 @@ class TestFormatCiStatus:
         result = gh_issues._format_ci_status(pr, "a/b")
         assert "—" in result
         assert "dim" in result
+
+    def test_dedup_by_name_latest_completed_at_wins(self):
+        """Duplicate check names: keep latest by completedAt. Ref: #176."""
+        pr = {
+            "number": 1,
+            "statusCheckRollup": [
+                {
+                    "name": "Validate PR Title",
+                    "conclusion": "FAILURE",
+                    "completedAt": "2026-02-24T12:52:49Z",
+                },
+                {
+                    "name": "Validate PR Title",
+                    "conclusion": "FAILURE",
+                    "completedAt": "2026-02-24T12:53:39Z",
+                },
+                {
+                    "name": "Validate PR Title",
+                    "conclusion": "SUCCESS",
+                    "completedAt": "2026-02-24T12:53:52Z",
+                },
+            ],
+        }
+        result = gh_issues._format_ci_status(pr, "a/b")
+        assert "✓" in result
+        assert "1/1" in result
+        assert "green" in result
+
+    def test_dedup_by_name_without_completed_at_last_wins(self):
+        """Duplicate check names without completedAt: last in list wins. Ref: #176."""
+        pr = {
+            "number": 1,
+            "statusCheckRollup": [
+                {"name": "Lint", "conclusion": "FAILURE"},
+                {"name": "Lint", "conclusion": "SUCCESS"},
+            ],
+        }
+        result = gh_issues._format_ci_status(pr, "a/b")
+        assert "✓" in result
+        assert "1/1" in result
 
 
 class TestGhLink:
@@ -427,3 +468,54 @@ class TestBuildCrossRefs:
         issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
         assert issue_to_pr == {102: 100, 103: 100}
         assert pr_to_issues == {100: [102, 103]}
+
+
+def _minimal_pr(number=42, linked_issues=None):
+    """Build a minimal PR dict sufficient for _build_pr_table."""
+    return {
+        "number": number,
+        "title": "Test PR",
+        "author": {"login": "alice"},
+        "assignees": [],
+        "headRefName": "feature/42",
+        "baseRefName": "dev",
+        "isDraft": False,
+        "additions": 10,
+        "deletions": 2,
+        "changedFiles": 1,
+        "reviewDecision": "",
+        "latestReviews": [],
+        "reviewRequests": [],
+        "statusCheckRollup": [],
+    }
+
+
+class TestBuildPrTableIssueLinks:
+    """Regression: issue numbers in PR table Issues column must be clickable links.
+
+    Ref: #174
+    """
+
+    def _issues_cell(self, table):
+        """Extract the raw Issues column cell string from the first row."""
+        issues_col_idx = 4
+        return table.columns[issues_col_idx]._cells[0]
+
+    def test_linked_issues_are_hyperlinks(self):
+        """Issue numbers in the Issues column render as Rich hyperlinks, not plain styled text."""
+        pr = _minimal_pr(number=42)
+        pr_to_issues = {42: [100, 101]}
+        table = _build_pr_table("Test", [pr], pr_to_issues, "owner/repo")
+
+        cell = self._issues_cell(table)
+        assert "link=https://github.com/owner/repo/issues/100" in cell
+        assert "link=https://github.com/owner/repo/issues/101" in cell
+
+    def test_linked_issues_contain_github_url(self):
+        """Each linked issue number should have a GitHub issues URL in link markup."""
+        pr = _minimal_pr(number=10)
+        pr_to_issues = {10: [55]}
+        table = _build_pr_table("PRs", [pr], pr_to_issues, "vig-os/devcontainer")
+
+        cell = self._issues_cell(table)
+        assert "link=https://github.com/vig-os/devcontainer/issues/55" in cell

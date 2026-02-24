@@ -148,6 +148,13 @@ setup() {
     assert_output --partial "gh issue develop"
 }
 
+@test "derive-branch-summary.sh accepts optional MODEL_TIER as third argument" {
+    DERIVE_SCRIPT="$PROJECT_ROOT/scripts/derive-branch-summary.sh"
+    run env BRANCH_SUMMARY_CMD="echo retry-summary" "$DERIVE_SCRIPT" "Some title" "/dev/null" "standard"
+    assert_success
+    assert_output "retry-summary"
+}
+
 # ── worktree-attach ───────────────────────────────────────────────────────────
 
 @test "worktree-attach errors when neither worktree dir nor session exists" {
