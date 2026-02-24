@@ -7,8 +7,13 @@
 # and compose lifecycle. URI construction delegated to Python helper.
 #
 # USAGE:
-#   ./scripts/devc-remote.sh <ssh-host> [--path <remote-path>]
+#   ./scripts/devc-remote.sh <ssh-host>[:<remote-path>]
 #   ./scripts/devc-remote.sh --help
+#
+# Examples:
+#   ./scripts/devc-remote.sh myserver
+#   ./scripts/devc-remote.sh user@host:/opt/projects/myrepo
+#   ./scripts/devc-remote.sh myserver:/home/user/repo
 #
 # Part of #70. See issue #152 for design.
 ###############################################################################
@@ -63,15 +68,6 @@ parse_args() {
             --help|-h)
                 show_help
                 ;;
-            --path)
-                if [[ $# -lt 2 ]]; then
-                    log_error "Missing value for --path"
-                    exit 1
-                fi
-                # shellcheck disable=SC2034
-                REMOTE_PATH="$2"
-                shift 2
-                ;;
             -*)
                 log_error "Unknown option: $1"
                 echo "Use --help for usage information"
@@ -82,14 +78,22 @@ parse_args() {
                     log_error "Unexpected argument: $1"
                     exit 1
                 fi
-                SSH_HOST="$1"
+                # Parse SSH-style format: user@host:path or host:path
+                if [[ "$1" =~ ^([^:]+):(.+)$ ]]; then
+                    SSH_HOST="${BASH_REMATCH[1]}"
+                    REMOTE_PATH="${BASH_REMATCH[2]}"
+                else
+                    SSH_HOST="$1"
+                    # Default to $HOME if no path specified
+                    REMOTE_PATH="$HOME"
+                fi
                 shift
                 ;;
         esac
     done
 
     if [[ -z "$SSH_HOST" ]]; then
-        log_error "Missing required argument: <ssh-host>"
+        log_error "Missing required argument: <ssh-host>[:<remote-path>]"
         echo "Use --help for usage information"
         exit 1
     fi

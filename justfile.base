@@ -373,9 +373,10 @@ sidecar name *args:
 # -------------------------------------------------------------------------------
 
 # Start a devcontainer on a remote host and open Cursor/VS Code
-# Usage: just devc-remote <ssh-host> [--path <remote-path>]
+# Usage: just devc-remote <ssh-host>[:<remote-path>]
 # Example: just devc-remote myserver
-#          just devc-remote user@host --path /opt/projects/myrepo
+#          just devc-remote user@host:/opt/projects/myrepo
+#          just devc-remote myserver:/home/user/repo
 [group('devcontainer')]
-devc-remote host *args:
-    bash scripts/devc-remote.sh {{host}} {{args}}
+devc-remote host_path:
+    bash scripts/devc-remote.sh {{host_path}}
