@@ -74,6 +74,24 @@ worktree-start issue prompt="" reviewer="":
         fi
     fi
 
+    # Preflight: ensure gh has a default repo (required when multiple remotes exist)
+    if ! gh repo set-default --view 2>/dev/null; then
+        ORIGIN_URL=$(git remote get-url origin 2>/dev/null || true)
+        if [ -n "$ORIGIN_URL" ]; then
+            OWNER_REPO=$(echo "$ORIGIN_URL" | sed -E 's|.*[:/]([^/]+)/([^/.]+)(\.git)?$|\1/\2|')
+            if gh repo set-default "$OWNER_REPO" 2>/dev/null; then
+                echo "[OK] Set default repo: $OWNER_REPO"
+            else
+                echo "[ERROR] Multiple remotes detected. No default repository set."
+                echo "        Run: gh repo set-default <owner/repo>"
+                exit 1
+            fi
+        else
+            echo "[ERROR] No origin remote. Run: gh repo set-default <owner/repo>"
+            exit 1
+        fi
+    fi
+
     # Resolve the local gh user as the reviewer (person launching the worktree)
     REVIEWER=$(gh api user --jq '.login' 2>/dev/null || echo "")
     if [ -n "$REVIEWER" ]; then
@@ -127,16 +145,10 @@ worktree-start issue prompt="" reviewer="":
 
         # Use agent ONLY for the intelligent part: deriving the short summary
         NAMING_RULE="$(pwd)/.cursor/rules/branch-naming.mdc"
-        SUMMARY=$(agent --print --yolo --trust --model $(_read_model lightweight) \
-            "Read the branch naming rules in ${NAMING_RULE}. " \
-            "The issue title is: ${TITLE} " \
-            "Output ONLY a kebab-case short summary suitable for a branch name (a few words). " \
-            "Omit prefixes like FEATURE, BUG, Add, Implement, Support. " \
-            "Example: 'Standardize and Enforce Commit Message Format' -> 'standardize-commit-messages'. " \
-            "No explanation. No quotes. Just the summary." | tail -1 | tr -d '[:space:]')
+        SUMMARY=$("$(pwd)/scripts/derive-branch-summary.sh" "$TITLE" "$NAMING_RULE" 2>/dev/null) || true
 
         if [ -z "$SUMMARY" ]; then
-            echo "[ERROR] Agent failed to derive a branch summary from title: ${TITLE}"
+            "$(pwd)/scripts/derive-branch-summary.sh" "$TITLE" "$NAMING_RULE" >/dev/null || true
             echo "        Create one manually: gh issue develop ${ISSUE} --base dev --name ${TYPE}/${ISSUE}-<summary>"
             exit 1
         fi
