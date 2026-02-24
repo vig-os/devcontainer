@@ -82,7 +82,7 @@ dest = ".devcontainer/justfile.worktree"
 [[entries]]
 src = ".pre-commit-config.yaml"
 transforms = [
-  { type = "RemovePrecommitHooks", hook_ids = ["generate-docs"] },
+  { type = "RemovePrecommitHooks", hook_ids = ["generate-docs", "check-skill-names"] },
   { type = "Sed", pattern = "bandit -r packages/vig-utils/src/ scripts/ assets/workspace/", replace = "bandit -r src/" },
   { type = "ReplaceBlock", start_pattern = "^\\s+args: \\[$", end_pattern = "^\\s+\\]$", replacement = """
         # Optional: customize commit types, scopes, or refs-optional types via CLI arguments.
