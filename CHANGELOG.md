@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **worktree-clean: add filter mode for stopped-only vs all** ([#158](https://github.com/vig-os/devcontainer/issues/158))
+  - Default `just worktree-clean` (no args) now cleans only stopped worktrees, skips running tmux sessions
+  - `just worktree-clean all` retains previous behavior (clean all worktrees) with warning
+  - Summary output shows cleaned vs skipped worktrees
+  - `just wt-clean` alias unchanged
 - **Consolidate sync_manifest.py and utils.py into manifest-as-config architecture** ([#89](https://github.com/vig-os/devcontainer/issues/89))
   - Extract transform classes (Sed, RemoveLines, etc.) to `scripts/transforms.py`
   - Unify sed logic: `substitute_in_file()` in utils shared by sed_inplace and Sed transform
