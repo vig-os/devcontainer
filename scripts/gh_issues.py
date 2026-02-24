@@ -175,6 +175,16 @@ def _gh_link(owner_repo: str, num: int, kind: str) -> str:
     return f"[link=https://github.com/{owner_repo}/{kind}/{num}]{num}[/link]"
 
 
+def _format_pr_issues_cell(owner_repo: str, linked: list[int]) -> str:
+    """Return Rich markup for PR table Issues column — clickable links.
+
+    Ref: #174
+    """
+    if not linked:
+        return ""
+    return " ".join(_gh_link(owner_repo, n, "issues") for n in sorted(linked))
+
+
 def _extract_label(labels: list[dict], prefix: str) -> str:
     for lbl in labels:
         name = lbl["name"]
@@ -632,9 +642,7 @@ def _build_pr_table(
         branch = f"[dim]{pr['headRefName']}[/] → [dim]{pr['baseRefName']}[/]"
 
         linked = pr_to_issues.get(pr["number"], [])
-        issues_cell = (
-            " ".join(_styled(f"#{n}", "cyan") for n in sorted(linked)) if linked else ""
-        )
+        issues_cell = _format_pr_issues_cell(owner_repo, linked)
 
         ci_cell = _format_ci_status(pr, owner_repo)
 
