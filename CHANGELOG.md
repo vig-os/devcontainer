@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **gh-issues CI status deduplicates re-run checks** ([#176](https://github.com/vig-os/devcontainer/issues/176))
+  - Deduplicate `statusCheckRollup` by check name, keeping only the latest result (by `completedAt`)
+  - CI column now matches GitHub PR page when checks are re-run
 - **worktree-start preflight gaps — agent hang and gh repo set-default** ([#154](https://github.com/vig-os/devcontainer/issues/154))
   - Add timeout (30s) to agent-based branch summary derivation; failure produces clear error with manual workaround
   - Add gh repo set-default preflight before any gh API calls; auto-resolve from origin or fail with instructions
