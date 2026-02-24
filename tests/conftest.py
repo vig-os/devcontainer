@@ -388,6 +388,7 @@ def initialized_workspace(container_image):
             "copying_files": None,
             "replacing_placeholders": None,
             "setting_permissions": None,
+            "syncing_deps": None,
             "completed": None,
         }
         current_stage = "started"
@@ -417,6 +418,7 @@ def initialized_workspace(container_image):
                 ("Copying files from", "copying_files", 30),
                 ("Replacing placeholders", "replacing_placeholders", 60),
                 ("Setting executable permissions", "setting_permissions", 30),
+                ("Syncing dependencies", "syncing_deps", 60),
                 ("Workspace initialized successfully", "completed", 30),
             ]
 
@@ -576,6 +578,7 @@ def initialized_workspace(container_image):
             "copying_files": None,
             "replacing_placeholders": None,
             "setting_permissions": None,
+            "syncing_deps": None,
             "completed": None,
         }
         current_stage = "started"
@@ -603,6 +606,7 @@ def initialized_workspace(container_image):
                 ("Copying files from", "copying_files", 30),
                 ("Replacing placeholders", "replacing_placeholders", 60),
                 ("Setting executable permissions", "setting_permissions", 30),
+                ("Syncing dependencies", "syncing_deps", 60),
                 ("Workspace initialized successfully", "completed", 30),
             ]
 

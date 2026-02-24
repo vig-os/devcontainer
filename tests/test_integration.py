@@ -760,6 +760,30 @@ class TestDevContainerGit:
 class TestDevContainerUserConf:
     """Test that user configuration files are set up."""
 
+    def test_project_installed_after_init(self, initialized_workspace):
+        """Regression: uv.lock must reference the actual project name after init.
+
+        init-workspace.sh runs `just sync` which calls `uv sync --all-extras`.
+        This resolves the lock file for the renamed project and installs it.
+
+        Before the fix, init did not sync, so uv.lock still referenced
+        template-project. The first `uv run pre-commit run -a` would then
+        mutate the venv and rewrite uv.lock.
+        """
+        lock_file = initialized_workspace / "uv.lock"
+        assert lock_file.exists(), "uv.lock not found after init"
+
+        content = lock_file.read_text()
+
+        assert "template-project" not in content and "template_project" not in content, (
+            "uv.lock still references template-project after init"
+        )
+
+        assert "test-project" in content or "test_project" in content, (
+            "uv.lock does not reference the project 'test_project' after init\n"
+            f"Lock file content (first 500 chars): {content[:500]}"
+        )
+
     def test_venv_prompt_name(self, devcontainer_up):
         """Test that .venv/bin/activate in the image does not contain 'template-project', but is renamed to `test_project`."""
         workspace_path = str(devcontainer_up.resolve())
@@ -798,7 +822,7 @@ class TestDevContainerUserConf:
             f"{activate_path} does not contain 'test_project'; "
             "should be renamed to project short name during container init (e.g. post-create)"
         )
-
+    
     def test_conf_directory_files(self, devcontainer_up):
         """Test that .devcontainer/.conf contains all expected files."""
         workspace_path = str(devcontainer_up.resolve())
