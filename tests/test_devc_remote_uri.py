@@ -140,3 +140,33 @@ class TestEdgeCases:
                 ssh_host="host",
                 container_workspace="/workspace",
             )
+
+    def test_build_uri_empty_devcontainer_path_raises(self):
+        """Empty devcontainer_path raises ValueError."""
+        with pytest.raises(ValueError, match="devcontainer_path"):
+            devc_remote_uri.build_uri(
+                workspace_path="/repo",
+                devcontainer_path="",
+                ssh_host="host",
+                container_workspace="/workspace",
+            )
+
+    def test_build_uri_empty_ssh_host_raises(self):
+        """Empty ssh_host raises ValueError."""
+        with pytest.raises(ValueError, match="ssh_host"):
+            devc_remote_uri.build_uri(
+                workspace_path="/repo",
+                devcontainer_path="/repo/.devcontainer/devcontainer.json",
+                ssh_host="",
+                container_workspace="/workspace",
+            )
+
+    def test_build_uri_empty_container_workspace_raises(self):
+        """Empty container_workspace raises ValueError."""
+        with pytest.raises(ValueError, match="container_workspace"):
+            devc_remote_uri.build_uri(
+                workspace_path="/repo",
+                devcontainer_path="/repo/.devcontainer/devcontainer.json",
+                ssh_host="host",
+                container_workspace="",
+            )

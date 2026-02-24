@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CI Project Checks coverage includes devc_remote_uri tests** ([#70](https://github.com/vig-os/devcontainer/issues/70))
+  - Add `tests/test_devc_remote_uri.py` to test-project action pytest run
+  - Add build_uri validation tests for empty devcontainer_path, ssh_host, container_workspace
 - **gh-issues cross-ref detects Refs: #N in PR bodies** ([#121](https://github.com/vig-os/devcontainer/issues/121))
   - `_build_cross_refs` now parses `Refs: #102` and comma-separated variants (`Refs: #102, #103`) alongside Closes/Fixes/Resolves
 - **PR table Reviewer column distinguishes requested vs completed reviewers** ([#105](https://github.com/vig-os/devcontainer/issues/105))
