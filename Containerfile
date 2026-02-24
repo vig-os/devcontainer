@@ -177,6 +177,7 @@ RUN uv pip install --system \
     pre-commit \
     rich \
     ruff \
+    bandit[toml] \
     pip-licenses && \
     uv pip install --system --upgrade pip
 
