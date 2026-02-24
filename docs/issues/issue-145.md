@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-21T21:57:13Z
-updated: 2026-02-21T22:44:59Z
+updated: 2026-02-23T23:48:00Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/145
-comments: 2
+comments: 4
 labels: feature, area:workflow, effort:large, semver:minor
 assignees: none
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-22T04:23:19.536Z
+synced: 2026-02-24T04:24:10.279Z
 ---
 
 # [Issue 145]: [[FEATURE] Rewrite gh-issues dashboard — Polars + Typer + responsive layout](https://github.com/vig-os/devcontainer/issues/145)
@@ -202,4 +202,80 @@ Pain points observed during daily use:
 - #121 Cross-ref bug (Refs: vs Closes)
 - #109 Discussion: CI pipeline optimization
 - Full RFC: `docs/rfcs/RFC-001-2026-02-21-gh-issues-dashboard-rewrite.md`
+
+---
+
+# [Comment #3]() by [gerchowl]()
+
+_Posted on February 23, 2026 at 07:24 AM_
+
+### Alternative to explore: GitKraken CLI (`gk`)
+
+Worth checking out [GitKraken CLI](https://github.com/gitkraken/gk-cli) (`gk`) as a potential alternative or inspiration before committing to the full rewrite. It provides:
+
+- `gk issue list` / `gk pr list` — rich terminal dashboard for issues and PRs
+- Built-in filtering by assignee, label, milestone
+- Launchpad view with CI status, review state, and activity indicators
+
+If it covers enough of our needs out of the box (or with light scripting), it could replace the custom dashboard entirely. If not, its UX patterns (column layout, status indicators) are worth borrowing.
+
+**Action:** Try `gk` against this repo and evaluate coverage vs. our requirements (milestone grouping, sub-issue trees, label taxonomy, `just` integration).
+
+---
+
+# [Comment #4]() by [gerchowl]()
+
+_Posted on February 23, 2026 at 11:48 PM_
+
+### Alternative to explore: Textual TUI (like Toad)
+
+[Toad](https://github.com/batrachianai/toad) — built by Will McGugan (creator of Rich and Textual) — demonstrates that Textual can power a full interactive terminal UI with live shell embedding, concurrent agent sessions, and streaming output. Worth evaluating as an architecture for the dashboard rewrite.
+
+#### What Textual enables beyond static Rich tables
+
+- **Interactive TUI** — sortable/filterable data tables, keyboard navigation, panel layouts, drill-down into issue details
+- **Live refresh** — auto-poll GitHub API and re-render in place (via `Worker` async tasks)
+- **Embedded shell / tmux viewer** — Toad proves Textual can run a real PTY widget; this could show live worktree agent output
+- **Concurrent session overview** — Toad's `Ctrl+S` shows all running agents; analogous to a worktree status panel
+
+#### Testability
+
+Textual ships with a first-class `Pilot` test driver — headless async tests via pytest:
+- `pilot.click()`, `pilot.press()` for interaction
+- `app.query_one(CSS_selector)` for widget state assertions
+- Snapshot regression testing for visual layout
+- No real terminal needed — fits TDD workflow
+
+#### Data layer: Python GitHub API instead of `gh` CLI
+
+Replace the current 5+ serial `subprocess.run` calls to `gh` with direct HTTP calls (`httpx` async) to GitHub REST/GraphQL API:
+- Fetch issues, PRs, branches, sub-issue parents in 1-2 GraphQL queries (vs. 5+ CLI round trips)
+- `asyncio.gather` for parallel fetches
+- Clean mockability (mock HTTP client vs. matching subprocess argument lists)
+- Native integration with Textual's async `Worker` for live refresh
+
+#### Potential architecture
+
+```
+data layer (async GitHub API client via httpx)
+  → model layer (dataclasses / Polars DataFrames)
+    → UI layer (Textual widgets consuming models)
+```
+
+Each layer independently testable.
+
+#### Scope question: dashboard vs. project control center
+
+Toad covers **agents + shell** but not **project management** (issues, PRs, CI, milestones). The gh-issues dashboard covers **project management** but not **agents or live shells**. Two possible paths:
+
+1. **Keep focused** — Textual TUI for the dashboard rewrite only (issues, PRs, CI, filtering). Agents stay in Toad or tmux.
+2. **Expand later** — Build the dashboard first, then layer on worktree overview panel and tmux shell viewer as follow-up issues. The async Textual architecture supports adding panels without rework.
+
+Recommend path 1 first (YAGNI), with the architecture designed to support path 2.
+
+#### References
+
+- [Toad](https://github.com/batrachianai/toad) — Textual-based agent TUI by Will McGugan
+- [Textual testing docs](https://textual.textualize.io/guide/testing/)
+- [Agent Client Protocol](https://agentclientprotocol.com/overview/introduction) — protocol Toad uses for multi-agent support
 
