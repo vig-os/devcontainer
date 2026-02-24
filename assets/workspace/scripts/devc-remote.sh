@@ -229,12 +229,18 @@ open_editor() {
     container_workspace="${container_workspace:-/workspace}"
 
     # Build URI using Python helper
-    uri=$(python3 "$SCRIPT_DIR/devc_remote_uri.py" \
+    if ! uri=$(python3 "$SCRIPT_DIR/devc_remote_uri.py" \
         "$REMOTE_PATH" \
         "$SSH_HOST" \
-        "$container_workspace")
+        "$container_workspace"); then
+        log_error "Failed to build editor URI. Is devc_remote_uri.py present in $SCRIPT_DIR?"
+        exit 1
+    fi
 
-    "$EDITOR_CLI" --folder-uri "$uri"
+    if ! "$EDITOR_CLI" --folder-uri "$uri"; then
+        log_error "Failed to open $EDITOR_CLI. URI: $uri"
+        exit 1
+    fi
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
