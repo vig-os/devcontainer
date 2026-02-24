@@ -108,6 +108,7 @@ Show the user a structured summary before any fixes:
 
 ### 5. Execute fixes
 
+- **Merge the base branch** before the first push: run `git fetch origin` and `git merge origin/<base_branch>` (use `baseRefName` from step 1's PR metadata). **Conflict handling:** If merge conflicts occur, list the conflicting files and ask the user to resolve them before proceeding.
 - Work through approved tasks one at a time.
 - Follow [code_tdd](../code_tdd/SKILL.md) discipline where applicable (write test first, then fix).
 - Commit each fix via [git_commit](../git_commit/SKILL.md).
