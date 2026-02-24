@@ -49,6 +49,7 @@ DEFAULT_REFS_OPTIONAL_TYPES = frozenset[str]({"chore"})
 _AGENT_FINGERPRINT_PATTERNS: list[tuple[str, int]] = [
     (r"Co-authored-by", re.IGNORECASE),
     (r"cursoragent", re.IGNORECASE),
+    (r"cursor\.com", re.IGNORECASE),  # "Made with [Cursor](https://cursor.com)" etc.
     (r"\bclaude\b", re.IGNORECASE),
     (r"\bcodex\b", re.IGNORECASE),
     (r"\bchatgpt\b", re.IGNORECASE),

@@ -1103,6 +1103,12 @@ class TestAgentFingerprints:
         valid, err = validate_commit_message(msg, subject_only=True)
         assert valid is False
 
+    def test_rejects_made_with_cursor_link(self):
+        """Reject 'Made with [Cursor](https://cursor.com)' branding in body."""
+        msg = "feat: add feature\n\nMade with [Cursor](https://cursor.com)\n\nRefs: #163\n"
+        valid, err = validate_commit_message(msg)
+        assert valid is False
+
 
 class TestSubjectOnly:
     """Test subject_only mode for PR title validation."""
