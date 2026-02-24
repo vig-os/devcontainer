@@ -57,14 +57,6 @@ repos:
         name: shellcheck
         args: ["-x"]
 
-  # Containerfile
-  - repo: https://github.com/hadolint/hadolint
-    rev: 346e4199e4baca7d6827f20ac078b6eee5b39327  # v2.9.3
-    hooks:
-      - id: hadolint-docker
-        name: hadolint
-
-  # Markdown Linting (excludes auto-generated docs)
   - repo: https://github.com/jackdewinter/pymarkdown
     rev: f93643d339dfee2a1022e7b05e8b5a281bfac553  # v0.9.23
     hooks:
@@ -87,48 +79,3 @@ repos:
     rev: 07d900b8fa1097806b8adb6391b0d3e0ac2fdea7  # v1.39.0
     hooks:
       - id: typos
-
-  # License Compliance Check (runs only when dependencies change)
-  - repo: local
-    hooks:
-      - id: pip-licenses
-        name: pip-licenses (check dependency licenses)
-        entry: uv run pip-licenses --fail-on="GPL-3.0-only;GPL-3.0-or-later;AGPL-3.0-only;AGPL-3.0-or-later"
-        language: system
-        files: ^(pyproject\.toml|uv\.lock|requirements.*\.txt)$
-        pass_filenames: false
-
-  # GitHub Actions SHA pinning enforcement
-  - repo: local
-    hooks:
-      - id: check-action-pins
-        name: check-action-pins (verify SHA-pinned actions)
-        entry: uv run check-action-pins
-        language: system
-        files: ^\.github/(workflows/.*\.ya?ml|actions/.*/action\.ya?ml)$
-        pass_filenames: false
-
-  # Python Security (Bandit)
-  - repo: local
-    hooks:
-      - id: bandit
-        name: bandit (Python security linting)
-        entry: uv run bandit -r src/ -ll
-        language: system
-        types: [python]
-        pass_filenames: false
-
-  - repo: local
-    hooks:
-      - id: validate-commit-msg
-        name: validate commit message
-        entry: uv run validate-commit-msg
-        language: system
-        stages: [commit-msg]
-        # Optional: customize commit types, scopes, or refs-optional types via CLI arguments.
-        # By default, scopes are not enforced. Set --scopes to require specific scopes.
-        # Examples (choose one args line):
-        #   args: ["--types", "feat,fix,docs,chore"]
-        #   args: ["--scopes", "api,cli,utils"]
-        #   args: ["--refs-optional-types", "chore"]
-        #   args: ["--types", "feat,fix,docs", "--scopes", "api,cli,utils", "--refs-optional-types", "chore"]

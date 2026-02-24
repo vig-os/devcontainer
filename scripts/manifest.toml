@@ -79,15 +79,16 @@ dest = ".devcontainer/justfile.worktree"
 [[entries]]
 src = ".pre-commit-config.yaml"
 transforms = [
-  { type = "RemovePrecommitHooks", hook_ids = ["generate-docs", "check-skill-names", "sync-manifest"] },
+  { type = "RemovePrecommitHooks", hook_ids = [
+    "hadolint-docker",
+    "generate-docs",
+    "sync-manifest",
+    "pip-licenses",
+    "check-action-pins",
+    "bandit",
+    "check-skill-names",
+    "validate-commit-msg",
+  ] },
   { type = "Sed", pattern = "bandit -r packages/vig-utils/src/ scripts/ assets/workspace/", replace = "bandit -r src/" },
-  { type = "ReplaceBlock", start_pattern = "^\\s+args: \\[$", end_pattern = "^\\s+\\]$", replacement = """
-        # Optional: customize commit types, scopes, or refs-optional types via CLI arguments.
-        # By default, scopes are not enforced. Set --scopes to require specific scopes.
-        # Examples (choose one args line):
-        #   args: ["--types", "feat,fix,docs,chore"]
-        #   args: ["--scopes", "api,cli,utils"]
-        #   args: ["--refs-optional-types", "chore"]
-        #   args: ["--types", "feat,fix,docs", "--scopes", "api,cli,utils", "--refs-optional-types", "chore"]
-""" }
+  { type = "StripTrailingBlankLines" },
 ]
