@@ -616,18 +616,11 @@ def _build_pr_table(
     table.add_column("Issues", no_wrap=True, width=10)
     table.add_column("Branch", no_wrap=True, overflow="ellipsis", max_width=30)
     table.add_column("CI", no_wrap=True, justify="center", width=14)
-    table.add_column("Review", no_wrap=True, justify="center", width=8)
-    table.add_column("Reviewer", no_wrap=True, width=12)
+    table.add_column("Review", no_wrap=True, width=18)
     table.add_column("Delta", no_wrap=True, justify="right", width=14)
 
     for pr in sorted(prs, key=lambda p: p["number"]):
-        review_state, review_label = _infer_review(pr)
-        style, label = REVIEW_STYLES.get(
-            review_state,
-            ("dim", review_label or "—"),
-        )
-        review = _styled(label, style)
-        reviewer = _extract_reviewers(pr)
+        review_cell = _format_review(pr)
 
         draft_marker = _styled(" draft", "dim italic") if pr.get("isDraft") else ""
 
@@ -653,8 +646,7 @@ def _build_pr_table(
             issues_cell,
             branch,
             ci_cell,
-            review,
-            reviewer,
+            review_cell,
             delta,
         )
     return table
