@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Issue numbers in PR table Issues column are not clickable links** ([#174](https://github.com/vig-os/devcontainer/issues/174))
+  - Replace `_styled` with `_gh_link` in `_build_pr_table` so issue numbers render as clickable terminal hyperlinks
 - **just gh-issues fails locally — rich not in .venv dependencies** ([#159](https://github.com/vig-os/devcontainer/issues/159))
   - Add `rich>=13.0.0` to dev dependency group in `pyproject.toml` so `uv sync` installs it into `.venv`
 - **gh-issues cross-ref detects Refs: #N in PR bodies** ([#121](https://github.com/vig-os/devcontainer/issues/121))

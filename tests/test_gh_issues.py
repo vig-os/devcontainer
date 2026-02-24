@@ -96,6 +96,24 @@ class TestFormatCiStatus:
         assert "dim" in result
 
 
+class TestFormatPrIssuesCell:
+    """Test issues cell in PR table uses clickable links.
+
+    Ref: #174
+    """
+
+    def test_linked_issues_render_as_clickable_links(self):
+        """Issue numbers in PR table Issues column use _gh_link markup."""
+        result = gh_issues._format_pr_issues_cell("vig-os/devcontainer", [143, 42])
+        assert "link=https://github.com/vig-os/devcontainer/issues/143" in result
+        assert "link=https://github.com/vig-os/devcontainer/issues/42" in result
+        assert "[/link]" in result
+
+    def test_empty_linked_returns_empty_string(self):
+        """No linked issues returns empty string."""
+        assert gh_issues._format_pr_issues_cell("owner/repo", []) == ""
+
+
 class TestGhLink:
     """Test _gh_link helper for clickable issue/PR numbers."""
 
