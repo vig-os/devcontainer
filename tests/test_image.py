@@ -23,6 +23,7 @@ EXPECTED_VERSIONS = {
     "pre_commit": "4.5.",  # Minor version check (installed via uv pip)
     "ruff": "0.15.",  # Minor version check (installed via uv pip)
     "pip_licenses": "5.",  # Major version check (installed via uv pip)
+    "bandit": "1.",  # Major version check (installed via uv pip)
     "just": "1.46.",  # Minor version check (manually installed from latest release)
     "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),
     "typstyle": "0.14.",  # Minor version check (installed from latest release)
@@ -340,6 +341,16 @@ class TestDevelopmentTools:
         expected = EXPECTED_VERSIONS["pip_licenses"]
         assert expected in result.stdout, (
             f"Expected pip-licenses {expected}, got: {result.stdout}"
+        )
+
+    def test_bandit_installed(self, host):
+        """Test that bandit is installed."""
+        result = host.run("bandit --version")
+        assert result.rc == 0, "bandit --version failed"
+        assert "bandit" in result.stdout.lower()
+        expected = EXPECTED_VERSIONS["bandit"]
+        assert expected in result.stdout, (
+            f"Expected bandit {expected}, got: {result.stdout}"
         )
 
     def test_vig_utils_installed(self, host):
