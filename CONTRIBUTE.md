@@ -125,14 +125,29 @@ Available recipes:
     clean-test-containers                      # Clean up lingering test containers
 
     [deps]
-    sync                                       # Sync dependencies from pyproject.toml
+    sync                                       # Sync all dependencies (idempotent, fast if nothing changed)
     update                                     # Update all dependencies
+
+    [devcontainer]
+    down                                       # Stop and remove containers
+    logs *args                                 # Tail container logs
+    open                                       # Open Cursor/VS Code attached to the running container
+    restart *args                              # Restart service(s)
+    shell                                      # Open bash in running devcontainer
+    status                                     # Show container status
+    up                                         # Start devcontainer + sidecars via compose
+
+    [git]
+    branch                                     # Show current branch + list recent branches
+    log                                        # Pretty one-line git log (last 20 commits)
 
     [github]
     gh-issues                                  # List open issues and PRs grouped by milestone [alias: gh-i]
 
     [info]
+    check *args                                # Examples: just check, just check config, just check off, just check 7d
     default                                    # Show available commands (default)
+    devcontainer-upgrade                       # This recipe MUST be run from a host terminal, not inside the container
     docs                                       # Generate documentation from templates
     help                                       # Show available commands
     info                                       # Show image information
@@ -164,7 +179,7 @@ Available recipes:
     reset-changelog                            # Reset CHANGELOG Unreleased section (after merging release to dev)
 
     [sidecar]
-    sidecar name *args                         # just sidecar redis flush
+    sidecar name *args                         # Example: just sidecar postgres migrate / just sidecar redis flush
     sidecars                                   # List available sidecar containers
 
     [test]
