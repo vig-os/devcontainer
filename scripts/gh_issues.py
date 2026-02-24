@@ -374,13 +374,34 @@ def _infer_review(pr: dict) -> tuple[str, str]:
     return ("", "—")
 
 
+def _dedupe_status_checks(rollup: list[dict]) -> list[dict]:
+    """Deduplicate statusCheckRollup by check name, keeping latest by completedAt.
+
+    GitHub includes re-runs of the same check; we keep only the latest result
+    per check name so the CI column matches what GitHub shows on the PR page.
+    Ref: #176
+    """
+    by_name: dict[str, dict] = {}
+    for check in rollup:
+        name = check.get("name") or "?"
+        completed = check.get("completedAt") or ""
+        existing = by_name.get(name)
+        if existing is None:
+            by_name[name] = check
+        else:
+            existing_completed = existing.get("completedAt") or ""
+            if completed >= existing_completed:
+                by_name[name] = check
+    return list(by_name.values())
+
+
 def _format_ci_status(pr: dict, owner_repo: str) -> str:
     """Return Rich markup for CI status cell: pass/fail/pending summary with link.
 
     Uses statusCheckRollup from gh pr list. Links to PR checks tab.
     Ref: #143
     """
-    rollup = pr.get("statusCheckRollup") or []
+    rollup = _dedupe_status_checks(pr.get("statusCheckRollup") or [])
     if not rollup:
         return _styled("—", "dim")
 
@@ -485,7 +506,9 @@ def _build_pr_table(
 
         linked = pr_to_issues.get(pr["number"], [])
         issues_cell = (
-            " ".join(_styled(f"#{n}", "cyan") for n in sorted(linked)) if linked else ""
+            " ".join(_gh_link(owner_repo, n, "issues") for n in sorted(linked))
+            if linked
+            else ""
         )
 
         ci_cell = _format_ci_status(pr, owner_repo)

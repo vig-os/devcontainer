@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Container image missing bandit and check-skill-names.sh for workspace pre-commit hooks** ([#186](https://github.com/vig-os/devcontainer/issues/186))
   - Add bandit to system-wide pip install in Containerfile
   - Deploy scripts/check-skill-names.sh to workspace template via manifest
+- **gh-issues CI status deduplicates re-run checks** ([#176](https://github.com/vig-os/devcontainer/issues/176))
+  - Deduplicate `statusCheckRollup` by check name, keeping only the latest result (by `completedAt`)
+  - CI column now matches GitHub PR page when checks are re-run
+- **worktree-start swallows derive-branch-summary error messages** ([#183](https://github.com/vig-os/devcontainer/issues/183))
+  - Remove stderr suppression so error messages from derive-branch-summary.sh are visible
+  - Retry with standard model when lightweight model fails; print manual workaround hint if both fail
+  - Add optional MODEL_TIER parameter to derive-branch-summary.sh; BATS test for retry path
 - **validate-commit-msg rejects AI agent identity fingerprints** ([#163](https://github.com/vig-os/devcontainer/issues/163))
   - Commit-msg hook now rejects commits containing Co-authored-by, cursoragent, cursor.com, claude, codex, chatgpt, copilot
   - Blocks "Made with [Cursor](https://cursor.com)" and similar branding
@@ -30,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatically restart session in existing worktree before attaching
   - Guard `worktree-start` against branches already checked out elsewhere with an informative error
   - BATS integration tests for restart, error paths, and checkout detection
+- **Issue numbers in PR table are now clickable hyperlinks** ([#174](https://github.com/vig-os/devcontainer/issues/174))
+  - Replace plain styled text with Rich hyperlink markup in the Issues column of the PR table
 
 ### Changed
 
