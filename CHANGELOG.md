@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **just check uses wrong path — justfile_directory() resolves incorrectly in imported justfile.base** ([#187](https://github.com/vig-os/devcontainer/issues/187))
+  - Replace `dirname(justfile_directory())` with `source_directory()/scripts` to correctly locate version-check.sh in deployed workspaces and devcontainer repo
+  - Regression test: `just check config` runs successfully from workspace
 - **gh-issues CI status deduplicates re-run checks** ([#176](https://github.com/vig-os/devcontainer/issues/176))
   - Deduplicate `statusCheckRollup` by check name, keeping only the latest result (by `completedAt`)
   - CI column now matches GitHub PR page when checks are re-run
