@@ -1,0 +1,115 @@
+title: Skill Pipeline
+description: >
+  Full agent-driven development pipeline from idea signal through
+  inception, design, implementation, and delivery.
+
+components:
+  signal:
+    label: Signal
+    type: trigger
+    group: inception
+    description: Idea, problem, feedback, or research finding
+
+  inception-explore:
+    label: "inception:explore"
+    type: skill
+    group: inception
+    phase: diverge
+    description: Understand the problem space — go wide before narrow
+
+  inception-scope:
+    label: "inception:scope"
+    type: skill
+    group: inception
+    phase: converge
+    description: Define what to build and what not to build
+
+  inception-architect:
+    label: "inception:architect"
+    type: skill
+    group: inception
+    phase: evaluate
+    description: Validate design against established patterns
+
+  inception-plan:
+    label: "inception:plan"
+    type: skill
+    group: inception
+    phase: decompose
+    description: Break scoped design into actionable GitHub issues
+
+  design-brainstorm:
+    label: "design:brainstorm"
+    type: skill
+    group: development
+    description: Implementation design per issue
+
+  issue:
+    label: "issue:*"
+    type: skill-group
+    group: development
+    description: Issue triage, claiming, creation
+
+  design:
+    label: "design:*"
+    type: skill-group
+    group: development
+    description: Brainstorm and plan implementation
+
+  code:
+    label: "code:*"
+    type: skill-group
+    group: development
+    description: TDD, debug, execute, review, verify
+
+  git:
+    label: "git:*"
+    type: skill-group
+    group: delivery
+    description: Commit workflow
+
+  ci:
+    label: "ci:*"
+    type: skill-group
+    group: delivery
+    description: Pipeline check and fix
+
+  pr:
+    label: "pr:*"
+    type: skill-group
+    group: delivery
+    description: Pull request creation and post-merge
+
+edges:
+  - from: signal
+    to: inception-explore
+  - from: inception-explore
+    to: inception-scope
+  - from: inception-scope
+    to: inception-architect
+  - from: inception-architect
+    to: inception-plan
+  - from: inception-plan
+    to: design-brainstorm
+  - from: design-brainstorm
+    to: issue
+  - from: issue
+    to: design
+  - from: design
+    to: code
+  - from: code
+    to: git
+  - from: git
+    to: ci
+  - from: ci
+    to: pr
+
+views:
+  full-pipeline:
+    title: Full Skill Pipeline
+    include: all
+  inception-only:
+    title: Inception Phase
+    filter:
+      group: inception
+    include_edges: true

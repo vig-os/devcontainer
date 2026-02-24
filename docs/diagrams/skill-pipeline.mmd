@@ -1,0 +1,41 @@
+graph LR
+    subgraph inception[Inception Phase]
+        signal(("Signal"))
+        explore["inception:explore\n(diverge)"]
+        scope["inception:scope\n(converge)"]
+        architect["inception:architect\n(evaluate)"]
+        plan["inception:plan\n(decompose)"]
+    end
+
+    subgraph development[Development Phase]
+        brainstorm["design:brainstorm"]
+        issue["issue:*"]
+        design["design:*"]
+        code["code:*"]
+    end
+
+    subgraph delivery[Delivery Phase]
+        git["git:*"]
+        ci["ci:*"]
+        pr["pr:*"]
+    end
+
+    signal --> explore
+    explore --> scope
+    scope --> architect
+    architect --> plan
+    plan --> brainstorm
+    brainstorm --> issue
+    issue --> design
+    design --> code
+    code --> git
+    git --> ci
+    ci --> pr
+
+    classDef inception fill:#E8F5E9,stroke:#388E3C
+    classDef development fill:#E3F2FD,stroke:#1565C0
+    classDef delivery fill:#FFF3E0,stroke:#E65100
+
+    class signal,explore,scope,architect,plan inception
+    class brainstorm,issue,design,code development
+    class git,ci,pr delivery

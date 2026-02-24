@@ -1,0 +1,44 @@
+digraph "Skill Pipeline" {
+    rankdir=LR;
+    node [fontname="Helvetica" fontsize=11 style=filled];
+    edge [fontname="Helvetica" fontsize=9];
+
+    subgraph cluster_inception {
+        label="Inception Phase";
+        style=filled; color="#E8F5E9";
+        signal [label="Signal" shape=oval fillcolor="#FFFDE7"];
+        explore [label="inception:explore\n(diverge)" shape=box fillcolor=white];
+        scope [label="inception:scope\n(converge)" shape=box fillcolor=white];
+        architect [label="inception:architect\n(evaluate)" shape=box fillcolor=white];
+        plan [label="inception:plan\n(decompose)" shape=box fillcolor=white];
+    }
+
+    subgraph cluster_development {
+        label="Development Phase";
+        style=filled; color="#E3F2FD";
+        brainstorm [label="design:brainstorm" shape=box fillcolor=white];
+        issue [label="issue:*" shape=box fillcolor=white];
+        design [label="design:*" shape=box fillcolor=white];
+        code [label="code:*" shape=box fillcolor=white];
+    }
+
+    subgraph cluster_delivery {
+        label="Delivery Phase";
+        style=filled; color="#FFF3E0";
+        git [label="git:*" shape=box fillcolor=white];
+        ci [label="ci:*" shape=box fillcolor=white];
+        pr [label="pr:*" shape=box fillcolor=white];
+    }
+
+    signal -> explore;
+    explore -> scope;
+    scope -> architect;
+    architect -> plan;
+    plan -> brainstorm;
+    brainstorm -> issue;
+    issue -> design;
+    design -> code;
+    code -> git;
+    git -> ci;
+    ci -> pr;
+}

@@ -1,0 +1,38 @@
+title: Skill Pipeline
+direction: right
+
+inception: Inception Phase {
+  style.fill: "#E8F5E9"
+  signal: Signal { shape: oval }
+  explore: "inception:explore\n(diverge)" { shape: rectangle }
+  scope: "inception:scope\n(converge)" { shape: rectangle }
+  architect: "inception:architect\n(evaluate)" { shape: rectangle }
+  plan: "inception:plan\n(decompose)" { shape: rectangle }
+}
+
+development: Development Phase {
+  style.fill: "#E3F2FD"
+  brainstorm: "design:brainstorm" { shape: rectangle }
+  issue: "issue:*" { shape: rectangle }
+  design: "design:*" { shape: rectangle }
+  code: "code:*" { shape: rectangle }
+}
+
+delivery: Delivery Phase {
+  style.fill: "#FFF3E0"
+  git: "git:*" { shape: rectangle }
+  ci: "ci:*" { shape: rectangle }
+  pr: "pr:*" { shape: rectangle }
+}
+
+inception.signal -> inception.explore
+inception.explore -> inception.scope
+inception.scope -> inception.architect
+inception.architect -> inception.plan
+inception.plan -> development.brainstorm
+development.brainstorm -> development.issue
+development.issue -> development.design
+development.design -> development.code
+development.code -> delivery.git
+delivery.git -> delivery.ci
+delivery.ci -> delivery.pr

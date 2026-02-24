@@ -1,0 +1,48 @@
+@startuml skill-pipeline
+!theme plain
+left to right direction
+skinparam backgroundColor white
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 11
+skinparam rectangleBorderColor #666666
+skinparam rectangleBackgroundColor white
+
+skinparam package {
+    BorderColor #999999
+    FontSize 13
+    FontStyle bold
+}
+
+package "Inception Phase" #E8F5E9 {
+    (Signal) as signal #FFFDE7
+    rectangle "inception:explore\n(diverge)" as explore
+    rectangle "inception:scope\n(converge)" as scope
+    rectangle "inception:architect\n(evaluate)" as architect
+    rectangle "inception:plan\n(decompose)" as plan
+}
+
+package "Development Phase" #E3F2FD {
+    rectangle "design:brainstorm" as brainstorm
+    rectangle "issue:*" as issue
+    rectangle "design:*" as design
+    rectangle "code:*" as code
+}
+
+package "Delivery Phase" #FFF3E0 {
+    rectangle "git:*" as git
+    rectangle "ci:*" as ci
+    rectangle "pr:*" as pr
+}
+
+signal --> explore
+explore --> scope
+scope --> architect
+architect --> plan
+plan --> brainstorm
+brainstorm --> issue
+issue --> design
+design --> code
+code --> git
+git --> ci
+ci --> pr
+@enduml
