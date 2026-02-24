@@ -76,6 +76,18 @@ src = "scripts/gh_issues.py"
 dest = ".devcontainer/scripts/gh_issues.py"
 
 [[entries]]
+src = "scripts/resolve-branch.sh"
+dest = ".devcontainer/scripts/resolve-branch.sh"
+
+[[entries]]
+src = "scripts/derive-branch-summary.sh"
+dest = ".devcontainer/scripts/derive-branch-summary.sh"
+
+[[entries]]
+src = "scripts/check-skill-names.sh"
+dest = ".devcontainer/scripts/check-skill-names.sh"
+
+[[entries]]
 src = "justfile.worktree"
 dest = ".devcontainer/justfile.worktree"
 
@@ -84,6 +96,7 @@ src = ".pre-commit-config.yaml"
 transforms = [
   { type = "RemovePrecommitHooks", hook_ids = ["generate-docs"] },
   { type = "Sed", pattern = "bandit -r packages/vig-utils/src/ scripts/ assets/workspace/", replace = "bandit -r src/" },
+  { type = "Sed", pattern = "scripts/check-skill-names.sh", replace = ".devcontainer/scripts/check-skill-names.sh" },
   { type = "ReplaceBlock", start_pattern = "^\\s+args: \\[$", end_pattern = "^\\s+\\]$", replacement = """
         # Optional: customize commit types, scopes, or refs-optional types via CLI arguments.
         # By default, scopes are not enforced. Set --scopes to require specific scopes.

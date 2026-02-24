@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CI Project Checks coverage includes devc_remote_uri tests** ([#70](https://github.com/vig-os/devcontainer/issues/70))
   - Add `tests/test_devc_remote_uri.py` to test-project action pytest run
   - Add build_uri validation tests for empty devcontainer_path, ssh_host, container_workspace
+- **just check uses wrong path — justfile_directory() resolves incorrectly in imported justfile.base** ([#187](https://github.com/vig-os/devcontainer/issues/187))
+  - Replace `dirname(justfile_directory())` with `source_directory()/scripts` to correctly locate version-check.sh in deployed workspaces and devcontainer repo
+  - Regression test: `just check config` runs successfully from workspace
 - **gh-issues CI status deduplicates re-run checks** ([#176](https://github.com/vig-os/devcontainer/issues/176))
   - Deduplicate `statusCheckRollup` by check name, keeping only the latest result (by `completedAt`)
   - CI column now matches GitHub PR page when checks are re-run
@@ -39,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - BATS integration tests for restart, error paths, and checkout detection
 - **Issue numbers in PR table are now clickable hyperlinks** ([#174](https://github.com/vig-os/devcontainer/issues/174))
   - Replace plain styled text with Rich hyperlink markup in the Issues column of the PR table
+- **Synced justfiles reference scripts not included in workspace manifest** ([#190](https://github.com/vig-os/devcontainer/issues/190))
+  - Add manifest entries for resolve-branch.sh, derive-branch-summary.sh, check-skill-names.sh → `.devcontainer/scripts/`
+  - Update justfile.worktree to use `source_directory() / "scripts"` for portable path resolution
+  - Add Sed transform for check-skill-names.sh path in synced `.pre-commit-config.yaml`
 
 ### Changed
 
