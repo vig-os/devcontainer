@@ -149,6 +149,11 @@ def _styled(value: str, style: str) -> str:
     return f"[{style}]{value}[/]"
 
 
+def _gh_link(owner_repo: str, num: int, kind: str) -> str:
+    """Return Rich hyperlink markup for issue or PR number."""
+    return f"[link=https://github.com/{owner_repo}/{kind}/{num}]{num}[/link]"
+
+
 def _extract_label(labels: list[dict], prefix: str) -> str:
     for lbl in labels:
         name = lbl["name"]
@@ -190,6 +195,7 @@ def _format_assignees(assignees: list[dict]) -> str:
 
 
 _CLOSING_RE = re.compile(r"(?:closes|fixes|resolves)\s+#(\d+)", re.IGNORECASE)
+_REFS_RE = re.compile(r"Refs:\s*((?:#\d+(?:\s*,\s*)?)+)", re.IGNORECASE)
 
 
 def _build_cross_refs(
@@ -215,6 +221,10 @@ def _build_cross_refs(
         body = pr.get("body") or ""
         for match in _CLOSING_RE.finditer(body):
             linked.add(int(match.group(1)))
+        refs_match = _REFS_RE.search(body)
+        if refs_match:
+            for m in re.finditer(r"#(\d+)", refs_match.group(1)):
+                linked.add(int(m.group(1)))
 
         for inum in linked:
             issue_to_pr[inum] = pr_num
@@ -230,6 +240,7 @@ def _build_table(
     issue_to_pr: dict[int, int],
     child_to_parent: dict[int, int],
     parent_to_children: dict[int, list[int]],
+    owner_repo: str,
 ) -> Table:
     from rich.table import Table
 
@@ -287,7 +298,7 @@ def _build_table(
             title_text = _styled(f"▸ {title_text}", "bright_cyan")
 
         table.add_row(
-            str(num),
+            _gh_link(owner_repo, num, "issues"),
             _extract_type(labels),
             title_text,
             _format_assignees(issue["assignees"]),
@@ -331,7 +342,7 @@ def _fetch_prs() -> list[dict]:
             "number,title,author,assignees,isDraft,reviewDecision,"
             "baseRefName,headRefName,additions,deletions,changedFiles,"
             "labels,milestone,createdAt,body,"
-            "reviewRequests,latestReviews",
+            "reviewRequests,latestReviews,statusCheckRollup",
         ],
         capture_output=True,
         text=True,
@@ -363,6 +374,40 @@ def _infer_review(pr: dict) -> tuple[str, str]:
     return ("", "—")
 
 
+def _format_ci_status(pr: dict, owner_repo: str) -> str:
+    """Return Rich markup for CI status cell: pass/fail/pending summary with link.
+
+    Uses statusCheckRollup from gh pr list. Links to PR checks tab.
+    Ref: #143
+    """
+    rollup = pr.get("statusCheckRollup") or []
+    if not rollup:
+        return _styled("—", "dim")
+
+    total = len(rollup)
+    passed = sum(1 for c in rollup if c.get("conclusion") == "SUCCESS")
+    failed = sum(1 for c in rollup if c.get("conclusion") in ("FAILURE", "ERROR"))
+    pending = total - passed - failed
+
+    url = f"https://github.com/{owner_repo}/pull/{pr['number']}/checks"
+    link_prefix = f"[link={url}]"
+    link_suffix = "[/link]"
+
+    if failed > 0:
+        failed_names = [
+            c.get("name", "?")
+            for c in rollup
+            if c.get("conclusion") in ("FAILURE", "ERROR")
+        ]
+        text = f"✗ {passed}/{total} {', '.join(failed_names)}"
+        return link_prefix + _styled(text, "red") + link_suffix
+    if pending > 0:
+        text = f"⏳ {passed}/{total}"
+        return link_prefix + _styled(text, "yellow") + link_suffix
+    text = f"✓ {passed}/{total}"
+    return link_prefix + _styled(text, "green") + link_suffix
+
+
 def _extract_reviewers(pr: dict) -> str:
     """Build a compact reviewer string from latestReviews and reviewRequests."""
     seen: dict[str, str] = {}
@@ -385,6 +430,8 @@ def _extract_reviewers(pr: dict) -> str:
             parts.append(_styled(login, "green"))
         elif state == "CHANGES_REQUESTED":
             parts.append(_styled(login, "red"))
+        elif state == "REQUESTED":
+            parts.append(_styled(f"?{login}", "dim italic"))
         else:
             parts.append(_styled(login, "yellow"))
     return " ".join(parts)
@@ -394,6 +441,7 @@ def _build_pr_table(
     title: str,
     prs: list[dict],
     pr_to_issues: dict[int, list[int]],
+    owner_repo: str,
 ) -> Table:
     from rich.table import Table
 
@@ -412,6 +460,7 @@ def _build_pr_table(
     table.add_column("Assignee", no_wrap=True, width=12)
     table.add_column("Issues", no_wrap=True, width=10)
     table.add_column("Branch", no_wrap=True, overflow="ellipsis", max_width=30)
+    table.add_column("CI", no_wrap=True, justify="center", width=14)
     table.add_column("Review", no_wrap=True, justify="center", width=8)
     table.add_column("Reviewer", no_wrap=True, width=12)
     table.add_column("Delta", no_wrap=True, justify="right", width=14)
@@ -439,13 +488,16 @@ def _build_pr_table(
             " ".join(_styled(f"#{n}", "cyan") for n in sorted(linked)) if linked else ""
         )
 
+        ci_cell = _format_ci_status(pr, owner_repo)
+
         table.add_row(
-            str(pr["number"]),
+            _gh_link(owner_repo, pr["number"], "pull"),
             _clean_title(pr["title"]) + draft_marker,
             f"[bright_white]{pr['author']['login']}[/]",
             _format_assignees(pr.get("assignees", [])),
             issues_cell,
             branch,
+            ci_cell,
             review,
             reviewer,
             delta,
@@ -498,6 +550,7 @@ def main() -> int:
                 issue_to_pr,
                 child_to_parent,
                 parent_to_children,
+                owner_repo,
             )
             console.print()
             console.print(table)
@@ -510,6 +563,7 @@ def main() -> int:
                 issue_to_pr,
                 child_to_parent,
                 parent_to_children,
+                owner_repo,
             )
             console.print()
             console.print(table)
@@ -525,6 +579,7 @@ def main() -> int:
             f"[green]▸ Pull Requests[/]  [dim]({len(prs)} open)[/]",
             prs,
             pr_to_issues,
+            owner_repo,
         )
         console.print()
         console.print(table)

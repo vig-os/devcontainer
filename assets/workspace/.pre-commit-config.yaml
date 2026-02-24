@@ -83,6 +83,15 @@ repos:
         files: ^justfile(\..*)?$
         pass_filenames: false
 
+  - repo: local
+    hooks:
+      - id: sync-manifest
+        name: sync-manifest (sync workspace template)
+        entry: bash -c 'uv run python scripts/sync_manifest.py sync assets/workspace/ && git add assets/workspace/ 2>/dev/null || true'
+        language: system
+        pass_filenames: false
+
+  # Typo Linting
   - repo: https://github.com/crate-ci/typos
     rev: 07d900b8fa1097806b8adb6391b0d3e0ac2fdea7  # v1.39.0
     hooks:
@@ -118,17 +127,6 @@ repos:
         types: [python]
         pass_filenames: false
 
-  # Skill directory naming convention
-  - repo: local
-    hooks:
-      - id: check-skill-names
-        name: check-skill-names (enforce naming convention)
-        entry: scripts/check-skill-names.sh .cursor/skills
-        language: script
-        files: ^\.cursor/skills/
-        pass_filenames: false
-
-  # Commit message validation (commit-msg stage)
   - repo: local
     hooks:
       - id: validate-commit-msg
