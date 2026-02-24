@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- **Pipeline phase column in gh-issues dashboard** ([#157](https://github.com/vig-os/devcontainer/issues/157))
+  - Add Phase column to issues table showing pipeline progress (Backlog, Claimed, Design, Planned, In Progress, In Review)
+  - Phase detection from issue comments (`## Design`, `## Implementation Plan`) and branch/PR state
+  - Merge Review+Reviewer columns in PR table into single Review column with icons (`?`, `◎`, `✓`, `✗`)
+
 ### Fixed
 
 - **gh-issues cross-ref detects Refs: #N in PR bodies** ([#121](https://github.com/vig-os/devcontainer/issues/121))

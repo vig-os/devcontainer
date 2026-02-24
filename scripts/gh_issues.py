@@ -33,7 +33,7 @@ def _fetch_issues() -> list[dict]:
     return json.loads(result.stdout)
 
 
-_LINKED_BRANCHES_QUERY = """
+_LINKED_BRANCHES_AND_COMMENTS_QUERY = """
 {
   repository(owner: "%s", name: "%s") {
     issues(states: OPEN, first: 100) {
@@ -42,6 +42,9 @@ _LINKED_BRANCHES_QUERY = """
         linkedBranches(first: 5) {
           nodes { ref { name } }
         }
+        comments(first: 20) {
+          nodes { body }
+        }
       }
     }
   }
@@ -49,8 +52,16 @@ _LINKED_BRANCHES_QUERY = """
 """
 
 
-def _fetch_linked_branches() -> dict[int, str]:
-    """Return {issue_number: branch_name} for issues with a linked branch."""
+def _fetch_linked_branches_and_comments() -> tuple[
+    dict[int, str], dict[int, list[dict]]
+]:
+    """Return (branches, comments) mappings for open issues.
+
+    Returns:
+        Tuple of:
+        - {issue_number: branch_name} for issues with linked branches
+        - {issue_number: [comment_dicts]} for all issues (empty list if no comments)
+    """
     owner_result = subprocess.run(
         ["gh", "repo", "view", "--json", "owner,name"],
         capture_output=True,
@@ -58,7 +69,10 @@ def _fetch_linked_branches() -> dict[int, str]:
         check=True,
     )
     repo_info = json.loads(owner_result.stdout)
-    query = _LINKED_BRANCHES_QUERY % (repo_info["owner"]["login"], repo_info["name"])
+    query = _LINKED_BRANCHES_AND_COMMENTS_QUERY % (
+        repo_info["owner"]["login"],
+        repo_info["name"],
+    )
 
     result = subprocess.run(
         ["gh", "api", "graphql", "-f", f"query={query}"],
@@ -67,16 +81,23 @@ def _fetch_linked_branches() -> dict[int, str]:
         check=True,
     )
     data = json.loads(result.stdout)
-    mapping: dict[int, str] = {}
+    branches: dict[int, str] = {}
+    comments: dict[int, list[dict]] = {}
     for node in data["data"]["repository"]["issues"]["nodes"]:
-        branches = [
+        issue_num = node["number"]
+        # Extract branches
+        branch_nodes = node.get("linkedBranches", {}).get("nodes", [])
+        branch_names = [
             b["ref"]["name"]
-            for b in node["linkedBranches"]["nodes"]
+            for b in branch_nodes
             if b.get("ref") and b["ref"].get("name")
         ]
-        if branches:
-            mapping[node["number"]] = branches[0]
-    return mapping
+        if branch_names:
+            branches[issue_num] = branch_names[0]
+        # Extract comments
+        comment_nodes = node.get("comments", {}).get("nodes", [])
+        comments[issue_num] = [{"body": c.get("body", "")} for c in comment_nodes]
+    return branches, comments
 
 
 def _fetch_sub_issue_tree(
@@ -194,6 +215,75 @@ def _format_assignees(assignees: list[dict]) -> str:
     return ", ".join(f"[bright_white]{a['login']}[/]" for a in assignees)
 
 
+def _has_comment_heading(comments: list[dict], heading: str) -> bool:
+    """Check if any comment contains the specified H2 heading.
+
+    Args:
+        comments: List of comment dicts with 'body' keys.
+        heading: Exact heading text to search for (e.g., "## Design").
+
+    Returns:
+        True if any comment body contains a line starting with the heading.
+    """
+    for comment in comments:
+        body = comment.get("body", "")
+        for line in body.split("\n"):
+            if line.strip() == heading:
+                return True
+    return False
+
+
+def _detect_phase(
+    issue_number: int,
+    comments: list[dict],
+    branches: dict[int, str],
+    issue_to_pr: dict[int, int],
+) -> tuple[str, str]:
+    """Detect pipeline phase for an issue based on comments, branch, and PR state.
+
+    Priority order (highest wins):
+    1. Linked PR exists → "In Review" (bold green)
+    2. Implementation Plan + branch → "In Progress" (green)
+    3. Implementation Plan → "Planned" (yellow)
+    4. Design → "Design" (yellow)
+    5. Branch exists → "Claimed" (cyan)
+    6. None → "Backlog" (dim)
+
+    Args:
+        issue_number: Issue number.
+        comments: List of comment dicts with 'body' keys.
+        branches: Mapping of issue_number to branch name.
+        issue_to_pr: Mapping of issue_number to PR number.
+
+    Returns:
+        Tuple of (phase_label, style) for Rich formatting.
+    """
+    # Priority 1: Linked PR exists
+    if issue_number in issue_to_pr:
+        return ("In Review", "bold green")
+
+    # Priority 2: Implementation Plan + branch
+    has_plan = _has_comment_heading(comments, "## Implementation Plan")
+    has_branch = issue_number in branches
+    if has_plan and has_branch:
+        return ("In Progress", "green")
+
+    # Priority 3: Implementation Plan
+    if has_plan:
+        return ("Planned", "yellow")
+
+    # Priority 4: Design
+    if _has_comment_heading(comments, "## Design"):
+        return ("Design", "yellow")
+
+    # Priority 5: Branch exists
+    if has_branch:
+        return ("Claimed", "cyan")
+
+    # Priority 6: Backlog
+    return ("Backlog", "dim")
+
+
 _CLOSING_RE = re.compile(r"(?:closes|fixes|resolves)\s+#(\d+)", re.IGNORECASE)
 _REFS_RE = re.compile(r"Refs:\s*((?:#\d+(?:\s*,\s*)?)+)", re.IGNORECASE)
 
@@ -241,6 +331,7 @@ def _build_table(
     child_to_parent: dict[int, int],
     parent_to_children: dict[int, list[int]],
     owner_repo: str,
+    comments: dict[int, list[dict]],
 ) -> Table:
     from rich.table import Table
 
@@ -271,6 +362,7 @@ def _build_table(
         max_width=24,
     )
     table.add_column("PR", no_wrap=True, justify="right", width=4)
+    table.add_column("Phase", no_wrap=True, width=11)
     table.add_column("Prio", no_wrap=True, justify="center", width=7)
     table.add_column("Scope", no_wrap=True, width=9)
     table.add_column("Effort", no_wrap=True, justify="center", width=6)
@@ -291,6 +383,12 @@ def _build_table(
         pr_num = issue_to_pr.get(num)
         pr_cell = _styled(f"#{pr_num}", "green") if pr_num else ""
 
+        issue_comments = comments.get(num, [])
+        phase_label, phase_style = _detect_phase(
+            num, issue_comments, branches, issue_to_pr
+        )
+        phase_cell = _styled(phase_label, phase_style)
+
         title_text = _clean_title(issue["title"])
         if indent > 0:
             title_text = _styled(f"└ {title_text}", "dim")
@@ -304,6 +402,7 @@ def _build_table(
             _format_assignees(issue["assignees"]),
             branch,
             pr_cell,
+            phase_cell,
             _extract_label(labels, "priority:"),
             _extract_scope(labels),
             _extract_label(labels, "effort:"),
@@ -437,6 +536,62 @@ def _extract_reviewers(pr: dict) -> str:
     return " ".join(parts)
 
 
+def _format_review(pr: dict) -> str:
+    """Format merged Review+Reviewer column with icons and reviewer names.
+
+    Combines review state and reviewer information into a single column:
+    - Review requested: ?alice (dim)
+    - Commented/pending: ◎bob (yellow)
+    - Approved: ✓carol (green)
+    - Changes requested: ✗dave (red)
+
+    Multiple reviewers are space-separated. If reviewDecision exists but no
+    reviewers are found, show the decision state. Otherwise show individual
+    reviewer states.
+
+    Ref: #157
+    """
+    seen: dict[str, str] = {}
+    # Collect reviewers from latestReviews
+    for r in pr.get("latestReviews") or []:
+        login = (r.get("author") or {}).get("login", "")
+        if login:
+            state = r.get("state", "")
+            seen[login] = state
+    # Add review requests (not already in latestReviews)
+    for r in pr.get("reviewRequests") or []:
+        login = r.get("login") or ""
+        if not login:
+            login = r.get("name") or ""
+        if login and login not in seen:
+            seen[login] = "REQUESTED"
+
+    # If no reviewers but reviewDecision exists, show decision
+    decision = pr.get("reviewDecision") or ""
+    if not seen:
+        if decision == "APPROVED":
+            return _styled("approved", "green")
+        if decision == "CHANGES_REQUESTED":
+            return _styled("changes", "red")
+        if decision == "REVIEW_REQUIRED":
+            return _styled("pending", "yellow")
+        return _styled("—", "dim")
+
+    # Show individual reviewer states
+    parts = []
+    for login, state in seen.items():
+        if state == "APPROVED":
+            parts.append(_styled(f"✓{login}", "green"))
+        elif state == "CHANGES_REQUESTED":
+            parts.append(_styled(f"✗{login}", "red"))
+        elif state == "REQUESTED":
+            parts.append(_styled(f"?{login}", "dim"))
+        else:
+            # COMMENTED or other pending states
+            parts.append(_styled(f"◎{login}", "yellow"))
+    return " ".join(parts)
+
+
 def _build_pr_table(
     title: str,
     prs: list[dict],
@@ -461,18 +616,11 @@ def _build_pr_table(
     table.add_column("Issues", no_wrap=True, width=10)
     table.add_column("Branch", no_wrap=True, overflow="ellipsis", max_width=30)
     table.add_column("CI", no_wrap=True, justify="center", width=14)
-    table.add_column("Review", no_wrap=True, justify="center", width=8)
-    table.add_column("Reviewer", no_wrap=True, width=12)
+    table.add_column("Review", no_wrap=True, width=18)
     table.add_column("Delta", no_wrap=True, justify="right", width=14)
 
     for pr in sorted(prs, key=lambda p: p["number"]):
-        review_state, review_label = _infer_review(pr)
-        style, label = REVIEW_STYLES.get(
-            review_state,
-            ("dim", review_label or "—"),
-        )
-        review = _styled(label, style)
-        reviewer = _extract_reviewers(pr)
+        review_cell = _format_review(pr)
 
         draft_marker = _styled(" draft", "dim italic") if pr.get("isDraft") else ""
 
@@ -498,8 +646,7 @@ def _build_pr_table(
             issues_cell,
             branch,
             ci_cell,
-            review,
-            reviewer,
+            review_cell,
             delta,
         )
     return table
@@ -510,7 +657,7 @@ def main() -> int:
 
     issues = _fetch_issues()
     prs = _fetch_prs()
-    branches = _fetch_linked_branches() if issues else {}
+    branches, comments = _fetch_linked_branches_and_comments() if issues else ({}, {})
     issue_to_pr, pr_to_issues = _build_cross_refs(branches, prs)
 
     owner_result = subprocess.run(
@@ -551,6 +698,7 @@ def main() -> int:
                 child_to_parent,
                 parent_to_children,
                 owner_repo,
+                comments,
             )
             console.print()
             console.print(table)
@@ -564,6 +712,7 @@ def main() -> int:
                 child_to_parent,
                 parent_to_children,
                 owner_repo,
+                comments,
             )
             console.print()
             console.print(table)
