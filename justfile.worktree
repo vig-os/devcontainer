@@ -7,6 +7,14 @@
 # Tracked: https://forum.cursor.com/t/cursor-parallel-agents-in-wsl-devcontainers-misresolve-worktree-paths-and-context/145711
 # ===============================================================================
 
+# ── Aliases — short prefixes for faster typing ──────────────────────────────
+
+alias wt-start := worktree-start
+alias wt-list := worktree-list
+alias wt-attach := worktree-attach
+alias wt-stop := worktree-stop
+alias wt-clean := worktree-clean
+
 # Derive worktree base directory: ../<repo>-worktrees/
 _wt_repo := `basename "$(git rev-parse --show-toplevel)"`
 _wt_base := "../" + _wt_repo + "-worktrees"

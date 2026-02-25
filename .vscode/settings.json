@@ -8,6 +8,11 @@
       "source.fixAll": "explicit"
     }
   },
+  "files.associations": {
+    "justfile": "just",
+    "Justfile": "just",
+    "just.*": "just"
+  },
   "files.exclude": {
     "**/__pycache__": true,
     "**/*.pyc": true,
