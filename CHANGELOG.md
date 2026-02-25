@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Add manifest entries for resolve-branch.sh, derive-branch-summary.sh, check-skill-names.sh → `.devcontainer/scripts/`
   - Update justfile.worktree to use `source_directory() / "scripts"` for portable path resolution
   - Add Sed transform for check-skill-names.sh path in synced `.pre-commit-config.yaml`
+- **Worktree prerequisites are declared in setup requirements** ([#196](https://github.com/vig-os/devcontainer/issues/196))
+  - Add `tmux`, `agent`, and `jq` to `scripts/requirements.yaml` as required host dependencies with install guidance
+  - `scripts/init.sh --check` now surfaces missing worktree prerequisites before running worktree commands
 
 ### Changed
 

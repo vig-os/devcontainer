@@ -15,6 +15,9 @@ This guide explains how to develop, build, test, and release the vigOS developme
 | **git** | >=2.34 | Version control and pre-commit hooks |
 | **ssh** | latest | GitHub authentication and commit signing |
 | **gh** | latest | GitHub CLI for repository and PR/issue management |
+| **jq** | latest | JSON parsing for worktree commands and issue metadata |
+| **tmux** | latest | Session manager required by worktree-start and worktree-attach |
+| **agent** | latest | Cursor Agent CLI required by worktree-start/worktree-attach flows |
 | **npm** | latest | Node.js package manager (for DevContainer CLI) |
 | **uv** | >=0.8 | Python package and project manager |
 | **bats** | 1.13.0 | Bash Automated Testing System for shell script tests |
@@ -25,7 +28,7 @@ This guide explains how to develop, build, test, and release the vigOS developme
 
 ```bash
 sudo apt update
-sudo apt install -y podman git openssh-client nodejs npm parallel
+sudo apt install -y podman git openssh-client jq tmux nodejs npm parallel
 # just
 curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
 
@@ -39,7 +42,7 @@ sudo apt update && sudo apt install -y gh
 **macOS (Homebrew):**
 
 ```bash
-brew install podman just git openssh gh node parallel
+brew install podman just git openssh gh jq tmux node parallel
 ```
 
 - For other Linux distributions, use your package manager (e.g., `dnf`, `yum`, `zypper`, `apk`) to install these dependencies.
@@ -125,14 +128,29 @@ Available recipes:
     clean-test-containers                      # Clean up lingering test containers
 
     [deps]
-    sync                                       # Sync dependencies from pyproject.toml
+    sync                                       # Sync all dependencies (idempotent, fast if nothing changed)
     update                                     # Update all dependencies
+
+    [devcontainer]
+    down                                       # Stop and remove containers
+    logs *args                                 # Tail container logs
+    open                                       # Open Cursor/VS Code attached to the running container
+    restart *args                              # Restart service(s)
+    shell                                      # Open bash in running devcontainer
+    status                                     # Show container status
+    up                                         # Start devcontainer + sidecars via compose
+
+    [git]
+    branch                                     # Show current branch + list recent branches
+    log                                        # Pretty one-line git log (last 20 commits)
 
     [github]
     gh-issues                                  # List open issues and PRs grouped by milestone [alias: gh-i]
 
     [info]
+    check *args                                # Examples: just check, just check config, just check off, just check 7d
     default                                    # Show available commands (default)
+    devcontainer-upgrade                       # This recipe MUST be run from a host terminal, not inside the container
     docs                                       # Generate documentation from templates
     help                                       # Show available commands
     info                                       # Show image information
@@ -164,7 +182,7 @@ Available recipes:
     reset-changelog                            # Reset CHANGELOG Unreleased section (after merging release to dev)
 
     [sidecar]
-    sidecar name *args                         # just sidecar redis flush
+    sidecar name *args                         # Example: just sidecar postgres migrate / just sidecar redis flush
     sidecars                                   # List available sidecar containers
 
     [test]
@@ -181,7 +199,7 @@ Available recipes:
 
     [worktree]
     worktree-attach issue                      # before attaching. See tests/bats/worktree.bats for integration tests. [alias: wt-attach]
-    worktree-clean                             # Remove all cursor-managed worktrees and tmux sessions [alias: wt-clean]
+    worktree-clean mode=""                     # Default (no args): clean only stopped worktrees. Use 'all' to clean everything. [alias: wt-clean]
     worktree-list                              # List active worktrees and their tmux sessions [alias: wt-list]
     worktree-start issue prompt="" reviewer="" # Create a worktree for an issue, open tmux session, launch cursor-agent [alias: wt-start]
     worktree-stop issue                        # Stop a worktree's tmux session and remove the worktree [alias: wt-stop]
