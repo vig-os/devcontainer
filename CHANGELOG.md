@@ -19,10 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Remove stderr suppression so error messages from derive-branch-summary.sh are visible
   - Retry with standard model when lightweight model fails; print manual workaround hint if both fail
   - Add optional MODEL_TIER parameter to derive-branch-summary.sh; BATS test for retry path
-- **validate-commit-msg rejects AI agent identity fingerprints** ([#163](https://github.com/vig-os/devcontainer/issues/163))
-  - Commit-msg hook now rejects commits containing Co-authored-by, cursoragent, cursor.com, claude, codex, chatgpt, copilot
-  - Blocks "Made with [Cursor](https://cursor.com)" and similar branding
-  - Enforced before other validation; applies to full message including subject-only mode
+- **AI agent identity enforcement: blocklist, prepare-commit-msg, author check, PR body scan** ([#163](https://github.com/vig-os/devcontainer/issues/163))
+  - Canonical blocklist `.github/agent-blocklist.toml` (trailers, names, emails) — single source of truth
+  - prepare-commit-msg hook strips Co-authored-by trailers before validation
+  - Pre-commit hook rejects commits when author/committer matches blocklist (skips in CI)
+  - validate-commit-msg accepts `--blocked-patterns` for TOML blocklist; rejects remaining fingerprints
+  - pr-title-check CI scans PR title and body for agent fingerprints
+  - Skill rules strengthened (git_commit, worktree_execute, worktree_pr)
 - **worktree-start preflight gaps — agent hang and gh repo set-default** ([#154](https://github.com/vig-os/devcontainer/issues/154))
   - Add timeout (30s) to agent-based branch summary derivation; failure produces clear error with manual workaround
   - Add gh repo set-default preflight before any gh API calls; auto-resolve from origin or fail with instructions
