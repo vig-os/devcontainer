@@ -174,6 +174,7 @@ RUN set -eux; \
 # Install Python development tools from root pyproject.toml (SSoT)
 # and upgrade pip to fix CVE-2025-8869 (symbolic link extraction vulnerability)
 # vig-utils must be present before uv export because uv.lock references it as a workspace member
+WORKDIR /build
 COPY packages/vig-utils packages/vig-utils
 COPY pyproject.toml uv.lock ./
 RUN uv export --only-group devcontainer --no-emit-project -o /tmp/devcontainer-reqs.txt && \

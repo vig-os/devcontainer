@@ -21,7 +21,7 @@ EXPECTED_VERSIONS = {
     "uv": "0.10.",  # Minor version check (manually installed from latest release)
     "python": "3.12",  # Python (from base image)
     "pre_commit": "4.5.",  # Minor version check (installed via uv pip)
-    "ruff": "0.15.",  # Minor version check (installed via uv pip)
+    "ruff": "0.14.",  # Minor version check (installed via uv pip, matches pyproject)
     "pip_licenses": "5.",  # Major version check (installed via uv pip)
     "just": "1.46.",  # Minor version check (manually installed from latest release)
     "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),
