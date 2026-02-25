@@ -135,8 +135,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `--subject-only` flag for `validate-commit-msg` to validate PR titles without requiring body or Refs
   - `pr-title-check.yml` CI workflow enforces commit message standard on PR titles
   - PR body template includes `Refs: #` placeholder for merge commit traceability
+- **Smoke-test repo bootstrap validation** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - Downstream smoke coverage that bootstraps a workspace from the template and verifies `ci.yml` passes on a real GitHub-hosted runner
+- **`bandit` pre-installed in devcontainer image** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - `bandit[toml]` added to the system Python install in the Containerfile
+- **`pre-commit` pre-installed in CI `setup-env` action** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - Workspace `setup-env` composite action now installs `pre-commit` as a mandatory step so hooks are available in bare-runner CI without a devcontainer
+- **`setup-gh-repo.sh` detaches org default code security configuration** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - On post-create, detach any org-level default security config from the repo to avoid conflicts with the security workflows shipped in the workspace template
+  - Graceful fallback when repo ID cannot be resolved or permissions are insufficient
+- **`init-workspace.sh` runs `just sync` after placeholder replacement** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - Resolves the `uv.lock` for the new project name and installs the project package into the venv during workspace bootstrap
 
 ### Changed
+
+- **Environment variables moved from `docker-compose.yml` into Containerfile `ENV`** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - `PRE_COMMIT_HOME`, `UV_PROJECT_ENVIRONMENT`, and `VIRTUAL_ENV` are now baked into the image so they are available outside of the devcontainer context (e.g. bare-runner CI)
+- **`just sync` installs the project package** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - Removed `--no-install-project` from the `sync` recipe so the workspace project is always installed into the venv
 
 - **Updated update notification message** ([#73](https://github.com/vig-os/devcontainer/issues/73))
   - Fixed misleading `just update` instruction (Python deps, not devcontainer upgrade)
@@ -349,6 +365,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Stale `.github_data/` directory** — 98 files superseded by `docs/issues/` and `docs/pull-requests/` ([#91](https://github.com/vig-os/devcontainer/issues/91))
 
 ### Fixed
+
+- **Workspace bootstrap preserves `README.md` and `CHANGELOG.md`** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - Both files added to `PRESERVE_FILES` in `init-workspace.sh` so project-specific docs survive re-initialization
+- **`just update` now delegates to `just sync`** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - `update` recipe called `uv sync` directly; now calls `@just sync` so any sync customisations (extras, env) are respected
+- **Pre-commit hook entry commands no longer swallow failures** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - `generate-docs` and `sync-manifest` hooks called via `bash -c '... || true'`, masking errors; now call the script directly so hook failures surface correctly
+- **`RemovePrecommitHooks` transform removes empty blocks for any repo type** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - Regex previously only matched `repo: local` blocks; updated to `repo:` so empty third-party repo blocks are also cleaned up after hook removal
 
 - **Sync-issues workflow schedule trigger** ([#91](https://github.com/vig-os/devcontainer/issues/91))
   - `github.event.inputs.target-branch` is null on schedule events, causing `TARGET_BRANCH` to resolve to `refs/heads/` (404 in commit-action)
