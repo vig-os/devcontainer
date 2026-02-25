@@ -136,10 +136,13 @@ setup() {
 }
 
 @test "detect_editor_cli fails when neither cursor nor code in PATH" {
-    # Use env -i for clean environment; minimal PATH has no cursor/code
-    run env -i PATH="/usr/bin:/bin" HOME="$HOME" "$DEVC_REMOTE" myserver 2>&1
+    local empty_path
+    empty_path="$(mktemp -d)"
+    # Run via /bin/bash so script execution does not depend on PATH/shebang lookup
+    run env -i PATH="$empty_path" HOME="$HOME" /bin/bash "$DEVC_REMOTE" myserver 2>&1
     assert_failure
     assert_output --partial "Neither cursor nor code"
+    rm -rf "$empty_path"
 }
 
 # ── check_ssh ────────────────────────────────────────────────────────────────
