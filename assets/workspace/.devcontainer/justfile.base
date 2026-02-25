@@ -51,7 +51,7 @@ sync:
 [group('deps')]
 update:
     uv lock --upgrade
-    uv sync
+    @just sync
 
 # -------------------------------------------------------------------------------
 # BUILD
