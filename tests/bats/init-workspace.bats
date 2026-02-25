@@ -30,6 +30,7 @@ setup() {
 @test "init-workspace.sh guards against nested template_project on re-run" {
     run grep -A4 'if \[\[ -d.*src/template_project' "$INIT_WORKSPACE_SH"
     assert_success
+    # shellcheck disable=SC2016
     assert_output --partial 'src/${SHORT_NAME}'
     assert_output --partial 'rm -rf'
 }
