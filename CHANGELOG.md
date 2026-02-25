@@ -53,6 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Add manifest entries for resolve-branch.sh, derive-branch-summary.sh, check-skill-names.sh → `.devcontainer/scripts/`
   - Update justfile.worktree to use `source_directory() / "scripts"` for portable path resolution
   - Add Sed transform for check-skill-names.sh path in synced `.pre-commit-config.yaml`
+- **Devcontainer lifecycle commands fail in mock-up folders with crun getcwd error** ([#204](https://github.com/vig-os/devcontainer/issues/204))
+  - Run post-create, post-start, and post-attach commands via `/bin/bash` in `devcontainer.json` for stable command resolution on attach
+  - Prevent attach-time failure where OCI runtime reports `getcwd: No such file or directory`
+  - Update tests in `test-integration.py`
 
 ### Changed
 
