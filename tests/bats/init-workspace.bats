@@ -28,7 +28,7 @@ setup() {
 # ── idempotent rename guard (#197) ───────────────────────────────────────────
 
 @test "init-workspace.sh guards against nested template_project on re-run" {
-    run grep -A2 'if \[\[ -d.*src/template_project' "$INIT_WORKSPACE_SH"
+    run grep -A4 'if \[\[ -d.*src/template_project' "$INIT_WORKSPACE_SH"
     assert_success
     assert_output --partial 'src/${SHORT_NAME}'
     assert_output --partial 'rm -rf'

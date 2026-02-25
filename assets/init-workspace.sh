@@ -254,8 +254,13 @@ fi
 
 # Rename template_project directory to match project short name
 if [[ -d "$WORKSPACE_DIR/src/template_project" ]]; then
-    echo "Renaming src/template_project to src/${SHORT_NAME}..."
-    mv "$WORKSPACE_DIR/src/template_project" "$WORKSPACE_DIR/src/${SHORT_NAME}"
+    if [[ -d "$WORKSPACE_DIR/src/${SHORT_NAME}" ]] && [[ "$SHORT_NAME" != "template_project" ]]; then
+        echo "Removing duplicate src/template_project (src/${SHORT_NAME} already exists)..."
+        rm -rf "$WORKSPACE_DIR/src/template_project"
+    else
+        echo "Renaming src/template_project to src/${SHORT_NAME}..."
+        mv "$WORKSPACE_DIR/src/template_project" "$WORKSPACE_DIR/src/${SHORT_NAME}"
+    fi
 fi
 
 # Update test imports to use actual project name (template_project -> $SHORT_NAME)
