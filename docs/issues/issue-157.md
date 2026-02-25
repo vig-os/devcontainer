@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-02-22T09:52:12Z
-updated: 2026-02-24T00:00:23Z
+updated: 2026-02-24T18:52:08Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/157
@@ -12,7 +12,7 @@ assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-24T04:24:09.464Z
+synced: 2026-02-25T04:25:57.516Z
 ---
 
 # [Issue 157]: [[FEATURE] Show pipeline phase (progress) per issue in gh-issues dashboard](https://github.com/vig-os/devcontainer/issues/157)
@@ -210,11 +210,11 @@ _Posted on February 23, 2026 at 11:58 PM_
 - [ ] Manual smoke test: `just gh-issues` to verify Phase column renders correctly
 
 ### Acceptance Criteria
-- [x] Phase column renders in issue table with color-coded phase label
-- [x] Phase detection covers: Backlog, Claimed, Design, Planned, In Progress, In Review
-- [x] At least Review+Reviewer column merge implemented in PR table
-- [x] No information loss from column consolidation
-- [x] TDD compliance (tests written first, then implementation)
+- [ ] Phase column renders in issue table with color-coded phase label
+- [ ] Phase detection covers: Backlog, Claimed, Design, Planned, In Progress, In Review
+- [ ] At least Review+Reviewer column merge implemented in PR table
+- [ ] No information loss from column consolidation
+- [ ] TDD compliance (tests written first, then implementation)
 
 
 ---
