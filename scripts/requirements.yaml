@@ -98,6 +98,51 @@ dependencies:
       fedora: sudo dnf install -y gh
       manual: https://cli.github.com/
 
+  # JSON processor (required by worktree trust/config commands)
+  - name: jq
+    version: latest
+    purpose: JSON parsing for worktree commands and issue metadata
+    required: true
+    check:
+      command: command -v jq
+      version_command: jq --version
+      version_regex: 'jq-(\d+\.\d+)'
+    install:
+      macos: brew install jq
+      debian: sudo apt install -y jq
+      fedora: sudo dnf install -y jq
+      alpine: sudo apk add jq
+      manual: https://jqlang.github.io/jq/download/
+
+  # Terminal multiplexer (required by worktree tmux sessions)
+  - name: tmux
+    version: latest
+    purpose: Session manager required by worktree-start and worktree-attach
+    required: true
+    check:
+      command: command -v tmux
+      version_command: tmux -V
+      version_regex: 'tmux (\d+\.\d+)'
+    install:
+      macos: brew install tmux
+      debian: sudo apt install -y tmux
+      fedora: sudo dnf install -y tmux
+      alpine: sudo apk add tmux
+      manual: https://github.com/tmux/tmux/wiki/Installing
+
+  # Cursor agent CLI (required by worktree autonomous flows)
+  - name: agent
+    version: latest
+    purpose: Cursor Agent CLI required by worktree-start/worktree-attach flows
+    required: true
+    check:
+      command: command -v agent
+      version_command: agent --version
+      version_regex: '([0-9]+\.[0-9]+\.[0-9]+)'
+    install:
+      all: curl https://cursor.com/install -fsSL | bash
+      manual: https://cursor.com/install
+
   # Node.js (for devcontainer CLI)
   - name: npm
     version: latest
