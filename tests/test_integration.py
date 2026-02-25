@@ -599,21 +599,18 @@ class TestDevContainerDockerCompose:
         )
         assert isinstance(service["environment"], list), "environment should be a list"
 
-        # Check for environment variable overrides
-        # (PYTHONUNBUFFERED and IN_CONTAINER are in Containerfile, not here)
+        # Check for runtime-only environment variable overrides
+        # (PRE_COMMIT_HOME, UV_PROJECT_ENVIRONMENT, VIRTUAL_ENV, PYTHONUNBUFFERED,
+        #  IN_CONTAINER are set in the image via Containerfile ENV)
         env_vars = {
             item.split("=")[0]: item.split("=")[1] if "=" in item else None
             for item in service["environment"]
         }
 
-        assert "PRE_COMMIT_HOME" in env_vars, (
-            "PRE_COMMIT_HOME environment variable not found"
+        assert "CONTAINER_HOST" in env_vars, (
+            "CONTAINER_HOST environment variable not found"
         )
-        # PRE_COMMIT_HOME points to pre-built cache in container image
-        # (not project-local, to enable instant pre-commit without downloads)
-        assert env_vars["PRE_COMMIT_HOME"] == "/opt/pre-commit-cache", (
-            f"PRE_COMMIT_HOME should point to pre-built cache, got: {env_vars['PRE_COMMIT_HOME']}"
-        )
+        assert "DOCKER_HOST" in env_vars, "DOCKER_HOST environment variable not found"
 
     def test_docker_compose_yml_command(self, initialized_workspace):
         """Test that docker-compose.yml has command configured."""
@@ -775,9 +772,9 @@ class TestDevContainerUserConf:
 
         content = lock_file.read_text()
 
-        assert "template-project" not in content and "template_project" not in content, (
-            "uv.lock still references template-project after init"
-        )
+        assert (
+            "template-project" not in content and "template_project" not in content
+        ), "uv.lock still references template-project after init"
 
         assert "test-project" in content or "test_project" in content, (
             "uv.lock does not reference the project 'test_project' after init\n"
@@ -822,7 +819,7 @@ class TestDevContainerUserConf:
             f"{activate_path} does not contain 'test_project'; "
             "should be renamed to project short name during container init (e.g. post-create)"
         )
-    
+
     def test_conf_directory_files(self, devcontainer_up):
         """Test that .devcontainer/.conf contains all expected files."""
         workspace_path = str(devcontainer_up.resolve())

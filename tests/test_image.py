@@ -258,14 +258,17 @@ PYPROJECT_EOF"""
             assert result.rc == 0, f"Failed to create pyproject.toml: {result.stderr}"
 
             # Step 2: Run uv sync (should create .venv by default)
-            result = host.run(f"cd {test_dir} && uv sync")
+            # Unset UV_PROJECT_ENVIRONMENT so uv creates a local .venv
+            result = host.run(f"cd {test_dir} && UV_PROJECT_ENVIRONMENT= uv sync")
             assert result.rc == 0, f"uv sync failed: {result.stderr}"
             assert host.file(lockfile_path).exists, "uv.lock file was not created"
             assert host.file(venv_path).is_directory, ".venv directory was not created"
 
             # Step 3: Run uv add with a lightweight package (typing-extensions is very lightweight)
             package_name = "typing-extensions"
-            result = host.run(f"cd {test_dir} && uv add {package_name}")
+            result = host.run(
+                f"cd {test_dir} && UV_PROJECT_ENVIRONMENT= uv add {package_name}"
+            )
             assert result.rc == 0, f"uv add {package_name} failed: {result.stderr}"
 
             # Verify package was added to pyproject.toml
@@ -275,13 +278,13 @@ PYPROJECT_EOF"""
             )
 
             # Step 4: Run uv sync again
-            result = host.run(f"cd {test_dir} && uv sync")
+            result = host.run(f"cd {test_dir} && UV_PROJECT_ENVIRONMENT= uv sync")
             assert result.rc == 0, f"Second uv sync failed: {result.stderr}"
 
             # Verify the package is installed in venv (not system-wide)
             # Use uv run to execute in the venv context
             result = host.run(
-                f"cd {test_dir} && uv run python -c 'import {package_name.replace('-', '_')}; print(\"OK\")'"
+                f"cd {test_dir} && UV_PROJECT_ENVIRONMENT= uv run python -c 'import {package_name.replace('-', '_')}; print(\"OK\")'"
             )
             assert result.rc == 0, (
                 f"{package_name} is not importable in venv after uv sync"
