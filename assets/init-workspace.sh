@@ -268,6 +268,10 @@ echo "Setting executable permissions on shell scripts and hooks..."
 find "$WORKSPACE_DIR" -type f -name "*.sh" -exec chmod +x {} \;
 find "$WORKSPACE_DIR/.githooks" -type f -exec chmod +x {} \; 2>/dev/null || true
 
+# Sync dependencies: resolves uv.lock for the new project name and installs the project
+echo "Syncing dependencies..."
+cd "$WORKSPACE_DIR"
+just sync
 
 echo "Workspace initialized successfully!"
 echo ""
