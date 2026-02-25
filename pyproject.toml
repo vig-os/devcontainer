@@ -97,6 +97,10 @@ omit = [
     "tests/*",
     "assets/*",
     "**/__init__.py",
+    # CLI scripts with subprocess/API calls — not yet unit-tested (see #99)
+    "scripts/gh_issues.py",
+    "scripts/sync_manifest.py",
+    "scripts/transforms.py",
 ]
 
 [tool.coverage.report]
