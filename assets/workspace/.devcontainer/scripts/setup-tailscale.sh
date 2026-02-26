@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# Tailscale SSH setup for devcontainer — opt-in via TAILSCALE_AUTHKEY env var.
+#
+# Subcommands:
+#   install  — install Tailscale (called from post-create.sh, runs once)
+#   start    — start tailscaled + tailscale up --ssh (called from post-start.sh, runs every start)
+#
+# Both subcommands are silent no-ops when TAILSCALE_AUTHKEY is unset or empty.
+
+set -euo pipefail
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+require_authkey() {
+    if [ -z "${TAILSCALE_AUTHKEY:-}" ]; then
+        echo "Tailscale: TAILSCALE_AUTHKEY not set, skipping."
+        return 1
+    fi
+    return 0
+}
+
+resolve_hostname() {
+    if [ -n "${TAILSCALE_HOSTNAME:-}" ]; then
+        echo "$TAILSCALE_HOSTNAME"
+        return
+    fi
+
+    local project="devc"
+    local devc_json
+    devc_json="$(dirname "${BASH_SOURCE[0]}")/../devcontainer.json"
+    if [ -f "$devc_json" ]; then
+        local name
+        name=$(python3 -c "import json,sys; print(json.load(sys.stdin).get('name',''))" < "$devc_json" 2>/dev/null || true)
+        if [ -n "$name" ]; then
+            project="${name%-devc}"
+        fi
+    fi
+
+    echo "${project}-devc-$(hostname -s)"
+}
+
+# ── subcommands ──────────────────────────────────────────────────────────────
+
+cmd_install() {
+    require_authkey || return 0
+
+    if command -v tailscale &>/dev/null; then
+        echo "Tailscale: already installed, skipping install."
+        return 0
+    fi
+
+    echo "Tailscale: installing..."
+    curl -fsSL https://tailscale.com/install.sh | sh
+    echo "Tailscale: install complete."
+}
+
+cmd_start() {
+    require_authkey || return 0
+
+    local hostname
+    hostname=$(resolve_hostname)
+
+    echo "Tailscale: starting (hostname=$hostname)..."
+
+    if ! pgrep -x tailscaled &>/dev/null; then
+        tailscaled --tun=userspace-networking --state=/var/lib/tailscale/tailscaled.state &
+        sleep 2
+    fi
+
+    if tailscale up --ssh --authkey="$TAILSCALE_AUTHKEY" --hostname="$hostname"; then
+        echo "Tailscale: connected as $hostname"
+    else
+        echo "Tailscale: WARNING — failed to connect. Container still usable via devcontainer protocol." >&2
+    fi
+}
+
+# ── main ─────────────────────────────────────────────────────────────────────
+
+case "${1:-}" in
+    install) cmd_install ;;
+    start)   cmd_start ;;
+    *)
+        echo "Usage: $(basename "$0") {install|start}" >&2
+        exit 1
+        ;;
+esac
