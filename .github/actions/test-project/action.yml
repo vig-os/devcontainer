@@ -95,6 +95,7 @@ runs:
       run: |
         uv run pytest \
           tests/test_utils.py \
+          tests/test_devc_remote_uri.py \
           tests/test_gh_issues.py \
           packages/vig-utils/tests \
           --cov --cov-report=term-missing --cov-report=xml \

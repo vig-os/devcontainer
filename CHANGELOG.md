@@ -9,9 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CI Project Checks coverage includes devc_remote_uri tests** ([#70](https://github.com/vig-os/devcontainer/issues/70))
+  - Add `tests/test_devc_remote_uri.py` to test-project action pytest run
+  - Add build_uri validation tests for empty devcontainer_path, ssh_host, container_workspace
+- **just gh-issues fails locally — rich not in .venv dependencies** ([#159](https://github.com/vig-os/devcontainer/issues/159))
+  - Add `devcontainer` dependency group in root `pyproject.toml` as SSoT for container tools (rich, pre-commit, ruff, pip-licenses)
+  - Container build installs from pyproject.toml via `uv export --only-group devcontainer` instead of hardcoding
+  - Add rich to workspace template dev group; change justfile.gh to `uv run python` so both local and container use project venv
 - **just check uses wrong path — justfile_directory() resolves incorrectly in imported justfile.base** ([#187](https://github.com/vig-os/devcontainer/issues/187))
   - Replace `dirname(justfile_directory())` with `source_directory()/scripts` to correctly locate version-check.sh in deployed workspaces and devcontainer repo
   - Regression test: `just check config` runs successfully from workspace
+- **Container image missing bandit and check-skill-names.sh for workspace pre-commit hooks** ([#186](https://github.com/vig-os/devcontainer/issues/186))
+  - Add bandit to system-wide pip install in Containerfile
+  - Deploy scripts/check-skill-names.sh to workspace template via manifest
 - **gh-issues CI status deduplicates re-run checks** ([#176](https://github.com/vig-os/devcontainer/issues/176))
   - Deduplicate `statusCheckRollup` by check name, keeping only the latest result (by `completedAt`)
   - CI column now matches GitHub PR page when checks are re-run
@@ -46,9 +56,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Add manifest entries for resolve-branch.sh, derive-branch-summary.sh, check-skill-names.sh → `.devcontainer/scripts/`
   - Update justfile.worktree to use `source_directory() / "scripts"` for portable path resolution
   - Add Sed transform for check-skill-names.sh path in synced `.pre-commit-config.yaml`
+- **Devcontainer lifecycle commands fail in mock-up folders with crun getcwd error** ([#204](https://github.com/vig-os/devcontainer/issues/204))
+  - Run post-create, post-start, and post-attach commands via `/bin/bash` in `devcontainer.json` for stable command resolution on attach
+  - Prevent attach-time failure where OCI runtime reports `getcwd: No such file or directory`
+  - Update tests in `test-integration.py`
 - **Worktree prerequisites are declared in setup requirements** ([#196](https://github.com/vig-os/devcontainer/issues/196))
   - Add `tmux`, `agent`, and `jq` to `scripts/requirements.yaml` as required host dependencies with install guidance
   - `scripts/init.sh --check` now surfaces missing worktree prerequisites before running worktree commands
+- **Cursor Agent shell fails with forkpty(3) when host sets zsh as default terminal profile** ([#206](https://github.com/vig-os/devcontainer/issues/206))
+  - Add `terminal.integrated.defaultProfile.linux: "bash"` to devcontainer.json template settings
+  - Prevents user's host-side shell preference from leaking into the container
 
 ### Changed
 
@@ -86,6 +103,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **devc-remote.sh — bash orchestrator for remote devcontainer** ([#152](https://github.com/vig-os/devcontainer/issues/152))
+  - `scripts/devc-remote.sh`: parse_args, detect_editor_cli, check_ssh, remote_preflight, remote_compose_up, open_editor
+  - `scripts/devc_remote_uri.py`: stub for URI construction (sibling sub-issue)
+  - BATS unit tests with mocked commands
+- **devc_remote_uri.py — Cursor URI construction for remote devcontainers** ([#153](https://github.com/vig-os/devcontainer/issues/153))
+  - Standalone Python module with `hex_encode()` and `build_uri()` for vscode-remote URIs
+  - CLI: `devc_remote_uri.py <workspace_path> <ssh_host> <container_workspace>` prints URI to stdout
+  - Stdlib only (json, argparse); called by devc-remote.sh (sibling sub-issue)
 - **Devcontainer and git recipes in justfile.base** ([#71](https://github.com/vig-os/devcontainer/issues/71))
   - Devcontainer group (host-side only): `up`, `down`, `status`, `logs`, `shell`, `restart`, `open`
   - Auto-detect podman/docker compose; graceful failure if run inside container

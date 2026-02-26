@@ -132,6 +132,7 @@ Available recipes:
     update                                     # Update all dependencies
 
     [devcontainer]
+    devc-remote *args                          # just devc-remote --repo git@github.com:org/repo.git myserver
     down                                       # Stop and remove containers
     logs *args                                 # Tail container logs
     open                                       # Open Cursor/VS Code attached to the running container

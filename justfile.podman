@@ -16,6 +16,7 @@ alias pdm-rmi-project := podman-rmi-project
 alias pdm-rmi-dangling := podman-rmi-dangling
 alias pdm-prune := podman-prune
 alias pdm-prune-all := podman-prune-all
+alias pdm-push-ssh := podman-push-ssh
 
 # List containers/images (--all for all podman resources)
 [group('podman')]
@@ -181,3 +182,19 @@ podman-prune-all:
     echo "Cleaning Pruning all unused podman resources (including volumes)..."
     podman system prune -af --volumes
     echo "[OK] Full prune complete"
+
+# Push a local image to a remote machine over SSH (no registry needed)
+[group('podman')]
+podman-push-ssh image host:
+    #!/usr/bin/env bash
+    if ! podman image exists "{{ image }}" 2>/dev/null; then
+        echo "[ERROR] Image '{{ image }}' not found locally"
+        exit 1
+    fi
+    if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "{{ host }}" true 2>/dev/null; then
+        echo "[ERROR] Cannot connect to '{{ host }}' over SSH"
+        exit 1
+    fi
+    echo "Pushing '{{ image }}' to {{ host }} over SSH..."
+    podman image save "{{ image }}" | ssh "{{ host }}" podman image load
+    echo "[OK] Image '{{ image }}' pushed to {{ host }}"

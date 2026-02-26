@@ -32,4 +32,5 @@ packages = ["src/{{SHORT_NAME}}"]
 [dependency-groups]
 dev = [
     "hatchling>=1.25",
+    "rich>=13.0.0",
 ]

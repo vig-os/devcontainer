@@ -75,6 +75,10 @@ src = "justfile.gh"
 dest = ".devcontainer/justfile.gh"
 
 [[entries]]
+src = "scripts/check-skill-names.sh"
+dest = "scripts/check-skill-names.sh"
+
+[[entries]]
 src = "scripts/gh_issues.py"
 dest = ".devcontainer/scripts/gh_issues.py"
 
@@ -89,6 +93,18 @@ dest = ".devcontainer/scripts/derive-branch-summary.sh"
 [[entries]]
 src = "scripts/check-skill-names.sh"
 dest = ".devcontainer/scripts/check-skill-names.sh"
+
+[[entries]]
+src = "scripts/setup-labels.sh"
+dest = "scripts/setup-labels.sh"
+
+[[entries]]
+src = "scripts/devc-remote.sh"
+dest = "scripts/devc-remote.sh"
+
+[[entries]]
+src = "scripts/devc_remote_uri.py"
+dest = "scripts/devc_remote_uri.py"
 
 [[entries]]
 src = "scripts/prepare-commit-msg-strip-trailers.py"

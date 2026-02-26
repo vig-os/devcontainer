@@ -366,4 +366,17 @@ sidecar name *args:
     fi
 
     # Execute the recipe in the sidecar
-    podman exec {{ name }} just {{ args }}
+    podman exec {{name}} just {{args}}
+
+# -------------------------------------------------------------------------------
+# REMOTE DEVCONTAINER
+# -------------------------------------------------------------------------------
+
+# Start a devcontainer on a remote host and open Cursor/VS Code
+# Auto-clones the repo and runs init-workspace if needed
+# Usage: just devc-remote myserver
+#        just devc-remote myserver:/home/user/repo
+#        just devc-remote --repo git@github.com:org/repo.git myserver
+[group('devcontainer')]
+devc-remote *args:
+    bash scripts/devc-remote.sh {{args}}
