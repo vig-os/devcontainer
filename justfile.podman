@@ -189,12 +189,47 @@ podman-push-ssh image host:
     #!/usr/bin/env bash
     if ! podman image exists "{{ image }}" 2>/dev/null; then
         echo "[ERROR] Image '{{ image }}' not found locally"
+        FMT_REPO=$(printf '\x7b\x7b.Repository\x7d\x7d')
+        FMT_TAG=$(printf '\x7b\x7b.Tag\x7d\x7d')
+        CANDIDATES=$(podman images --format "${FMT_REPO}:${FMT_TAG}" 2>/dev/null \
+            | grep -v '<none>' \
+            | awk -v q="{{ image }}" '
+                BEGIN { IGNORECASE=1 }
+                {
+                    s = tolower($0); t = tolower(q)
+                    # exact substring match ranks highest
+                    if (index(s, t) > 0)       { print 1, $0; next }
+                    # check if every query char appears in order (fuzzy)
+                    pos = 0; match_len = 0
+                    for (i = 1; i <= length(t); i++) {
+                        c = substr(t, i, 1)
+                        found = 0
+                        for (j = pos + 1; j <= length(s); j++) {
+                            if (substr(s, j, 1) == c) { pos = j; match_len++; found = 1; break }
+                        }
+                        if (!found) break
+                    }
+                    if (match_len == length(t)) { print 2, $0 }
+                }
+            ' | sort -t' ' -k1,1n | head -5 | cut -d' ' -f2-)
+        if [ -n "$CANDIDATES" ]; then
+            echo ""
+            echo "Did you mean one of these?"
+            echo "$CANDIDATES" | while read -r c; do echo "  - $c"; done
+        fi
         exit 1
     fi
     if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "{{ host }}" true 2>/dev/null; then
         echo "[ERROR] Cannot connect to '{{ host }}' over SSH"
         exit 1
     fi
-    echo "Pushing '{{ image }}' to {{ host }} over SSH..."
-    podman image save "{{ image }}" | ssh "{{ host }}" podman image load
+    FMT_SIZE=$(printf '\x7b\x7b.Size\x7d\x7d')
+    IMAGE_SIZE=$(podman image inspect "{{ image }}" --format "$FMT_SIZE" 2>/dev/null)
+    HUMAN_SIZE=$(numfmt --to=iec "$IMAGE_SIZE" 2>/dev/null || echo "${IMAGE_SIZE} bytes")
+    echo "Pushing '{{ image }}' ($HUMAN_SIZE) to {{ host }} over SSH..."
+    if command -v pv &>/dev/null && [ -n "$IMAGE_SIZE" ]; then
+        podman image save "{{ image }}" | pv -s "$IMAGE_SIZE" -F "%b/$HUMAN_SIZE %t %r %p %e" | ssh "{{ host }}" podman image load
+    else
+        podman image save "{{ image }}" | ssh "{{ host }}" podman image load
+    fi
     echo "[OK] Image '{{ image }}' pushed to {{ host }}"
