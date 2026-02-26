@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Container image missing bandit and check-skill-names.sh for workspace pre-commit hooks** ([#186](https://github.com/vig-os/devcontainer/issues/186))
+  - Add bandit to system-wide pip install in Containerfile
+  - Deploy scripts/check-skill-names.sh to workspace template via manifest
 - **just check uses wrong path — justfile_directory() resolves incorrectly in imported justfile.base** ([#187](https://github.com/vig-os/devcontainer/issues/187))
   - Replace `dirname(justfile_directory())` with `source_directory()/scripts` to correctly locate version-check.sh in deployed workspaces and devcontainer repo
   - Regression test: `just check config` runs successfully from workspace

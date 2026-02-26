@@ -75,6 +75,10 @@ src = "justfile.gh"
 dest = ".devcontainer/justfile.gh"
 
 [[entries]]
+src = "scripts/check-skill-names.sh"
+dest = "scripts/check-skill-names.sh"
+
+[[entries]]
 src = "scripts/gh_issues.py"
 dest = ".devcontainer/scripts/gh_issues.py"
 

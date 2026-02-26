@@ -177,7 +177,8 @@ RUN uv pip install --system \
     pre-commit \
     rich \
     ruff \
-    pip-licenses && \
+    pip-licenses \
+    bandit && \
     uv pip install --system --upgrade pip
 
 # Copy vig-utils package and install system-wide
