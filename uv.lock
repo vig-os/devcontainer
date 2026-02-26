@@ -165,9 +165,16 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-docker" },
     { name = "pytest-testinfra" },
+    { name = "rich" },
     { name = "ruff" },
     { name = "testcontainers" },
     { name = "vig-utils" },
+]
+devcontainer = [
+    { name = "pip-licenses" },
+    { name = "pre-commit" },
+    { name = "rich" },
+    { name = "ruff" },
 ]
 lint = [
     { name = "bandit" },
@@ -207,9 +214,16 @@ dev = [
     { name = "pytest-cov", specifier = ">=6.0" },
     { name = "pytest-docker", specifier = ">=3.2.3" },
     { name = "pytest-testinfra", specifier = ">=10.2.2" },
+    { name = "rich", specifier = ">=13.0.0" },
     { name = "ruff", specifier = ">=0.14.3" },
     { name = "testcontainers", specifier = ">=4.9.0" },
     { name = "vig-utils", editable = "packages/vig-utils" },
+]
+devcontainer = [
+    { name = "pip-licenses", specifier = ">=5.0.0" },
+    { name = "pre-commit", specifier = ">=4.3.0" },
+    { name = "rich", specifier = ">=13.0.0" },
+    { name = "ruff", specifier = ">=0.14.3" },
 ]
 lint = [
     { name = "bandit", extras = ["toml"], specifier = ">=1.7.5" },

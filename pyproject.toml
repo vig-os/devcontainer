@@ -16,8 +16,15 @@ dependencies = [
 [dependency-groups]
 dev = [
     "vig-utils",
+    {include-group = "devcontainer"},
     {include-group = "lint"},
     {include-group = "test"},
+]
+devcontainer = [
+    "rich>=13.0.0",
+    "pre-commit>=4.3.0",
+    "ruff>=0.14.3",
+    "pip-licenses>=5.0.0",
 ]
 lint = [
     "pre-commit>=4.3.0",
@@ -90,6 +97,10 @@ omit = [
     "tests/*",
     "assets/*",
     "**/__init__.py",
+    # CLI scripts with subprocess/API calls — not yet unit-tested (see #99)
+    "scripts/gh_issues.py",
+    "scripts/sync_manifest.py",
+    "scripts/transforms.py",
 ]
 
 [tool.coverage.report]
