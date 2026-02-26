@@ -35,6 +35,9 @@ sed -i 's/template-project/{{SHORT_NAME}}/g' /root/assets/workspace/.venv/bin/ac
 echo "Syncing dependencies..."
 just --justfile "$PROJECT_ROOT/justfile" --working-directory "$PROJECT_ROOT" sync
 
+# Tailscale SSH (opt-in: no-op when TAILSCALE_AUTHKEY is unset)
+"$SCRIPT_DIR/setup-tailscale.sh" install
+
 # User specific setup
 # Add your custom setup commands here to install any dependencies or tools needed for your project
 
