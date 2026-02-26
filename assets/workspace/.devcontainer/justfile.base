@@ -73,7 +73,7 @@ clean-artifacts:
 [group('info')]
 check *args:
     #!/usr/bin/env bash
-    SCRIPT_DIR="$(cd "$(dirname "{{justfile_directory()}}")/.devcontainer/scripts" && pwd)" || {
+    SCRIPT_DIR="$(cd "{{source_directory()}}/scripts" && pwd)" || {
         echo "Error: Could not locate .devcontainer/scripts directory"
         exit 1
     }

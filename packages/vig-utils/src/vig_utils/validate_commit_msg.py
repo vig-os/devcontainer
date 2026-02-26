@@ -16,6 +16,7 @@ Examples:
     validate-commit-msg .git/COMMIT_EDITMSG --refs-optional-types chore,build
     validate-commit-msg .git/COMMIT_EDITMSG --types feat,fix --scopes api,cli --refs-optional-types chore
     validate-commit-msg .git/COMMIT_EDITMSG --scopes api,cli,utils --require-scope
+    validate-commit-msg .git/COMMIT_EDITMSG --blocked-patterns .github/agent-blocklist.toml
 """
 
 from __future__ import annotations
@@ -24,6 +25,9 @@ import argparse
 import re
 import sys
 from pathlib import Path
+
+from vig_utils.agent_blocklist import contains_agent_fingerprint as check_blocklist
+from vig_utils.agent_blocklist import load_blocklist
 
 # Default approved commit types (single source of truth; keep in sync with COMMIT_MESSAGE_STANDARD.md)
 DEFAULT_APPROVED_TYPES = frozenset[str](
@@ -43,6 +47,28 @@ DEFAULT_APPROVED_TYPES = frozenset[str](
 
 # Default types where the Refs line is optional (maintenance commits that may not relate to an issue)
 DEFAULT_REFS_OPTIONAL_TYPES = frozenset[str]({"chore"})
+
+# Fallback agent fingerprints when --blocked-patterns not provided (Refs: #163)
+_AGENT_FINGERPRINT_PATTERNS: list[tuple[str, int]] = [
+    (r"Co-authored-by", re.IGNORECASE),
+    (r"cursoragent", re.IGNORECASE),
+    (r"cursor\.com", re.IGNORECASE),
+    (r"\bclaude\b", re.IGNORECASE),
+    (r"\bcodex\b", re.IGNORECASE),
+    (r"\bchatgpt\b", re.IGNORECASE),
+    (r"\bcopilot\b", re.IGNORECASE),
+]
+_AGENT_FINGERPRINT_PATTERNS_COMPILED = [
+    re.compile(pattern, flags) for pattern, flags in _AGENT_FINGERPRINT_PATTERNS
+]
+
+
+def _contains_agent_fingerprint_fallback(content: str) -> bool:
+    """Check if content contains AI agent identity fingerprints (hardcoded fallback)."""
+    for pattern_re in _AGENT_FINGERPRINT_PATTERNS_COMPILED:
+        if pattern_re.search(content):
+            return True
+    return False
 
 
 # Build regex patterns dynamically based on approved types and optional refs types
@@ -83,6 +109,7 @@ def validate_commit_message(
     refs_optional_types: frozenset[str] | None = None,
     require_scope: bool = False,
     subject_only: bool = False,
+    blocked_patterns: dict | None = None,
 ) -> tuple[bool, str | None]:
     """Validate a commit message string.
 
@@ -94,6 +121,7 @@ def validate_commit_message(
         require_scope: If True, at least one scope is mandatory. Defaults to False.
         subject_only: If True, validate only the subject line (type, scope, description).
             Skips blank-line, body, and Refs validation. Useful for PR title checks.
+        blocked_patterns: Blocklist dict from agent_blocklist.load_blocklist(). If None, uses hardcoded fallback.
 
     Returns:
         (True, None) if valid.
@@ -112,6 +140,21 @@ def validate_commit_message(
         return (
             False,
             "require_scope=True requires approved_scopes to be configured.",
+        )
+
+    # Reject agent identity fingerprints (Refs: #163)
+    if blocked_patterns:
+        match = check_blocklist(content, blocked_patterns)
+        if match:
+            return (
+                False,
+                f"Commit message contains blocked AI agent fingerprint: '{match}'. Remove agent identity from commit.",
+            )
+    elif _contains_agent_fingerprint_fallback(content):
+        return (
+            False,
+            "Commit message contains AI agent fingerprint (e.g. Co-authored-by, "
+            "cursoragent, claude). Remove agent identity from commit.",
         )
 
     subject_pattern, ref_pattern, issue_ref_pattern = _build_patterns(approved_types)
@@ -258,6 +301,12 @@ def main() -> int:
         action="store_true",
         help="Validate only the subject line (skip body and Refs). Useful for PR title validation.",
     )
+    parser.add_argument(
+        "--blocked-patterns",
+        type=Path,
+        default=None,
+        help="Path to agent blocklist TOML (e.g. .github/agent-blocklist.toml). If not provided, uses built-in fallback.",
+    )
 
     args = parser.parse_args()
 
@@ -287,6 +336,10 @@ def main() -> int:
         print(f"File not found: {path}", file=sys.stderr)
         return 2
 
+    blocked_patterns = None
+    if args.blocked_patterns and args.blocked_patterns.exists():
+        blocked_patterns = load_blocklist(args.blocked_patterns)
+
     content = path.read_text(encoding="utf-8", errors="replace")
     valid, error = validate_commit_message(
         content,
@@ -295,6 +348,7 @@ def main() -> int:
         refs_optional_types=refs_optional_types,
         require_scope=args.require_scope,
         subject_only=args.subject_only,
+        blocked_patterns=blocked_patterns,
     )
     if valid:
         return 0

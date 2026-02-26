@@ -18,17 +18,7 @@ Create a pull request **without user interaction**. This is the worktree variant
 
 ## Workflow Steps
 
-### 1. Ensure clean state
-
-```bash
-git status
-git fetch origin
-```
-
-- If there are uncommitted changes, commit them first.
-- Push the branch: `git push -u origin HEAD`
-
-### 2. Determine base branch
+### 1. Determine base branch
 
 Detect whether this issue is a sub-issue and resolve the correct merge target:
 
@@ -49,6 +39,23 @@ Detect whether this issue is a sub-issue and resolve the correct merge target:
    - If the parent has no linked branch, fall back to `dev`.
 
 4. If no parent exists, use `dev` as `<base_branch>`.
+
+### 2. Ensure clean state
+
+```bash
+git status
+git fetch origin
+```
+
+- If there are uncommitted changes, commit them first.
+- **Merge the base branch** before pushing:
+
+```bash
+  git merge origin/<base_branch>
+  ```
+
+**Conflict handling:** If merge conflicts occur, list the conflicting files and invoke [worktree_ask](../worktree_ask/SKILL.md) to post a question on the issue asking for help resolving the conflict. Do not push until conflicts are resolved.
+- Push the branch: `git push -u origin HEAD`
 
 ### 3. Gather context
 
@@ -116,7 +123,7 @@ The reviewer is the person who launched the worktree (their gh user login), not 
 
 The following steps SHOULD be delegated to reduce token consumption:
 
-- **Steps 1-2** (precondition check, ensure clean state, determine base branch): Spawn a Task subagent with `model: "fast"` that validates the branch name, runs `git status`/`git fetch`, pushes the branch, checks for a parent issue via `gh api`, resolves the base branch. Returns: issue number, base branch name, clean state confirmation.
+- **Steps 1-2** (precondition check, determine base branch, ensure clean state): Spawn a Task subagent with `model: "fast"` that validates the branch name, checks for a parent issue via `gh api`, resolves the base branch, runs `git status`/`git fetch`, merges `origin/<base_branch>`, and pushes. Returns: issue number, base branch name, clean state confirmation. On merge conflict, the subagent must invoke worktree_ask and return without pushing.
 - **Step 3** (gather context): Spawn a Task subagent with `model: "fast"` that executes `git log`, `git diff`, `gh issue view` and returns the raw outputs. Returns: commit log, diff stat, issue title/body.
 - **Steps 6-7** (create PR, clean up): Spawn a Task subagent with `model: "fast"` that takes the PR title and body file path, executes `gh pr create`, deletes the draft file, and returns the PR URL.
 
@@ -129,4 +136,4 @@ Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
 - Never block for user review of the PR text. Generate the best text from available context.
 - Base branch is auto-detected: parent issue's branch for sub-issues, `dev` otherwise.
 - The PR title should follow commit message conventions: `type(scope): description (#issue)`.
-- **NEVER add 'Co-authored-by: Cursor <cursoragent@cursor.com>'** to commit messages.
+- Never add Co-authored-by trailers. Never set git author/committer to an AI agent identity. Never mention AI agent names in commit messages or PR descriptions. The pre-commit hooks will reject violations.
