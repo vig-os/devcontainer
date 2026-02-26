@@ -282,31 +282,3 @@ clean-test-containers:
 import 'justfile.podman'
 import 'justfile.gh'
 import 'justfile.worktree'
-
-# ===============================================================================
-# ALIASES — short prefixes for faster typing
-# ===============================================================================
-# podman -> pdm
-
-alias pdm-ps := podman-ps
-alias pdm-kill := podman-kill
-alias pdm-kill-all := podman-kill-all
-alias pdm-kill-project := podman-kill-project
-alias pdm-rmi := podman-rmi
-alias pdm-rmi-all := podman-rmi-all
-alias pdm-rmi-project := podman-rmi-project
-alias pdm-rmi-dangling := podman-rmi-dangling
-alias pdm-prune := podman-prune
-alias pdm-prune-all := podman-prune-all
-
-# worktree -> wt
-
-alias wt-start := worktree-start
-alias wt-list := worktree-list
-alias wt-attach := worktree-attach
-alias wt-stop := worktree-stop
-alias wt-clean := worktree-clean
-
-# github -> gh (already short, but single-char saves a hyphen)
-
-alias gh-i := gh-issues
