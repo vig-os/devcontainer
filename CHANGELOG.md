@@ -57,6 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Run post-create, post-start, and post-attach commands via `/bin/bash` in `devcontainer.json` for stable command resolution on attach
   - Prevent attach-time failure where OCI runtime reports `getcwd: No such file or directory`
   - Update tests in `test-integration.py`
+- **Cursor Agent shell fails with forkpty(3) when host sets zsh as default terminal profile** ([#206](https://github.com/vig-os/devcontainer/issues/206))
+  - Add `terminal.integrated.defaultProfile.linux: "bash"` to devcontainer.json template settings
+  - Prevents user's host-side shell preference from leaking into the container
 
 ### Changed
 
