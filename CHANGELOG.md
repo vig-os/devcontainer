@@ -63,6 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Worktree prerequisites are declared in setup requirements** ([#196](https://github.com/vig-os/devcontainer/issues/196))
   - Add `tmux`, `agent`, and `jq` to `scripts/requirements.yaml` as required host dependencies with install guidance
   - `scripts/init.sh --check` now surfaces missing worktree prerequisites before running worktree commands
+- **Cursor Agent shell fails with forkpty(3) when host sets zsh as default terminal profile** ([#206](https://github.com/vig-os/devcontainer/issues/206))
+  - Add `terminal.integrated.defaultProfile.linux: "bash"` to devcontainer.json template settings
+  - Prevents user's host-side shell preference from leaking into the container
 
 ### Changed
 
