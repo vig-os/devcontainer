@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-23T22:59:55Z
-updated: 2026-02-24T18:00:36Z
+updated: 2026-02-25T10:38:13Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/163
-comments: 3
+comments: 4
 labels: bug, area:workflow, effort:small, semver:patch
 assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-25T04:25:56.343Z
+synced: 2026-02-26T04:22:25.755Z
 ---
 
 # [Issue 163]: [[BUG] Wrong identity tags in commits & PR messages](https://github.com/vig-os/devcontainer/issues/163)
@@ -214,4 +214,12 @@ _Posted on February 24, 2026 at 06:00 PM_
 - Verify: vig-utils tests pass (271), lint passes
 - PR: https://github.com/vig-os/devcontainer/pull/194
 - CI: pending
+
+---
+
+# [Comment #4]() by [c-vigo]()
+
+_Posted on February 25, 2026 at 10:37 AM_
+
+@gerchowl The fix does not seem consistent. PRs #200 and #201 do not mention Cursor, but the commit messages do, e.g. 6d9dca5
 

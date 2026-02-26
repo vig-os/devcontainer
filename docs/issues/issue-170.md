@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-02-24T10:13:03Z
-updated: 2026-02-24T12:42:49Z
+updated: 2026-02-25T09:56:55Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/170
@@ -12,7 +12,7 @@ assignees: c-vigo
 milestone: Backlog
 projects: none
 relationship: none
-synced: 2026-02-25T04:25:55.708Z
+synced: 2026-02-26T04:22:25.130Z
 ---
 
 # [Issue 170]: [[FEATURE] Bootstrap smoke-test repo with bare-runner CI](https://github.com/vig-os/devcontainer/issues/170)
@@ -61,6 +61,6 @@ Added
 - [x] Public repo `vig-os/devcontainer-smoke-test` exists
 - [x] Workspace is deployed from the current template with placeholders resolved
 - [x] Branch model (dev/main) is set up
-- [ ] `ci.yml` passes on a PR to dev (lint, test, security jobs)
-- [ ] `repository_dispatch` listener workflow exists (stub)
-- [ ] TDD compliance (see .cursor/rules/tdd.mdc)
+- [x] `ci.yml` passes on a PR to dev (lint, test, security jobs)
+- [x] `repository_dispatch` listener workflow exists (stub)
+- [x] TDD compliance (see .cursor/rules/tdd.mdc)
