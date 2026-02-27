@@ -177,6 +177,7 @@ RUN uv pip install --system \
     pre-commit \
     rich \
     ruff \
+    bandit[toml] \
     pip-licenses && \
     uv pip install --system --upgrade pip
 
@@ -227,6 +228,9 @@ WORKDIR /workspace
 # Set environment variables
 ENV PYTHONUNBUFFERED="1"
 ENV IN_CONTAINER="true"
+ENV PRE_COMMIT_HOME="/opt/pre-commit-cache"
+ENV UV_PROJECT_ENVIRONMENT="/root/assets/workspace/.venv"
+ENV VIRTUAL_ENV="/root/assets/workspace/.venv"
 
 # Create aliases for pre-commit
 RUN echo 'alias precommit="pre-commit run"' >> /root/.bashrc

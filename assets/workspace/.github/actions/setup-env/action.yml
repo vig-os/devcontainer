@@ -1,6 +1,6 @@
 # Composite action to set up the CI environment
 #
-# Installs Python, uv, and optionally syncs project dependencies and installs:
+# Installs Python, uv, pre-commit, and optionally syncs project dependencies and installs:
 # - Podman (for container operations)
 # - Node.js (for JS tooling)
 # - Devcontainer CLI + docker-compose wrapper (for integration tests)
@@ -41,7 +41,7 @@
 #       install-devcontainer-cli: 'true'
 
 name: 'Setup Environment'
-description: 'Set up CI environment with Python, uv, and optional tools (podman, Node.js, devcontainer CLI, BATS)'
+description: 'Set up CI environment with Python, uv, pre-commit, and optional tools (podman, Node.js, devcontainer CLI, BATS)'
 
 inputs:
   sync-dependencies:
@@ -95,6 +95,11 @@ runs:
         enable-cache: true
         # Install a specific version of uv.
         version: "0.10.0"
+
+    # ── pre-commit ───────────────────────────────────────────────────────────
+    - name: Install pre-commit
+      shell: bash
+      run: python -m pip install --upgrade pre-commit
 
     # ── Python dependencies ───────────────────────────────────────────────
     - name: Sync Python dependencies

@@ -599,21 +599,18 @@ class TestDevContainerDockerCompose:
         )
         assert isinstance(service["environment"], list), "environment should be a list"
 
-        # Check for environment variable overrides
-        # (PYTHONUNBUFFERED and IN_CONTAINER are in Containerfile, not here)
+        # Check for runtime-only environment variable overrides
+        # (PRE_COMMIT_HOME, UV_PROJECT_ENVIRONMENT, VIRTUAL_ENV, PYTHONUNBUFFERED,
+        #  IN_CONTAINER are set in the image via Containerfile ENV)
         env_vars = {
             item.split("=")[0]: item.split("=")[1] if "=" in item else None
             for item in service["environment"]
         }
 
-        assert "PRE_COMMIT_HOME" in env_vars, (
-            "PRE_COMMIT_HOME environment variable not found"
+        assert "CONTAINER_HOST" in env_vars, (
+            "CONTAINER_HOST environment variable not found"
         )
-        # PRE_COMMIT_HOME points to pre-built cache in container image
-        # (not project-local, to enable instant pre-commit without downloads)
-        assert env_vars["PRE_COMMIT_HOME"] == "/opt/pre-commit-cache", (
-            f"PRE_COMMIT_HOME should point to pre-built cache, got: {env_vars['PRE_COMMIT_HOME']}"
-        )
+        assert "DOCKER_HOST" in env_vars, "DOCKER_HOST environment variable not found"
 
     def test_docker_compose_yml_command(self, initialized_workspace):
         """Test that docker-compose.yml has command configured."""
@@ -759,6 +756,30 @@ class TestDevContainerGit:
 
 class TestDevContainerUserConf:
     """Test that user configuration files are set up."""
+
+    def test_project_installed_after_init(self, initialized_workspace):
+        """Regression: uv.lock must reference the actual project name after init.
+
+        init-workspace.sh runs `just sync` which calls `uv sync --all-extras`.
+        This resolves the lock file for the renamed project and installs it.
+
+        Before the fix, init did not sync, so uv.lock still referenced
+        template-project. The first `uv run pre-commit run -a` would then
+        mutate the venv and rewrite uv.lock.
+        """
+        lock_file = initialized_workspace / "uv.lock"
+        assert lock_file.exists(), "uv.lock not found after init"
+
+        content = lock_file.read_text()
+
+        assert (
+            "template-project" not in content and "template_project" not in content
+        ), "uv.lock still references template-project after init"
+
+        assert "test-project" in content or "test_project" in content, (
+            "uv.lock does not reference the project 'test_project' after init\n"
+            f"Lock file content (first 500 chars): {content[:500]}"
+        )
 
     def test_venv_prompt_name(self, devcontainer_up):
         """Test that .venv/bin/activate in the image does not contain 'template-project', but is renamed to `test_project`."""

@@ -48,9 +48,6 @@ src = ".github/pull_request_template.md"
 src = ".github/ISSUE_TEMPLATE/"
 
 [[entries]]
-src = ".github/actions/setup-env/"
-
-[[entries]]
 src = ".github/dependabot.yml"
 transforms = [
   { type = "RemoveBlock", start_pattern = "^\\s+# Docker", end_pattern = "^$" },
@@ -109,8 +106,20 @@ dest = ".devcontainer/justfile.worktree"
 [[entries]]
 src = ".pre-commit-config.yaml"
 transforms = [
-  { type = "RemovePrecommitHooks", hook_ids = ["generate-docs"] },
+  { type = "RemovePrecommitHooks", hook_ids = [
+    "hadolint-docker",
+    "generate-docs",
+    "sync-manifest",
+    "pip-licenses",
+    "check-action-pins",
+    "bandit",
+    "check-skill-names",
+    "prepare-commit-msg-strip-trailers",
+    "check-agent-identity",
+    "validate-commit-msg",
+  ] },
   { type = "Sed", pattern = "bandit -r packages/vig-utils/src/ scripts/ assets/workspace/", replace = "bandit -r src/" },
+  { type = "StripTrailingBlankLines" },
   { type = "Sed", pattern = "scripts/check-skill-names.sh", replace = ".devcontainer/scripts/check-skill-names.sh" },
   { type = "Sed", pattern = "scripts/prepare-commit-msg-strip-trailers.py", replace = ".devcontainer/scripts/prepare-commit-msg-strip-trailers.py" },
   { type = "Sed", pattern = "scripts/check-agent-identity.py", replace = ".devcontainer/scripts/check-agent-identity.py" },
