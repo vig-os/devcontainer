@@ -339,6 +339,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `assets/workspace/.pre-commit-config.yaml` now ships with explicit `args` instead of commented-out examples
   - Default args enable type enforcement, scope enforcement with `--require-scope`, and `chore` refs exemption
   - Link to `vig-utils` README added as a comment above the hook for discoverability
+- **Refresh pinned Python base image digest** ([#213](https://github.com/vig-os/devcontainer/issues/213))
+  - Update `python:3.12-slim-bookworm` pinned digest in `Containerfile` to the latest upstream value while keeping the same tag
 
 ### Deprecated
 
@@ -446,6 +448,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Container build fails when resolving latest cargo-binstall via GitHub API** ([#154](https://github.com/vig-os/devcontainer/issues/154))
   - Resolve the latest cargo-binstall version from the `releases/latest` redirect URL instead of `api.github.com` to avoid HTTP 22 failures during image build
   - Add an explicit empty-version guard so the build fails with a clear error message if version resolution fails
+- **CI python security scan fails on unsatisfiable safety pin** ([#213](https://github.com/vig-os/devcontainer/issues/213))
+  - Bump workflow `safety` install pin from `3.2.11` to `3.7.0` in both root and workspace-template CI workflows so `uv pip install` resolves successfully again
 
 ### Security
 
@@ -467,6 +471,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-commit hook repos pinned to commit SHAs** ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Workflow permissions hardened** with least-privilege principle and explicit token scoping ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Input sanitization** — inline expression interpolation replaced with environment variables in workflow run blocks to prevent injection ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **Update vulnerable Python dependencies** ([#88](https://github.com/vig-os/devcontainer/issues/88))
+  - Add uv constraints for transitive dependencies: `urllib3>=2.6.3`, `filelock>=3.20.3`, and `virtualenv>=20.36.1`
+  - Regenerate `uv.lock` with patched resolutions (`urllib3 2.6.3`, `filelock 3.25.0`, `virtualenv 21.1.0`)
 
 ## [0.2.1](https://github.com/vig-os/devcontainer/releases/tag/0.2.1) - 2026-01-28
 
