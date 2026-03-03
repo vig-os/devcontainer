@@ -51,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Worktree prerequisites are declared in setup requirements** ([#196](https://github.com/vig-os/devcontainer/issues/196))
   - Add `tmux`, `agent`, and `jq` to `scripts/requirements.yaml` as required host dependencies with install guidance
   - `scripts/init.sh --check` now surfaces missing worktree prerequisites before running worktree commands
+- **--force preserves excluded files by relying on rsync-only copy path** ([#212](https://github.com/vig-os/devcontainer/issues/212))
+  - Remove the `cp` fallback path that could overwrite preserved files during force upgrades
 
 ### Changed
 
