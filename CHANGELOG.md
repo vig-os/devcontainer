@@ -339,6 +339,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `assets/workspace/.pre-commit-config.yaml` now ships with explicit `args` instead of commented-out examples
   - Default args enable type enforcement, scope enforcement with `--require-scope`, and `chore` refs exemption
   - Link to `vig-utils` README added as a comment above the hook for discoverability
+- **Refresh pinned Python base image digest** ([#213](https://github.com/vig-os/devcontainer/issues/213))
+  - Update `python:3.12-slim-bookworm` pinned digest in `Containerfile` to the latest upstream value while keeping the same tag
 
 ### Deprecated
 
