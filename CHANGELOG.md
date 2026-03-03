@@ -448,6 +448,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Container build fails when resolving latest cargo-binstall via GitHub API** ([#154](https://github.com/vig-os/devcontainer/issues/154))
   - Resolve the latest cargo-binstall version from the `releases/latest` redirect URL instead of `api.github.com` to avoid HTTP 22 failures during image build
   - Add an explicit empty-version guard so the build fails with a clear error message if version resolution fails
+- **CI python security scan fails on unsatisfiable safety pin** ([#213](https://github.com/vig-os/devcontainer/issues/213))
+  - Bump workflow `safety` install pin from `3.2.11` to `3.7.0` in both root and workspace-template CI workflows so `uv pip install` resolves successfully again
 
 ### Security
 
