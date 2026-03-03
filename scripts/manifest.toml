@@ -109,11 +109,17 @@ dest = ".devcontainer/justfile.worktree"
 [[entries]]
 src = ".pre-commit-config.yaml"
 transforms = [
-  { type = "RemovePrecommitHooks", hook_ids = ["generate-docs"] },
-  { type = "Sed", pattern = "bandit -r packages/vig-utils/src/ scripts/ assets/workspace/", replace = "bandit -r src/" },
-  { type = "Sed", pattern = "scripts/check-skill-names.sh", replace = ".devcontainer/scripts/check-skill-names.sh" },
-  { type = "Sed", pattern = "scripts/prepare-commit-msg-strip-trailers.py", replace = ".devcontainer/scripts/prepare-commit-msg-strip-trailers.py" },
-  { type = "Sed", pattern = "scripts/check-agent-identity.py", replace = ".devcontainer/scripts/check-agent-identity.py" },
+  { type = "RemovePrecommitHooks", hook_ids = [
+    "generate-docs",
+    "sync-manifest",
+    "pip-licenses",
+    "check-action-pins",
+    "check-skill-names",
+    "prepare-commit-msg-strip-trailers",
+    "check-agent-identity",
+    "validate-commit-msg",
+    "hadolint-docker",
+  ] },
   { type = "ReplaceBlock", start_pattern = "^\\s+args: \\[$", end_pattern = "^\\s+\\]$", replacement = """
         # Optional: customize commit types, scopes, or refs-optional types via CLI arguments.
         # By default, scopes are not enforced. Set --scopes to require specific scopes.
@@ -122,5 +128,7 @@ transforms = [
         #   args: ["--scopes", "api,cli,utils"]
         #   args: ["--refs-optional-types", "chore"]
         #   args: ["--types", "feat,fix,docs", "--scopes", "api,cli,utils", "--refs-optional-types", "chore"]
-""" }
+""" },
+  { type = "Sed", pattern = "-r packages/vig-utils/src/ scripts/ assets/workspace/ ", replace = "-r src/ " },
+  { type = "StripTrailingBlankLines" },
 ]
