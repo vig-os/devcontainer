@@ -28,6 +28,7 @@ EXPECTED_VERSIONS = {
     "typstyle": "0.14.",  # Minor version check (installed from latest release)
     "vig_utils": "0.1.",  # Minor version check (installed via uv pip)
     "tmux": "3.3",  # Major.minor version check (from apt package)
+    "rsync": "3.2",  # Major.minor version check (from apt package)
 }
 
 
@@ -183,6 +184,19 @@ class TestSystemTools:
         expected = EXPECTED_VERSIONS["tmux"]
         assert expected in result.stdout, (
             f"Expected tmux {expected}, got: {result.stdout}"
+        )
+
+    def test_rsync_installed(self, host):
+        """Test that rsync is installed."""
+        assert host.package("rsync").is_installed, "rsync is not installed"
+
+    def test_rsync_version(self, host):
+        """Test that rsync version is correct."""
+        result = host.run("rsync --version")
+        assert result.rc == 0, "rsync --version failed"
+        expected = EXPECTED_VERSIONS["rsync"]
+        assert expected in result.stdout, (
+            f"Expected rsync {expected}, got: {result.stdout}"
         )
 
     def test_tmux_detached_session_survives(self, host):
