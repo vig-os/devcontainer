@@ -70,6 +70,18 @@ Step 3 (handle failures) should remain in the main agent as it requires debuggin
 
 Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
 
+## Delegation
+
+The following steps SHOULD be delegated to reduce token consumption:
+
+- **Step 1** (precondition check, run verification): Spawn a Task subagent with `model: "fast"` that validates the branch name and executes `just test`, `just lint`, `just precommit`. Returns: exit codes, stdout/stderr for each command.
+- **Step 2** (analyze results): Spawn a Task subagent with `model: "fast"` that parses the command outputs, counts failures/warnings, and formats the structured verification report. Returns: pass/fail status per check, formatted report.
+- **Step 4** (invoke next skill): Can remain in main agent (simple skill invocation).
+
+Step 3 (handle failures) should remain in the main agent as it requires debugging and code fixes.
+
+Reference: [subagent-delegation rule](../../rules/subagent-delegation.mdc)
+
 ## Important Notes
 
 - Never claim "done" without running the commands in this session.

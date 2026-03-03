@@ -97,6 +97,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `--subject-only` flag for `validate-commit-msg` to validate PR titles without requiring body or Refs
   - `pr-title-check.yml` CI workflow enforces commit message standard on PR titles
   - PR body template includes `Refs: #` placeholder for merge commit traceability
+- **Smoke-test repo bootstrap validation** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - Downstream smoke coverage that bootstraps a workspace from the template and verifies `ci.yml` passes on a real GitHub-hosted runner
+- **`bandit` pre-installed in devcontainer image** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - `bandit[toml]` added to the system Python install in the Containerfile
+- **`pre-commit` pre-installed in CI `setup-env` action** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - Workspace `setup-env` composite action now installs `pre-commit` as a mandatory step so hooks are available in bare-runner CI without a devcontainer
+- **`setup-gh-repo.sh` detaches org default code security configuration** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - On post-create, detach any org-level default security config from the repo to avoid conflicts with the security workflows shipped in the workspace template
+  - Graceful fallback when repo ID cannot be resolved or permissions are insufficient
+- **`init-workspace.sh` runs `just sync` after placeholder replacement** ([#170](https://github.com/vig-os/devcontainer/issues/170))
+  - Resolves the `uv.lock` for the new project name and installs the project package into the venv during workspace bootstrap
 
 ### Changed
 

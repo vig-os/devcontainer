@@ -88,9 +88,18 @@ repos:
     hooks:
       - id: generate-docs
         name: generate-docs (regenerate from templates)
-        entry: bash -c 'uv run python docs/generate.py && git add README.md CONTRIBUTE.md TESTING.md 2>/dev/null || true'
+        entry: uv run python docs/generate.py
         language: system
         files: ^(docs/templates/.*\.j2|docs/narrative/.*\.md|scripts/requirements\.yaml|justfile)$
+        pass_filenames: false
+
+  # Workspace sync (keep assets/workspace in sync with manifest)
+  - repo: local
+    hooks:
+      - id: sync-manifest
+        name: sync-manifest
+        entry: uv run python scripts/sync_manifest.py sync assets/workspace/
+        language: system
         pass_filenames: false
 
   # Typo Linting
