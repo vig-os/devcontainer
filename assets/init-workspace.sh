@@ -25,6 +25,9 @@ PRESERVE_FILES=(
     ".devcontainer/docker-compose.local.yaml"
     "README.md"
     "CHANGELOG.md"
+    "LICENSE"
+    ".github/CODEOWNERS"
+    "justfile.project"
 )
 
 # Get script directory for manifest location
@@ -205,25 +208,10 @@ for preserved in "${PRESERVE_FILES[@]}"; do
     fi
 done
 
-# Use rsync if available, otherwise cp
 # Note: Excluding .venv - it is used directly from the container image
 # via UV_PROJECT_ENVIRONMENT environment variable (set in docker-compose.yml)
 # Pre-commit cache is now at /opt/pre-commit-cache (not in assets/workspace)
-if command -v rsync &> /dev/null; then
-    rsync -av --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
-else
-    # Fallback to cp with proper handling (less precise, may overwrite preserved files)
-    echo "Warning: rsync not available, preserved files may be overwritten"
-    for item in "$TEMPLATE_DIR"/*; do
-        [[ -e "$item" ]] || continue
-        cp -r "$item" "$WORKSPACE_DIR/" 2>/dev/null || true
-    done
-    for item in "$TEMPLATE_DIR"/.[!.]*; do
-        [[ -e "$item" ]] || continue
-        [[ "$(basename "$item")" == ".venv" ]] && continue
-        cp -r "$item" "$WORKSPACE_DIR/" 2>/dev/null || true
-    done
-fi
+rsync -av --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
 
 # Replace placeholders in files (using pre-built manifest from image)
 echo "Replacing placeholders in files..."

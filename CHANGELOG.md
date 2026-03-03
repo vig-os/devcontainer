@@ -7,87 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-### Fixed
-
-- **install.sh is not idempotent — creates nested src/template_project on second run** ([#197](https://github.com/vig-os/devcontainer/issues/197))
-  - Guard template_project rename: if `src/${SHORT_NAME}` already exists, remove the redundant copy instead of moving it inside
-- **just check uses wrong path — justfile_directory() resolves incorrectly in imported justfile.base** ([#187](https://github.com/vig-os/devcontainer/issues/187))
-  - Replace `dirname(justfile_directory())` with `source_directory()/scripts` to correctly locate version-check.sh in deployed workspaces and devcontainer repo
-  - Regression test: `just check config` runs successfully from workspace
-- **gh-issues CI status deduplicates re-run checks** ([#176](https://github.com/vig-os/devcontainer/issues/176))
-  - Deduplicate `statusCheckRollup` by check name, keeping only the latest result (by `completedAt`)
-  - CI column now matches GitHub PR page when checks are re-run
-- **worktree-start swallows derive-branch-summary error messages** ([#183](https://github.com/vig-os/devcontainer/issues/183))
-  - Remove stderr suppression so error messages from derive-branch-summary.sh are visible
-  - Retry with standard model when lightweight model fails; print manual workaround hint if both fail
-  - Add optional MODEL_TIER parameter to derive-branch-summary.sh; BATS test for retry path
-- **AI agent identity enforcement: blocklist, prepare-commit-msg, author check, PR body scan** ([#163](https://github.com/vig-os/devcontainer/issues/163))
-  - Canonical blocklist `.github/agent-blocklist.toml` (trailers, names, emails) — single source of truth
-  - prepare-commit-msg hook strips Co-authored-by trailers before validation
-  - Pre-commit hook rejects commits when author/committer matches blocklist (skips in CI)
-  - validate-commit-msg accepts `--blocked-patterns` for TOML blocklist; rejects remaining fingerprints
-  - pr-title-check CI scans PR title and body for agent fingerprints
-  - Skill rules strengthened (git_commit, worktree_execute, worktree_pr)
-- **worktree-start preflight gaps — agent hang and gh repo set-default** ([#154](https://github.com/vig-os/devcontainer/issues/154))
-  - Add timeout (30s) to agent-based branch summary derivation; failure produces clear error with manual workaround
-  - Add gh repo set-default preflight before any gh API calls; auto-resolve from origin or fail with instructions
-  - Extract derive-branch-summary.sh with BRANCH_SUMMARY_CMD mock for tests; BATS tests for timeout and error paths
-- **gh-issues cross-ref detects Refs: #N in PR bodies** ([#121](https://github.com/vig-os/devcontainer/issues/121))
-  - `_build_cross_refs` now parses `Refs: #102` and comma-separated variants (`Refs: #102, #103`) alongside Closes/Fixes/Resolves
-- **PR table Reviewer column distinguishes requested vs completed reviewers** ([#105](https://github.com/vig-os/devcontainer/issues/105))
-  - Requested reviewers (no review yet) display as `?login` with dim italic style
-  - Actual reviewers (submitted review) display as plain login with green/red
-- **worktree-attach restarts stopped tmux session when worktree dir exists** ([#132](https://github.com/vig-os/devcontainer/issues/132))
-  - Detect when worktree directory exists but tmux session has terminated
-  - Automatically restart session in existing worktree before attaching
-  - Guard `worktree-start` against branches already checked out elsewhere with an informative error
-  - BATS integration tests for restart, error paths, and checkout detection
-- **Issue numbers in PR table are now clickable hyperlinks** ([#174](https://github.com/vig-os/devcontainer/issues/174))
-  - Replace plain styled text with Rich hyperlink markup in the Issues column of the PR table
-- **Synced justfiles reference scripts not included in workspace manifest** ([#190](https://github.com/vig-os/devcontainer/issues/190))
-  - Add manifest entries for resolve-branch.sh, derive-branch-summary.sh, check-skill-names.sh → `.devcontainer/scripts/`
-  - Update justfile.worktree to use `source_directory() / "scripts"` for portable path resolution
-  - Add Sed transform for check-skill-names.sh path in synced `.pre-commit-config.yaml`
-- **Worktree prerequisites are declared in setup requirements** ([#196](https://github.com/vig-os/devcontainer/issues/196))
-  - Add `tmux`, `agent`, and `jq` to `scripts/requirements.yaml` as required host dependencies with install guidance
-  - `scripts/init.sh --check` now surfaces missing worktree prerequisites before running worktree commands
-
-### Changed
-
-- **worktree-clean: add filter mode for stopped-only vs all** ([#158](https://github.com/vig-os/devcontainer/issues/158))
-  - Default `just worktree-clean` (no args) now cleans only stopped worktrees, skips running tmux sessions
-  - `just worktree-clean all` retains previous behavior (clean all worktrees) with warning
-  - Summary output shows cleaned vs skipped worktrees
-  - `just wt-clean` alias unchanged
-- **Consolidate sync_manifest.py and utils.py into manifest-as-config architecture** ([#89](https://github.com/vig-os/devcontainer/issues/89))
-  - Extract transform classes (Sed, RemoveLines, etc.) to `scripts/transforms.py`
-  - Unify sed logic: `substitute_in_file()` in utils shared by sed_inplace and Sed transform
-  - Convert MANIFEST from Python code to declarative `scripts/manifest.toml`
-- **justfile.base is canonical at repo root, synced via manifest** ([#71](https://github.com/vig-os/devcontainer/issues/71))
-  - Root `justfile.base` is now the single source of truth; synced to `assets/workspace/.devcontainer/justfile.base` via `sync_manifest.py`
-  - `just sync-workspace` and prepare-build keep workspace template in sync
-- **Autonomous PR skills use pull request template** ([#147](https://github.com/vig-os/devcontainer/issues/147))
-  - `pr_create` and `worktree_pr` now read `.github/pull_request_template.md` and fill each section from available context
-  - Explicit read-then-fill procedure with section-by-section mapping (Description, Type of Change, Changelog Entry, Testing, Checklist, Refs)
-  - Ensures autonomous PRs match manual PR structure and include all checklist items
-- **Rename skill namespace separator from colon to underscore** ([#128](https://github.com/vig-os/devcontainer/issues/128))
-  - All skill directories under `.cursor/skills/` and `assets/workspace/.cursor/skills/` renamed (e.g. `issue:create` → `issue_create`)
-  - All internal cross-references, frontmatter, prose, `CLAUDE.md` command table, and label taxonomy updated
-  - `issue_create` skill enhanced: gathers context via `just gh-issues` before drafting, suggests parent/child relationships and milestones
-  - `issue_create` skill now includes TDD acceptance criterion for testable issue types
-  - Remaining `sync-issues` workflow trigger references removed from skills
-  - `tdd.mdc` expanded with test scenario checklist and test type guidance; switched from always-on to glob-triggered on source/test files
-  - `code_tdd`, `code_execute`, and `worktree_execute` skills now reference `tdd.mdc` explicitly
-- **Clickable issue and PR numbers in gh-issues table** ([#104](https://github.com/vig-os/devcontainer/issues/104))
-  - `#` column in issue and PR tables now uses Rich OSC 8 hyperlinks to GitHub URLs
-  - Clicking an issue or PR number opens it in the browser (or Cursor's integrated terminal)
-- **PR template aligned with canonical commit types** ([#115](https://github.com/vig-os/devcontainer/issues/115))
-  - Replace ad-hoc Type of Change checkboxes with the 10 canonical commit types
-  - Move breaking change from type to a separate modifier checkbox
-  - Add release-branch hint to Related Issues section
-
 ### Added
 
+- **Image tools** ([[#212](https://github.com/vig-os/devcontainer/issues/212)])
+  - Install rsync
+- **Preserve user-authored files during `--force` workspace upgrades** ([#212](https://github.com/vig-os/devcontainer/issues/212))
+  - `init-workspace --force` no longer overwrites `README.md`, `CHANGELOG.md`, `LICENSE`, `.github/CODEOWNERS`, or `justfile.project`
 - **Devcontainer and git recipes in justfile.base** ([#71](https://github.com/vig-os/devcontainer/issues/71))
   - Devcontainer group (host-side only): `up`, `down`, `status`, `logs`, `shell`, `restart`, `open`
   - Auto-detect podman/docker compose; graceful failure if run inside container
@@ -186,11 +111,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Environment variables moved from `docker-compose.yml` into Containerfile `ENV`** ([#170](https://github.com/vig-os/devcontainer/issues/170))
-  - `PRE_COMMIT_HOME`, `UV_PROJECT_ENVIRONMENT`, and `VIRTUAL_ENV` are now baked into the image so they are available outside of the devcontainer context (e.g. bare-runner CI)
-- **`just sync` installs the project package** ([#170](https://github.com/vig-os/devcontainer/issues/170))
-  - Removed `--no-install-project` from the `sync` recipe so the workspace project is always installed into the venv
-
+- **worktree-clean: add filter mode for stopped-only vs all** ([#158](https://github.com/vig-os/devcontainer/issues/158))
+  - Default `just worktree-clean` (no args) now cleans only stopped worktrees, skips running tmux sessions
+  - `just worktree-clean all` retains previous behavior (clean all worktrees) with warning
+  - Summary output shows cleaned vs skipped worktrees
+  - `just wt-clean` alias unchanged
+- **Consolidate sync_manifest.py and utils.py into manifest-as-config architecture** ([#89](https://github.com/vig-os/devcontainer/issues/89))
+  - Extract transform classes (Sed, RemoveLines, etc.) to `scripts/transforms.py`
+  - Unify sed logic: `substitute_in_file()` in utils shared by sed_inplace and Sed transform
+  - Convert MANIFEST from Python code to declarative `scripts/manifest.toml`
+- **justfile.base is canonical at repo root, synced via manifest** ([#71](https://github.com/vig-os/devcontainer/issues/71))
+  - Root `justfile.base` is now the single source of truth; synced to `assets/workspace/.devcontainer/justfile.base` via `sync_manifest.py`
+  - `just sync-workspace` and prepare-build keep workspace template in sync
+- **Autonomous PR skills use pull request template** ([#147](https://github.com/vig-os/devcontainer/issues/147))
+  - `pr_create` and `worktree_pr` now read `.github/pull_request_template.md` and fill each section from available context
+  - Explicit read-then-fill procedure with section-by-section mapping (Description, Type of Change, Changelog Entry, Testing, Checklist, Refs)
+  - Ensures autonomous PRs match manual PR structure and include all checklist items
+- **Rename skill namespace separator from colon to underscore** ([#128](https://github.com/vig-os/devcontainer/issues/128))
+  - All skill directories under `.cursor/skills/` and `assets/workspace/.cursor/skills/` renamed (e.g. `issue:create` → `issue_create`)
+  - All internal cross-references, frontmatter, prose, `CLAUDE.md` command table, and label taxonomy updated
+  - `issue_create` skill enhanced: gathers context via `just gh-issues` before drafting, suggests parent/child relationships and milestones
+  - `issue_create` skill now includes TDD acceptance criterion for testable issue types
+  - Remaining `sync-issues` workflow trigger references removed from skills
+  - `tdd.mdc` expanded with test scenario checklist and test type guidance; switched from always-on to glob-triggered on source/test files
+  - `code_tdd`, `code_execute`, and `worktree_execute` skills now reference `tdd.mdc` explicitly
+- **Clickable issue and PR numbers in gh-issues table** ([#104](https://github.com/vig-os/devcontainer/issues/104))
+  - `#` column in issue and PR tables now uses Rich OSC 8 hyperlinks to GitHub URLs
+  - Clicking an issue or PR number opens it in the browser (or Cursor's integrated terminal)
+- **PR template aligned with canonical commit types** ([#115](https://github.com/vig-os/devcontainer/issues/115))
+  - Replace ad-hoc Type of Change checkboxes with the 10 canonical commit types
+  - Move breaking change from type to a separate modifier checkbox
+  - Add release-branch hint to Related Issues section
 - **Updated update notification message** ([#73](https://github.com/vig-os/devcontainer/issues/73))
   - Fixed misleading `just update` instruction (Python deps, not devcontainer upgrade)
   - Show correct upgrade instructions: `just devcontainer-upgrade` and curl fallback
@@ -342,9 +293,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New script runs on every container start (create + restart)
   - Handles Docker socket permissions and dependency sync via `just sync`
   - Replaces inline `postStartCommand` in `devcontainer.json`
-
-### Changed
-
 - **Dependency sync delegated to `just sync` across all lifecycle hooks** ([#60](https://github.com/vig-os/devcontainer/issues/60))
   - `post-create.sh`, `post-start.sh`, and `post-attach.sh` now call `just sync` instead of `uv sync` directly
   - `justfile.base` `sync` recipe updated with `--all-extras --no-install-project` flags and `pyproject.toml` guard
@@ -403,15 +351,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Workspace bootstrap preserves `README.md` and `CHANGELOG.md`** ([#170](https://github.com/vig-os/devcontainer/issues/170))
-  - Both files added to `PRESERVE_FILES` in `init-workspace.sh` so project-specific docs survive re-initialization
-- **`just update` now delegates to `just sync`** ([#170](https://github.com/vig-os/devcontainer/issues/170))
-  - `update` recipe called `uv sync` directly; now calls `@just sync` so any sync customisations (extras, env) are respected
-- **Pre-commit hook entry commands no longer swallow failures** ([#170](https://github.com/vig-os/devcontainer/issues/170))
-  - `generate-docs` and `sync-manifest` hooks called via `bash -c '... || true'`, masking errors; now call the script directly so hook failures surface correctly
-- **`RemovePrecommitHooks` transform removes empty blocks for any repo type** ([#170](https://github.com/vig-os/devcontainer/issues/170))
-  - Regex previously only matched `repo: local` blocks; updated to `repo:` so empty third-party repo blocks are also cleaned up after hook removal
-
+- **install.sh is not idempotent — creates nested src/template_project on second run** ([#197](https://github.com/vig-os/devcontainer/issues/197))
+  - Guard template_project rename: if `src/${SHORT_NAME}` already exists, remove the redundant copy instead of moving it inside
+- **just check uses wrong path — justfile_directory() resolves incorrectly in imported justfile.base** ([#187](https://github.com/vig-os/devcontainer/issues/187))
+  - Replace `dirname(justfile_directory())` with `source_directory()/scripts` to correctly locate version-check.sh in deployed workspaces and devcontainer repo
+  - Regression test: `just check config` runs successfully from workspace
+- **gh-issues CI status deduplicates re-run checks** ([#176](https://github.com/vig-os/devcontainer/issues/176))
+  - Deduplicate `statusCheckRollup` by check name, keeping only the latest result (by `completedAt`)
+  - CI column now matches GitHub PR page when checks are re-run
+- **worktree-start swallows derive-branch-summary error messages** ([#183](https://github.com/vig-os/devcontainer/issues/183))
+  - Remove stderr suppression so error messages from derive-branch-summary.sh are visible
+  - Retry with standard model when lightweight model fails; print manual workaround hint if both fail
+  - Add optional MODEL_TIER parameter to derive-branch-summary.sh; BATS test for retry path
+- **AI agent identity enforcement: blocklist, prepare-commit-msg, author check, PR body scan** ([#163](https://github.com/vig-os/devcontainer/issues/163))
+  - Canonical blocklist `.github/agent-blocklist.toml` (trailers, names, emails) — single source of truth
+  - prepare-commit-msg hook strips Co-authored-by trailers before validation
+  - Pre-commit hook rejects commits when author/committer matches blocklist (skips in CI)
+  - validate-commit-msg accepts `--blocked-patterns` for TOML blocklist; rejects remaining fingerprints
+  - pr-title-check CI scans PR title and body for agent fingerprints
+  - Skill rules strengthened (git_commit, worktree_execute, worktree_pr)
+- **worktree-start preflight gaps — agent hang and gh repo set-default** ([#154](https://github.com/vig-os/devcontainer/issues/154))
+  - Add timeout (30s) to agent-based branch summary derivation; failure produces clear error with manual workaround
+  - Add gh repo set-default preflight before any gh API calls; auto-resolve from origin or fail with instructions
+  - Extract derive-branch-summary.sh with BRANCH_SUMMARY_CMD mock for tests; BATS tests for timeout and error paths
+- **gh-issues cross-ref detects Refs: #N in PR bodies** ([#121](https://github.com/vig-os/devcontainer/issues/121))
+  - `_build_cross_refs` now parses `Refs: #102` and comma-separated variants (`Refs: #102, #103`) alongside Closes/Fixes/Resolves
+- **PR table Reviewer column distinguishes requested vs completed reviewers** ([#105](https://github.com/vig-os/devcontainer/issues/105))
+  - Requested reviewers (no review yet) display as `?login` with dim italic style
+  - Actual reviewers (submitted review) display as plain login with green/red
+- **worktree-attach restarts stopped tmux session when worktree dir exists** ([#132](https://github.com/vig-os/devcontainer/issues/132))
+  - Detect when worktree directory exists but tmux session has terminated
+  - Automatically restart session in existing worktree before attaching
+  - Guard `worktree-start` against branches already checked out elsewhere with an informative error
+  - BATS integration tests for restart, error paths, and checkout detection
+- **Issue numbers in PR table are now clickable hyperlinks** ([#174](https://github.com/vig-os/devcontainer/issues/174))
+  - Replace plain styled text with Rich hyperlink markup in the Issues column of the PR table
+- **Synced justfiles reference scripts not included in workspace manifest** ([#190](https://github.com/vig-os/devcontainer/issues/190))
+  - Add manifest entries for resolve-branch.sh, derive-branch-summary.sh, check-skill-names.sh → `.devcontainer/scripts/`
+  - Update justfile.worktree to use `source_directory() / "scripts"` for portable path resolution
+  - Add Sed transform for check-skill-names.sh path in synced `.pre-commit-config.yaml`
+- **Worktree prerequisites are declared in setup requirements** ([#196](https://github.com/vig-os/devcontainer/issues/196))
+  - Add `tmux`, `agent`, and `jq` to `scripts/requirements.yaml` as required host dependencies with install guidance
+  - `scripts/init.sh --check` now surfaces missing worktree prerequisites before running worktree commands
+- **--force preserves excluded files by relying on rsync-only copy path** ([#212](https://github.com/vig-os/devcontainer/issues/212))
+  - Remove the `cp` fallback path that could overwrite preserved files during force upgrades
+  - Pin Trivy in CI and release security scan workflows to `v0.69.2` so scans continue working when older release assets are unavailable
 - **Sync-issues workflow schedule trigger** ([#91](https://github.com/vig-os/devcontainer/issues/91))
   - `github.event.inputs.target-branch` is null on schedule events, causing `TARGET_BRANCH` to resolve to `refs/heads/` (404 in commit-action)
   - Added `|| 'dev'` fallbacks for all input references so schedule triggers default to `dev`
@@ -459,6 +443,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Worktree branch resolution broken by tab-separated `gh` output** ([#103](https://github.com/vig-os/devcontainer/issues/103))
   - `gh issue develop --list` now returns `branch<TAB>URL`; the previous `grep -oE '[^ ]+$'` captured the entire line
   - Extracted parsing into `scripts/resolve-branch.sh` (`head -1 | cut -f1`) used by both call sites in `justfile.worktree`
+- **Container build fails when resolving latest cargo-binstall via GitHub API** ([#154](https://github.com/vig-os/devcontainer/issues/154))
+  - Resolve the latest cargo-binstall version from the `releases/latest` redirect URL instead of `api.github.com` to avoid HTTP 22 failures during image build
+  - Add an explicit empty-version guard so the build fails with a clear error message if version resolution fails
 
 ### Security
 

@@ -59,6 +59,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nano \
     minisign \
     podman \
+    rsync \
     tmux \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -125,7 +126,14 @@ RUN set -eux; \
         arm64) ARCH=aarch64-unknown-linux-musl ;; \
         *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
     esac; \
-    BINSTALL_VERSION="$(curl -fsSL https://api.github.com/repos/cargo-bins/cargo-binstall/releases/latest | sed -n 's/.*"tag_name": *"v\?\([^"]*\)".*/\1/p')"; \
+    BINSTALL_VERSION="$( \
+        curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/cargo-bins/cargo-binstall/releases/latest \
+        | sed -n 's#.*/tag/v\([^/?]*\).*#\1#p' \
+    )"; \
+    if [ -z "$BINSTALL_VERSION" ]; then \
+        echo "Failed to resolve cargo-binstall latest version"; \
+        exit 1; \
+    fi; \
     URL="https://github.com/cargo-bins/cargo-binstall/releases/download/v${BINSTALL_VERSION}"; \
     FILE="cargo-binstall-${ARCH}.tgz"; \
     SIG_FILE="${FILE}.sig"; \
