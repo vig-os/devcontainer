@@ -34,3 +34,18 @@ setup() {
     assert_output --partial 'src/${SHORT_NAME}'
     assert_output --partial 'rm -rf'
 }
+
+@test "init-workspace.sh uses rsync without fallback" {
+    run grep 'rsync -av' "$INIT_WORKSPACE_SH"
+    assert_success
+
+    run grep 'if command -v rsync' "$INIT_WORKSPACE_SH"
+    assert_failure
+}
+
+@test "init-workspace.sh excludes preserved files only when they exist" {
+    run grep -A3 'for preserved in "${PRESERVE_FILES\[@\]}"' "$INIT_WORKSPACE_SH"
+    assert_success
+    assert_output --partial 'if [[ -e "$WORKSPACE_DIR/$preserved" ]]; then'
+    assert_output --partial 'EXCLUDE_ARGS+=("--exclude=$preserved")'
+}
