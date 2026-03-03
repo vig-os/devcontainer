@@ -23,6 +23,11 @@ NO_PROMPTS=false
 PRESERVE_FILES=(
     ".devcontainer/docker-compose.project.yaml"
     ".devcontainer/docker-compose.local.yaml"
+    "README.md"
+    "CHANGELOG.md"
+    "LICENSE"
+    ".github/CODEOWNERS"
+    "justfile.project"
 )
 
 # Get script directory for manifest location
