@@ -44,8 +44,11 @@ setup() {
 }
 
 @test "init-workspace.sh excludes preserved files only when they exist" {
+    # shellcheck disable=SC2016
     run grep -A3 'for preserved in "${PRESERVE_FILES\[@\]}"' "$INIT_WORKSPACE_SH"
     assert_success
+    # shellcheck disable=SC2016
     assert_output --partial 'if [[ -e "$WORKSPACE_DIR/$preserved" ]]; then'
+    # shellcheck disable=SC2016
     assert_output --partial 'EXCLUDE_ARGS+=("--exclude=$preserved")'
 }
