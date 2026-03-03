@@ -432,6 +432,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Worktree branch resolution broken by tab-separated `gh` output** ([#103](https://github.com/vig-os/devcontainer/issues/103))
   - `gh issue develop --list` now returns `branch<TAB>URL`; the previous `grep -oE '[^ ]+$'` captured the entire line
   - Extracted parsing into `scripts/resolve-branch.sh` (`head -1 | cut -f1`) used by both call sites in `justfile.worktree`
+- **Container build fails when resolving latest cargo-binstall via GitHub API** ([#154](https://github.com/vig-os/devcontainer/issues/154))
+  - Resolve the latest cargo-binstall version from the `releases/latest` redirect URL instead of `api.github.com` to avoid HTTP 22 failures during image build
+  - Add an explicit empty-version guard so the build fails with a clear error message if version resolution fails
 
 ### Security
 
