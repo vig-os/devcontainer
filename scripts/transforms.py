@@ -155,14 +155,18 @@ class RemovePrecommitHooks:
                 ):
                     buf.append(result_lines[i])
                     i += 1
-                # Check if buffer has any actual hooks
+                # Trailing comments/blanks belong to the *next* section, not this block
+                tail: list[str] = []
+                while len(buf) > 1 and re.match(r"^\s*#", buf[-1]):
+                    tail.insert(0, buf.pop())
+                while len(buf) > 1 and buf[-1].strip() == "" and tail:
+                    tail.insert(0, buf.pop())
                 has_hooks = any(re.match(r"^      - id:", b) for b in buf)
                 if has_hooks:
                     final.extend(buf)
-                # If no hooks, discard the entire block (including comment above)
-                # Check if last line in final is a comment for this section
                 elif final and final[-1].strip().startswith("#"):
-                    final.pop()  # Remove the section comment too
+                    final.pop()
+                final.extend(tail)
                 continue
             final.append(line)
             i += 1

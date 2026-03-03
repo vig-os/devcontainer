@@ -57,6 +57,7 @@ repos:
         name: shellcheck
         args: ["-x"]
 
+  # Markdown Linting (excludes auto-generated docs)
   - repo: https://github.com/jackdewinter/pymarkdown
     rev: f93643d339dfee2a1022e7b05e8b5a281bfac553  # v0.9.23
     hooks:
@@ -75,6 +76,7 @@ repos:
         files: ^justfile(\..*)?$
         pass_filenames: false
 
+  # Typo Linting
   - repo: https://github.com/crate-ci/typos
     rev: 07d900b8fa1097806b8adb6391b0d3e0ac2fdea7  # v1.39.0
     hooks:
