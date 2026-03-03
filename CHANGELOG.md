@@ -467,6 +467,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-commit hook repos pinned to commit SHAs** ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Workflow permissions hardened** with least-privilege principle and explicit token scoping ([#50](https://github.com/vig-os/devcontainer/issues/50))
 - **Input sanitization** — inline expression interpolation replaced with environment variables in workflow run blocks to prevent injection ([#50](https://github.com/vig-os/devcontainer/issues/50))
+- **Update vulnerable Python dependencies** ([#88](https://github.com/vig-os/devcontainer/issues/88))
+  - Add uv constraints for transitive dependencies: `urllib3>=2.6.3`, `filelock>=3.20.3`, and `virtualenv>=20.36.1`
+  - Regenerate `uv.lock` with patched resolutions (`urllib3 2.6.3`, `filelock 3.25.0`, `virtualenv 21.1.0`)
 
 ## [0.2.1](https://github.com/vig-os/devcontainer/releases/tag/0.2.1) - 2026-01-28
 

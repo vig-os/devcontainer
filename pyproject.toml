@@ -35,6 +35,13 @@ test = [
     "bcrypt>=5.0.0",
 ]
 
+[tool.uv]
+constraint-dependencies = [
+    "urllib3>=2.6.3",
+    "filelock>=3.20.3",
+    "virtualenv>=20.36.1",
+]
+
 [tool.uv.sources]
 vig-utils = { path = "packages/vig-utils", editable = true }
 
