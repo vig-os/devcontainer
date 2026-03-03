@@ -384,6 +384,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `scripts/init.sh --check` now surfaces missing worktree prerequisites before running worktree commands
 - **--force preserves excluded files by relying on rsync-only copy path** ([#212](https://github.com/vig-os/devcontainer/issues/212))
   - Remove the `cp` fallback path that could overwrite preserved files during force upgrades
+  - Pin Trivy in CI and release security scan workflows to `v0.69.2` so scans continue working when older release assets are unavailable
 - **Sync-issues workflow schedule trigger** ([#91](https://github.com/vig-os/devcontainer/issues/91))
   - `github.event.inputs.target-branch` is null on schedule events, causing `TARGET_BRANCH` to resolve to `refs/heads/` (404 in commit-action)
   - Added `|| 'dev'` fallbacks for all input references so schedule triggers default to `dev`
