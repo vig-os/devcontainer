@@ -172,3 +172,13 @@ repos:
           "--refs-optional-types", "chore",
           "--blocked-patterns", ".github/agent-blocklist.toml",
         ]
+
+  # Sync manifest
+  - repo: local
+    hooks:
+      - id: sync-manifest
+        name: sync manifest
+        entry: uv run python scripts/sync_manifest.py sync assets/workspace/
+        language: system
+        files: ^scripts/manifest\.toml$
+        pass_filenames: false
