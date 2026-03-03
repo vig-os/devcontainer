@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **install.sh is not idempotent — creates nested src/template_project on second run** ([#197](https://github.com/vig-os/devcontainer/issues/197))
+  - Guard template_project rename: if `src/${SHORT_NAME}` already exists, remove the redundant copy instead of moving it inside
 - **just check uses wrong path — justfile_directory() resolves incorrectly in imported justfile.base** ([#187](https://github.com/vig-os/devcontainer/issues/187))
   - Replace `dirname(justfile_directory())` with `source_directory()/scripts` to correctly locate version-check.sh in deployed workspaces and devcontainer repo
   - Regression test: `just check config` runs successfully from workspace
