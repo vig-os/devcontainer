@@ -1,0 +1,136 @@
+# Container CI Workflow
+#
+# Proof-of-concept: runs CI jobs inside the devcontainer image using the
+# GitHub Actions container: directive.  Only tools already baked into the
+# image are used — no additional installs.
+#
+# Jobs:
+#   1. lint    — Pre-commit hooks (uses image-provided pre-commit + ruff)
+#   2. test    — Pytest with coverage (pytest installed via uv sync)
+#   3. summary — Aggregate results for branch protection
+#
+# Differences from bare-runner ci.yml are documented in
+# docs/container-ci-quirks.md.
+#
+# Triggers:
+#   - Pull requests to dev, release/**, and main
+#   - Manual workflow_dispatch
+#
+
+name: CI (Container)
+
+on:  # yamllint disable-line rule:truthy
+  pull_request:
+    branches:
+      - dev
+      - 'release/**'
+      - main
+  workflow_dispatch:
+    inputs:
+      test-suite:
+        description: 'Test suite to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - lint
+          - test
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint & Format (container)
+    runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/vig-os/devcontainer:latest
+      env:
+        # Image-baked cache; may miss if repo pins hooks by hash (see docs/container-ci-quirks.md)
+        PRE_COMMIT_HOME: /opt/pre-commit-cache
+        # Reuse the venv already present in the image instead of creating a new one
+        UV_PROJECT_ENVIRONMENT: /root/assets/workspace/.venv
+    timeout-minutes: 10
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      inputs.test-suite == 'all' ||
+      inputs.test-suite == 'lint'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Fix git safe.directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Sync project dependencies
+        run: uv sync --frozen --all-extras
+
+      - name: Run pre-commit hooks
+        run: uv run pre-commit run --all-files --show-diff-on-failure
+
+  test:
+    name: Tests (container)
+    runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/vig-os/devcontainer:latest
+      env:
+        # Reuse the venv already present in the image instead of creating a new one
+        UV_PROJECT_ENVIRONMENT: /root/assets/workspace/.venv
+    timeout-minutes: 15
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      inputs.test-suite == 'all' ||
+      inputs.test-suite == 'test'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Fix git safe.directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Sync project dependencies
+        run: uv sync --frozen --all-extras
+
+      - name: Run tests with coverage
+        run: uv run pytest --cov --cov-report=term-missing
+
+  summary:
+    name: CI Summary (container)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    needs: [lint, test]
+    if: always()
+
+    steps:
+      - name: Check results
+        run: |
+          echo "CI (Container) Results Summary"
+          echo "==============================="
+          echo ""
+          echo "Lint: ${{ needs.lint.result }}"
+          echo "Test: ${{ needs.test.result }}"
+          echo ""
+
+          FAILED=false
+
+          if [ "${{ needs.lint.result }}" = "failure" ]; then
+            echo "ERROR: Lint checks failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.test.result }}" = "failure" ]; then
+            echo "ERROR: Tests failed"
+            FAILED=true
+          fi
+
+          if [ "$FAILED" = "true" ]; then
+            echo ""
+            echo "One or more checks failed"
+            exit 1
+          fi
+
+          echo ""
+          echo "All executed checks passed"
