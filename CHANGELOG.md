@@ -341,6 +341,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Link to `vig-utils` README added as a comment above the hook for discoverability
 - **Refresh pinned Python base image digest** ([#213](https://github.com/vig-os/devcontainer/issues/213))
   - Update `python:3.12-slim-bookworm` pinned digest in `Containerfile` to the latest upstream value while keeping the same tag
+- **Pre-commit hook removal transform preserves section comments** ([#171](https://github.com/vig-os/devcontainer/issues/171))
+  - `scripts/transforms.py` keeps section comments intact while removing configured hooks during manifest sync
+  - `scripts/manifest.toml` and related sync/test updates keep workspace pre-commit outputs aligned with container CI workflow changes
 
 ### Deprecated
 
