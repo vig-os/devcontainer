@@ -1,7 +1,7 @@
 # Use Python 3.12 as base image (pinned to digest for supply chain integrity)
 # Dependabot (docker ecosystem) will propose digest updates automatically
 # Updated to bookworm (stable) for better security patch cadence
-FROM python:3.12-slim-bookworm@sha256:73dbd1a2ad74137451593a8ac30f7bdd0f5010fc05fb34644190cffa7696bbf3
+FROM python:3.12-slim-bookworm@sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcade98e669c
 
 # Add metadata
 # By default, we build the dev version unless specified as an argument
@@ -59,6 +59,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nano \
     minisign \
     podman \
+    rsync \
     tmux \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -125,7 +126,14 @@ RUN set -eux; \
         arm64) ARCH=aarch64-unknown-linux-musl ;; \
         *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
     esac; \
-    BINSTALL_VERSION="$(curl -fsSL https://api.github.com/repos/cargo-bins/cargo-binstall/releases/latest | sed -n 's/.*"tag_name": *"v\?\([^"]*\)".*/\1/p')"; \
+    BINSTALL_VERSION="$( \
+        curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/cargo-bins/cargo-binstall/releases/latest \
+        | sed -n 's#.*/tag/v\([^/?]*\).*#\1#p' \
+    )"; \
+    if [ -z "$BINSTALL_VERSION" ]; then \
+        echo "Failed to resolve cargo-binstall latest version"; \
+        exit 1; \
+    fi; \
     URL="https://github.com/cargo-bins/cargo-binstall/releases/download/v${BINSTALL_VERSION}"; \
     FILE="cargo-binstall-${ARCH}.tgz"; \
     SIG_FILE="${FILE}.sig"; \
@@ -177,6 +185,7 @@ RUN uv pip install --system \
     pre-commit \
     rich \
     ruff \
+    bandit[toml] \
     pip-licenses && \
     uv pip install --system --upgrade pip
 
@@ -227,6 +236,9 @@ WORKDIR /workspace
 # Set environment variables
 ENV PYTHONUNBUFFERED="1"
 ENV IN_CONTAINER="true"
+ENV PRE_COMMIT_HOME="/opt/pre-commit-cache"
+ENV UV_PROJECT_ENVIRONMENT="/root/assets/workspace/.venv"
+ENV VIRTUAL_ENV="/root/assets/workspace/.venv"
 
 # Create aliases for pre-commit
 RUN echo 'alias precommit="pre-commit run"' >> /root/.bashrc

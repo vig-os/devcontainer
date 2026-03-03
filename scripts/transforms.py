@@ -140,13 +140,14 @@ class RemovePrecommitHooks:
             result.append(line)
             i += 1
 
-        # Second pass: remove empty repo blocks
+        # Second pass: remove empty repo blocks (any repo with no remaining hooks)
         final: list[str] = []
         i = 0
         result_lines = result
         while i < len(result_lines):
             line = result_lines[i]
             if re.match(r"^  - repo:", line):
+                # Buffer this repo block header
                 buf = [line]
                 i += 1
                 while i < len(result_lines) and not re.match(

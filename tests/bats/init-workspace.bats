@@ -24,3 +24,31 @@ setup() {
     run grep 'set -euo pipefail' "$INIT_WORKSPACE_SH"
     assert_success
 }
+
+# ── idempotent rename guard (#197) ───────────────────────────────────────────
+
+@test "init-workspace.sh guards against nested template_project on re-run" {
+    run grep -A4 'if \[\[ -d.*src/template_project' "$INIT_WORKSPACE_SH"
+    assert_success
+    # shellcheck disable=SC2016
+    assert_output --partial 'src/${SHORT_NAME}'
+    assert_output --partial 'rm -rf'
+}
+
+@test "init-workspace.sh uses rsync without fallback" {
+    run grep 'rsync -av' "$INIT_WORKSPACE_SH"
+    assert_success
+
+    run grep 'if command -v rsync' "$INIT_WORKSPACE_SH"
+    assert_failure
+}
+
+@test "init-workspace.sh excludes preserved files only when they exist" {
+    # shellcheck disable=SC2016
+    run grep -A3 'for preserved in "${PRESERVE_FILES\[@\]}"' "$INIT_WORKSPACE_SH"
+    assert_success
+    # shellcheck disable=SC2016
+    assert_output --partial 'if [[ -e "$WORKSPACE_DIR/$preserved" ]]; then'
+    # shellcheck disable=SC2016
+    assert_output --partial 'EXCLUDE_ARGS+=("--exclude=$preserved")'
+}
