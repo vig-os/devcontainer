@@ -108,6 +108,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Graceful fallback when repo ID cannot be resolved or permissions are insufficient
 - **`init-workspace.sh` runs `just sync` after placeholder replacement** ([#170](https://github.com/vig-os/devcontainer/issues/170))
   - Resolves the `uv.lock` for the new project name and installs the project package into the venv during workspace bootstrap
+- **Candidate publishing mode in release workflow** ([#172](https://github.com/vig-os/devcontainer/issues/172))
+  - `release.yml` now supports `release-kind=candidate` (default) and infers the next available `X.Y.Z-rcN` tag automatically
+  - Candidate runs create and push Git tags, publish candidate manifests, and keep candidate tags after final release
+  - Final runs remain available via `release-kind=final` and are exposed by `just finalize-release`
 
 ### Changed
 

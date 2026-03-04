@@ -211,10 +211,21 @@ finalize-release version *flags:
     #!/usr/bin/env bash
     set -euo pipefail
     # Trigger the release workflow via GitHub Actions
-    # The workflow handles: finalize CHANGELOG, build/test images, create tag, publish
-    gh workflow run release.yml -f "version={{ version }}" {{ flags }}
+    # The workflow handles: finalize CHANGELOG, build/test images, create final tag, publish
+    gh workflow run release.yml -f "version={{ version }}" -f "release-kind=final" {{ flags }}
     echo ""
     echo "✓ Release workflow triggered for version {{ version }}"
+    echo "Monitor progress: gh run list --workflow release.yml"
+
+# Publish release candidate via GitHub Actions workflow
+[group('release')]
+publish-candidate version *flags:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Trigger release workflow in candidate mode (default mode in workflow)
+    gh workflow run release.yml -f "version={{ version }}" -f "release-kind=candidate" {{ flags }}
+    echo ""
+    echo "✓ Candidate release workflow triggered for version {{ version }}"
     echo "Monitor progress: gh run list --workflow release.yml"
 
 # Reset CHANGELOG Unreleased section (after merging release to dev)

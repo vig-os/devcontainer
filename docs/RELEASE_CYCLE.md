@@ -309,7 +309,10 @@ This is the main quality gate. The release branch and draft PR serve as the coor
 **Execute:**
 
 ```bash
-# Trigger the finalize-release workflow
+# Publish next candidate (X.Y.Z-rcN inferred automatically)
+just publish-candidate X.Y.Z
+
+# Publish final release (X.Y.Z + latest)
 just finalize-release X.Y.Z
 
 # Monitor progress
@@ -344,13 +347,14 @@ The `release.yml` workflow performs the entire remaining release process:
    - If ANY test fails: entire workflow stops and triggers rollback
 
 4. ✅ **Publish** job (runs only if all builds/tests pass)
-   - Creates annotated tag `X.Y.Z`
+   - Candidate mode: infers next `rcN`, creates annotated tag `X.Y.Z-rcN`, publishes candidate manifests
+   - Final mode: creates annotated tag `X.Y.Z`, publishes final manifests
    - Pushes tag to origin
    - Downloads tested images from artifacts
    - Logs in to GitHub Container Registry
    - Pushes images to GHCR with architecture-specific tags
-   - Creates multi-architecture manifest `ghcr.io/vig-os/devcontainer:X.Y.Z`
-   - Creates/updates `ghcr.io/vig-os/devcontainer:latest` manifest (only when both architectures are built)
+   - Creates multi-architecture manifest `ghcr.io/vig-os/devcontainer:<publish-tag>`
+   - Creates/updates `ghcr.io/vig-os/devcontainer:latest` only in final mode (and only when both architectures are built)
    - Verifies manifests exist
 
 5. ✅ **Rollback** job (runs if ANY job failed)
@@ -369,7 +373,8 @@ Monitor progress: gh run list --workflow release.yml
 ✓ Release published successfully!
 
 Release Summary:
-  Version: 1.0.0
+  Base Version: 1.0.0
+  Release Kind: final
   Tag: 1.0.0
   Images:
     - ghcr.io/vig-os/devcontainer:1.0.0
@@ -479,7 +484,10 @@ Used by the `release.yml` workflow to set the actual release date.
 # Prepare release branch
 just prepare-release X.Y.Z
 
-# Finalize release
+# Publish next release candidate (X.Y.Z-rcN)
+just publish-candidate X.Y.Z
+
+# Finalize release (X.Y.Z + latest)
 just finalize-release X.Y.Z
 
 # Reset CHANGELOG after release
@@ -536,7 +544,7 @@ gh workflow run prepare-release.yml -f "version=1.0.0" -f "dry-run=true"
 
 #### release.yml (Unified Release Workflow)
 
-**Trigger:** `workflow_dispatch` (manual trigger via `just finalize-release`)
+**Trigger:** `workflow_dispatch` (manual trigger via `just publish-candidate` or `just finalize-release`)
 
 **Purpose:** Complete release workflow - finalize, build, test, publish, with rollback on failure
 
@@ -544,12 +552,14 @@ gh workflow run prepare-release.yml -f "version=1.0.0" -f "dry-run=true"
 
 1. **validate** - Checks all prerequisites before mutations
    - Validates semantic version format
+   - Validates release kind (`candidate` or `final`)
+   - Computes publish tag (`X.Y.Z-rcN` for candidate, `X.Y.Z` for final)
    - Verifies release branch exists
    - Checks CHANGELOG has `[X.Y.Z] - TBD`
-   - Confirms tag doesn't exist
+   - Confirms publish tag doesn't exist
    - Verifies PR: not draft, approved, CI passed
    - Records pre-finalization commit for rollback
-   - Outputs: PR number, release date, pre-finalization SHA
+   - Outputs: PR number, release date, pre-finalization SHA, publish tag metadata
 
 2. **finalize** (skipped if dry-run) - Updates release branch
    - Sets release date in CHANGELOG
@@ -567,11 +577,13 @@ gh workflow run prepare-release.yml -f "version=1.0.0" -f "dry-run=true"
    - Fails workflow if any test fails
 
 4. **publish** (runs if all builds/tests pass) - Creates tag and publishes
-   - Creates annotated tag `X.Y.Z`
+   - Candidate mode creates and pushes `X.Y.Z-rcN` (next available `N`)
+   - Final mode creates and pushes `X.Y.Z`
    - Pushes tag
    - Downloads tested images from artifacts
    - Pushes images to GHCR
-   - Creates multi-architecture manifests
+   - Creates multi-architecture manifest for computed publish tag
+   - Updates `latest` only in final mode
    - Verifies manifests exist
 
 5. **rollback** (runs if any job failed) - Cleans up partial state
@@ -584,12 +596,14 @@ gh workflow run prepare-release.yml -f "version=1.0.0" -f "dry-run=true"
 ```bash
 gh workflow run release.yml \
   -f "version=1.0.0" \
+  -f "release-kind=final" \
   -f "architectures=amd64,arm64" \
   -f "dry-run=false"
 
 # Dry-run mode (validates without making changes)
 gh workflow run release.yml \
   -f "version=1.0.0" \
+  -f "release-kind=candidate" \
   -f "dry-run=true"
 ```
 
