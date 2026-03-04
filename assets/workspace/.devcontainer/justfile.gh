@@ -8,9 +8,7 @@
 
 alias gh-i := gh-issues
 
-_gh_scripts := source_directory() / "scripts"
-
 # List open issues and PRs grouped by milestone
 [group('github')]
 gh-issues:
-    python3 {{ _gh_scripts }}/gh_issues.py
+    gh-issues

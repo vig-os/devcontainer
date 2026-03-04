@@ -133,7 +133,7 @@ repos:
     hooks:
       - id: bandit
         name: bandit (Python security linting)
-        entry: uv run bandit -r packages/vig-utils/src/ scripts/ assets/workspace/ -ll
+        entry: uv run bandit -r packages/vig-utils/src/ assets/workspace/ -ll
         language: system
         types: [python]
         pass_filenames: false
@@ -143,8 +143,8 @@ repos:
     hooks:
       - id: check-skill-names
         name: check-skill-names (enforce naming convention)
-        entry: scripts/check-skill-names.sh .cursor/skills
-        language: script
+        entry: uv run check-skill-names .cursor/skills
+        language: system
         files: ^\.cursor/skills/
         pass_filenames: false
 
@@ -153,7 +153,7 @@ repos:
     hooks:
       - id: prepare-commit-msg-strip-trailers
         name: strip agent trailers from commit message
-        entry: uv run python scripts/prepare-commit-msg-strip-trailers.py
+        entry: uv run prepare-commit-msg-strip-trailers
         language: system
         stages: [prepare-commit-msg]
         pass_filenames: true
@@ -163,7 +163,7 @@ repos:
     hooks:
       - id: check-agent-identity
         name: check agent identity
-        entry: uv run python scripts/check-agent-identity.py
+        entry: uv run check-agent-identity
         language: system
         pass_filenames: false
 

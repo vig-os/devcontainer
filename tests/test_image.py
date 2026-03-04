@@ -12,6 +12,8 @@ base functionality is preserved in their containers.
 import hashlib
 from pathlib import Path
 
+import pytest
+
 # Expected versions for installed tools
 # These should be updated when the Containerfile is updated
 EXPECTED_VERSIONS = {
@@ -387,32 +389,110 @@ class TestDevelopmentTools:
             f"Expected vig-utils {expected}x, got: {result.stdout}"
         )
 
+    @pytest.mark.parametrize(
+        "module",
+        [
+            "vig_utils.gh_issues",
+            "vig_utils.validate_commit_msg",
+            "vig_utils.check_action_pins",
+            "vig_utils.prepare_changelog",
+            "vig_utils.prepare_commit_msg_strip_trailers",
+            "vig_utils.check_agent_identity",
+            "vig_utils.check_pr_agent_fingerprints",
+            "vig_utils.resolve_branch",
+            "vig_utils.derive_branch_summary",
+            "vig_utils.check_skill_names",
+            "vig_utils.setup_labels",
+            "vig_utils.utils",
+        ],
+    )
+    def test_vig_utils_required_modules_importable(self, host, module):
+        """Test that core vig_utils modules are importable."""
+        result = host.run(f"python3 -c 'import {module}; print(\"OK\")'")
+        assert result.rc == 0, f"{module} is not importable: {result.stderr}"
+        assert "OK" in result.stdout
+
+    @pytest.mark.parametrize(
+        ("name", "command"),
+        [
+            (
+                "check-skill-names",
+                "command -v check-skill-names",
+            ),
+            (
+                "derive-branch-summary",
+                "command -v derive-branch-summary",
+            ),
+            (
+                "resolve-branch",
+                "command -v resolve-branch",
+            ),
+            ("setup-labels", "command -v setup-labels"),
+        ],
+        ids=[
+            "check-skill-names",
+            "derive-branch-summary",
+            "resolve-branch",
+            "setup-labels",
+        ],
+    )
+    def test_vig_utils_shell_scripts(self, host, name, command):
+        """Test vig-utils shell wrapper commands are callable."""
+        result = host.run(f'bash -lc "{command}"')
+        assert result.rc == 0, f"{name} command failed: {result.stderr}"
+
 
 class TestEnvironmentVariables:
     """Test that environment variables are set correctly."""
 
-    def test_pythonunbuffered_set(self, host):
-        """Test that PYTHONUNBUFFERED is set."""
-        result = host.run("echo $PYTHONUNBUFFERED")
-        assert result.rc == 0, "Failed to read PYTHONUNBUFFERED"
-        assert result.stdout.strip() == "1", (
-            f"Expected PYTHONUNBUFFERED=1, got: {result.stdout.strip()}"
+    @pytest.mark.parametrize(
+        ("name", "expected"),
+        [
+            ("DEBIAN_FRONTEND", "noninteractive"),
+            ("LANG", "en_US.UTF-8"),
+            ("LANGUAGE", "en_US:en"),
+            ("LC_ALL", "en_US.UTF-8"),
+            ("PYTHONUNBUFFERED", "1"),
+            ("IN_CONTAINER", "true"),
+            ("PRE_COMMIT_HOME", "/opt/pre-commit-cache"),
+            ("UV_PROJECT_ENVIRONMENT", "/root/assets/workspace/.venv"),
+            ("VIRTUAL_ENV", "/root/assets/workspace/.venv"),
+        ],
+        ids=[
+            "debian_frontend",
+            "lang",
+            "language",
+            "lc_all",
+            "pythonunbuffered",
+            "in_container",
+            "pre_commit_home",
+            "uv_project_environment",
+            "virtual_env",
+        ],
+    )
+    def test_env_vars_set(self, host, name, expected):
+        """Test that required environment variables are set to expected values."""
+        result = host.run(f"printenv {name}")
+        assert result.rc == 0, f"Failed to read {name}"
+        assert result.stdout.strip() == expected, (
+            f"Expected {name}={expected}, got: {result.stdout.strip()}"
         )
 
-    def test_in_container_set(self, host):
-        """Test that IN_CONTAINER is set."""
-        result = host.run("echo $IN_CONTAINER")
-        assert result.rc == 0, "Failed to read IN_CONTAINER"
-        assert result.stdout.strip() == "true", (
-            f"Expected IN_CONTAINER=true, got: {result.stdout.strip()}"
-        )
-
-    def test_locale_set(self, host):
-        """Test that locale environment variables are set."""
-        result = host.run("echo $LANG")
-        assert result.rc == 0, "Failed to read LANG"
-        assert "en_US.UTF-8" in result.stdout, (
-            f"Expected LANG=en_US.UTF-8, got: {result.stdout.strip()}"
+    @pytest.mark.parametrize(
+        "path_entry",
+        [
+            "/root/.local/bin",
+            "/root/.cargo/bin",
+        ],
+        ids=["cursor_agent_path", "cargo_path"],
+    )
+    def test_path_contains_required_entries(self, host, path_entry):
+        """Test that PATH includes required binary locations."""
+        result = host.run("printenv PATH")
+        assert result.rc == 0, "Failed to read PATH"
+        path_entries = result.stdout.strip().split(":")
+        assert path_entry in path_entries, (
+            f"Expected PATH to contain {path_entry}, got: {result.stdout.strip()}"
         )
 
 
@@ -557,36 +637,6 @@ class TestFileStructure:
                         )
                     else:
                         verify_file_identity(host, str(rel), dest_file_path)
-
-
-class TestGhIssuesDeployment:
-    """Test that gh_issues.py runtime dependencies are available in the image."""
-
-    def test_rich_importable(self, host):
-        """Test that the rich library is importable (runtime dep of gh_issues.py).
-
-        rich is installed system-wide (not in the project venv) because it is
-        a devcontainer tool, not a user project dependency.
-        """
-        result = host.run("python3 -c \"from rich.table import Table; print('OK')\"")
-        assert result.rc == 0, f"rich is not importable: {result.stderr}"
-        assert "OK" in result.stdout
-
-    def test_gh_issues_importable(self, host):
-        """Test that gh_issues.py is importable (catches syntax errors, missing imports).
-
-        Uses system Python because gh_issues.py depends on rich, which is
-        installed system-wide as a devcontainer tool.
-        """
-        result = host.run(
-            'python3 -c "'
-            "import sys; "
-            "sys.path.insert(0, '/root/assets/workspace/.devcontainer/scripts'); "
-            "import gh_issues; "
-            "print('OK')\""
-        )
-        assert result.rc == 0, f"gh_issues.py is not importable: {result.stderr}"
-        assert "OK" in result.stdout
 
 
 class TestPlaceholders:
