@@ -428,6 +428,35 @@ class TestExtractUnreleasedContent:
         assert list(sections.keys()) == ["Security"]
         assert "CVE-2026-0001" in sections["Security"]
 
+    def test_inline_hash_markers_not_truncated(self):
+        """Inline ## or ### in backticks must not truncate content (sync-issues-action #18)."""
+        changelog = """\
+# Changelog
+
+## Unreleased
+
+### Fixed
+
+- Corrected heading hierarchy: promoted from `##` to `#`
+- Fixed indentation in `### subsection` headers
+- Third fix unrelated to headings
+- Another entry mentioning `##` in a sentence
+- Fifth fix at the end
+
+### Added
+
+- New feature
+"""
+        sections = extract_unreleased_content(changelog)
+        assert "Fixed" in sections
+        assert "Corrected heading hierarchy" in sections["Fixed"]
+        assert "Fixed indentation" in sections["Fixed"]
+        assert "Third fix" in sections["Fixed"]
+        assert "Another entry mentioning" in sections["Fixed"]
+        assert "Fifth fix at the end" in sections["Fixed"]
+        assert "Added" in sections
+        assert "New feature" in sections["Added"]
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # create_new_changelog
