@@ -8,8 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from vig_utils.agent_blocklist import load_blocklist
-from vig_utils.utils import agent_blocklist_path, find_repo_root
+from vig_utils.utils import agent_blocklist_path, find_repo_root, load_blocklist
 
 
 def _get_git_config(cwd: Path, key: str) -> str:

@@ -7,8 +7,11 @@ import os
 import sys
 from pathlib import Path
 
-from vig_utils.agent_blocklist import contains_agent_fingerprint, load_blocklist
-from vig_utils.utils import agent_blocklist_path
+from vig_utils.utils import (
+    agent_blocklist_path,
+    contains_agent_fingerprint,
+    load_blocklist,
+)
 
 
 def main() -> int:
