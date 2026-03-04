@@ -12,6 +12,10 @@
 #         - open PR (auto-merge enabled, or labelled "merge-conflict" with
 #           resolution instructions when conflicts exist)
 #
+# Auth: Two GitHub App tokens:
+# - COMMIT_APP_* for git/ref operations (least-privilege commit identity)
+# - RELEASE_APP_* for PR/label operations that require pull-request scopes
+#
 # With the new CHANGELOG flow, dev already has ## Unreleased (created during
 # prepare-release), so no CHANGELOG reset is needed here.
 #
@@ -78,21 +82,22 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      issues: write
 
     steps:
-      - name: Generate GitHub App Token
-        id: app-token
+      - name: Generate Commit App Token
+        id: commit-app-token
         uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
         with:
-          app-id: ${{ secrets.APP_SYNC_ISSUES_ID }}
-          private-key: ${{ secrets.APP_SYNC_ISSUES_PRIVATE_KEY }}
+          app-id: ${{ secrets.COMMIT_APP_ID }}
+          private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
 
       - name: Checkout dev
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           ref: dev
           fetch-depth: 0
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ steps.commit-app-token.outputs.token }}
 
       - name: Re-check if dev is still behind main
         id: recheck
@@ -108,11 +113,19 @@ jobs:
             echo "Dev is still behind main by ${BEHIND} commit(s). Continuing."
           fi
 
+      - name: Generate Release App Token
+        if: steps.recheck.outputs.up_to_date != 'true'
+        id: release-app-token
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - name: Check for existing open sync PR
         if: steps.recheck.outputs.up_to_date != 'true'
         id: existing-pr
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.release-app-token.outputs.token }}
         run: |
           set -euo pipefail
           OPEN=$(gh pr list --base dev --state open --limit 200 \
@@ -126,13 +139,13 @@ jobs:
       - name: Clean up stale sync branches
         if: steps.recheck.outputs.up_to_date != 'true'
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
         run: |
           set -euo pipefail
           REFS=$(gh api --paginate "repos/${{ github.repository }}/git/matching-refs/heads/chore/sync-main-to-dev-" \
             --jq '.[].ref' | sed 's|refs/heads/||') || true
           for branch in ${REFS}; do
-            HAS_PR=$(gh pr list --base dev --head "${branch}" \
+            HAS_PR=$(GH_TOKEN="${{ steps.release-app-token.outputs.token }}" gh pr list --base dev --head "${branch}" \
               --state open --json number --jq 'length')
             if [ "${HAS_PR}" = "0" ]; then
               gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/${branch}" 2>/dev/null || true
@@ -156,7 +169,7 @@ jobs:
       - name: Create sync branch from main
         if: steps.existing-pr.outputs.count == '0' && steps.recheck.outputs.up_to_date != 'true'
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
         run: |
           set -euo pipefail
           MAIN_SHA=$(git rev-parse origin/main)
@@ -169,7 +182,7 @@ jobs:
         if: steps.existing-pr.outputs.count == '0' && steps.recheck.outputs.up_to_date != 'true'
         id: create-pr
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.release-app-token.outputs.token }}
           CONFLICT: ${{ steps.merge-check.outputs.conflict }}
         run: |
           set -euo pipefail
@@ -214,20 +227,9 @@ jobs:
           steps.create-pr.outputs.pr_url != ''
           && steps.merge-check.outputs.conflict != 'true'
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.release-app-token.outputs.token }}
           PR_URL: ${{ steps.create-pr.outputs.pr_url }}
         run: |
           set -euo pipefail
           gh pr merge "${PR_URL}" --auto --merge || \
             echo "Warning: could not enable auto-merge (may require branch protection settings)"
-
-      - name: Trigger sync-issues workflow
-        if: steps.create-pr.outputs.pr_url != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          echo "Triggering sync-issues workflow for dev..."
-          gh workflow run sync-issues.yml \
-            -f "target-branch=dev"
-          echo "✓ sync-issues workflow triggered"

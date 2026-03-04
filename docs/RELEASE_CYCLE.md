@@ -421,7 +421,6 @@ Any push to `main` (including PR merges) triggers the `sync-main-to-dev.yml` wor
    - Creates sync branch from main via API
    - Opens PR to dev (with `merge-conflict` label + resolution instructions if conflicts)
    - Enables auto-merge for conflict-free PRs
-   - Triggers sync-issues workflow targeting dev
 
 No CHANGELOG reset is needed -- dev already has `## Unreleased` from the prepare-release step. The sync simply brings the finalized `[X.Y.Z] - YYYY-MM-DD` from main, which merges cleanly because both branches share the `[X.Y.Z]` section as a common ancestor.
 
@@ -509,6 +508,18 @@ just reset-changelog
 ### Workflow Architecture
 
 The release process uses five coordinated workflows:
+
+### GitHub App Configuration
+
+Release automation relies on two GitHub Apps with different scopes:
+
+| App | Secrets | Permissions | Used by | Purpose |
+|-----|---------|-------------|---------|---------|
+| **RELEASE_APP** | `RELEASE_APP_ID`, `RELEASE_APP_PRIVATE_KEY` | Contents read/write, Issues read/write, Pull requests read/write | `release.yml`, `prepare-release.yml`, `sync-main-to-dev.yml` | Release operations, PR creation/updates, rollback |
+| **COMMIT_APP** | `COMMIT_APP_ID`, `COMMIT_APP_PRIVATE_KEY` | Contents read/write, Issues read, Pull requests read | `sync-issues.yml`, `sync-main-to-dev.yml` | Commits to protected branches and git ref operations |
+
+Additional requirement:
+- `COMMIT_APP` must be allowed in branch protection bypass rules for `dev` so sync commits can be pushed by automation.
 
 #### prepare-release.yml (Release Preparation Workflow)
 
@@ -648,7 +659,6 @@ gh workflow run release.yml \
    - Creates sync branch from main via API
    - Opens PR to dev (labels `merge-conflict` with resolution instructions if conflicts)
    - Enables auto-merge for conflict-free PRs
-   - Triggers sync-issues workflow targeting dev
 
 **Key characteristics:**
 - PR-based: satisfies branch protection rules requiring changes via PR

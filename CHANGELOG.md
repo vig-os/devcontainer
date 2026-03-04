@@ -124,6 +124,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Dev never enters a state without `## Unreleased`; both branches share the [X.Y.Z] section for clean merges
   - Candidate releases skip CHANGELOG changes; only final releases set the date
   - No CHANGELOG reset needed during post-release sync
+- **Release automation now uses dedicated GitHub App identities** ([#172](https://github.com/vig-os/devcontainer/issues/172))
+  - Replaced deprecated `APP_SYNC_ISSUES_*` secrets with `RELEASE_APP_*` for release and preparation workflows
+  - `sync-issues.yml` now uses `COMMIT_APP_*`; `sync-main-to-dev.yml` uses both apps (commit app for refs, release app for PR operations)
+  - Removed automatic `sync-issues` trigger from `sync-main-to-dev.yml` and documented the app permission model in `docs/RELEASE_CYCLE.md`
 
 - **worktree-clean: add filter mode for stopped-only vs all** ([#158](https://github.com/vig-os/devcontainer/issues/158))
   - Default `just worktree-clean` (no args) now cleans only stopped worktrees, skips running tmux sessions
