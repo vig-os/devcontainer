@@ -45,7 +45,7 @@ if [ -d "$BUILD_DIR/assets/workspace" ]; then
 	echo "Replacing {{IMAGE_TAG}} with $BUILD_VERSION in template files..."
 
 	find "$BUILD_DIR/assets/workspace" -type f -print0 | while IFS= read -r -d '' file; do
-		uv run python "$SCRIPT_DIR/utils.py" sed "s|{{IMAGE_TAG}}|$BUILD_VERSION|g" "$file"
+		uv run vig-utils sed "s|{{IMAGE_TAG}}|$BUILD_VERSION|g" "$file"
 	done
 
 	# Verify replacements
@@ -64,7 +64,7 @@ if [ -f "$BUILD_DEVCONTAINER_README" ] && [ -f "scripts/update_readme.py" ] && [
 	# Only update README if RELEASE_URL is provided (indicates a versioned release, not dev build)
 	if [ -n "$RELEASE_URL" ]; then
 		echo "Updating devcontainer README with version $BUILD_VERSION..."
-		if uv run python "$SCRIPT_DIR/utils.py" version "$BUILD_DEVCONTAINER_README" "$BUILD_VERSION" "$RELEASE_URL" "$RELEASE_DATE"; then
+		if uv run vig-utils version "$BUILD_DEVCONTAINER_README" "$BUILD_VERSION" "$RELEASE_URL" "$RELEASE_DATE"; then
 			echo "✓ Updated devcontainer README with version $BUILD_VERSION"
 		else
 			echo "❌ Failed to update devcontainer README..."

@@ -18,7 +18,6 @@ scripts/build.sh                @c-vigo
 scripts/prepare-build.sh        @c-vigo
 scripts/clean.sh                @c-vigo
 scripts/sync_manifest.py        @c-vigo
-scripts/utils.py                @c-vigo
 
 # Developer tooling scripts
 packages/vig-utils/src/vig_utils/gh_issues.py                   @gerchowl
