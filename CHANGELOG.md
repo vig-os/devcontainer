@@ -108,8 +108,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Graceful fallback when repo ID cannot be resolved or permissions are insufficient
 - **`init-workspace.sh` runs `just sync` after placeholder replacement** ([#170](https://github.com/vig-os/devcontainer/issues/170))
   - Resolves the `uv.lock` for the new project name and installs the project package into the venv during workspace bootstrap
+- **Candidate publishing mode in release workflow** ([#172](https://github.com/vig-os/devcontainer/issues/172))
+  - `release.yml` now supports `release-kind=candidate` (default) and infers the next available `X.Y.Z-rcN` tag automatically
+  - Candidate runs create and push Git tags, publish candidate manifests, and keep candidate tags after final release
+  - Final runs remain available via `release-kind=final` and are exposed by `just finalize-release`
+- **PR-based dev sync after release** ([#172](https://github.com/vig-os/devcontainer/issues/172))
+  - `sync-main-to-dev.yml` replaces `post-release.yml` — syncs main into dev via PR instead of direct push, satisfying branch protection rules
+  - Detects merge conflicts, labels `merge-conflict` with resolution instructions
+  - Auto-merge enabled for conflict-free PRs; stale sync branches cleaned up automatically
 
 ### Changed
+
+- **Release CHANGELOG flow redesigned** ([#172](https://github.com/vig-os/devcontainer/issues/172))
+  - `prepare-release.yml` now freezes CHANGELOG on dev (Unreleased → [X.Y.Z] - TBD + fresh empty Unreleased), then forks release branch and strips the empty Unreleased section
+  - Dev never enters a state without `## Unreleased`; both branches share the [X.Y.Z] section for clean merges
+  - Candidate releases skip CHANGELOG changes; only final releases set the date
+  - No CHANGELOG reset needed during post-release sync
+- **Release automation now uses dedicated GitHub App identities** ([#172](https://github.com/vig-os/devcontainer/issues/172))
+  - Replaced deprecated `APP_SYNC_ISSUES_*` secrets with `RELEASE_APP_*` for release and preparation workflows
+  - `sync-issues.yml` now uses `COMMIT_APP_*`; `sync-main-to-dev.yml` uses both apps (commit app for refs, release app for PR operations)
+  - Removed automatic `sync-issues` trigger from `sync-main-to-dev.yml` and documented the app permission model in `docs/RELEASE_CYCLE.md`
 
 - **worktree-clean: add filter mode for stopped-only vs all** ([#158](https://github.com/vig-os/devcontainer/issues/158))
   - Default `just worktree-clean` (no args) now cleans only stopped worktrees, skips running tmux sessions
@@ -349,6 +367,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **`post-release.yml`** — replaced by `sync-main-to-dev.yml` ([#172](https://github.com/vig-os/devcontainer/issues/172))
 - **`scripts/prepare-build.sh`** — merged into `build.sh` ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **`scripts/sync-prs-issues.sh`** — deprecated sync script ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **`test.yml` workflow** — replaced by `ci.yml` ([#48](https://github.com/vig-os/devcontainer/issues/48))
@@ -356,6 +375,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CHANGELOG extraction truncated on inline `##` markers** ([#172](https://github.com/vig-os/devcontainer/issues/172))
+  - `extract_unreleased_content` regex used mid-line lookahead for `##`/`###` which treated inline hash markers (e.g. `` `##` `` in backticks) as heading boundaries
+  - Anchored regex to line starts with `re.MULTILINE` so only actual heading lines terminate section capture
 - **install.sh is not idempotent — creates nested src/template_project on second run** ([#197](https://github.com/vig-os/devcontainer/issues/197))
   - Guard template_project rename: if `src/${SHORT_NAME}` already exists, remove the redundant copy instead of moving it inside
 - **just check uses wrong path — justfile_directory() resolves incorrectly in imported justfile.base** ([#187](https://github.com/vig-os/devcontainer/issues/187))
