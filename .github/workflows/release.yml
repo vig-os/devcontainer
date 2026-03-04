@@ -2,10 +2,14 @@
 #
 # Unified release workflow that handles the complete release process:
 # 1. Validate: Check all prerequisites (PR status, CI passed, CHANGELOG ready)
-# 2. Finalize: Set release date in CHANGELOG, trigger PR doc sync
+# 2. Finalize: For final releases only, set release date in CHANGELOG
 # 3. Build & Test: Build and test images for all architectures
 # 4. Publish: Create tag and publish images only if all tests pass
 # 5. Rollback (on failure): Revert changes and create issue
+#
+# Release kinds:
+#   candidate: Publishes X.Y.Z-rcN. No CHANGELOG changes, no sync-issues.
+#   final:     Publishes X.Y.Z. Sets release date in CHANGELOG, triggers sync-issues.
 #
 # Design: Everything happens in one workflow dispatch before creating the tag.
 # This ensures no broken releases are tagged.
@@ -362,11 +366,13 @@ jobs:
           persist-credentials: true
 
       - name: Set up environment
+        if: needs.validate.outputs.release_kind == 'final'
         uses: ./.github/actions/setup-env
         with:
           sync-dependencies: 'true'
 
       - name: Set release date in CHANGELOG
+        if: needs.validate.outputs.release_kind == 'final'
         env:
           VERSION: ${{ needs.validate.outputs.version }}
           RELEASE_DATE: ${{ needs.validate.outputs.release_date }}
@@ -375,7 +381,8 @@ jobs:
           uv run prepare-changelog finalize "$VERSION" "$RELEASE_DATE"
           echo "✓ Release date set in CHANGELOG.md"
 
-      - name: Commit and push finalization changes via API
+      - name: Commit finalization changes via API
+        if: needs.validate.outputs.release_kind == 'final'
         uses: vig-os/commit-action@b70c2d87acd0f146c40e8d88a9bda40b76c084b5  # v0.1.3
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -390,6 +397,7 @@ jobs:
           FILE_PATHS: CHANGELOG.md
 
       - name: Trigger sync-issues workflow
+        if: needs.validate.outputs.release_kind == 'final'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.validate.outputs.version }}
@@ -401,6 +409,9 @@ jobs:
           echo "✓ sync-issues workflow triggered"
 
       - name: Wait for sync-issues completion
+        if: needs.validate.outputs.release_kind == 'final'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           TIMEOUT=120
@@ -442,10 +453,8 @@ jobs:
             echo "The release may continue, but PR documentation may not be synced"
           fi
 
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: Pull sync-issues changes
+      - name: Pull remote changes
+        if: needs.validate.outputs.release_kind == 'final'
         env:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
@@ -456,10 +465,19 @@ jobs:
 
       - name: Output finalize SHA
         id: finalize
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_KIND: ${{ needs.validate.outputs.release_kind }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          FINALIZE_SHA=$(git rev-parse HEAD)
+          set -euo pipefail
+          if [ "$RELEASE_KIND" = "final" ]; then
+            FINALIZE_SHA=$(git rev-parse HEAD)
+          else
+            FINALIZE_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/$VERSION" --jq '.object.sha')
+          fi
           echo "finalize_sha=$FINALIZE_SHA" >> $GITHUB_OUTPUT
-          echo "Finalized at commit: $FINALIZE_SHA"
+          echo "Release kind: $RELEASE_KIND — SHA: $FINALIZE_SHA"
 
   build-and-test:
     name: Build and Test (${{ matrix.arch }})
@@ -831,7 +849,7 @@ jobs:
           echo "    - SBOM (SPDX) generated and attested"
           echo ""
           echo "Next steps:"
-          echo "  1. Merge release PR to main (triggers post-release workflow automatically)"
+          echo "  1. Merge release PR to main (triggers sync-main-to-dev workflow automatically)"
 
   rollback:
     name: Rollback on Failure

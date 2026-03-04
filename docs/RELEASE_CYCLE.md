@@ -106,30 +106,33 @@ gh pr create --base dev --head chore/<short-summary>
 ```mermaid
 graph TB
     A["Development on dev"] --> B["just prepare-release X.Y.Z<br/>(triggers workflow)"]
-    B --> C["Workflow: Create release/X.Y.Z branch"]
-    C --> D["Workflow: Create draft PR to main"]
-    D --> E["Review & Test Release"]
-    E --> F{Issues found?}
-    F -->|Yes| G["Fix via bugfix PRs"]
-    G --> E
-    F -->|No| H["Mark PR ready<br/>Get approval"]
-    H --> I["just finalize-release X.Y.Z<br/>(triggers workflow)"]
-    I --> J["Workflow: validate<br/>prerequisites"]
-    J --> K["Workflow: finalize CHANGELOG<br/>sync PR docs"]
-    K --> L["Workflow: build & test<br/>all architectures"]
-    L --> M{Tests pass?}
-    M -->|No| N["Automatic rollback<br/>+ issue creation"]
-    M -->|Yes| O["Workflow: create tag<br/>publish images"]
-    O --> P["Merge PR to main"]
-    P --> Q["Workflow: post-release<br/>Sync dev, reset CHANGELOG"]
+    B --> C["Workflow: Freeze CHANGELOG on dev"]
+    C --> D["Workflow: Create release/X.Y.Z branch"]
+    D --> E["Workflow: Reset Unreleased on dev"]
+    E --> F["Workflow: Create draft PR to main"]
+    F --> G["Review & Test Release"]
+    G --> H{Issues found?}
+    H -->|Yes| I["Fix via bugfix PRs"]
+    I --> G
+    H -->|No| J["Mark PR ready<br/>Get approval"]
+    J --> K["just publish-candidate X.Y.Z"]
+    K --> L["Workflow: build & test<br/>(no CHANGELOG changes)"]
+    L --> M["Publish X.Y.Z-rcN"]
+    J --> N["just finalize-release X.Y.Z"]
+    N --> O["Workflow: set release date<br/>build & test"]
+    O --> P{Tests pass?}
+    P -->|No| Q["Automatic rollback<br/>+ issue creation"]
+    P -->|Yes| R["Workflow: create tag<br/>publish images"]
+    R --> S["Merge PR to main"]
+    S --> T["Workflow: sync-main-to-dev<br/>PR-based sync"]
 ```
 
 ### Release Phases
 
-1. **Preparation** (`prepare-release`): Create release branch, prepare CHANGELOG, open draft PR
+1. **Preparation** (`prepare-release`): Freeze CHANGELOG on dev, create release branch, reset Unreleased on dev, open draft PR
 2. **Review & Testing**: CI validation, mark PR ready, fix issues, get approvals
-3. **Finalization** (GitHub Actions workflow): Validate, finalize CHANGELOG, build/test, tag, publish
-4. **Post-Release**: Merge PR to main (manual), then automated: sync dev with main, reset CHANGELOG
+3. **Finalization** (GitHub Actions workflow): Candidates skip CHANGELOG changes; final releases set the date. Both build/test/publish.
+4. **Post-Release**: Merge PR to main (manual), then automated: PR-based sync of main to dev
 
 
 ---
@@ -155,7 +158,7 @@ gh workflow run prepare-release.yml -f "version=X.Y.Z"
 
 **What the workflow does (automatically):**
 
-The `prepare-release.yml` workflow prepares the release branch:
+The `prepare-release.yml` workflow freezes the CHANGELOG on dev and creates the release branch:
 
 1. ✅ **Validate** job (runs first)
    - Validates semantic version format (X.Y.Z)
@@ -165,15 +168,18 @@ The `prepare-release.yml` workflow prepares the release branch:
    - Confirms dev branch is checked out
 
 2. ✅ **Prepare** job (skipped if --dry-run)
-   - Creates `release/X.Y.Z` branch from `dev`
-   - Prepares CHANGELOG using `prepare-changelog.py prepare`
-   - Moves Unreleased → `## [X.Y.Z] - TBD`
-   - Creates fresh Unreleased section
-   - Extracts CHANGELOG content for PR body
-   - Commits changes: `chore: prepare release X.Y.Z`
-   - Pushes release branch to origin (via GitHub App token, triggering CI)
+   - Runs `prepare-changelog prepare` → moves Unreleased content to `## [X.Y.Z] - TBD` + creates fresh empty Unreleased section
+   - Commits prepared CHANGELOG to `dev` via API (single atomic commit — dev never loses `## Unreleased`)
+   - Creates `release/X.Y.Z` branch from that dev commit
+   - Strips empty Unreleased section from release branch CHANGELOG
+   - Commits stripped CHANGELOG to release branch via API
    - Creates draft PR to `main` with CHANGELOG content as body
-   - Outputs PR URL and next steps
+
+**CHANGELOG state after prepare-release:**
+- `dev`: `## Unreleased` (empty) + `## [X.Y.Z] - TBD` (with content)
+- `release/X.Y.Z`: `## [X.Y.Z] - TBD` (with content, no Unreleased)
+
+This design ensures both branches share the `[X.Y.Z]` section as a common ancestor, which reduces merge conflicts when main is synced back to dev after release.
 
 **Output example:**
 
@@ -184,13 +190,18 @@ Release Summary:
   Version: 1.0.0
   Branch: release/1.0.0
 
+CHANGELOG state:
+  dev:     ## Unreleased (empty) + ## [1.0.0] - TBD
+  release: ## [1.0.0] - TBD (no Unreleased)
+
 Next steps:
   1. Test release: git checkout release/1.0.0
   2. Review draft PR and monitor CI
   3. Fix any issues via bugfix PRs to release/1.0.0
   4. Mark PR as ready for review (gh pr ready <PR_NUMBER>)
   5. Get PR approval from reviewer
-  6. Run: just finalize-release 1.0.0
+  6. Publish candidate: just publish-candidate 1.0.0
+  7. Final release: just finalize-release 1.0.0
 ```
 
 **Key characteristics:**
@@ -200,6 +211,7 @@ Next steps:
 - **CI triggering**: Push via GitHub App token triggers CI on release branch automatically
 - **No interactive prompts**: Workflow fails if CHANGELOG Unreleased section is missing or empty (no user prompts)
 - **Reproducible**: Same behavior regardless of developer's local setup
+- **Atomic CHANGELOG**: Dev never enters a state without `## Unreleased`
 
 ### Phase 2: Review & Testing
 
@@ -321,7 +333,7 @@ gh run list --workflow release.yml
 
 **What the workflow does (automatically):**
 
-The `release.yml` workflow performs the entire remaining release process:
+The `release.yml` workflow performs the entire remaining release process. Behavior differs by release kind:
 
 1. ✅ **Validate** job (runs first)
    - Validates semantic version format
@@ -332,12 +344,8 @@ The `release.yml` workflow performs the entire remaining release process:
    - Records pre-finalization commit for rollback
 
 2. ✅ **Finalize** job (skipped if --dry-run)
-   - Sets actual release date in CHANGELOG (TBD → YYYY-MM-DD)
-   - Commits: `chore: finalize release X.Y.Z`
-   - Pushes release branch
-   - Triggers sync-issues workflow to generate PR documentation
-   - Waits for sync-issues completion (120s timeout)
-   - Pulls PR docs into the release branch
+   - **Candidate**: No CHANGELOG changes. Outputs current release branch HEAD SHA.
+   - **Final**: Sets actual release date in CHANGELOG (TBD → YYYY-MM-DD), commits, triggers sync-issues workflow, outputs finalized SHA.
 
 3. ✅ **Build & Test** jobs (per-architecture, runs in parallel)
    - Builds container image as tar file
@@ -401,14 +409,21 @@ gh run list --workflow release.yml --limit 1
 gh pr merge <PR_NUMBER> --merge
 ```
 
-**What the `post-release.yml` workflow does (automatically on merge):**
+**What the `sync-main-to-dev.yml` workflow does (automatically on push to main):**
 
-Merging any PR to `main` triggers the `post-release.yml` workflow, which:
+Any push to `main` (including PR merges) triggers the `sync-main-to-dev.yml` workflow, which creates a PR to sync main into dev:
 
-1. ✅ **Merges main into dev** -- keeps dev in sync with main
-2. ✅ **Resets CHANGELOG** -- creates fresh Unreleased section for next cycle (skipped gracefully if Unreleased already exists, e.g. for non-release merges)
-3. ✅ **Commits and pushes** -- only if there are actual changes
-4. ✅ **Triggers sync-issues** -- updates issue/PR documentation on dev
+1. ✅ **Check** -- Early exit if dev already contains all main commits
+2. ✅ **Sync** -- Creates a PR from a disposable `chore/sync-main-to-dev-*` branch into dev:
+   - Checks for existing open sync PR (skips if one exists)
+   - Cleans up stale sync branches without open PRs
+   - Detects merge conflicts via trial merge
+   - Creates sync branch from main via API
+   - Opens PR to dev (with `merge-conflict` label + resolution instructions if conflicts)
+   - Enables auto-merge for conflict-free PRs
+   - Triggers sync-issues workflow targeting dev
+
+No CHANGELOG reset is needed -- dev already has `## Unreleased` from the prepare-release step. The sync simply brings the finalized `[X.Y.Z] - YYYY-MM-DD` from main, which merges cleanly because both branches share the `[X.Y.Z]` section as a common ancestor.
 
 **Verify release is published:**
 
@@ -429,50 +444,43 @@ docker buildx imagetools inspect ghcr.io/vig-os/devcontainer:1.0.0
 ## Scripts and Tools
 
 
-### prepare-changelog.py
+### prepare-changelog
 
-**Location:** `scripts/prepare-changelog.py`
+**Location:** `packages/vig-utils/src/vig_utils/prepare_changelog.py` (installed as `prepare-changelog` CLI)
 
 **Purpose:** Multi-action CHANGELOG management tool
 
 **Actions:**
 
 #### `prepare VERSION [FILE]`
-Move Unreleased section to version section with TBD date.
+Move Unreleased content to `[VERSION] - TBD` section and create fresh empty Unreleased section. Used by `prepare-release.yml` to freeze the CHANGELOG on dev.
 
 ```bash
-uv run python scripts/prepare-changelog.py prepare 1.0.0 [CHANGELOG.md]
+uv run prepare-changelog prepare 1.0.0 [CHANGELOG.md]
 ```
 
 #### `validate [FILE]`
-Validate CHANGELOG has Unreleased section with content.
+Validate CHANGELOG has Unreleased section with content. Used by `prepare-release.yml` to ensure there are changes to release.
 
 ```bash
-uv run python scripts/prepare-changelog.py validate [CHANGELOG.md]
+uv run prepare-changelog validate [CHANGELOG.md]
 ```
-
-Used by the `prepare-release.yml` workflow to ensure there are changes to release.
 
 #### `reset [FILE]`
-Create fresh Unreleased section (for after release merge to dev).
+Create fresh Unreleased section when one doesn't exist. **Safety:** Fails if Unreleased section already exists.
 
 ```bash
-uv run python scripts/prepare-changelog.py reset [CHANGELOG.md]
+uv run prepare-changelog reset [CHANGELOG.md]
 ```
-
-**Safety:** Fails if Unreleased section already exists (prevents accidental data loss).
 
 #### `finalize VERSION DATE [FILE]`
-
-Replace TBD date with actual release date for a version section.
+Replace TBD date with actual release date. Used by `release.yml` (final releases only) to set the date.
 
 ```bash
-uv run python scripts/prepare-changelog.py finalize 1.0.0 2026-02-11 [CHANGELOG.md]
+uv run prepare-changelog finalize 1.0.0 2026-02-11 [CHANGELOG.md]
 ```
 
-Used by the `release.yml` workflow to set the actual release date.
-
-**Tests:** `tests/test_release_cycle.py::TestPrepareChangelog`
+**Tests:** `packages/vig-utils/tests/test_prepare_changelog.py`
 
 ### Justfile Recipes
 
@@ -506,7 +514,7 @@ The release process uses five coordinated workflows:
 
 **Trigger:** `workflow_dispatch` (manual trigger via `just prepare-release X.Y.Z`)
 
-**Purpose:** Create and prepare release branch for testing
+**Purpose:** Freeze CHANGELOG on dev and create release branch
 
 **Jobs (sequential):**
 
@@ -518,14 +526,13 @@ The release process uses five coordinated workflows:
    - Confirms dev branch is checked out
    - Outputs: version, release_branch
 
-2. **prepare** (skipped if dry-run) - Creates and prepares release branch
-   - Creates `release/X.Y.Z` branch from `dev`
-   - Prepares CHANGELOG using `prepare-changelog.py prepare`
-   - Extracts CHANGELOG content for PR body
-   - Creates standardized commit: `chore: prepare release X.Y.Z`
-   - Pushes release branch to origin (via GitHub App token to trigger CI)
+2. **prepare** (skipped if dry-run) - Freezes CHANGELOG and creates release branch
+   - Runs `prepare-changelog prepare` (Unreleased → [X.Y.Z] - TBD + fresh empty Unreleased)
+   - Commits prepared CHANGELOG to `dev` via API
+   - Creates `release/X.Y.Z` branch from that dev commit
+   - Strips empty Unreleased section from release branch CHANGELOG
+   - Commits stripped CHANGELOG to release branch via API
    - Creates draft PR to `main` with release content
-   - Outputs summary and next steps
 
 **Manual trigger (for testing):**
 
@@ -561,13 +568,9 @@ gh workflow run prepare-release.yml -f "version=1.0.0" -f "dry-run=true"
    - Records pre-finalization commit for rollback
    - Outputs: PR number, release date, pre-finalization SHA, publish tag metadata
 
-2. **finalize** (skipped if dry-run) - Updates release branch
-   - Sets release date in CHANGELOG
-   - Creates finalization commit
-   - Pushes to release branch
-   - Triggers sync-issues workflow
-   - Waits for sync-issues completion (120s timeout)
-   - Outputs: finalization commit SHA
+2. **finalize** (skipped if dry-run) - Conditionally updates release branch
+   - **Candidate**: No CHANGELOG changes, no sync-issues. Outputs current release branch HEAD SHA.
+   - **Final**: Sets release date in CHANGELOG (TBD → YYYY-MM-DD), commits, triggers sync-issues, outputs finalized SHA.
 
 3. **build-and-test** (matrix: amd64, arm64) - Builds and validates images
    - Builds container image for architecture
@@ -629,23 +632,30 @@ gh workflow run release.yml \
 
 **For more details:** See sync-issues workflow documentation
 
-#### post-release.yml (Post-Release Workflow)
+#### sync-main-to-dev.yml (Sync Workflow)
 
-**Trigger:** `pull_request` closed event on `main` branch (runs when any PR is merged to main)
+**Trigger:** `push` to `main` branch, or manual `workflow_dispatch`
 
-**Purpose:** Keep dev in sync with main after merge. After a release, also resets CHANGELOG for next cycle.
+**Purpose:** Keep dev up to date with main via a PR. Never pushes directly to protected branches.
 
-**Job: sync-dev** (single job, skipped if PR was closed without merging)
+**Jobs:**
 
-1. Merges `main` into `dev`
-2. Resets CHANGELOG Unreleased section (`continue-on-error` -- succeeds after releases, skipped for non-release merges)
-3. Commits and pushes to `dev` (only if there are changes)
-4. Triggers `sync-issues.yml` targeting `dev`
+1. **check** -- Early exit if dev already contains all main commits
+2. **sync** -- Creates a PR from a disposable `chore/sync-main-to-dev-*` branch into dev:
+   - Skips if an open sync PR already exists
+   - Cleans up stale sync branches without open PRs
+   - Detects merge conflicts via trial merge
+   - Creates sync branch from main via API
+   - Opens PR to dev (labels `merge-conflict` with resolution instructions if conflicts)
+   - Enables auto-merge for conflict-free PRs
+   - Triggers sync-issues workflow targeting dev
 
 **Key characteristics:**
-- Fires automatically on any PR merge to `main` -- no manual trigger needed
-- Works for both release merges and non-release merges (e.g., hotfixes)
-- CHANGELOG reset is graceful: succeeds when Unreleased section was consumed (release), harmlessly fails when it already exists (non-release)
+- PR-based: satisfies branch protection rules requiring changes via PR
+- No CHANGELOG reset needed: dev already has `## Unreleased` from prepare-release
+- Conflict detection: labels PRs with `merge-conflict` and provides resolution instructions
+- Stale branch cleanup: removes old sync branches without open PRs
+- Auto-merge: enabled for conflict-free PRs
 
 #### ci.yml (CI Workflow)
 
@@ -926,6 +936,8 @@ Follow [Semantic Versioning 2.0.0](https://semver.org/):
 
 - Update during development, not at release time
 - Each feature/fix PR should update CHANGELOG
+- On `dev` and feature branches: edit `## Unreleased`
+- On `release/*` branches: edit `## [X.Y.Z] - TBD` (no Unreleased section exists)
 - Use clear, user-facing language
 - Include issue references: `([#N](link))`
 - Group by type: Added, Changed, Fixed, Removed, etc.

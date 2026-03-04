@@ -250,7 +250,7 @@ reference, see [docs/RELEASE_CYCLE.md](docs/RELEASE_CYCLE.md).
    - Automatically roll back on failure
 
 5. **Merge the release PR into `main`**
-   - The post-release workflow automatically syncs `dev` with `main` and resets the CHANGELOG Unreleased section
+   - The `sync-main-to-dev` workflow automatically opens a PR to merge `main` into `dev`
 
 ## Version Tagging
 
