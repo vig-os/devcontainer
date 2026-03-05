@@ -506,6 +506,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Update vulnerable Python dependencies** ([#88](https://github.com/vig-os/devcontainer/issues/88))
   - Add uv constraints for transitive dependencies: `urllib3>=2.6.3`, `filelock>=3.20.3`, and `virtualenv>=20.36.1`
   - Regenerate `uv.lock` with patched resolutions (`urllib3 2.6.3`, `filelock 3.25.0`, `virtualenv 21.1.0`)
+- **Temporary Trivy exception for CVE-2025-15558 in gh binary** ([#122](https://github.com/vig-os/devcontainer/issues/122))
+  - Added `CVE-2025-15558` to `.trivyignore` with risk assessment, upstream dependency context, and an expiration date
+  - Keeps CI vulnerability scan unblocked while waiting for an upstream `gh` release that includes the patched `github.com/docker/cli` dependency
 
 ## [0.2.1](https://github.com/vig-os/devcontainer/releases/tag/0.2.1) - 2026-01-28
 
