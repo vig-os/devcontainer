@@ -111,6 +111,25 @@ RUN set -eux; \
     rm "$FILE"; \
     just --version;
 
+# Install hadolint binary with checksum verification
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+        amd64) ARCH=linux-x86_64 ;; \
+        arm64) ARCH=linux-arm64 ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    HADOLINT_VERSION="v2.14.0"; \
+    URL="https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}"; \
+    FILE="hadolint-${ARCH}"; \
+    SHA_FILE="${FILE}.sha256"; \
+    curl -fsSL "${URL}/${FILE}" -o "$FILE"; \
+    curl -fsSL "${URL}/${SHA_FILE}" -o "$SHA_FILE"; \
+    EXPECTED_SHA="$(awk '{print $1}' "$SHA_FILE")"; \
+    echo "${EXPECTED_SHA}  ${FILE}" | sha256sum -c -; \
+    install -m 0755 "$FILE" /usr/local/bin/hadolint; \
+    rm "$FILE" "$SHA_FILE"; \
+    hadolint --version;
+
 # Install cursor-agent CLI (installs to ~/.local/bin)
 ENV PATH="/root/.local/bin:${PATH}"
 RUN set -eux; \

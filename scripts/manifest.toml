@@ -107,7 +107,7 @@ dest = ".devcontainer/justfile.worktree"
 src = ".pre-commit-config.yaml"
 transforms = [
   { type = "RemovePrecommitHooks", hook_ids = [
-    "hadolint-docker",
+    "hadolint",
     "generate-docs",
     "sync-manifest",
     "pip-licenses",
