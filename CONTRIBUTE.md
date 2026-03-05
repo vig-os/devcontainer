@@ -30,7 +30,7 @@ This guide explains how to develop, build, test, and release the vigOS developme
 sudo apt update
 sudo apt install -y podman git openssh-client jq tmux nodejs npm parallel
 # just
-curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
 # gh
 curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
