@@ -116,6 +116,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `sync-main-to-dev.yml` replaces `post-release.yml` — syncs main into dev via PR instead of direct push, satisfying branch protection rules
   - Detects merge conflicts, labels `merge-conflict` with resolution instructions
   - Auto-merge enabled for conflict-free PRs; stale sync branches cleaned up automatically
+- **hadolint installed and wired into CI tooling** ([#122](https://github.com/vig-os/devcontainer/issues/122))
+  - Install `hadolint` in the devcontainer image with SHA-256 checksum verification
+  - Add image test coverage to verify `hadolint` is available in the built image
+  - Configure pre-commit to use the local `hadolint` binary and install it in `setup-env`/`test-project` workflows
 
 ### Changed
 
@@ -475,6 +479,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Add an explicit empty-version guard so the build fails with a clear error message if version resolution fails
 - **CI python security scan fails on unsatisfiable safety pin** ([#213](https://github.com/vig-os/devcontainer/issues/213))
   - Bump workflow `safety` install pin from `3.2.11` to `3.7.0` in both root and workspace-template CI workflows so `uv pip install` resolves successfully again
+- **Requirements parser and `just` install guidance in setup flow** ([#122](https://github.com/vig-os/devcontainer/issues/122))
+  - `scripts/init.sh` now supports multiline `install_command` values in `scripts/requirements.yaml`
+  - Update `just` install instructions to use `sudo` where required by apt-based installation steps
 
 ### Security
 
