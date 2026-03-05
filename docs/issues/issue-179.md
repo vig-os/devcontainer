@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-24T15:22:45Z
-updated: 2026-02-24T15:22:45Z
+updated: 2026-03-04T08:57:19Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/179
-comments: 0
+comments: 1
 labels: refactor, area:workflow, effort:small
 assignees: none
-milestone: none
+milestone: 0.3
 projects: none
 relationship: none
-synced: 2026-02-25T04:25:53.311Z
+synced: 2026-03-05T04:18:20.658Z
 ---
 
 # [Issue 179]: [[REFACTOR] Move gh_issues.py into vig-utils and add entry point](https://github.com/vig-os/devcontainer/issues/179)
@@ -57,3 +57,11 @@ Changed
 ### Additional Context
 
 Related to parent issue `#145`.
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on March 4, 2026 at 07:00 AM_
+
+Subsumed by #217: [REFACTOR] Reorganize scripts/ — project-specific vs shared vig-utils. Tracking migration work there to keep script reorganization in one place.
+
