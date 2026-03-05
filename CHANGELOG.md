@@ -120,6 +120,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Install `hadolint` in the devcontainer image with SHA-256 checksum verification
   - Add image test coverage to verify `hadolint` is available in the built image
   - Configure pre-commit to use the local `hadolint` binary and install it in `setup-env`/`test-project` workflows
+- **Taplo TOML linting in pre-commit** ([#181](https://github.com/vig-os/devcontainer/issues/181))
+  - Add SHA-pinned `taplo-format` and `taplo-lint` hooks to enforce TOML formatting and schema-aware validation
+  - Add `.taplo.toml` to repository sync manifest so workspace templates receive the same Taplo configuration
 
 ### Changed
 

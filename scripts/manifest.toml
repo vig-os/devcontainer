@@ -36,6 +36,9 @@ src = ".pymarkdown.config.md"
 src = ".hadolint.yaml"
 
 [[entries]]
+src = ".taplo.toml"
+
+[[entries]]
 src = ".github/agent-blocklist.toml"
 
 [[entries]]
