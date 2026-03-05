@@ -45,6 +45,7 @@ runs:
       uses: ./.github/actions/setup-env
       with:
         sync-dependencies: 'true'
+        install-hadolint: 'true'
         install-bats: 'true'
 
     - name: Cache pre-commit hooks

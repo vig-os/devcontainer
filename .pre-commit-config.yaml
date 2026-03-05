@@ -58,11 +58,13 @@ repos:
         args: ["-x"]
 
   # Containerfile
-  - repo: https://github.com/hadolint/hadolint
-    rev: 346e4199e4baca7d6827f20ac078b6eee5b39327  # v2.9.3
+  - repo: local
     hooks:
-      - id: hadolint-docker
+      - id: hadolint
         name: hadolint
+        entry: hadolint
+        language: system
+        files: ^(.*/)?(Containerfile|Dockerfile)$
 
   # Markdown Linting (excludes auto-generated docs)
   - repo: https://github.com/jackdewinter/pymarkdown
