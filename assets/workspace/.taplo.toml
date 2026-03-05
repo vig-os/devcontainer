@@ -1,9 +1,0 @@
-# Taplo lint configuration.
-# Keep schema validation enabled by default and opt out only where
-# repository templates or tool sections are not schema-compatible.
-
-[[rule]]
-include = ["pyproject.toml", "assets/workspace/pyproject.toml"]
-
-[rule.schema]
-enabled = false

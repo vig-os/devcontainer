@@ -122,7 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Configure pre-commit to use the local `hadolint` binary and install it in `setup-env`/`test-project` workflows
 - **Taplo TOML linting in pre-commit** ([#181](https://github.com/vig-os/devcontainer/issues/181))
   - Add SHA-pinned `taplo-format` and `taplo-lint` hooks to enforce TOML formatting and schema-aware validation
-  - Add `.taplo.toml` to repository sync manifest so workspace templates receive the same Taplo configuration
+  - Add `.taplo.toml` configuration (local to this repository, not synced downstream)
 
 ### Changed
 
