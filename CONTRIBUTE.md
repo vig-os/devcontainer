@@ -60,19 +60,19 @@ rm -f "${BIN_FILE}" "${SHA_FILE}"
 
 # taplo
 case "$(dpkg --print-architecture)" in
-  amd64) ARCH="x86_64-unknown-linux-gnu" ;;
-  arm64) ARCH="aarch64-unknown-linux-gnu" ;;
+  amd64) ARCH="x86_64" ;;
+  arm64) ARCH="aarch64" ;;
   *)
     echo "Unsupported architecture: $(dpkg --print-architecture)"
     exit 1
     ;;
 esac
 BASE_URL="https://github.com/tamasfe/taplo/releases/latest/download"
-BIN_FILE="taplo-full-${ARCH}.gz"
+BIN_FILE="taplo-linux-${ARCH}.gz"
 curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
 gunzip "${BIN_FILE}"
-sudo install -m 0755 "taplo-full-${ARCH}" /usr/local/bin/taplo
-rm -f "taplo-full-${ARCH}"
+sudo install -m 0755 "taplo-linux-${ARCH}" /usr/local/bin/taplo
+rm -f "taplo-linux-${ARCH}"
 
 ```
 
