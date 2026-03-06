@@ -228,6 +228,34 @@ dependencies:
         rm -f "${BIN_FILE}" "${SHA_FILE}"
       manual: https://github.com/hadolint/hadolint/releases
 
+  # TOML linting
+  - name: taplo
+    version: latest
+    purpose: TOML formatter and linter used by pre-commit
+    required: true
+    check:
+      command: command -v taplo
+      version_command: taplo --version
+      version_regex: 'taplo (\d+\.\d+)'
+    install:
+      macos: brew install taplo
+      debian: |
+        case "$(dpkg --print-architecture)" in
+          amd64) ARCH="x86_64-unknown-linux-gnu" ;;
+          arm64) ARCH="aarch64-unknown-linux-gnu" ;;
+          *)
+            echo "Unsupported architecture: $(dpkg --print-architecture)"
+            exit 1
+            ;;
+        esac
+        BASE_URL="https://github.com/tamasfe/taplo/releases/latest/download"
+        BIN_FILE="taplo-full-${ARCH}.gz"
+        curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
+        gunzip "${BIN_FILE}"
+        sudo install -m 0755 "taplo-full-${ARCH}" /usr/local/bin/taplo
+        rm -f "taplo-full-${ARCH}"
+      manual: https://github.com/tamasfe/taplo/releases
+
   # Parallel (auto-installed by npm install)
   - name: parallel
     version: latest

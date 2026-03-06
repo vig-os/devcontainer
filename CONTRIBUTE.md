@@ -23,6 +23,7 @@ This guide explains how to develop, build, test, and release the vigOS developme
 | **bats** | 1.13.0 | Bash Automated Testing System for shell script tests |
 | **devcontainer** | 0.81.1 | DevContainer CLI for testing devcontainer functionality |
 | **hadolint** | latest | Containerfile/Dockerfile linter used by pre-commit |
+| **taplo** | latest | TOML formatter and linter used by pre-commit |
 | **parallel** | latest | Parallelizes BATS test execution for faster test runs |
 
 **Ubuntu/Debian:**
@@ -57,12 +58,28 @@ echo "${EXPECTED_SHA}  ${BIN_FILE}" | sha256sum -c -
 sudo install -m 0755 "${BIN_FILE}" /usr/local/bin/hadolint
 rm -f "${BIN_FILE}" "${SHA_FILE}"
 
+# taplo
+case "$(dpkg --print-architecture)" in
+  amd64) ARCH="x86_64-unknown-linux-gnu" ;;
+  arm64) ARCH="aarch64-unknown-linux-gnu" ;;
+  *)
+    echo "Unsupported architecture: $(dpkg --print-architecture)"
+    exit 1
+    ;;
+esac
+BASE_URL="https://github.com/tamasfe/taplo/releases/latest/download"
+BIN_FILE="taplo-full-${ARCH}.gz"
+curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
+gunzip "${BIN_FILE}"
+sudo install -m 0755 "taplo-full-${ARCH}" /usr/local/bin/taplo
+rm -f "taplo-full-${ARCH}"
+
 ```
 
 **macOS (Homebrew):**
 
 ```bash
-brew install podman just git openssh gh jq tmux node hadolint parallel
+brew install podman just git openssh gh jq tmux node hadolint taplo parallel
 ```
 
 - For other Linux distributions, use your package manager (e.g., `dnf`, `yum`, `zypper`, `apk`) to install these dependencies.
