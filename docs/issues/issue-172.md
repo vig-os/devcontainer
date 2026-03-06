@@ -1,18 +1,18 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-24T10:13:37Z
-updated: 2026-02-24T10:13:37Z
+updated: 2026-03-04T20:52:29Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/172
-comments: 0
+comments: 1
 labels: feature, area:ci, effort:medium, semver:minor
-assignees: none
-milestone: Backlog
+assignees: c-vigo
+milestone: 0.3
 projects: none
 relationship: none
-synced: 2026-02-25T04:25:55.092Z
+synced: 2026-03-05T04:18:21.133Z
 ---
 
 # [Issue 172]: [[FEATURE] Add RC publishing and cleanup to devcontainer release workflow](https://github.com/vig-os/devcontainer/issues/172)
@@ -62,6 +62,56 @@ Added
 
 - [ ] Can publish `X.Y.Z-rc1` to GHCR from a release branch
 - [ ] Can publish incremented RCs (`rc2`, `rc3`, etc.)
-- [ ] RC tags are cleaned up from GHCR after the final `X.Y.Z` is published
+- [ ] Candidate tags (`X.Y.Z-rc*`) are retained after final release
 - [ ] Existing release workflow is not broken
 - [ ] TDD compliance (see .cursor/rules/tdd.mdc)
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on March 4, 2026 at 01:43 PM_
+
+## Design
+
+Issue: #172
+Branch: feature/172-rc-publishing-cleanup-release-workflow
+
+### Decisions Confirmed
+- Extend existing `.github/workflows/release.yml` (no new workflow file).
+- Add `release-kind` input with default `candidate`.
+- Candidate runs infer the next available RC number automatically (`X.Y.Z-rcN`).
+- Every candidate publish creates and pushes a git tag (`X.Y.Z-rcN`).
+- Candidate tags are retained (no cleanup on final release).
+
+### Architecture
+- Keep current `validate -> finalize -> build-and-test -> publish -> rollback` structure.
+- Add mode-aware behavior in `validate` and `publish`:
+  - `candidate` mode computes `publish_version = X.Y.Z-rcN` using next available N from existing tags.
+  - `final` mode keeps current `publish_version = X.Y.Z` behavior.
+
+### Data Flow
+- `workflow_dispatch` inputs feed `validate`.
+- `validate` outputs include mode and computed publish version.
+- `build-and-test` remains unchanged and uses base `X.Y.Z` inputs for branch/release context.
+- `publish` uses computed publish version for tag and image manifest naming.
+
+### Publish Rules
+- Candidate mode:
+  - Create/push git tag `X.Y.Z-rcN`.
+  - Publish arch images and multi-arch manifest for `X.Y.Z-rcN`.
+  - Do not update `latest`.
+- Final mode:
+  - Preserve existing behavior for git tag `X.Y.Z`, manifest `X.Y.Z`, and conditional `latest`.
+
+### Error Handling and Safety
+- Next-RC inference includes a pre-push collision check; if race detected, fail with retry guidance.
+- Rollback path supports deleting candidate tag when candidate publish partially failed.
+- Final release path remains default-safe via explicit mode checks around candidate logic.
+
+### Testing Strategy (TDD-aligned)
+- Candidate mode with no prior tags infers `rc1`.
+- Candidate mode with existing tags infers next number (`rc2`, `rc3`, ...).
+- Candidate mode creates git tag and publishes candidate manifest without touching `latest`.
+- Final mode regression checks confirm existing release behavior remains intact.
+- Workflow YAML/lint validation and targeted CI verification required before merge.
+

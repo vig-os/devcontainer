@@ -22,13 +22,15 @@ EXPECTED_VERSIONS = {
     "python": "3.12",  # Python (from base image)
     "pre_commit": "4.5.",  # Minor version check (installed via uv pip)
     "ruff": "0.15.",  # Minor version check (installed via uv pip)
+    "bandit": "1.9.",  # Minor version check (installed via uv pip)
     "pip_licenses": "5.",  # Major version check (installed via uv pip)
-    "bandit": "1.",  # Major version check (installed via uv pip)
     "just": "1.46.",  # Minor version check (manually installed from latest release)
+    "hadolint": "2.14.",  # Minor version check (manually installed from pinned release)
     "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),
     "typstyle": "0.14.",  # Minor version check (installed from latest release)
     "vig_utils": "0.1.",  # Minor version check (installed via uv pip)
     "tmux": "3.3",  # Major.minor version check (from apt package)
+    "rsync": "3.2",  # Major.minor version check (from apt package)
 }
 
 
@@ -142,6 +144,21 @@ class TestSystemTools:
             f"Expected just {expected}, got: {result.stdout}"
         )
 
+    def test_hadolint_installed(self, host):
+        """Test that hadolint is installed."""
+        # hadolint is manually installed, so check for the binary file
+        assert host.file("/usr/local/bin/hadolint").exists, "hadolint binary not found"
+        assert host.file("/usr/local/bin/hadolint").is_file, "hadolint is not a file"
+
+    def test_hadolint_version(self, host):
+        """Test that hadolint version is correct."""
+        result = host.run("hadolint --version")
+        assert result.rc == 0, "hadolint --version failed"
+        expected = EXPECTED_VERSIONS["hadolint"]
+        assert expected in result.stdout, (
+            f"Expected hadolint {expected}, got: {result.stdout}"
+        )
+
     def test_cursor_agent_installed(self, host):
         """Test that cursor-agent CLI (agent) is installed."""
         result = host.run("agent --version")
@@ -184,6 +201,19 @@ class TestSystemTools:
         expected = EXPECTED_VERSIONS["tmux"]
         assert expected in result.stdout, (
             f"Expected tmux {expected}, got: {result.stdout}"
+        )
+
+    def test_rsync_installed(self, host):
+        """Test that rsync is installed."""
+        assert host.package("rsync").is_installed, "rsync is not installed"
+
+    def test_rsync_version(self, host):
+        """Test that rsync version is correct."""
+        result = host.run("rsync --version")
+        assert result.rc == 0, "rsync --version failed"
+        expected = EXPECTED_VERSIONS["rsync"]
+        assert expected in result.stdout, (
+            f"Expected rsync {expected}, got: {result.stdout}"
         )
 
     def test_tmux_detached_session_survives(self, host):
@@ -258,14 +288,17 @@ PYPROJECT_EOF"""
             assert result.rc == 0, f"Failed to create pyproject.toml: {result.stderr}"
 
             # Step 2: Run uv sync (should create .venv by default)
-            result = host.run(f"cd {test_dir} && uv sync")
+            # Unset UV_PROJECT_ENVIRONMENT so uv creates a local .venv
+            result = host.run(f"cd {test_dir} && UV_PROJECT_ENVIRONMENT= uv sync")
             assert result.rc == 0, f"uv sync failed: {result.stderr}"
             assert host.file(lockfile_path).exists, "uv.lock file was not created"
             assert host.file(venv_path).is_directory, ".venv directory was not created"
 
             # Step 3: Run uv add with a lightweight package (typing-extensions is very lightweight)
             package_name = "typing-extensions"
-            result = host.run(f"cd {test_dir} && uv add {package_name}")
+            result = host.run(
+                f"cd {test_dir} && UV_PROJECT_ENVIRONMENT= uv add {package_name}"
+            )
             assert result.rc == 0, f"uv add {package_name} failed: {result.stderr}"
 
             # Verify package was added to pyproject.toml
@@ -275,13 +308,13 @@ PYPROJECT_EOF"""
             )
 
             # Step 4: Run uv sync again
-            result = host.run(f"cd {test_dir} && uv sync")
+            result = host.run(f"cd {test_dir} && UV_PROJECT_ENVIRONMENT= uv sync")
             assert result.rc == 0, f"Second uv sync failed: {result.stderr}"
 
             # Verify the package is installed in venv (not system-wide)
             # Use uv run to execute in the venv context
             result = host.run(
-                f"cd {test_dir} && uv run python -c 'import {package_name.replace('-', '_')}; print(\"OK\")'"
+                f"cd {test_dir} && UV_PROJECT_ENVIRONMENT= uv run python -c 'import {package_name.replace('-', '_')}; print(\"OK\")'"
             )
             assert result.rc == 0, (
                 f"{package_name} is not importable in venv after uv sync"
@@ -333,16 +366,6 @@ class TestDevelopmentTools:
             f"Expected ruff {expected}, got: {result.stdout}"
         )
 
-    def test_pip_licenses_installed(self, host):
-        """Test that pip-licenses is installed."""
-        result = host.run("pip-licenses --version")
-        assert result.rc == 0, "pip-licenses --version failed"
-        assert "pip-licenses" in result.stdout.lower()
-        expected = EXPECTED_VERSIONS["pip_licenses"]
-        assert expected in result.stdout, (
-            f"Expected pip-licenses {expected}, got: {result.stdout}"
-        )
-
     def test_bandit_installed(self, host):
         """Test that bandit is installed."""
         result = host.run("bandit --version")
@@ -351,6 +374,16 @@ class TestDevelopmentTools:
         expected = EXPECTED_VERSIONS["bandit"]
         assert expected in result.stdout, (
             f"Expected bandit {expected}, got: {result.stdout}"
+        )
+
+    def test_pip_licenses_installed(self, host):
+        """Test that pip-licenses is installed."""
+        result = host.run("pip-licenses --version")
+        assert result.rc == 0, "pip-licenses --version failed"
+        assert "pip-licenses" in result.stdout.lower()
+        expected = EXPECTED_VERSIONS["pip_licenses"]
+        assert expected in result.stdout, (
+            f"Expected pip-licenses {expected}, got: {result.stdout}"
         )
 
     def test_vig_utils_installed(self, host):

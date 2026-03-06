@@ -4,6 +4,7 @@
 # - Podman (for container operations)
 # - Node.js (for JS tooling)
 # - Devcontainer CLI + docker-compose wrapper (for integration tests)
+# - hadolint (for Containerfile linting in pre-commit)
 # - BATS + helper libraries (for shell script testing)
 #
 # IMPORTANT: The caller must checkout the repository before using this action.
@@ -16,6 +17,7 @@
 #   install-node:             Install Node.js (default: false)
 #   node-version:             Node.js version (default: '20')
 #   install-devcontainer-cli: Install devcontainer CLI + docker-compose wrapper (default: false)
+#   install-hadolint:         Install hadolint binary (default: false)
 #   install-bats:             Install BATS + helper libraries (default: false)
 #
 # Outputs:
@@ -41,7 +43,7 @@
 #       install-devcontainer-cli: 'true'
 
 name: 'Setup Environment'
-description: 'Set up CI environment with Python, uv, and optional tools (podman, Node.js, devcontainer CLI, BATS)'
+description: 'Set up CI environment with Python, uv, and optional tools (podman, Node.js, devcontainer CLI, hadolint, BATS)'
 
 inputs:
   sync-dependencies:
@@ -62,6 +64,10 @@ inputs:
     default: '20'
   install-devcontainer-cli:
     description: 'Install @devcontainers/cli and docker-compose wrapper (requires Node.js)'
+    required: false
+    default: 'false'
+  install-hadolint:
+    description: 'Install hadolint binary for Containerfile linting'
     required: false
     default: 'false'
   install-just:
@@ -129,6 +135,38 @@ runs:
       uses: taiki-e/install-action@3035223527de4d6eb6207d7b9f901df966359a8e  # just
       with:
         tool: just
+
+    # ── hadolint (Containerfile linter) ───────────────────────────────────
+    - name: Install hadolint
+      if: inputs.install-hadolint == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        case "$(uname -m)" in
+          x86_64) ARCH="linux-x86_64" ;;
+          aarch64|arm64) ARCH="linux-arm64" ;;
+          *)
+            echo "Unsupported architecture: $(uname -m)"
+            exit 1
+            ;;
+        esac
+
+        HADOLINT_VERSION="v2.14.0"
+        BASE_URL="https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}"
+        BIN_FILE="hadolint-${ARCH}"
+        SHA_FILE="${BIN_FILE}.sha256"
+
+        curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
+        curl -fsSL "${BASE_URL}/${SHA_FILE}" -o "${SHA_FILE}"
+
+        EXPECTED_SHA="$(awk '{print $1}' "${SHA_FILE}")"
+        echo "${EXPECTED_SHA}  ${BIN_FILE}" | sha256sum -c -
+
+        sudo install -m 0755 "${BIN_FILE}" /usr/local/bin/hadolint
+        rm -f "${BIN_FILE}" "${SHA_FILE}"
+
+        hadolint --version
 
     # ── Devcontainer CLI + docker-compose wrapper ───────────────────────
     # Requires Node.js (automatically installed above when this flag is set)

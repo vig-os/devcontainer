@@ -208,27 +208,27 @@ setup() {
 }
 
 @test "init.sh supports macOS-specific install" {
-    run grep 'macos:' "$INIT_SH"
+    run grep 'macos) target_var="current_install_macos"' "$INIT_SH"
     assert_success
 }
 
 @test "init.sh supports Debian-specific install" {
-    run grep 'debian:' "$INIT_SH"
+    run grep 'debian) target_var="current_install_debian"' "$INIT_SH"
     assert_success
 }
 
 @test "init.sh supports Fedora-specific install" {
-    run grep 'fedora:' "$INIT_SH"
+    run grep 'fedora) target_var="current_install_fedora"' "$INIT_SH"
     assert_success
 }
 
 @test "init.sh supports Alpine-specific install" {
-    run grep 'alpine:' "$INIT_SH"
+    run grep 'alpine) target_var="current_install_alpine"' "$INIT_SH"
     assert_success
 }
 
 @test "init.sh supports platform-agnostic install" {
-    run grep 'all:' "$INIT_SH"
+    run grep 'all) target_var="current_install_all"' "$INIT_SH"
     assert_success
 }
 

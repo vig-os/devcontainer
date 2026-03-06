@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-24T15:42:40Z
-updated: 2026-02-24T15:42:40Z
+updated: 2026-03-04T12:33:21Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/181
-comments: 0
+comments: 1
 labels: feature, area:ci, area:workspace, effort:small, semver:minor
-assignees: none
-milestone: none
+assignees: c-vigo
+milestone: 0.3
 projects: none
 relationship: none
-synced: 2026-02-25T04:25:52.964Z
+synced: 2026-03-05T04:18:20.284Z
 ---
 
 # [Issue 181]: [[FEATURE] Add TOML linting as a pre-commit hook](https://github.com/vig-os/devcontainer/issues/181)
@@ -58,3 +58,29 @@ Added
 ### Additional Context
 
 Goal: TOML linting as a pre-commit hook.
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on March 4, 2026 at 08:54 AM_
+
+Implementation plan for #181 (no claim, no code changes yet)
+
+Chosen TOML tool: Taplo (`ComPWA/taplo-pre-commit`), pinned to a stable revision.
+Reason: mature + widely adopted TOML toolkit with reliable pre-commit integration; complements existing `check-toml` syntax validation.
+
+Plan:
+1. Update root `.pre-commit-config.yaml`
+   - Keep existing `check-toml` hook
+   - Add pinned Taplo hook (`taplo-lint`)
+2. Mirror the same hook update in `assets/workspace/.pre-commit-config.yaml` to keep workspace template parity.
+3. Verify locally:
+   - `uv run pre-commit run --all-files`
+4. Confirm CI parity:
+   - No workflow changes expected, since CI already runs `uv run pre-commit run --all-files` via `.github/actions/test-project/action.yml`.
+5. Validate acceptance criteria and include evidence in the PR notes.
+
+Scope guardrails:
+- In scope: TOML linting hook addition only
+- Out of scope: unrelated pre-commit refactors and non-TOML linting changes
+

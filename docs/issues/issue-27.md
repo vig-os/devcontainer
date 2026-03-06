@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-01-23T15:32:05Z
-updated: 2026-01-23T15:32:06Z
+updated: 2026-02-28T21:44:09Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/27
-comments: 0
-labels: feature
+comments: 1
+labels: feature, priority:low, area:image, effort:large, semver:minor
 assignees: gerchowl, c-vigo
-milestone: 0.3
+milestone: Backlog
 projects: none
 relationship: none
-synced: 2026-02-18T08:56:39.878Z
+synced: 2026-03-01T04:27:31.888Z
 ---
 
 # [Issue 27]: [Adopt Nix/devenv for reproducible, auditable dependency management](https://github.com/vig-os/devcontainer/issues/27)
@@ -212,3 +212,22 @@ diff release-1.0/flake.lock release-1.1/flake.lock
 ---
 
 cc @c-vigo for discussion
+---
+
+# [Comment #1]() by [gerchowl]()
+
+_Posted on February 28, 2026 at 09:44 PM_
+
+I've been prototyping the Nix approach in a standalone repo: [gerchowl/devbase](https://github.com/gerchowl/devbase) (private, ask for access).
+
+What's implemented so far:
+- Pure Nix container image via `flake.nix` — all tools from nixpkgs, pinned via `flake.lock`
+- `devenv.nix` for host-side dev shell (just, podman, bats, linters) with direnv auto-activation
+- Entrypoint with secrets management (age-encrypted API keys, SSH keys, gh token, Claude credentials)
+- `scripts/deploy.sh` for scaffolding child projects (`FROM devbase:latest`)
+- `nix run github:gerchowl/devbase -- ./my-project` for bootstrapping from anywhere
+- bats + container-structure-test suite
+- CI workflows (build, test, scheduled rebuild)
+
+This is a prototype/sandbox — not a migration plan. Serves as a reference for what the Nix layer could look like when we tackle this in devc.
+

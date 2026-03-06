@@ -33,10 +33,10 @@ def extract_unreleased_content(content):
     # Extract each subsection
     sections = {}
     for section in STANDARD_SECTIONS:
-        # Match section header, then capture content until next section/heading
-        # Use negative lookahead to stop before next ### or ##
-        pattern = rf"### {section}\s*\n((?:(?!###|##).)*)"
-        match = re.search(pattern, unreleased_text, re.DOTALL)
+        # Anchor heading markers to line starts so inline ## in content
+        # (e.g. backtick-quoted `##`) is not treated as a heading boundary.
+        pattern = rf"^### {section}\s*\n(.*?)(?=^### |^## |\Z)"
+        match = re.search(pattern, unreleased_text, re.MULTILINE | re.DOTALL)
         if match:
             section_content = match.group(1).strip()
             # Only keep if it has actual bullet points (lines starting with -)
