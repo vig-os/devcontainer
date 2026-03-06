@@ -387,6 +387,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Anchored regex to line starts with `re.MULTILINE` so only actual heading lines terminate section capture
 - **install.sh is not idempotent — creates nested src/template_project on second run** ([#197](https://github.com/vig-os/devcontainer/issues/197))
   - Guard template_project rename: if `src/${SHORT_NAME}` already exists, remove the redundant copy instead of moving it inside
+- **just gh-issues fails locally — rich not in .venv dependencies** ([#159](https://github.com/vig-os/devcontainer/issues/159))
+  - Add `devcontainer` dependency group in root `pyproject.toml` as SSoT for container tools (rich, pre-commit, ruff, pip-licenses)
+  - Container build installs from pyproject.toml via `uv export --only-group devcontainer` instead of hardcoding
+  - Add rich to workspace template dev group; change justfile.gh to `uv run python` so both local and container use project venv
+  - Copy `packages/vig-utils` before `uv export` so the lockfile can resolve the workspace member
 - **just check uses wrong path — justfile_directory() resolves incorrectly in imported justfile.base** ([#187](https://github.com/vig-os/devcontainer/issues/187))
   - Replace `dirname(justfile_directory())` with `source_directory()/scripts` to correctly locate version-check.sh in deployed workspaces and devcontainer repo
   - Regression test: `just check config` runs successfully from workspace
