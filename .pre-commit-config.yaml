@@ -65,6 +65,7 @@ repos:
       - id: shellcheck
         name: shellcheck
         args: ["-x"]
+        exclude: ^\.envrc$
 
   # Containerfile
   - repo: local
