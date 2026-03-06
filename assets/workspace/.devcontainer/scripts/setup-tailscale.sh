@@ -64,7 +64,7 @@ cmd_start() {
     echo "Tailscale: starting (hostname=$hostname)..."
 
     if ! pgrep -x tailscaled &>/dev/null; then
-        tailscaled --tun=userspace-networking --state=/var/lib/tailscale/tailscaled.state &
+        setsid tailscaled --tun=userspace-networking --state=/var/lib/tailscale/tailscaled.state &>/dev/null &
         sleep 2
     fi
 
