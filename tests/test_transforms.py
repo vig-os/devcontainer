@@ -45,3 +45,35 @@ class TestTransformsModule:
         transforms.RemoveLines(pattern=r"remove me").apply(f)
 
         assert f.read_text() == "keep\nkeep\n"
+
+
+class TestRemovePrecommitHooks:
+    """Tests for RemovePrecommitHooks transform."""
+
+    def test_preserves_section_comment_after_removed_repo(self, tmp_path):
+        """Section comment preceding a kept repo must survive removal of the prior repo."""
+        transforms = _load_transforms()
+        f = tmp_path / ".pre-commit-config.yaml"
+        f.write_text(
+            "repos:\n"
+            "  # Section A\n"
+            "  - repo: https://example.com/a\n"
+            "    rev: abc123\n"
+            "    hooks:\n"
+            "      - id: remove-me\n"
+            "        name: remove-me\n"
+            "\n"
+            "  # Section B (must survive)\n"
+            "  - repo: https://example.com/b\n"
+            "    rev: def456\n"
+            "    hooks:\n"
+            "      - id: keep-me\n"
+        )
+
+        transforms.RemovePrecommitHooks(hook_ids=["remove-me"]).apply(f)
+
+        result = f.read_text()
+        assert "# Section B (must survive)" in result
+        assert "keep-me" in result
+        assert "# Section A" not in result
+        assert "remove-me" not in result

@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-24T16:00:23Z
-updated: 2026-02-24T16:00:23Z
+updated: 2026-03-04T08:57:20Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/185
-comments: 0
+comments: 1
 labels: chore, priority:medium, area:image, area:workspace, effort:medium, semver:minor
 assignees: none
-milestone: none
+milestone: 0.3
 projects: none
 relationship: none
-synced: 2026-02-25T04:25:52.357Z
+synced: 2026-03-05T04:18:19.861Z
 ---
 
 # [Issue 185]: [[CHORE] Make container scripts callable via PATH and manifest sync](https://github.com/vig-os/devcontainer/issues/185)
@@ -50,3 +50,11 @@ Changed
 
 ## Additional Context
 Requested outcome: “scripts are callable from within the devcontainer”.
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on March 4, 2026 at 07:00 AM_
+
+Subsumed by #217: [REFACTOR] Reorganize scripts/ — project-specific vs shared vig-utils. Path/callability changes are now tracked under the consolidated reorganization issue.
+

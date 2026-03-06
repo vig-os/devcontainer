@@ -1,7 +1,7 @@
 # Use Python 3.12 as base image (pinned to digest for supply chain integrity)
 # Dependabot (docker ecosystem) will propose digest updates automatically
 # Updated to bookworm (stable) for better security patch cadence
-FROM python:3.12-slim-bookworm@sha256:73dbd1a2ad74137451593a8ac30f7bdd0f5010fc05fb34644190cffa7696bbf3
+FROM python:3.12-slim-bookworm@sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcade98e669c
 
 # Add metadata
 # By default, we build the dev version unless specified as an argument
@@ -60,6 +60,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nano \
     minisign \
     podman \
+    rsync \
     tmux \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -111,6 +112,25 @@ RUN set -eux; \
     rm "$FILE"; \
     just --version;
 
+# Install hadolint binary with checksum verification
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+        amd64) ARCH=linux-x86_64 ;; \
+        arm64) ARCH=linux-arm64 ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    HADOLINT_VERSION="v2.14.0"; \
+    URL="https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}"; \
+    FILE="hadolint-${ARCH}"; \
+    SHA_FILE="${FILE}.sha256"; \
+    curl -fsSL "${URL}/${FILE}" -o "$FILE"; \
+    curl -fsSL "${URL}/${SHA_FILE}" -o "$SHA_FILE"; \
+    EXPECTED_SHA="$(awk '{print $1}' "$SHA_FILE")"; \
+    echo "${EXPECTED_SHA}  ${FILE}" | sha256sum -c -; \
+    install -m 0755 "$FILE" /usr/local/bin/hadolint; \
+    rm "$FILE" "$SHA_FILE"; \
+    hadolint --version;
+
 # Install cursor-agent CLI (installs to ~/.local/bin)
 ENV PATH="/root/.local/bin:${PATH}"
 RUN set -eux; \
@@ -126,7 +146,14 @@ RUN set -eux; \
         arm64) ARCH=aarch64-unknown-linux-musl ;; \
         *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
     esac; \
-    BINSTALL_VERSION="$(curl -fsSL https://api.github.com/repos/cargo-bins/cargo-binstall/releases/latest | sed -n 's/.*"tag_name": *"v\?\([^"]*\)".*/\1/p')"; \
+    BINSTALL_VERSION="$( \
+        curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/cargo-bins/cargo-binstall/releases/latest \
+        | sed -n 's#.*/tag/v\([^/?]*\).*#\1#p' \
+    )"; \
+    if [ -z "$BINSTALL_VERSION" ]; then \
+        echo "Failed to resolve cargo-binstall latest version"; \
+        exit 1; \
+    fi; \
     URL="https://github.com/cargo-bins/cargo-binstall/releases/download/v${BINSTALL_VERSION}"; \
     FILE="cargo-binstall-${ARCH}.tgz"; \
     SIG_FILE="${FILE}.sig"; \
@@ -177,14 +204,17 @@ COPY packages/vig-utils /root/packages/vig-utils
 
 # Install Python development tools from root pyproject.toml (SSoT)
 # and upgrade pip to fix CVE-2025-8869 (symbolic link extraction vulnerability)
-COPY pyproject.toml uv.lock /root/
-RUN uv export --project /root --only-group devcontainer --no-emit-project -o /tmp/devcontainer-reqs.txt && \
+# vig-utils must be present before uv export because uv.lock references it as a workspace member
+WORKDIR /build
+COPY packages/vig-utils packages/vig-utils
+COPY pyproject.toml uv.lock ./
+RUN uv export --only-group devcontainer --no-emit-project -o /tmp/devcontainer-reqs.txt && \
     uv pip install --system -r /tmp/devcontainer-reqs.txt && \
     uv pip install --system --upgrade pip && \
     rm /tmp/devcontainer-reqs.txt
 
 # Install vig-utils system-wide
-RUN uv pip install --system /root/packages/vig-utils
+RUN uv pip install --system packages/vig-utils
 
 # Copy assets into container image
 COPY assets /root/assets
@@ -229,6 +259,9 @@ WORKDIR /workspace
 # Set environment variables
 ENV PYTHONUNBUFFERED="1"
 ENV IN_CONTAINER="true"
+ENV PRE_COMMIT_HOME="/opt/pre-commit-cache"
+ENV UV_PROJECT_ENVIRONMENT="/root/assets/workspace/.venv"
+ENV VIRTUAL_ENV="/root/assets/workspace/.venv"
 
 # Create aliases for pre-commit
 RUN echo 'alias precommit="pre-commit run"' >> /root/.bashrc

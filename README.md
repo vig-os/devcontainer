@@ -154,6 +154,7 @@ Available recipes:
     podman-prune                               # Prune unused containers, images, networks, and volumes [alias: pdm-prune]
     podman-prune-all                           # Full cleanup: prune including volumes [alias: pdm-prune-all]
     podman-ps *args                            # List containers/images (--all for all podman resources) [alias: pdm-ps]
+    podman-push-ssh image host                 # Push a local image to a remote machine over SSH (no registry needed) [alias: pdm-push-ssh]
     podman-rmi image                           # Remove an image by name, tag, or ID [alias: pdm-rmi]
     podman-rmi-all                             # Remove all images (with confirmation) [alias: pdm-rmi-all]
     podman-rmi-dangling                        # Remove dangling images (untagged) [alias: pdm-rmi-dangling]
@@ -167,6 +168,7 @@ Available recipes:
     [release]
     finalize-release version *flags            # Finalize and publish release via GitHub Actions workflow (step 3, after testing)
     prepare-release version *flags             # Prepare release branch for testing (step 1)
+    publish-candidate version *flags           # Publish release candidate via GitHub Actions workflow
     pull version="latest"                      # Pull image from registry (default: latest)
     reset-changelog                            # Reset CHANGELOG Unreleased section (after merging release to dev)
 

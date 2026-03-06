@@ -9,9 +9,7 @@ description = "Reusable CLI utilities for vigOS development workflows"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
-authors = [
-    { name = "Carlos Vigo", email = "carlos.vigo@exoma.ch" },
-]
+authors = [{ name = "Carlos Vigo", email = "carlos.vigo@exoma.ch" }]
 
 [project.scripts]
 validate-commit-msg = "vig_utils.validate_commit_msg:main"
