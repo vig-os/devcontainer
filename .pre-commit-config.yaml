@@ -49,6 +49,15 @@ repos:
       - id: yamllint
         args: ["--format", "parsable", "--strict"]
 
+  # TOML Linting (style + semantic checks)
+  - repo: https://github.com/ComPWA/taplo-pre-commit
+    rev: 23eab0f0eedcbedebff420f5fdfb284744adc7b3  # v0.9.3
+    hooks:
+      - id: taplo-format
+        args: ["--config", ".taplo.toml"]
+      - id: taplo-lint
+        args: ["--config", ".taplo.toml", "--default-schema-catalogs"]
+
   # Shellcheck
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: a23f6b85d0fdd5bb9d564e2579e678033debbdff  # v0.10.0.1
@@ -58,11 +67,13 @@ repos:
         args: ["-x"]
 
   # Containerfile
-  - repo: https://github.com/hadolint/hadolint
-    rev: 346e4199e4baca7d6827f20ac078b6eee5b39327  # v2.9.3
+  - repo: local
     hooks:
-      - id: hadolint-docker
+      - id: hadolint
         name: hadolint
+        entry: hadolint
+        language: system
+        files: ^(.*/)?(Containerfile|Dockerfile)$
 
   # Markdown Linting (excludes auto-generated docs)
   - repo: https://github.com/jackdewinter/pymarkdown
@@ -88,9 +99,18 @@ repos:
     hooks:
       - id: generate-docs
         name: generate-docs (regenerate from templates)
-        entry: bash -c 'uv run python docs/generate.py && git add README.md CONTRIBUTE.md TESTING.md 2>/dev/null || true'
+        entry: uv run python docs/generate.py
         language: system
         files: ^(docs/templates/.*\.j2|docs/narrative/.*\.md|scripts/requirements\.yaml|justfile)$
+        pass_filenames: false
+
+  # Workspace sync (keep assets/workspace in sync with manifest)
+  - repo: local
+    hooks:
+      - id: sync-manifest
+        name: sync-manifest
+        entry: uv run python scripts/sync_manifest.py sync assets/workspace/
+        language: system
         pass_filenames: false
 
   # Typo Linting
@@ -139,6 +159,25 @@ repos:
         files: ^\.cursor/skills/
         pass_filenames: false
 
+  # AI agent identity: strip trailers before commit-msg (Refs: #163)
+  - repo: local
+    hooks:
+      - id: prepare-commit-msg-strip-trailers
+        name: strip agent trailers from commit message
+        entry: uv run python scripts/prepare-commit-msg-strip-trailers.py
+        language: system
+        stages: [prepare-commit-msg]
+        pass_filenames: true
+
+  # AI agent identity: reject author/committer matching blocklist (Refs: #163)
+  - repo: local
+    hooks:
+      - id: check-agent-identity
+        name: check agent identity
+        entry: uv run python scripts/check-agent-identity.py
+        language: system
+        pass_filenames: false
+
   # Commit message validation (commit-msg stage)
   - repo: local
     hooks:
@@ -149,6 +188,17 @@ repos:
         stages: [commit-msg]
         args: [
           "--types", "feat,fix,docs,chore,refactor,test,ci,build,revert,style",
-          "--scopes", "agent,setup,image,vigutils",
+          "--scopes", "agent,ci,setup,image,vigutils",
           "--refs-optional-types", "chore",
+          "--blocked-patterns", ".github/agent-blocklist.toml",
         ]
+
+  # Sync manifest
+  - repo: local
+    hooks:
+      - id: sync-manifest
+        name: sync manifest
+        entry: uv run python scripts/sync_manifest.py sync assets/workspace/
+        language: system
+        files: ^scripts/manifest\.toml$
+        pass_filenames: false

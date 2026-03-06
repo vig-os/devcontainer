@@ -23,6 +23,11 @@ NO_PROMPTS=false
 PRESERVE_FILES=(
     ".devcontainer/docker-compose.project.yaml"
     ".devcontainer/docker-compose.local.yaml"
+    "README.md"
+    "CHANGELOG.md"
+    "LICENSE"
+    ".github/CODEOWNERS"
+    "justfile.project"
 )
 
 # Get script directory for manifest location
@@ -203,25 +208,10 @@ for preserved in "${PRESERVE_FILES[@]}"; do
     fi
 done
 
-# Use rsync if available, otherwise cp
 # Note: Excluding .venv - it is used directly from the container image
 # via UV_PROJECT_ENVIRONMENT environment variable (set in docker-compose.yml)
 # Pre-commit cache is now at /opt/pre-commit-cache (not in assets/workspace)
-if command -v rsync &> /dev/null; then
-    rsync -av --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
-else
-    # Fallback to cp with proper handling (less precise, may overwrite preserved files)
-    echo "Warning: rsync not available, preserved files may be overwritten"
-    for item in "$TEMPLATE_DIR"/*; do
-        [[ -e "$item" ]] || continue
-        cp -r "$item" "$WORKSPACE_DIR/" 2>/dev/null || true
-    done
-    for item in "$TEMPLATE_DIR"/.[!.]*; do
-        [[ -e "$item" ]] || continue
-        [[ "$(basename "$item")" == ".venv" ]] && continue
-        cp -r "$item" "$WORKSPACE_DIR/" 2>/dev/null || true
-    done
-fi
+rsync -av --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
 
 # Replace placeholders in files (using pre-built manifest from image)
 echo "Replacing placeholders in files..."
@@ -254,8 +244,13 @@ fi
 
 # Rename template_project directory to match project short name
 if [[ -d "$WORKSPACE_DIR/src/template_project" ]]; then
-    echo "Renaming src/template_project to src/${SHORT_NAME}..."
-    mv "$WORKSPACE_DIR/src/template_project" "$WORKSPACE_DIR/src/${SHORT_NAME}"
+    if [[ -d "$WORKSPACE_DIR/src/${SHORT_NAME}" ]] && [[ "$SHORT_NAME" != "template_project" ]]; then
+        echo "Removing duplicate src/template_project (src/${SHORT_NAME} already exists)..."
+        rm -rf "$WORKSPACE_DIR/src/template_project"
+    else
+        echo "Renaming src/template_project to src/${SHORT_NAME}..."
+        mv "$WORKSPACE_DIR/src/template_project" "$WORKSPACE_DIR/src/${SHORT_NAME}"
+    fi
 fi
 
 # Update test imports to use actual project name (template_project -> $SHORT_NAME)
@@ -268,6 +263,10 @@ echo "Setting executable permissions on shell scripts and hooks..."
 find "$WORKSPACE_DIR" -type f -name "*.sh" -exec chmod +x {} \;
 find "$WORKSPACE_DIR/.githooks" -type f -exec chmod +x {} \; 2>/dev/null || true
 
+# Sync dependencies: resolves uv.lock for the new project name and installs the project
+echo "Syncing dependencies..."
+cd "$WORKSPACE_DIR"
+just sync
 
 echo "Workspace initialized successfully!"
 echo ""

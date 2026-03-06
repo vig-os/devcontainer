@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-20T13:03:35Z
-updated: 2026-02-20T13:05:29Z
+updated: 2026-02-24T19:00:54Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/113
-comments: 1
+comments: 4
 labels: feature, area:workflow, area:docs, effort:large, semver:minor
 assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-20T13:17:14.457Z
+synced: 2026-02-25T04:25:59.112Z
 ---
 
 # [Issue 113]: [[FEATURE] Declarative diagram-as-code tooling with model-renderer separation](https://github.com/vig-os/devcontainer/issues/113)
@@ -83,4 +83,95 @@ The `inception:explore` phase is complete. An RFC has been committed to this bra
 ### Next step
 
 Continue with `inception:scope` to define what to build and what not to build.
+
+---
+
+# [Comment #2]() by [gerchowl]()
+
+_Posted on February 24, 2026 at 06:28 PM_
+
+## Diagram-as-code benchmark added
+
+Reproduced the skill pipeline diagram (from issue-90, worktree:solve-and-pr) in all tools suggested in RFC-001:
+
+| Format | Location | Render status |
+|--------|----------|---------------|
+| **YAML model** | \`docs/diagrams/skill-pipeline.yaml\` | SSoT — RFC-001 direction A |
+| Mermaid | \`skill-pipeline.mmd\` | GitHub renders inline |
+| D2 | \`skill-pipeline.d2\` | Requires D2 CLI |
+| PlantUML | \`skill-pipeline.puml\` | Requires Java + PlantUML |
+| Graphviz | \`skill-pipeline.dot\` | \`dot -Tsvg\` ✓ |
+| Fletcher | \`skill-pipeline.typ\` | \`typst compile\` ✓ (Libertinus Serif) |
+
+\`scripts/render_diagram.py\` emits Mermaid, D2, and DOT from the YAML model. See \`docs/diagrams/README.md\` for rendering commands and evaluation notes.
+
+---
+
+# [Comment #3]() by [gerchowl]()
+
+_Posted on February 24, 2026 at 06:55 PM_
+
+## Diagram-as-code benchmark added
+
+Reproduced the skill pipeline diagram (from issue-90, worktree:solve-and-pr) in **all 9 tools** evaluated in RFC-001:
+
+| Format | Location | Render status |
+|--------|----------|---------------|
+| **YAML model** | `docs/diagrams/skill-pipeline.yaml` | SSoT — RFC-001 direction A |
+| Mermaid | `skill-pipeline.mmd` | `mmdc` ✓ |
+| D2 | `skill-pipeline.d2` | `d2` CLI ✓ |
+| PlantUML | `skill-pipeline.puml` | `plantuml` (Java) ✓ |
+| Graphviz | `skill-pipeline.dot` | `dot -Tsvg` ✓ |
+| Fletcher | `skill-pipeline.typ` | `typst compile` ✓ (Libertinus Serif) |
+| TikZ | `skill-pipeline.tex` | `lualatex` + `pdf2svg` ✓ |
+| Pikchr | `skill-pipeline.pikchr` | Kroki API ✓ |
+| Structurizr | `skill-pipeline.dsl` | `structurizr-cli export` → Mermaid → SVG ✓ |
+| Excalidraw | `skill-pipeline.excalidraw` | JSON — open in excalidraw.com ✓ |
+
+`scripts/render_diagram.py` emits Mermaid, D2, and DOT from the YAML model. See `docs/diagrams/README.md` for rendering commands and evaluation notes.
+
+---
+
+# [Comment #4]() by [gerchowl]()
+
+_Posted on February 24, 2026 at 07:00 PM_
+
+## Next: try alternative layouts
+
+The current benchmark renders the pipeline as a **left-to-right linear chain** — this works for showing the overall flow but hides the real structure. Each skill namespace actually contains **parallel sub-skills** that fan out:
+
+```
+inception:*          issue:*          design:*       code:*           ci:*          pr:*         git:*
+├─ explore           ├─ claim         ├─ brainstorm  ├─ tdd           ├─ check      ├─ create    └─ commit
+├─ scope             ├─ create        └─ plan        ├─ execute       └─ fix        └─ post-merge
+├─ architect         └─ triage                       ├─ review
+└─ plan                                              ├─ verify
+                                                     └─ debug
+```
+
+Plus the `worktree:*` namespace runs as an autonomous **parallel track** that wraps the interactive skills:
+
+```
+worktree:solve-and-pr → worktree:brainstorm → worktree:plan → worktree:execute → worktree:verify → worktree:pr
+                                                                   ↕                    ↕
+                                                          worktree:ci-check      worktree:ci-fix
+                                                          worktree:ask
+```
+
+### Suggested follow-up layouts to benchmark
+
+1. **Top-to-bottom flowchart with parallel lanes** — each namespace as a vertical swim lane, sub-skills as parallel nodes within each lane, flow going top-to-bottom across lanes
+2. **Two-track diagram** — interactive (top) vs. autonomous/worktree (bottom) tracks sharing the same phase columns
+3. **Nested groups with fan-out** — each `*:namespace` box expands to show its individual skills, edges connect at the group level
+
+These layouts would stress-test each tool's **grouping**, **parallel node placement**, and **cross-group edge routing** — the exact capabilities where the tools diverge most. The current linear chain is the easy case every tool handles well.
+
+### Which tools to re-test first
+
+- **D2**: Has `grid-rows`/`grid-columns` for swim lanes — should handle layout 1 natively
+- **Fletcher/Typst**: Full manual control via coordinate grid — can do any layout but requires more authoring effort
+- **Mermaid**: Subgraphs support parallel nodes but layout is unpredictable — this is where it should struggle most
+- **Structurizr**: Model-view separation means the same model can emit different view layouts — test multiple views from one `.dsl`
+
+Refs: #113
 

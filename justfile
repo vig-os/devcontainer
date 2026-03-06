@@ -187,10 +187,9 @@ test version="dev":
 #      - Creates vX.Y.Z tag
 #      - Publishes images to GHCR
 #      - On failure: automatic rollback and issue creation
-#   6. Merge release PR to main       - Triggers post-release.yml automatically:
-#      - Merges main back into dev
-#      - Resets CHANGELOG for next cycle
-#      - Deletes release branch
+#   6. Merge release PR to main       - Triggers sync-main-to-dev.yml automatically:
+#      - Opens PR to merge main into dev
+#      - Auto-merges if no conflicts
 # ===============================================================================
 
 # Prepare release branch for testing (step 1)
@@ -211,10 +210,21 @@ finalize-release version *flags:
     #!/usr/bin/env bash
     set -euo pipefail
     # Trigger the release workflow via GitHub Actions
-    # The workflow handles: finalize CHANGELOG, build/test images, create tag, publish
-    gh workflow run release.yml -f "version={{ version }}" {{ flags }}
+    # The workflow handles: finalize CHANGELOG, build/test images, create final tag, publish
+    gh workflow run release.yml -f "version={{ version }}" -f "release-kind=final" {{ flags }}
     echo ""
     echo "✓ Release workflow triggered for version {{ version }}"
+    echo "Monitor progress: gh run list --workflow release.yml"
+
+# Publish release candidate via GitHub Actions workflow
+[group('release')]
+publish-candidate version *flags:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Trigger release workflow in candidate mode (default mode in workflow)
+    gh workflow run release.yml -f "version={{ version }}" -f "release-kind=candidate" {{ flags }}
+    echo ""
+    echo "✓ Candidate release workflow triggered for version {{ version }}"
     echo "Monitor progress: gh run list --workflow release.yml"
 
 # Reset CHANGELOG Unreleased section (after merging release to dev)
@@ -282,31 +292,3 @@ clean-test-containers:
 import 'justfile.podman'
 import 'justfile.gh'
 import 'justfile.worktree'
-
-# ===============================================================================
-# ALIASES — short prefixes for faster typing
-# ===============================================================================
-# podman -> pdm
-
-alias pdm-ps := podman-ps
-alias pdm-kill := podman-kill
-alias pdm-kill-all := podman-kill-all
-alias pdm-kill-project := podman-kill-project
-alias pdm-rmi := podman-rmi
-alias pdm-rmi-all := podman-rmi-all
-alias pdm-rmi-project := podman-rmi-project
-alias pdm-rmi-dangling := podman-rmi-dangling
-alias pdm-prune := podman-prune
-alias pdm-prune-all := podman-prune-all
-
-# worktree -> wt
-
-alias wt-start := worktree-start
-alias wt-list := worktree-list
-alias wt-attach := worktree-attach
-alias wt-stop := worktree-stop
-alias wt-clean := worktree-clean
-
-# github -> gh (already short, but single-char saves a hyphen)
-
-alias gh-i := gh-issues

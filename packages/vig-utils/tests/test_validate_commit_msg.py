@@ -6,6 +6,7 @@ These tests run locally (pytest); they do not require the devcontainer CLI.
 
 import sys
 
+import pytest
 from vig_utils.validate_commit_msg import (
     DEFAULT_APPROVED_TYPES,
     DEFAULT_REFS_OPTIONAL_TYPES,
@@ -1108,6 +1109,25 @@ class TestAgentFingerprints:
         msg = "feat: add feature\n\nMade with [Cursor](https://cursor.com)\n\nRefs: #163\n"
         valid, err = validate_commit_message(msg)
         assert valid is False
+
+    def test_blocked_patterns_from_toml_rejects_openai(self):
+        """When blocked_patterns from TOML is provided, reject names from blocklist (e.g. openai)."""
+        from pathlib import Path
+
+        from vig_utils.agent_blocklist import load_blocklist
+
+        blocklist_path = (
+            Path(__file__).resolve().parent.parent.parent.parent
+            / ".github"
+            / "agent-blocklist.toml"
+        )
+        if not blocklist_path.exists():
+            pytest.skip("agent-blocklist.toml not in repo")
+        blocklist = load_blocklist(blocklist_path)
+        msg = "feat: add feature\n\nPowered by openai\n\nRefs: #163\n"
+        valid, err = validate_commit_message(msg, blocked_patterns=blocklist)
+        assert valid is False
+        assert "openai" in err.lower() or "blocked" in err.lower()
 
 
 class TestSubjectOnly:

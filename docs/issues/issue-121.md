@@ -1,8 +1,8 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-20T15:09:51Z
-updated: 2026-02-21T23:37:45Z
+updated: 2026-02-24T12:45:47Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/121
@@ -12,7 +12,7 @@ assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-22T04:23:22.579Z
+synced: 2026-02-25T04:25:58.737Z
 ---
 
 # [Issue 121]: [[BUG] gh_issues.py cross-ref misses PRs linked via Refs: instead of Closes/Fixes](https://github.com/vig-os/devcontainer/issues/121)
@@ -67,8 +67,8 @@ Branch: bugfix/121-cross-ref-misses-refs-linked-prs
 
 ### Tasks
 
-- [ ] Task 1: Add failing unit tests for Refs: #N and Refs: #N, #M in `tests/test_gh_issues.py` — verify: `pytest tests/test_gh_issues.py::TestBuildCrossRefs -v`
-- [ ] Task 2: Add _REFS_RE regex and use it in _build_cross_refs in `scripts/gh_issues.py` — verify: `pytest tests/test_gh_issues.py::TestBuildCrossRefs -v`
+- [x] Task 1: Add failing unit tests for Refs: #N and Refs: #N, #M in `tests/test_gh_issues.py` — verify: `pytest tests/test_gh_issues.py::TestBuildCrossRefs -v`
+- [x] Task 2: Add _REFS_RE regex and use it in _build_cross_refs in `scripts/gh_issues.py` — verify: `pytest tests/test_gh_issues.py::TestBuildCrossRefs -v`
 
 ---
 

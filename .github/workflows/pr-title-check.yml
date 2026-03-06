@@ -37,3 +37,9 @@ jobs:
           TITLE_FILE=$(mktemp)
           printf '%s' "$PR_TITLE" > "$TITLE_FILE"
           uv run validate-commit-msg "$TITLE_FILE" --subject-only
+
+      - name: Check PR for agent fingerprints
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: uv run python scripts/check-pr-agent-fingerprints.py

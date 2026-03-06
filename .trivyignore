@@ -95,5 +95,15 @@ CVE-2025-61728
 Expiration: 2026-05-15
 CVE-2025-61730
 
-# Tracking: https://github.com/vig-os/devcontainer/issues/37
+# CVE-2025-15558: docker/cli plugin search path privilege escalation
+# Risk Assessment: LOW (devcontainer context)
+# - Reported against github.com/docker/cli v29.0.3 embedded in gh v2.87.3
+# - Fix is in github.com/docker/cli >= 29.2.0 and requires upstream gh rebuild
+# - gh in this image is used for trusted GitHub workflows, not privileged plugin execution
+# - Temporary exception to unblock CI until upstream gh release includes the patched dependency
+# - Tracking: https://github.com/vig-os/devcontainer/issues/162
+Expiration: 2026-04-15
+CVE-2025-15558
+
+# Tracking: https://github.com/vig-os/devcontainer
 # Upstream: https://github.com/aquasecurity/trivy/

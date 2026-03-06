@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-23T22:59:55Z
-updated: 2026-02-23T23:04:31Z
+updated: 2026-02-25T10:38:13Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/163
-comments: 1
+comments: 4
 labels: bug, area:workflow, effort:small, semver:patch
 assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-02-24T04:24:07.489Z
+synced: 2026-02-26T04:22:25.755Z
 ---
 
 # [Issue 163]: [[BUG] Wrong identity tags in commits & PR messages](https://github.com/vig-os/devcontainer/issues/163)
@@ -176,4 +176,50 @@ Replace with: "Never add Co-authored-by trailers. Never set git author/committer
 ### Sync to workspace template
 
 Both `.pre-commit-config.yaml` and `.github/agent-blocklist.toml` are synced to `assets/workspace/` per the project's sync manifest pattern.
+
+---
+
+# [Comment #2]() by [gerchowl]()
+
+_Posted on February 24, 2026 at 05:54 PM_
+
+## Implementation Plan
+
+Issue: #163
+Branch: bugfix/163-wrong-identity-tags
+
+### Tasks
+
+- [ ] Task 1: Create `.github/agent-blocklist.toml` with trailers, names, emails patterns per design — `.github/agent-blocklist.toml` — verify: `uv run python -c "import tomllib; tomllib.load(open(.github/agent-blocklist.toml,rb))"` succeeds
+- [ ] Task 2: Add prepare-commit-msg hook script that strips trailer patterns from COMMIT_EDITMSG — `scripts/prepare-commit-msg-strip-trailers.py` — verify: manual test strips Co-authored-by line
+- [ ] Task 3: Extend validate-commit-msg with --blocked-patterns, load TOML, scan message for blocklist — `packages/vig-utils/src/vig_utils/validate_commit_msg.py` — verify: `uv run pytest packages/vig-utils/tests/test_validate_commit_msg.py -v -k agent`
+- [ ] Task 4: Add author/committer identity check hook script — `scripts/check-agent-identity.py` — verify: rejects when GIT_AUTHOR_EMAIL matches blocklist
+- [ ] Task 5: Wire prepare-commit-msg, check-agent-identity, and --blocked-patterns into .pre-commit-config.yaml — `.pre-commit-config.yaml` — verify: `just precommit` runs
+- [ ] Task 6: Extend pr-title-check.yml to scan PR body for agent fingerprints — `.github/workflows/pr-title-check.yml` — verify: workflow file valid
+- [ ] Task 7: Add agent-blocklist.toml to sync manifest — `scripts/manifest.toml` — verify: `just sync-workspace` runs
+- [ ] Task 8: Strengthen skill rules (git_commit, worktree_execute, worktree_pr, CLAUDE.md) — `CLAUDE.md`, `.cursor/skills/` — verify: grep finds updated text
+- [ ] Task 9: Update CHANGELOG — `CHANGELOG.md` — verify: entry under Unreleased
+
+---
+
+# [Comment #3]() by [gerchowl]()
+
+_Posted on February 24, 2026 at 06:00 PM_
+
+## Autonomous Run Complete
+
+- Design: posted (existing)
+- Plan: posted (9 tasks)
+- Execute: all tasks done
+- Verify: vig-utils tests pass (271), lint passes
+- PR: https://github.com/vig-os/devcontainer/pull/194
+- CI: pending
+
+---
+
+# [Comment #4]() by [c-vigo]()
+
+_Posted on February 25, 2026 at 10:37 AM_
+
+@gerchowl The fix does not seem consistent. PRs #200 and #201 do not mention Cursor, but the commit messages do, e.g. 6d9dca5
 

@@ -46,7 +46,7 @@ dependencies:
     install:
       macos: brew install just
       debian: |
-        curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+        curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
       fedora: sudo dnf install -y just
       manual: https://github.com/casey/just#installation
 
@@ -97,6 +97,51 @@ dependencies:
         sudo apt update && sudo apt install -y gh
       fedora: sudo dnf install -y gh
       manual: https://cli.github.com/
+
+  # JSON processor (required by worktree trust/config commands)
+  - name: jq
+    version: latest
+    purpose: JSON parsing for worktree commands and issue metadata
+    required: true
+    check:
+      command: command -v jq
+      version_command: jq --version
+      version_regex: 'jq-(\d+\.\d+)'
+    install:
+      macos: brew install jq
+      debian: sudo apt install -y jq
+      fedora: sudo dnf install -y jq
+      alpine: sudo apk add jq
+      manual: https://jqlang.github.io/jq/download/
+
+  # Terminal multiplexer (required by worktree tmux sessions)
+  - name: tmux
+    version: latest
+    purpose: Session manager required by worktree-start and worktree-attach
+    required: true
+    check:
+      command: command -v tmux
+      version_command: tmux -V
+      version_regex: 'tmux (\d+\.\d+)'
+    install:
+      macos: brew install tmux
+      debian: sudo apt install -y tmux
+      fedora: sudo dnf install -y tmux
+      alpine: sudo apk add tmux
+      manual: https://github.com/tmux/tmux/wiki/Installing
+
+  # Cursor agent CLI (required by worktree autonomous flows)
+  - name: agent
+    version: latest
+    purpose: Cursor Agent CLI required by worktree-start/worktree-attach flows
+    required: true
+    check:
+      command: command -v agent
+      version_command: agent --version
+      version_regex: '([0-9]+\.[0-9]+\.[0-9]+)'
+    install:
+      all: curl https://cursor.com/install -fsSL | bash
+      manual: https://cursor.com/install
 
   # Node.js (for devcontainer CLI)
   - name: npm
@@ -151,6 +196,37 @@ dependencies:
     install:
       all: npm install
       manual: https://github.com/devcontainers/cli
+
+  # Containerfile linting
+  - name: hadolint
+    version: latest
+    purpose: Containerfile/Dockerfile linter used by pre-commit
+    required: true
+    check:
+      command: command -v hadolint
+      version_command: hadolint --version
+      version_regex: 'Haskell Dockerfile Linter (\d+\.\d+)'
+    install:
+      macos: brew install hadolint
+      debian: |
+        case "$(dpkg --print-architecture)" in
+          amd64) ARCH="linux-x86_64" ;;
+          arm64) ARCH="linux-arm64" ;;
+          *)
+            echo "Unsupported architecture: $(dpkg --print-architecture)"
+            exit 1
+            ;;
+        esac
+        BASE_URL="https://github.com/hadolint/hadolint/releases/latest/download"
+        BIN_FILE="hadolint-${ARCH}"
+        SHA_FILE="${BIN_FILE}.sha256"
+        curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
+        curl -fsSL "${BASE_URL}/${SHA_FILE}" -o "${SHA_FILE}"
+        EXPECTED_SHA="$(awk '{print $1}' "${SHA_FILE}")"
+        echo "${EXPECTED_SHA}  ${BIN_FILE}" | sha256sum -c -
+        sudo install -m 0755 "${BIN_FILE}" /usr/local/bin/hadolint
+        rm -f "${BIN_FILE}" "${SHA_FILE}"
+      manual: https://github.com/hadolint/hadolint/releases
 
   # Parallel (auto-installed by npm install)
   - name: parallel
