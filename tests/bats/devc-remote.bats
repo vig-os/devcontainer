@@ -141,8 +141,102 @@ setup() {
     # Run via /bin/bash so script execution does not depend on PATH/shebang lookup
     run env -i PATH="$empty_path" HOME="$HOME" /bin/bash "$DEVC_REMOTE" myserver 2>&1
     assert_failure
-    assert_output --partial "Neither cursor nor code"
+    assert_output --partial "cursor CLI not found"
     rm -rf "$empty_path"
+}
+
+# ── --open flag ──────────────────────────────────────────────────────────────
+
+@test "--open none skips editor detection" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    # No cursor/code in PATH, but --open none should skip detection
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver 2>&1
+    refute_output --partial "cursor CLI not found"
+    refute_output --partial "code CLI not found"
+    # Should fail at check_ssh, not editor detection
+    assert_output --partial "Cannot connect to"
+    rm -rf "$mock_bin"
+}
+
+@test "--open code fails when code not in PATH" {
+    local empty_path
+    empty_path="$(mktemp -d)"
+    run env -i PATH="$empty_path" HOME="$HOME" /bin/bash "$DEVC_REMOTE" --open code myserver 2>&1
+    assert_failure
+    assert_output --partial "code CLI not found"
+    rm -rf "$empty_path"
+}
+
+@test "--open invalid value rejected" {
+    run "$DEVC_REMOTE" --open vim myserver 2>&1
+    assert_failure
+    assert_output --partial "must be cursor, code, or none"
+}
+
+# ── --yes flag ──────────────────────────────────────────────────────────────
+
+@test "--yes flag is accepted" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
+    chmod +x "$mock_bin/cursor"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --yes myserver 2>&1
+    # Should fail at check_ssh, not argument parsing
+    assert_output --partial "Cannot connect to"
+    rm -rf "$mock_bin"
+}
+
+# ── inject_tailscale_key ────────────────────────────────────────────────────
+
+@test "inject_tailscale_key defines function" {
+    run grep 'inject_tailscale_key()' "$DEVC_REMOTE"
+    assert_success
+}
+
+@test "inject_tailscale_key is called in main" {
+    run grep 'inject_tailscale_key' "$DEVC_REMOTE"
+    assert_success
+    # Should appear at least twice: definition + call
+    local count
+    count=$(grep -c 'inject_tailscale_key' "$DEVC_REMOTE")
+    [ "$count" -ge 2 ]
+}
+
+@test "inject_tailscale_key skips when TS_CLIENT_ID unset" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/ssh" << SSHEOF
+#!/bin/sh
+counter="${mock_bin}/ssh_counter"
+count=\$(cat "\$counter" 2>/dev/null || echo 0)
+echo \$((count + 1)) > "\$counter"
+if [ "\$count" = "1" ]; then
+  echo "RUNTIME=podman"
+  echo "COMPOSE_AVAILABLE=1"
+  echo "REPO_PATH_EXISTS=1"
+  echo "DEVCONTAINER_EXISTS=1"
+  echo "DISK_AVAILABLE_GB=5"
+  echo "OS_TYPE=linux"
+elif [ "\$count" = "2" ]; then
+  echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
+fi
+exit 0
+SSHEOF
+    chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'echo "vscode-remote://test"' 'exit 0' > "$mock_bin/python3"
+    chmod +x "$mock_bin/python3"
+    printf '%s\n' '#!/bin/sh' '[ "$1" = "--folder-uri" ] && [ -n "$2" ] && exit 0' 'exit 1' > "$mock_bin/cursor"
+    chmod +x "$mock_bin/cursor"
+    # Run WITHOUT TS_CLIENT_ID — should not mention Tailscale at all
+    PATH="$mock_bin:$PATH" run env -u TS_CLIENT_ID -u TS_CLIENT_SECRET "$DEVC_REMOTE" host 2>&1
+    assert_success
+    refute_output --partial "Tailscale"
+    rm -rf "$mock_bin"
 }
 
 # ── check_ssh ────────────────────────────────────────────────────────────────

@@ -2,20 +2,29 @@
 ###############################################################################
 # devc-remote.sh - Remote devcontainer orchestrator
 #
-# Starts a devcontainer on a remote host via SSH and opens Cursor/VS Code.
+# Starts a devcontainer on a remote host via SSH and optionally opens an IDE.
 # Handles SSH connectivity, pre-flight checks, container state detection,
-# and compose lifecycle. URI construction delegated to Python helper.
+# compose lifecycle, and optional Tailscale auth key injection.
 #
 # USAGE:
-#   ./scripts/devc-remote.sh <ssh-host>[:<remote-path>]
+#   ./scripts/devc-remote.sh [options] <ssh-host>[:<remote-path>]
 #   ./scripts/devc-remote.sh --help
+#
+# Options:
+#   --yes, -y         Auto-accept prompts (reuse running containers)
+#   --open <mode>     IDE to open: cursor | code | none (default: cursor)
+#
+# Tailscale key injection (opt-in):
+#   When TS_CLIENT_ID and TS_CLIENT_SECRET are set in the local environment,
+#   generates an ephemeral auth key via the Tailscale API and injects it
+#   into the remote docker-compose.local.yaml before compose up.
 #
 # Examples:
 #   ./scripts/devc-remote.sh myserver
-#   ./scripts/devc-remote.sh user@host:/opt/projects/myrepo
-#   ./scripts/devc-remote.sh myserver:/home/user/repo
+#   ./scripts/devc-remote.sh --open none myserver:/home/user/repo
+#   ./scripts/devc-remote.sh --yes --open code user@host:/opt/projects/myrepo
 #
-# Part of #70. See issue #152 for design.
+# Part of #70. See issues #152, #230, #231 for design.
 ###############################################################################
 
 set -euo pipefail
@@ -62,11 +71,27 @@ show_help() {
 parse_args() {
     SSH_HOST=""
     REMOTE_PATH="~"
+    YES_MODE=0
+    OPEN_MODE="cursor"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --help|-h)
                 show_help
+                ;;
+            --yes|-y)
+                # shellcheck disable=SC2034
+                YES_MODE=1
+                shift
+                ;;
+            --open)
+                shift
+                OPEN_MODE="${1:-cursor}"
+                if [[ "$OPEN_MODE" != "cursor" && "$OPEN_MODE" != "code" && "$OPEN_MODE" != "none" ]]; then
+                    log_error "--open must be cursor, code, or none"
+                    exit 1
+                fi
+                shift
                 ;;
             -*)
                 log_error "Unknown option: $1"
@@ -100,16 +125,138 @@ parse_args() {
 }
 
 detect_editor_cli() {
-    if command -v cursor &>/dev/null; then
-        # shellcheck disable=SC2034
-        EDITOR_CLI="cursor"
-    elif command -v code &>/dev/null; then
-        # shellcheck disable=SC2034
-        EDITOR_CLI="code"
-    else
-        log_error "Neither cursor nor code CLI found. Install Cursor or VS Code and enable the shell command."
-        exit 1
+    if [[ "$OPEN_MODE" == "none" ]]; then
+        EDITOR_CLI=""
+        return
     fi
+
+    if [[ "$OPEN_MODE" == "cursor" ]]; then
+        if command -v cursor &>/dev/null; then
+            EDITOR_CLI="cursor"
+        else
+            log_error "cursor CLI not found. Install Cursor and enable the shell command, or use --open code|none."
+            exit 1
+        fi
+    elif [[ "$OPEN_MODE" == "code" ]]; then
+        if command -v code &>/dev/null; then
+            EDITOR_CLI="code"
+        else
+            log_error "code CLI not found. Install VS Code and enable the shell command, or use --open cursor|none."
+            exit 1
+        fi
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAILSCALE KEY INJECTION (opt-in via TS_CLIENT_ID + TS_CLIENT_SECRET)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+inject_tailscale_key() {
+    # Skip if no OAuth credentials
+    if [[ -z "${TS_CLIENT_ID:-}" || -z "${TS_CLIENT_SECRET:-}" ]]; then
+        return 0
+    fi
+
+    # Check if key already set on remote
+    # shellcheck disable=SC2029
+    if ssh "$SSH_HOST" "grep -q 'TAILSCALE_AUTHKEY' '$REMOTE_PATH/.devcontainer/docker-compose.local.yaml' 2>/dev/null"; then
+        log_info "Tailscale: auth key already configured on remote"
+        return 0
+    fi
+
+    # Verify local prerequisites
+    if ! command -v curl &>/dev/null || ! command -v jq &>/dev/null; then
+        log_warning "Tailscale: curl and jq required for key generation, skipping"
+        return 0
+    fi
+
+    log_info "Tailscale: generating ephemeral auth key..."
+
+    # Get OAuth access token
+    local token_response token
+    token_response=$(curl -s -f \
+        -d "client_id=$TS_CLIENT_ID" \
+        -d "client_secret=$TS_CLIENT_SECRET" \
+        "https://api.tailscale.com/api/v2/oauth/token" 2>&1) || {
+        log_warning "Tailscale: failed to get OAuth token, skipping"
+        return 0
+    }
+    token=$(echo "$token_response" | jq -r '.access_token // empty')
+    if [[ -z "$token" ]]; then
+        log_warning "Tailscale: empty access token, skipping"
+        return 0
+    fi
+
+    # Create ephemeral, non-reusable auth key
+    local key_response auth_key
+    key_response=$(curl -s -f -X POST \
+        -H "Authorization: Bearer $token" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "capabilities": {
+                "devices": {
+                    "create": {
+                        "reusable": false,
+                        "ephemeral": true,
+                        "tags": ["tag:devcontainer"]
+                    }
+                }
+            }
+        }' \
+        "https://api.tailscale.com/api/v2/tailnet/-/keys" 2>&1) || {
+        log_warning "Tailscale: failed to create auth key, skipping"
+        return 0
+    }
+    auth_key=$(echo "$key_response" | jq -r '.key // empty')
+    if [[ -z "$auth_key" ]]; then
+        local err_msg
+        err_msg=$(echo "$key_response" | jq -r '.message // empty')
+        log_warning "Tailscale: API error: ${err_msg:-unknown}, skipping"
+        return 0
+    fi
+
+    # Inject into remote docker-compose.local.yaml
+    # shellcheck disable=SC2029
+    ssh "$SSH_HOST" "bash -s" "$REMOTE_PATH" "$auth_key" << 'INJECT_EOF'
+REPO_PATH="$1"
+AUTH_KEY="$2"
+LOCAL_YAML="$REPO_PATH/.devcontainer/docker-compose.local.yaml"
+
+# Create if missing
+if [ ! -f "$LOCAL_YAML" ]; then
+    cat > "$LOCAL_YAML" << 'YAML'
+services:
+  devcontainer:
+    environment:
+      - TAILSCALE_AUTHKEY=PLACEHOLDER
+YAML
+fi
+
+# If file has 'services: {}' (empty), replace with proper structure
+if grep -q 'services: {}' "$LOCAL_YAML"; then
+    cat > "$LOCAL_YAML" << YAML
+services:
+  devcontainer:
+    environment:
+      - TAILSCALE_AUTHKEY=${AUTH_KEY}
+YAML
+elif grep -q 'TAILSCALE_AUTHKEY' "$LOCAL_YAML"; then
+    sed -i "s|TAILSCALE_AUTHKEY=.*|TAILSCALE_AUTHKEY=${AUTH_KEY}|" "$LOCAL_YAML"
+elif grep -q 'environment:' "$LOCAL_YAML"; then
+    sed -i "/environment:/a\\      - TAILSCALE_AUTHKEY=${AUTH_KEY}" "$LOCAL_YAML"
+elif grep -q 'devcontainer:' "$LOCAL_YAML"; then
+    sed -i "/devcontainer:/a\\    environment:\\n      - TAILSCALE_AUTHKEY=${AUTH_KEY}" "$LOCAL_YAML"
+else
+    cat > "$LOCAL_YAML" << YAML
+services:
+  devcontainer:
+    environment:
+      - TAILSCALE_AUTHKEY=${AUTH_KEY}
+YAML
+fi
+INJECT_EOF
+
+    log_success "Tailscale: ephemeral auth key injected into remote compose"
 }
 
 check_ssh() {
@@ -247,9 +394,14 @@ open_editor() {
 main() {
     parse_args "$@"
 
-    log_info "Detecting local editor CLI..."
-    detect_editor_cli
-    log_success "Using $EDITOR_CLI"
+    if [[ "$OPEN_MODE" != "none" ]]; then
+        log_info "Detecting local editor CLI..."
+        detect_editor_cli
+        log_success "Using $EDITOR_CLI"
+    else
+        detect_editor_cli
+        log_info "IDE: none (infra only)"
+    fi
 
     log_info "Checking SSH connectivity to $SSH_HOST..."
     check_ssh
@@ -259,10 +411,16 @@ main() {
     remote_preflight
     log_success "Pre-flight OK (runtime: $RUNTIME)"
 
-    remote_compose_up
-    open_editor
+    inject_tailscale_key
 
-    log_success "Done — opened $EDITOR_CLI for $SSH_HOST:$REMOTE_PATH"
+    remote_compose_up
+
+    if [[ "$OPEN_MODE" != "none" ]]; then
+        open_editor
+        log_success "Done — opened $EDITOR_CLI for $SSH_HOST:$REMOTE_PATH"
+    else
+        log_success "Done — devcontainer running on $SSH_HOST:$REMOTE_PATH"
+    fi
 }
 
 main "$@"
