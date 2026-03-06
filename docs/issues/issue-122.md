@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-20T15:35:54Z
-updated: 2026-02-21T00:22:45Z
+updated: 2026-03-05T10:35:49Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/122
 comments: 1
 labels: chore, area:ci, area:image, effort:small, semver:patch
-assignees: none
-milestone: none
+assignees: c-vigo
+milestone: 0.3
 projects: none
 relationship: none
-synced: 2026-02-21T04:11:18.657Z
+synced: 2026-03-06T04:14:28.262Z
 ---
 
 # [Issue 122]: [[CHORE] Add hadolint linting for Containerfiles](https://github.com/vig-os/devcontainer/issues/122)
@@ -27,10 +27,10 @@ Add [hadolint](https://github.com/hadolint/hadolint) static analysis for all Con
 
 ### Acceptance Criteria
 
-- [ ] `hadolint` pre-commit hook added to `.pre-commit-config.yaml`, pinned by SHA
-- [ ] `Containerfile` passes hadolint with no warnings
-- [ ] `tests/fixtures/sidecar.Containerfile` passes hadolint with no warnings
-- [ ] `uv run pre-commit run --all-files` exits clean
+- [x] `hadolint` pre-commit hook added to `.pre-commit-config.yaml`, pinned by SHA
+- [x] `Containerfile` passes hadolint with no warnings
+- [x] `tests/fixtures/sidecar.Containerfile` passes hadolint with no warnings
+- [x] `uv run pre-commit run --all-files` exits clean
 
 ### Implementation Notes
 
