@@ -13,7 +13,8 @@
 # Options:
 #   --yes, -y         Auto-accept prompts (reuse running containers)
 #   --open <mode>     How to connect after compose up:
-#                       cursor  - open Cursor via devcontainer protocol (default)
+#                       auto    - detect IDE from $TERM_PROGRAM or CLI availability (default)
+#                       cursor  - open Cursor via devcontainer protocol
 #                       code    - open VS Code via devcontainer protocol
 #                       ssh     - wait for Tailscale, print hostname (for SSH clients)
 #                       none    - infra only, no IDE
@@ -77,7 +78,7 @@ parse_args() {
     SSH_HOST=""
     REMOTE_PATH="~"
     YES_MODE=0
-    OPEN_MODE="cursor"
+    OPEN_MODE="auto"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -92,8 +93,8 @@ parse_args() {
             --open)
                 shift
                 OPEN_MODE="${1:-cursor}"
-                if [[ "$OPEN_MODE" != "cursor" && "$OPEN_MODE" != "code" && "$OPEN_MODE" != "ssh" && "$OPEN_MODE" != "none" ]]; then
-                    log_error "--open must be cursor, code, ssh, or none"
+                if [[ "$OPEN_MODE" != "auto" && "$OPEN_MODE" != "cursor" && "$OPEN_MODE" != "code" && "$OPEN_MODE" != "ssh" && "$OPEN_MODE" != "none" ]]; then
+                    log_error "--open must be auto, cursor, code, ssh, or none"
                     exit 1
                 fi
                 shift
@@ -133,6 +134,31 @@ detect_editor_cli() {
     if [[ "$OPEN_MODE" == "none" || "$OPEN_MODE" == "ssh" ]]; then
         EDITOR_CLI=""
         return
+    fi
+
+    # Auto-detect: check TERM_PROGRAM, then fall back to CLI availability
+    if [[ "$OPEN_MODE" == "auto" ]]; then
+        case "${TERM_PROGRAM:-}" in
+            cursor|Cursor)
+                OPEN_MODE="cursor" ;;
+            vscode|VSCode)
+                OPEN_MODE="code" ;;
+            WezTerm|iTerm*|Apple_Terminal|tmux)
+                # Terminal app — no devcontainer protocol, default to ssh
+                OPEN_MODE="ssh" ;;
+        esac
+    fi
+
+    # Still auto? Fall back to CLI availability
+    if [[ "$OPEN_MODE" == "auto" ]]; then
+        if command -v cursor &>/dev/null; then
+            OPEN_MODE="cursor"
+        elif command -v code &>/dev/null; then
+            OPEN_MODE="code"
+        else
+            OPEN_MODE="ssh"
+            log_info "No IDE CLI found, falling back to --open ssh"
+        fi
     fi
 
     if [[ "$OPEN_MODE" == "cursor" ]]; then
