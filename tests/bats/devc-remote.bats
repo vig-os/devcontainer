@@ -170,10 +170,22 @@ setup() {
     rm -rf "$empty_path"
 }
 
+@test "--open ssh skips editor detection" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open ssh myserver 2>&1
+    refute_output --partial "cursor CLI not found"
+    refute_output --partial "code CLI not found"
+    assert_output --partial "Cannot connect to"
+    rm -rf "$mock_bin"
+}
+
 @test "--open invalid value rejected" {
     run "$DEVC_REMOTE" --open vim myserver 2>&1
     assert_failure
-    assert_output --partial "must be cursor, code, or none"
+    assert_output --partial "must be cursor, code, ssh, or none"
 }
 
 # ── --yes flag ──────────────────────────────────────────────────────────────
@@ -192,6 +204,16 @@ setup() {
 }
 
 # ── inject_tailscale_key ────────────────────────────────────────────────────
+
+@test "wait_for_tailscale defines function" {
+    run grep 'wait_for_tailscale()' "$DEVC_REMOTE"
+    assert_success
+}
+
+@test "read_workspace_folder defines function" {
+    run grep 'read_workspace_folder()' "$DEVC_REMOTE"
+    assert_success
+}
 
 @test "inject_tailscale_key defines function" {
     run grep 'inject_tailscale_key()' "$DEVC_REMOTE"
@@ -375,7 +397,7 @@ SSHEOF
     chmod +x "$mock_bin/cursor"
     PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" host 2>&1
     assert_success
-    assert_output --partial "editor CLI"
+    assert_output --partial "IDE:"
     assert_output --partial "SSH"
     assert_output --partial "pre-flight"
     rm -rf "$mock_bin"
