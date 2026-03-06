@@ -2,43 +2,49 @@
 
 ## Custom Commands
 
-Available slash commands (symlinked from `.cursor/skills/`):
+Available slash commands (SSoT: `.cursor/skills/`, mapped via `.claude/commands/`):
+
 | Command | Description |
 |---------|-------------|
-| `/ci_check` | Check CI pipeline status for current branch/PR |
-| `/ci_fix` | Diagnose and fix failing CI runs |
-| `/code_debug` | Systematic debugging: root cause first, fix second |
-| `/code_execute` | Work through implementation plan in batches with checkpoints |
-| `/code_review` | Structured self-review before submitting a PR |
-| `/code_tdd` | Strict RED-GREEN-REFACTOR discipline |
-| `/code_verify` | Run verification and provide evidence before claiming done |
-| `/design_brainstorm` | Explore requirements and design before writing code |
-| `/design_plan` | Break approved design into implementation tasks |
-| `/git_commit` | Commit workflow following project conventions |
-| `/inception_explore` | Divergent exploration — understand the problem space |
-| `/inception_scope` | Convergent scoping — define what to build and what not to build |
-| `/inception_architect` | Architecture evaluation — validate design against established patterns |
-| `/inception_plan` | Decomposition — turn scoped design into actionable GitHub issues |
-| `/issue_claim` | Set up local environment to work on a GitHub issue |
-| `/issue_create` | Create a new GitHub issue using templates |
-| `/issue_triage` | Triage and label GitHub issues |
-| `/pr_create` | Prepare and submit a pull request |
-| `/pr_post-merge` | Cleanup after PR merge |
-| `/pr_solve` | Diagnose PR failures, plan fixes, execute them |
-| `/worktree_ci-check` | Autonomous CI check — polls until completion, triggers fix on failure |
-| `/worktree_ci-fix` | Autonomous CI fix — diagnose, post diagnosis, fix, push, re-check |
-| `/worktree_brainstorm` | Autonomous design — reads issue, posts design, never blocks |
-| `/worktree_plan` | Autonomous planning — posts implementation plan, never blocks |
-| `/worktree_execute` | Autonomous TDD implementation — no user checkpoints |
-| `/worktree_verify` | Autonomous verification — evidence only, loops on failure |
-| `/worktree_pr` | Autonomous PR creation from worktree branch |
-| `/worktree_ask` | Post question to issue when autonomous agent is stuck |
-| `/worktree_solve-and-pr` | Full autonomous pipeline: detect state → design → plan → execute → verify → PR |
+| `/project:ci_check` | Check CI pipeline status for current branch/PR |
+| `/project:ci_fix` | Diagnose and fix failing CI runs |
+| `/project:code_debug` | Systematic debugging: root cause first, fix second |
+| `/project:code_execute` | Work through implementation plan in batches with checkpoints |
+| `/project:code_review` | Structured self-review before submitting a PR |
+| `/project:code_tdd` | Strict RED-GREEN-REFACTOR discipline |
+| `/project:code_verify` | Run verification and provide evidence before claiming done |
+| `/project:design_brainstorm` | Explore requirements and design before writing code |
+| `/project:design_plan` | Break approved design into implementation tasks |
+| `/project:git_commit` | Commit workflow following project conventions |
+| `/project:inception_explore` | Divergent exploration -- understand the problem space |
+| `/project:inception_scope` | Convergent scoping -- define what to build and what not to build |
+| `/project:inception_architect` | Architecture evaluation -- validate design against established patterns |
+| `/project:inception_plan` | Decomposition -- turn scoped design into actionable GitHub issues |
+| `/project:issue_claim` | Set up local environment to work on a GitHub issue |
+| `/project:issue_create` | Create a new GitHub issue using templates |
+| `/project:issue_triage` | Triage and label GitHub issues |
+| `/project:pr_create` | Prepare and submit a pull request |
+| `/project:pr_post-merge` | Cleanup after PR merge |
+| `/project:pr_solve` | Diagnose PR failures, plan fixes, execute them |
+| `/project:worktree_ci-check` | Autonomous CI check -- polls until completion, triggers fix on failure |
+| `/project:worktree_ci-fix` | Autonomous CI fix -- diagnose, post diagnosis, fix, push, re-check |
+| `/project:worktree_brainstorm` | Autonomous design -- reads issue, posts design, never blocks |
+| `/project:worktree_plan` | Autonomous planning -- posts implementation plan, never blocks |
+| `/project:worktree_execute` | Autonomous TDD implementation -- no user checkpoints |
+| `/project:worktree_verify` | Autonomous verification -- evidence only, loops on failure |
+| `/project:worktree_pr` | Autonomous PR creation from worktree branch |
+| `/project:worktree_ask` | Post question to issue when autonomous agent is stuck |
+| `/project:worktree_solve-and-pr` | Full autonomous pipeline: detect state, design, plan, execute, verify, PR |
+
 ---
 
 ## Always-Apply Rules
 
+Rules SSoT: `.cursor/rules/` (read these files for full detail).
+
 ### Coding Principles
+
+See `.cursor/rules/coding-principles.mdc` for full detail.
 
 1. **YAGNI** -- Implement only what the issue or user explicitly requests. No speculative features. Ask before adding anything unasked.
 2. **Minimal diff** -- Touch only files and lines required for the task. No drive-by refactors, renames, or reformats. Mention improvements separately; don't silently change them.
@@ -50,6 +56,8 @@ Available slash commands (symlinked from `.cursor/skills/`):
 **Stop if:** Adding code the issue didn't ask for, editing files outside scope, hardcoding secrets, making untraceable changes, or growing a function beyond one purpose.
 
 ### Commit Message Standard
+
+See `.cursor/rules/commit-messages.mdc` and `docs/COMMIT_MESSAGE_STANDARD.md` for full detail.
 
 Format:
 
@@ -65,6 +73,7 @@ Refs: #<issue>
 - **Refs line mandatory** (at least one GitHub issue, e.g. `Refs: #36`). Exception: `chore` commits may omit `Refs:` when no issue is related.
 - Exactly one `Refs:` line, always last line
 - No emojis, no semantic-release style, no types outside the list
+- Never add Co-authored-by trailers. Never set git author/committer to an AI agent identity. Never mention AI agent names in commit messages or PR descriptions. The pre-commit hooks will reject violations.
 
 ### Changelog Rules
 
@@ -76,6 +85,8 @@ Refs: #<issue>
 
 ### Branch Naming
 
+See `.cursor/rules/branch-naming.mdc` for full detail.
+
 Format: `<type>/<issue_number>-<short_summary>`
 
 Types: `feature` | `bugfix` | `release`
@@ -86,7 +97,9 @@ Use `gh issue develop` to create and link branches. Always confirm branch name w
 
 Every piece of knowledge lives in exactly one place. Reference it everywhere else. Don't copy -- link. Applies to docs, config, infra, rules, and comments.
 
-### TDD (glob-triggered on source/test files, see `.cursor/rules/tdd.mdc`)
+### TDD
+
+See `.cursor/rules/tdd.mdc` for the scenario checklist and full detail.
 
 1. Write the failing test first. Run it. Confirm it fails.
 2. **Commit** the failing test (`test: ...`) following the Commit Message Standard above. Do not proceed before committing.
@@ -96,5 +109,3 @@ Every piece of knowledge lives in exactly one place. Reference it everywhere els
 All commits must follow the Commit Message Standard. Never use `--no-verify`.
 
 Each phase gets its own commit. Do not write implementation before its test. Skip TDD only for non-testable changes (config, templates, docs) -- note why.
-
-Before writing tests, use the **scenario checklist** in `tdd.mdc`: happy path, edge cases, error paths, input validation, state/side effects, regression, smoke. Use the narrowest test type (unit > integration > smoke > E2E) that covers the behavior.
