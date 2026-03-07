@@ -53,6 +53,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
+    jq \
     openssh-client \
     locales \
     ca-certificates \
@@ -213,6 +214,9 @@ RUN set -eux; \
     echo "${CHECKSUM}  ${FILE}" | sha256sum -c -; \
     tar -xzf "$FILE" -C /usr/local/bin --strip-components=1; \
     rm "$FILE";
+
+# Copy vig-utils package early so uv can resolve the workspace member
+COPY packages/vig-utils /root/packages/vig-utils
 
 # Install Python development tools from root pyproject.toml (SSoT)
 # and upgrade pip to fix CVE-2025-8869 (symbolic link extraction vulnerability)

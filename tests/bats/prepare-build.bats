@@ -124,8 +124,8 @@ setup() {
     assert_success
 }
 
-@test "prepare-build.sh uses python utils.py for replacements" {
-    run grep 'uv run python "\$SCRIPT_DIR/utils.py"' "$PREPARE_BUILD_SH"
+@test "prepare-build.sh uses vig-utils for replacements" {
+    run grep 'uv run vig-utils sed' "$PREPARE_BUILD_SH"
     assert_success
 }
 

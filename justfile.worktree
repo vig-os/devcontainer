@@ -21,9 +21,6 @@ alias wt-clean := worktree-clean
 _wt_repo := `basename "$(git rev-parse --show-toplevel)"`
 _wt_base := "../" + _wt_repo + "-worktrees"
 
-# Scripts path: resolves to scripts/ in devcontainer repo, .devcontainer/scripts/ in workspace
-_scripts := source_directory() / "scripts"
-
 # -------------------------------------------------------------------------------
 # START
 # -------------------------------------------------------------------------------
@@ -127,10 +124,11 @@ worktree-start issue prompt="" reviewer="":
             echo "    tmux session '$SESSION' is running. Use: just worktree-attach $ISSUE"
         else
             echo "    No tmux session found. Starting one..."
+            AGENT_MODEL=$(_read_model "autonomous")
             if [ -n "$PROMPT" ]; then
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --yolo --approve-mcps \"$PROMPT\""
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --model $AGENT_MODEL --yolo --approve-mcps \"$PROMPT\""
             else
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --approve-mcps"
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --model $AGENT_MODEL --approve-mcps"
             fi
             sleep 2 && tmux send-keys -t "$SESSION" "a" 2>/dev/null || true
             echo "[OK] tmux session '$SESSION' started. Use: just worktree-attach $ISSUE"
@@ -139,7 +137,7 @@ worktree-start issue prompt="" reviewer="":
     fi
 
     # Resolve the issue's linked branch (may already exist from issue:claim)
-    BRANCH=$(gh issue develop --list "$ISSUE" 2>/dev/null | "{{ _scripts }}/resolve-branch.sh")
+    BRANCH=$(gh issue develop --list "$ISSUE" 2>/dev/null | uv run resolve-branch)
 
     if [ -z "$BRANCH" ]; then
         echo "[*] No linked branch for issue #${ISSUE}. Creating one..."
@@ -159,11 +157,11 @@ worktree-start issue prompt="" reviewer="":
         # Use agent ONLY for the intelligent part: deriving the short summary
         # Try lightweight first; on failure retry with standard model (#183)
         NAMING_RULE="$(pwd)/.cursor/rules/branch-naming.mdc"
-        SUMMARY=$("{{ _scripts }}/derive-branch-summary.sh" "$TITLE" "$NAMING_RULE" "lightweight") || true
+        SUMMARY=$(uv run derive-branch-summary "$TITLE" "$NAMING_RULE" "lightweight") || true
 
         if [ -z "$SUMMARY" ]; then
             echo "[!] Lightweight model failed. Retrying with standard model..."
-            SUMMARY=$("{{ _scripts }}/derive-branch-summary.sh" "$TITLE" "$NAMING_RULE" "standard") || true
+            SUMMARY=$(uv run derive-branch-summary "$TITLE" "$NAMING_RULE" "standard") || true
         fi
 
         if [ -z "$SUMMARY" ]; then
@@ -175,7 +173,7 @@ worktree-start issue prompt="" reviewer="":
         OWNER_REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner')
         PARENT=$(gh api "repos/${OWNER_REPO}/issues/${ISSUE}/parent" --jq '.number' 2>/dev/null || true)
         if [ -n "$PARENT" ]; then
-            BASE=$(gh issue develop --list "$PARENT" 2>/dev/null | "{{ _scripts }}/resolve-branch.sh")
+            BASE=$(gh issue develop --list "$PARENT" 2>/dev/null | uv run resolve-branch)
             BASE="${BASE:-dev}"
         else
             BASE="dev"
@@ -231,10 +229,11 @@ worktree-start issue prompt="" reviewer="":
 
     # Start tmux session
     # --yolo: auto-approve all shell commands (autonomous agent, no human at the terminal)
+    AGENT_MODEL=$(_read_model "autonomous")
     if [ -n "$PROMPT" ]; then
-        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --yolo --approve-mcps \"$PROMPT\""
+        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --model $AGENT_MODEL --yolo --approve-mcps \"$PROMPT\""
     else
-        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --approve-mcps"
+        tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --model $AGENT_MODEL --approve-mcps"
     fi
     sleep 2 && tmux send-keys -t "$SESSION" "a" 2>/dev/null || true
 
@@ -317,6 +316,12 @@ worktree-attach issue:
         fi
     }
 
+    _read_model() {
+        local tier="$1"
+        local cfg="$(git rev-parse --show-toplevel)/.cursor/agent-models.toml"
+        grep "^${tier}" "$cfg" | sed 's/.*= *"//' | sed 's/".*//'
+    }
+
     ISSUE="{{ issue }}"
     SESSION="wt-${ISSUE}"
     WT_DIR="{{ _wt_base }}/${ISSUE}"
@@ -325,11 +330,12 @@ worktree-attach issue:
         if [ -d "$WT_DIR" ]; then
             echo "[!] tmux session '$SESSION' stopped. Restarting..."
             _wt_ensure_trust "$WT_DIR"
-            REVIEWER=$(gh api user --jq '.login' 2>/dev/null || echo "")
             if [ -n "${WORKTREE_ATTACH_RESTART_CMD:-}" ]; then
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "$WORKTREE_ATTACH_RESTART_CMD"
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" "$WORKTREE_ATTACH_RESTART_CMD"
             else
-                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --approve-mcps"
+                REVIEWER=$(gh api user --jq '.login' 2>/dev/null || echo "")
+                AGENT_MODEL=$(_read_model "autonomous")
+                tmux new-session -d -s "$SESSION" -c "$WT_DIR" -e "PR_REVIEWER=$REVIEWER" "agent chat --model $AGENT_MODEL --approve-mcps"
             fi
             sleep 2 && tmux send-keys -t "$SESSION" "a" 2>/dev/null || true
             echo "[OK] tmux session '$SESSION' restarted"

@@ -25,6 +25,27 @@ setup() {
     assert_success
 }
 
+# ── devcontainer.json template ───────────────────────────────────────────────
+
+@test "devcontainer.json template sets terminal.integrated.defaultProfile.linux to bash" {
+    DEVCONTAINER_JSON="$PROJECT_ROOT/assets/workspace/.devcontainer/devcontainer.json"
+    run python3 -c "
+import json, sys
+with open('$DEVCONTAINER_JSON') as f:
+    data = json.load(f)
+settings = data.get('customizations', {}).get('vscode', {}).get('settings', {})
+profile = settings.get('terminal.integrated.defaultProfile.linux')
+if profile == 'bash':
+    print('bash')
+    sys.exit(0)
+else:
+    print(f'expected bash, got {profile!r}')
+    sys.exit(1)
+"
+    assert_success
+    assert_output "bash"
+}
+
 # ── idempotent rename guard (#197) ───────────────────────────────────────────
 
 @test "init-workspace.sh guards against nested template_project on re-run" {

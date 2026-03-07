@@ -26,8 +26,8 @@ import re
 import sys
 from pathlib import Path
 
-from vig_utils.agent_blocklist import contains_agent_fingerprint as check_blocklist
-from vig_utils.agent_blocklist import load_blocklist
+from vig_utils.utils import contains_agent_fingerprint as check_blocklist
+from vig_utils.utils import load_blocklist
 
 # Default approved commit types (single source of truth; keep in sync with COMMIT_MESSAGE_STANDARD.md)
 DEFAULT_APPROVED_TYPES = frozenset[str](

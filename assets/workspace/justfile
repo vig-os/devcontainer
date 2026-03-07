@@ -11,6 +11,7 @@ help:
 
 import '.devcontainer/justfile.base'
 import '.devcontainer/justfile.gh'
+import '.devcontainer/justfile.worktree'
 
 # Import team-shared project recipes (git-tracked, preserved on upgrade)
 

@@ -1,44 +1,11 @@
 #!/usr/bin/env bats
-# BATS tests for worktree-related scripts
+# BATS tests for repo-level worktree integration.
 #
-# Tests scripts/resolve-branch.sh which extracts a branch name from
-# the tab-separated output of `gh issue develop --list`.
+# Encapsulated command behavior (resolve-branch/derive-branch-summary) lives in:
+#   packages/vig-utils/tests/test_shell_entrypoints.py
 
 setup() {
     load test_helper
-    RESOLVE_BRANCH="$PROJECT_ROOT/scripts/resolve-branch.sh"
-}
-
-# ── resolve-branch.sh ────────────────────────────────────────────────────────
-
-@test "resolve-branch.sh is executable" {
-    assert_file_exists "$RESOLVE_BRANCH"
-    run test -x "$RESOLVE_BRANCH"
-    assert_success
-}
-
-@test "extracts branch from tab-separated output" {
-    run bash -c 'printf "feature/103-enhancements\thttps://github.com/org/repo/tree/feature/103-enhancements\n" | "$1"' _ "$RESOLVE_BRANCH"
-    assert_success
-    assert_output "feature/103-enhancements"
-}
-
-@test "handles output with no tab (branch name only)" {
-    run bash -c 'printf "feature/103-enhancements\n" | "$1"' _ "$RESOLVE_BRANCH"
-    assert_success
-    assert_output "feature/103-enhancements"
-}
-
-@test "picks first line when multiple branches returned" {
-    run bash -c 'printf "feature/103-first\thttps://example.com\nbugfix/99-second\thttps://example.com\n" | "$1"' _ "$RESOLVE_BRANCH"
-    assert_success
-    assert_output "feature/103-first"
-}
-
-@test "returns empty on empty input" {
-    run bash -c 'printf "" | "$1"' _ "$RESOLVE_BRANCH"
-    assert_success
-    assert_output ""
 }
 
 # ── worktree-attach restart logic (#132) ───────────────────────────────────────
@@ -116,43 +83,6 @@ setup() {
     assert_failure
 
     rm -rf "$TMPDIR_TEST"
-}
-
-# ── derive-branch-summary.sh (#154) ───────────────────────────────────────────
-
-@test "derive-branch-summary.sh outputs summary when BRANCH_SUMMARY_CMD succeeds" {
-    DERIVE_SCRIPT="$PROJECT_ROOT/scripts/derive-branch-summary.sh"
-    assert_file_exists "$DERIVE_SCRIPT"
-    run test -x "$DERIVE_SCRIPT"
-    assert_success
-
-    run env BRANCH_SUMMARY_CMD="echo fix-login-bug" "$DERIVE_SCRIPT" "Fix login bug"
-    assert_success
-    assert_output "fix-login-bug"
-}
-
-@test "derive-branch-summary.sh times out when mock hangs" {
-    DERIVE_SCRIPT="$PROJECT_ROOT/scripts/derive-branch-summary.sh"
-    run env BRANCH_SUMMARY_CMD="sleep 5" DERIVE_BRANCH_TIMEOUT=2 "$DERIVE_SCRIPT" "Some title" 2>&1
-    assert_failure
-    assert_output --partial "[ERROR]"
-    assert_output --partial "Failed to derive branch summary"
-}
-
-@test "derive-branch-summary.sh prints error with workaround when mock fails" {
-    DERIVE_SCRIPT="$PROJECT_ROOT/scripts/derive-branch-summary.sh"
-    run env BRANCH_SUMMARY_CMD="false" "$DERIVE_SCRIPT" "Some title" 2>&1
-    assert_failure
-    assert_output --partial "[ERROR]"
-    assert_output --partial "Create one manually"
-    assert_output --partial "gh issue develop"
-}
-
-@test "derive-branch-summary.sh accepts optional MODEL_TIER as third argument" {
-    DERIVE_SCRIPT="$PROJECT_ROOT/scripts/derive-branch-summary.sh"
-    run env BRANCH_SUMMARY_CMD="echo retry-summary" "$DERIVE_SCRIPT" "Some title" "/dev/null" "standard"
-    assert_success
-    assert_output "retry-summary"
 }
 
 # ── worktree-attach ───────────────────────────────────────────────────────────
