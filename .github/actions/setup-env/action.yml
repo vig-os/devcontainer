@@ -18,6 +18,7 @@
 #   node-version:             Node.js version (default: '20')
 #   install-devcontainer-cli: Install devcontainer CLI + docker-compose wrapper (default: false)
 #   install-hadolint:         Install hadolint binary (default: false)
+#   install-taplo:            Install taplo TOML linter/formatter (default: false)
 #   install-bats:             Install BATS + helper libraries (default: false)
 #
 # Outputs:
@@ -74,6 +75,10 @@ inputs:
     description: 'Install just command runner for Justfile support'
     required: false
     default: 'true'
+  install-taplo:
+    description: 'Install taplo TOML linter/formatter'
+    required: false
+    default: 'false'
   install-bats:
     description: 'Install BATS and helper libraries (support, assert, file) for shell testing'
     required: false
@@ -167,6 +172,33 @@ runs:
         rm -f "${BIN_FILE}" "${SHA_FILE}"
 
         hadolint --version
+
+    # ── taplo (TOML linter/formatter) ──────────────────────────────────
+    - name: Install taplo
+      if: inputs.install-taplo == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        case "$(uname -m)" in
+          x86_64) ARCH="x86_64" ;;
+          aarch64|arm64) ARCH="aarch64" ;;
+          *)
+            echo "Unsupported architecture: $(uname -m)"
+            exit 1
+            ;;
+        esac
+
+        TAPLO_VERSION="$(curl -fsSL https://api.github.com/repos/tamasfe/taplo/releases/latest | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')"
+        BASE_URL="https://github.com/tamasfe/taplo/releases/download/${TAPLO_VERSION}"
+        BIN_FILE="taplo-linux-${ARCH}.gz"
+
+        curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
+        gunzip "${BIN_FILE}"
+        sudo install -m 0755 "taplo-linux-${ARCH}" /usr/local/bin/taplo
+        rm -f "taplo-linux-${ARCH}"
+
+        taplo --version
 
     # ── Devcontainer CLI + docker-compose wrapper ───────────────────────
     # Requires Node.js (automatically installed above when this flag is set)
