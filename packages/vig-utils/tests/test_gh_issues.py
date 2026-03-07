@@ -1,17 +1,11 @@
-"""Unit tests for pure-logic functions in scripts/gh_issues.py.
+"""Unit tests for pure-logic functions in vig_utils.gh_issues.
 
-No subprocess mocking, no Rich rendering tests — just data in, data out.
+No subprocess mocking, no Rich rendering tests - just data in, data out.
 
 Refs: #99
 """
 
-import importlib.util
-from pathlib import Path
-
-scripts_dir = Path(__file__).parent.parent / "scripts"
-spec = importlib.util.spec_from_file_location("gh_issues", scripts_dir / "gh_issues.py")
-gh_issues = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(gh_issues)
+from vig_utils import gh_issues
 
 _styled = gh_issues._styled
 _extract_label = gh_issues._extract_label

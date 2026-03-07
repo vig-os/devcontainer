@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""Reject commits when git author/committer matches AI agent identity blocklist.
-
-Runs in pre-commit stage. Checks GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL,
-GIT_COMMITTER_NAME, GIT_COMMITTER_EMAIL (from env) and git config user.name/email.
-Skips when running in CI (GITHUB_ACTIONS=true or CI=true).
-
-Refs: #163
-"""
+"""Reject commits when git author/committer matches AI agent identity blocklist."""
 
 from __future__ import annotations
 
@@ -14,6 +7,8 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
+from vig_utils.utils import agent_blocklist_path, find_repo_root, load_blocklist
 
 
 def _get_git_config(cwd: Path, key: str) -> str:
@@ -48,14 +43,12 @@ def _check_value(value: str, blocklist: dict) -> str | None:
 def main() -> int:
     """Entry point. Exits 1 if author/committer matches blocklist."""
     if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("CI") == "true":
-        return 0  # Skip in CI; Dependabot etc. use bot identities
-
-    project_root = Path(__file__).resolve().parent.parent
-    blocklist_path = project_root / ".github" / "agent-blocklist.toml"
-    if not blocklist_path.exists():
         return 0
 
-    from vig_utils.agent_blocklist import load_blocklist
+    project_root = find_repo_root(start=Path(__file__))
+    blocklist_path = agent_blocklist_path(start=Path(__file__))
+    if not blocklist_path.exists():
+        return 0
 
     blocklist = load_blocklist(blocklist_path)
 
@@ -65,7 +58,6 @@ def main() -> int:
         ("GIT_COMMITTER_NAME", os.environ.get("GIT_COMMITTER_NAME", "")),
         ("GIT_COMMITTER_EMAIL", os.environ.get("GIT_COMMITTER_EMAIL", "")),
     ]
-    # git config user.name/email when not in env (e.g. user-initiated commit)
     if not values_to_check[0][1]:
         values_to_check.append(
             ("user.name", _get_git_config(project_root, "user.name"))

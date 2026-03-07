@@ -1,30 +1,20 @@
 #!/usr/bin/env bash
 ###############################################################################
 # setup-labels.sh — Provision GitHub labels from label-taxonomy.toml
-#
-# Reads the canonical label definitions from .github/label-taxonomy.toml and
-# creates or updates them on the target repository.  Idempotent: safe to run
-# repeatedly.
-#
-# USAGE:
-#   ./scripts/setup-labels.sh                  # current repo
-#   ./scripts/setup-labels.sh --repo owner/repo
-#   ./scripts/setup-labels.sh --prune          # also delete unlisted labels
-#   ./scripts/setup-labels.sh --dry-run        # show what would happen
-#
-# REQUIRES: gh (GitHub CLI), authenticated
 ###############################################################################
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TAXONOMY_FILE="${SCRIPT_DIR}/../.github/label-taxonomy.toml"
+if [[ -n "${VIG_UTILS_REPO_ROOT:-}" ]]; then
+    REPO_ROOT="$VIG_UTILS_REPO_ROOT"
+else
+    REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+fi
+TAXONOMY_FILE="${REPO_ROOT}/.github/label-taxonomy.toml"
 
 REPO_ARGS=()
 PRUNE=false
 DRY_RUN=false
-
-# ── Argument parsing ─────────────────────────────────────────────────────────
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -41,7 +31,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --help|-h)
-            sed -n '/^###############################################################################$/,/^###############################################################################$/p' "$0" | sed '1d;$d'
+            echo "Usage: setup-labels [--repo owner/repo] [--prune] [--dry-run]"
             exit 0
             ;;
         *)
@@ -55,9 +45,6 @@ if [[ ! -f "$TAXONOMY_FILE" ]]; then
     echo "Error: taxonomy file not found: $TAXONOMY_FILE" >&2
     exit 1
 fi
-
-# ── Parse TOML ───────────────────────────────────────────────────────────────
-# Minimal parser: extracts name/description/color from [[labels]] blocks.
 
 NAMES=()
 DESCRIPTIONS=()
@@ -99,14 +86,10 @@ flush_label
 
 echo "Taxonomy: ${#NAMES[@]} labels defined in $(basename "$TAXONOMY_FILE")"
 
-# ── Fetch existing labels ────────────────────────────────────────────────────
-
 mapfile -t EXISTING < <(gh label list "${REPO_ARGS[@]}" --limit 100 --json name --jq '.[].name')
 
 echo "Remote:   ${#EXISTING[@]} labels on repo"
 echo ""
-
-# ── Create / update ──────────────────────────────────────────────────────────
 
 for i in "${!NAMES[@]}"; do
     name="${NAMES[$i]}"
@@ -137,8 +120,6 @@ for i in "${!NAMES[@]}"; do
         fi
     fi
 done
-
-# ── Prune ────────────────────────────────────────────────────────────────────
 
 if $PRUNE; then
     for existing in "${EXISTING[@]}"; do
