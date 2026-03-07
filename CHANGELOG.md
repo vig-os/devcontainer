@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- **Opt-in Tailscale SSH support for devcontainer** ([#208](https://github.com/vig-os/devcontainer/issues/208))
+  - New `setup-tailscale.sh` script with `install` and `start` subcommands
+  - Hooks into `post-create.sh` (install) and `post-start.sh` (start)
+  - Silent no-op when `TAILSCALE_AUTHKEY` is unset — zero impact on existing users
+  - Commented example in `docker-compose.local.yaml` for quick setup
+  - Documentation in `.devcontainer/README.md` with quick-start and ACL instructions
+
 ### Fixed
 
 - **CI Project Checks coverage includes devc_remote_uri tests** ([#70](https://github.com/vig-os/devcontainer/issues/70))

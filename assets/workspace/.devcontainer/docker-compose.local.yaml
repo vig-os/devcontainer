@@ -22,4 +22,14 @@
 #       environment:
 #         - MY_API_KEY=secret123
 
+# Optional: Tailscale SSH for direct mesh access (e.g. Cursor GUI workaround)
+# Generate an auth key at https://login.tailscale.com/admin/settings/keys
+# Use an ephemeral + reusable key so stale containers auto-expire.
+#
+#   services:
+#     devcontainer:
+#       environment:
+#         - TAILSCALE_AUTHKEY=tskey-auth-XXXX
+#         - TAILSCALE_HOSTNAME=myproject-devc-mybox  # optional override
+
 services: {}
