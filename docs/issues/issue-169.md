@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-24T07:13:32Z
-updated: 2026-02-25T11:01:46Z
+updated: 2026-03-06T11:11:31Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/169
 comments: 0
 labels: feature, area:ci, area:testing, effort:large, semver:minor
 assignees: none
-milestone: Backlog
+milestone: 0.3
 projects: none
 relationship: none
-synced: 2026-02-26T04:22:25.432Z
+synced: 2026-03-07T04:05:38.968Z
 ---
 
 # [Issue 169]: [[FEATURE] Smoke-test repository to validate shipped CI/CD workflows](https://github.com/vig-os/devcontainer/issues/169)
@@ -52,9 +52,6 @@ CI passes on PR ──► Publish X.Y.Z-rc1 to GHCR
              Promote to    Fix on release branch
              X.Y.Z +      Publish X.Y.Z-rc2
              latest        (re-trigger smoke)
-                    │
-                    ▼
-             Delete X.Y.Z-rc* from GHCR
 ```
 
 #### Phase 1 -- Smoke-test repo + RC publishing (high value)
@@ -72,7 +69,6 @@ CI passes on PR ──► Publish X.Y.Z-rc1 to GHCR
 - Add RC publishing capability: after CI passes on a release branch PR, publish `X.Y.Z-rc1` to GHCR
 - Trigger smoke-test repo via `repository_dispatch` with the RC tag
 - Gate final release on smoke-test results (manual initially, automated later)
-- Clean up `X.Y.Z-rc*` tags from GHCR after final `X.Y.Z` is published
 
 #### Phase 2 -- Extended validation
 
@@ -107,7 +103,7 @@ Per-workflow feasibility assessment:
 RC image lifecycle:
 - RC tags follow SemVer pre-release format: `X.Y.Z-rc1`, `X.Y.Z-rc2`, etc.
 - RCs are published to the same GHCR registry (`ghcr.io/vig-os/devcontainer`)
-- After final release, RC tags are deleted via `gh api` to keep the registry clean
+- RC tags are retained after final release (they serve as an audit trail and the storage cost is negligible)
 - No circular dependency: the devcontainer repo's own CI does not depend on the smoke-test repo
 
 Future direction: once `ci-container.yml` is proven in the smoke-test repo, the template `ci.yml` itself can migrate to use `container:` with the devcontainer image, eventually retiring `setup-env` for most jobs.
@@ -116,7 +112,7 @@ Future direction: once `ci-container.yml` is proven in the smoke-test repo, the 
 
 - **Who benefits:** All downstream users of the devcontainer template. Regressions in shipped workflows and the image's CI capability are caught before release.
 - **Compatibility:** Backward compatible. No changes to shipped templates in Phase 1. The `container:` migration is a future opt-in change.
-- **Cost:** Public repo = free GitHub Actions minutes. RC images add minor GHCR storage (cleaned up after release).
+- **Cost:** Public repo = free GitHub Actions minutes. RC images add minor GHCR storage (retained after release).
 
 ### Changelog Category
 
@@ -129,5 +125,4 @@ Added
 - [ ] Container CI (`ci-container.yml`) runs successfully using the RC image via `container:` directive
 - [ ] RC publishing works: release workflow can publish `X.Y.Z-rc1` to GHCR
 - [ ] Smoke-test repo is triggered via `repository_dispatch` on RC publish
-- [ ] RC tags are cleaned up from GHCR after final release
 - [ ] TDD compliance (see .cursor/rules/tdd.mdc)

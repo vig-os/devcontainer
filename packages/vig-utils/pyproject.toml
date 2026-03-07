@@ -9,12 +9,10 @@ description = "Reusable CLI utilities for development workflows"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
-dependencies = [
-    "rich",
-]
+dependencies = ["rich"]
 authors = [
-    { name = "Carlos Vigo", email = "carlos.vigo@exoma.ch" },
-    { name = "Lars Gerchow", email = "lars.gerchow@exoma.ch" },
+  { name = "Carlos Vigo", email = "carlos.vigo@exoma.ch" },
+  { name = "Lars Gerchow", email = "lars.gerchow@exoma.ch" },
 ]
 
 [project.scripts]

@@ -27,6 +27,8 @@ EXPECTED_VERSIONS = {
     "bandit": "1.9.",  # Minor version check (installed via uv pip)
     "pip_licenses": "5.",  # Major version check (installed via uv pip)
     "just": "1.46.",  # Minor version check (manually installed from latest release)
+    "hadolint": "2.14.",  # Minor version check (manually installed from pinned release)
+    "taplo": "0.10.",  # Minor version check (manually installed from latest release)
     "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),
     "typstyle": "0.14.",  # Minor version check (installed from latest release)
     "vig_utils": "0.1.",  # Minor version check (installed via uv pip)
@@ -143,6 +145,35 @@ class TestSystemTools:
         expected = EXPECTED_VERSIONS["just"]
         assert expected in result.stdout, (
             f"Expected just {expected}, got: {result.stdout}"
+        )
+
+    def test_hadolint_installed(self, host):
+        """Test that hadolint is installed."""
+        # hadolint is manually installed, so check for the binary file
+        assert host.file("/usr/local/bin/hadolint").exists, "hadolint binary not found"
+        assert host.file("/usr/local/bin/hadolint").is_file, "hadolint is not a file"
+
+    def test_hadolint_version(self, host):
+        """Test that hadolint version is correct."""
+        result = host.run("hadolint --version")
+        assert result.rc == 0, "hadolint --version failed"
+        expected = EXPECTED_VERSIONS["hadolint"]
+        assert expected in result.stdout, (
+            f"Expected hadolint {expected}, got: {result.stdout}"
+        )
+
+    def test_taplo_installed(self, host):
+        """Test that taplo (TOML formatter/linter) is installed."""
+        assert host.file("/usr/local/bin/taplo").exists, "taplo binary not found"
+        assert host.file("/usr/local/bin/taplo").is_file, "taplo is not a file"
+
+    def test_taplo_version(self, host):
+        """Test that taplo version is correct."""
+        result = host.run("taplo --version")
+        assert result.rc == 0, "taplo --version failed"
+        expected = EXPECTED_VERSIONS["taplo"]
+        assert expected in result.stdout, (
+            f"Expected taplo {expected}, got: {result.stdout}"
         )
 
     def test_cursor_agent_installed(self, host):

@@ -22,6 +22,8 @@ This guide explains how to develop, build, test, and release the vigOS developme
 | **uv** | >=0.8 | Python package and project manager |
 | **bats** | 1.13.0 | Bash Automated Testing System for shell script tests |
 | **devcontainer** | 0.81.1 | DevContainer CLI for testing devcontainer functionality |
+| **hadolint** | latest | Containerfile/Dockerfile linter used by pre-commit |
+| **taplo** | latest | TOML formatter and linter used by pre-commit |
 | **parallel** | latest | Parallelizes BATS test execution for faster test runs |
 
 **Ubuntu/Debian:**
@@ -30,19 +32,54 @@ This guide explains how to develop, build, test, and release the vigOS developme
 sudo apt update
 sudo apt install -y podman git openssh-client jq tmux nodejs npm parallel
 # just
-curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
 # gh
 curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
 sudo apt update && sudo apt install -y gh
 
+# hadolint
+case "$(dpkg --print-architecture)" in
+  amd64) ARCH="linux-x86_64" ;;
+  arm64) ARCH="linux-arm64" ;;
+  *)
+    echo "Unsupported architecture: $(dpkg --print-architecture)"
+    exit 1
+    ;;
+esac
+BASE_URL="https://github.com/hadolint/hadolint/releases/latest/download"
+BIN_FILE="hadolint-${ARCH}"
+SHA_FILE="${BIN_FILE}.sha256"
+curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
+curl -fsSL "${BASE_URL}/${SHA_FILE}" -o "${SHA_FILE}"
+EXPECTED_SHA="$(awk '{print $1}' "${SHA_FILE}")"
+echo "${EXPECTED_SHA}  ${BIN_FILE}" | sha256sum -c -
+sudo install -m 0755 "${BIN_FILE}" /usr/local/bin/hadolint
+rm -f "${BIN_FILE}" "${SHA_FILE}"
+
+# taplo
+case "$(dpkg --print-architecture)" in
+  amd64) ARCH="x86_64" ;;
+  arm64) ARCH="aarch64" ;;
+  *)
+    echo "Unsupported architecture: $(dpkg --print-architecture)"
+    exit 1
+    ;;
+esac
+BASE_URL="https://github.com/tamasfe/taplo/releases/latest/download"
+BIN_FILE="taplo-linux-${ARCH}.gz"
+curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
+gunzip "${BIN_FILE}"
+sudo install -m 0755 "taplo-linux-${ARCH}" /usr/local/bin/taplo
+rm -f "taplo-linux-${ARCH}"
+
 ```
 
 **macOS (Homebrew):**
 
 ```bash
-brew install podman just git openssh gh jq tmux node parallel
+brew install podman just git openssh gh jq tmux node hadolint taplo parallel
 ```
 
 - For other Linux distributions, use your package manager (e.g., `dnf`, `yum`, `zypper`, `apk`) to install these dependencies.
@@ -178,6 +215,7 @@ Available recipes:
     [release]
     finalize-release version *flags            # Finalize and publish release via GitHub Actions workflow (step 3, after testing)
     prepare-release version *flags             # Prepare release branch for testing (step 1)
+    publish-candidate version *flags           # Publish release candidate via GitHub Actions workflow
     pull version="latest"                      # Pull image from registry (default: latest)
     reset-changelog                            # Reset CHANGELOG Unreleased section (after merging release to dev)
 
@@ -249,7 +287,7 @@ reference, see [docs/RELEASE_CYCLE.md](docs/RELEASE_CYCLE.md).
    - Automatically roll back on failure
 
 5. **Merge the release PR into `main`**
-   - The post-release workflow automatically syncs `dev` with `main` and resets the CHANGELOG Unreleased section
+   - The `sync-main-to-dev` workflow automatically opens a PR to merge `main` into `dev`
 
 ## Version Tagging
 

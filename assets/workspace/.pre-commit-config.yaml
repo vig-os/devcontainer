@@ -49,6 +49,20 @@ repos:
       - id: yamllint
         args: ["--format", "parsable", "--strict"]
 
+  # TOML Linting (style + semantic checks)
+  - repo: local
+    hooks:
+      - id: taplo-format
+        name: taplo-format
+        entry: taplo format --config .taplo.toml
+        language: system
+        types: [toml]
+      - id: taplo-lint
+        name: taplo-lint
+        entry: taplo lint --config .taplo.toml --default-schema-catalogs
+        language: system
+        types: [toml]
+
   # Shellcheck
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: a23f6b85d0fdd5bb9d564e2579e678033debbdff  # v0.10.0.1

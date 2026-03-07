@@ -46,7 +46,7 @@ dependencies:
     install:
       macos: brew install just
       debian: |
-        curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+        curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
       fedora: sudo dnf install -y just
       manual: https://github.com/casey/just#installation
 
@@ -196,6 +196,65 @@ dependencies:
     install:
       all: npm install
       manual: https://github.com/devcontainers/cli
+
+  # Containerfile linting
+  - name: hadolint
+    version: latest
+    purpose: Containerfile/Dockerfile linter used by pre-commit
+    required: true
+    check:
+      command: command -v hadolint
+      version_command: hadolint --version
+      version_regex: 'Haskell Dockerfile Linter (\d+\.\d+)'
+    install:
+      macos: brew install hadolint
+      debian: |
+        case "$(dpkg --print-architecture)" in
+          amd64) ARCH="linux-x86_64" ;;
+          arm64) ARCH="linux-arm64" ;;
+          *)
+            echo "Unsupported architecture: $(dpkg --print-architecture)"
+            exit 1
+            ;;
+        esac
+        BASE_URL="https://github.com/hadolint/hadolint/releases/latest/download"
+        BIN_FILE="hadolint-${ARCH}"
+        SHA_FILE="${BIN_FILE}.sha256"
+        curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
+        curl -fsSL "${BASE_URL}/${SHA_FILE}" -o "${SHA_FILE}"
+        EXPECTED_SHA="$(awk '{print $1}' "${SHA_FILE}")"
+        echo "${EXPECTED_SHA}  ${BIN_FILE}" | sha256sum -c -
+        sudo install -m 0755 "${BIN_FILE}" /usr/local/bin/hadolint
+        rm -f "${BIN_FILE}" "${SHA_FILE}"
+      manual: https://github.com/hadolint/hadolint/releases
+
+  # TOML linting
+  - name: taplo
+    version: latest
+    purpose: TOML formatter and linter used by pre-commit
+    required: true
+    check:
+      command: command -v taplo
+      version_command: taplo --version
+      version_regex: 'taplo (\d+\.\d+)'
+    install:
+      macos: brew install taplo
+      debian: |
+        case "$(dpkg --print-architecture)" in
+          amd64) ARCH="x86_64" ;;
+          arm64) ARCH="aarch64" ;;
+          *)
+            echo "Unsupported architecture: $(dpkg --print-architecture)"
+            exit 1
+            ;;
+        esac
+        BASE_URL="https://github.com/tamasfe/taplo/releases/latest/download"
+        BIN_FILE="taplo-linux-${ARCH}.gz"
+        curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
+        gunzip "${BIN_FILE}"
+        sudo install -m 0755 "taplo-linux-${ARCH}" /usr/local/bin/taplo
+        rm -f "taplo-linux-${ARCH}"
+      manual: https://github.com/tamasfe/taplo/releases
 
   # Parallel (auto-installed by npm install)
   - name: parallel

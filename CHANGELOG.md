@@ -108,8 +108,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Graceful fallback when repo ID cannot be resolved or permissions are insufficient
 - **`init-workspace.sh` runs `just sync` after placeholder replacement** ([#170](https://github.com/vig-os/devcontainer/issues/170))
   - Resolves the `uv.lock` for the new project name and installs the project package into the venv during workspace bootstrap
+- **Candidate publishing mode in release workflow** ([#172](https://github.com/vig-os/devcontainer/issues/172))
+  - `release.yml` now supports `release-kind=candidate` (default) and infers the next available `X.Y.Z-rcN` tag automatically
+  - Candidate runs create and push Git tags, publish candidate manifests, and keep candidate tags after final release
+  - Final runs remain available via `release-kind=final` and are exposed by `just finalize-release`
+- **PR-based dev sync after release** ([#172](https://github.com/vig-os/devcontainer/issues/172))
+  - `sync-main-to-dev.yml` replaces `post-release.yml` — syncs main into dev via PR instead of direct push, satisfying branch protection rules
+  - Detects merge conflicts, labels `merge-conflict` with resolution instructions
+  - Auto-merge enabled for conflict-free PRs; stale sync branches cleaned up automatically
+- **hadolint installed and wired into CI tooling** ([#122](https://github.com/vig-os/devcontainer/issues/122))
+  - Install `hadolint` in the devcontainer image with SHA-256 checksum verification
+  - Add image test coverage to verify `hadolint` is available in the built image
+  - Configure pre-commit to use the local `hadolint` binary and install it in `setup-env`/`test-project` workflows
+- **Taplo TOML linting in pre-commit** ([#181](https://github.com/vig-os/devcontainer/issues/181))
+  - Add SHA-pinned `taplo-format` and `taplo-lint` hooks to enforce TOML formatting and schema-aware validation
+  - Add `.taplo.toml` configuration (local to this repository, not synced downstream)
 
 ### Changed
+
+- **Release CHANGELOG flow redesigned** ([#172](https://github.com/vig-os/devcontainer/issues/172))
+  - `prepare-release.yml` now freezes CHANGELOG on dev (Unreleased → [X.Y.Z] - TBD + fresh empty Unreleased), then forks release branch and strips the empty Unreleased section
+  - Dev never enters a state without `## Unreleased`; both branches share the [X.Y.Z] section for clean merges
+  - Candidate releases skip CHANGELOG changes; only final releases set the date
+  - No CHANGELOG reset needed during post-release sync
+- **Release automation now uses dedicated GitHub App identities** ([#172](https://github.com/vig-os/devcontainer/issues/172))
+  - Replaced deprecated `APP_SYNC_ISSUES_*` secrets with `RELEASE_APP_*` for release and preparation workflows
+  - `sync-issues.yml` now uses `COMMIT_APP_*`; `sync-main-to-dev.yml` uses both apps (commit app for refs, release app for PR operations)
+  - Removed automatic `sync-issues` trigger from `sync-main-to-dev.yml` and documented the app permission model in `docs/RELEASE_CYCLE.md`
 
 - **worktree-clean: add filter mode for stopped-only vs all** ([#158](https://github.com/vig-os/devcontainer/issues/158))
   - Default `just worktree-clean` (no args) now cleans only stopped worktrees, skips running tmux sessions
@@ -354,6 +379,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **`post-release.yml`** — replaced by `sync-main-to-dev.yml` ([#172](https://github.com/vig-os/devcontainer/issues/172))
 - **`scripts/prepare-build.sh`** — merged into `build.sh` ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **`scripts/sync-prs-issues.sh`** — deprecated sync script ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **`test.yml` workflow** — replaced by `ci.yml` ([#48](https://github.com/vig-os/devcontainer/issues/48))
@@ -365,8 +391,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CHANGELOG extraction truncated on inline `##` markers** ([#172](https://github.com/vig-os/devcontainer/issues/172))
+  - `extract_unreleased_content` regex used mid-line lookahead for `##`/`###` which treated inline hash markers (e.g. `` `##` `` in backticks) as heading boundaries
+  - Anchored regex to line starts with `re.MULTILINE` so only actual heading lines terminate section capture
 - **install.sh is not idempotent — creates nested src/template_project on second run** ([#197](https://github.com/vig-os/devcontainer/issues/197))
   - Guard template_project rename: if `src/${SHORT_NAME}` already exists, remove the redundant copy instead of moving it inside
+- **just gh-issues fails locally — rich not in .venv dependencies** ([#159](https://github.com/vig-os/devcontainer/issues/159))
+  - Add `devcontainer` dependency group in root `pyproject.toml` as SSoT for container tools (rich, pre-commit, ruff, pip-licenses)
+  - Container build installs from pyproject.toml via `uv export --only-group devcontainer` instead of hardcoding
+  - Add rich to workspace template dev group; change justfile.gh to `uv run python` so both local and container use project venv
+  - Copy `packages/vig-utils` before `uv export` so the lockfile can resolve the workspace member
 - **just check uses wrong path — justfile_directory() resolves incorrectly in imported justfile.base** ([#187](https://github.com/vig-os/devcontainer/issues/187))
   - Replace `dirname(justfile_directory())` with `source_directory()/scripts` to correctly locate version-check.sh in deployed workspaces and devcontainer repo
   - Regression test: `just check config` runs successfully from workspace
@@ -462,6 +496,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Add an explicit empty-version guard so the build fails with a clear error message if version resolution fails
 - **CI python security scan fails on unsatisfiable safety pin** ([#213](https://github.com/vig-os/devcontainer/issues/213))
   - Bump workflow `safety` install pin from `3.2.11` to `3.7.0` in both root and workspace-template CI workflows so `uv pip install` resolves successfully again
+- **Requirements parser and `just` install guidance in setup flow** ([#122](https://github.com/vig-os/devcontainer/issues/122))
+  - `scripts/init.sh` now supports multiline `install_command` values in `scripts/requirements.yaml`
+  - Update `just` install instructions to use `sudo` where required by apt-based installation steps
+- **Taplo pre-commit hook compiles from source instead of using system binary** ([#226](https://github.com/vig-os/devcontainer/issues/226))
+  - Switch taplo pre-commit hooks from `language: rust` (cargo compile) to `language: system` using the binary already installed in the container image
+  - Correct the taplo release URL and pin to the latest version in the Containerfile
+  - Add taplo to the CI `setup-env` action so pre-commit hooks work on bare runners
 
 ### Security
 
@@ -486,6 +527,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Update vulnerable Python dependencies** ([#88](https://github.com/vig-os/devcontainer/issues/88))
   - Add uv constraints for transitive dependencies: `urllib3>=2.6.3`, `filelock>=3.20.3`, and `virtualenv>=20.36.1`
   - Regenerate `uv.lock` with patched resolutions (`urllib3 2.6.3`, `filelock 3.25.0`, `virtualenv 21.1.0`)
+- **Temporary Trivy exception for CVE-2025-15558 in gh binary** ([#122](https://github.com/vig-os/devcontainer/issues/122))
+  - Added `CVE-2025-15558` to `.trivyignore` with risk assessment, upstream dependency context, and an expiration date
+  - Keeps CI vulnerability scan unblocked while waiting for an upstream `gh` release that includes the patched `github.com/docker/cli` dependency
 
 ## [0.2.1](https://github.com/vig-os/devcontainer/releases/tag/0.2.1) - 2026-01-28
 

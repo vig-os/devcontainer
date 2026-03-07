@@ -30,8 +30,9 @@ echo "🔍 DEBUG: BUILD_VERSION='$BUILD_VERSION'"
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-# Copy Containerfile, assets, and vig-utils package to build folder
+# Copy Containerfile, assets, packages, and pyproject for container build
 cp Containerfile "$BUILD_DIR/"
+cp pyproject.toml uv.lock "$BUILD_DIR/"
 cp -r assets "$BUILD_DIR/"
 cp -r packages "$BUILD_DIR/"
 
