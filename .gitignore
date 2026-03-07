@@ -150,9 +150,11 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
+# Nix / direnv
+.direnv/
+
 # Environments
 .env
-.envrc
 .venv
 env/
 venv/

@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git fetch*)",
+      "Bash(gh issue*)",
+      "Bash(gh pr*)",
+      "Bash(gh api*)",
+      "Bash(just --list*)",
+      "Bash(just test*)",
+      "Bash(just lint*)",
+      "Bash(just format*)",
+      "Bash(just info*)",
+      "Bash(just check*)"
+    ],
+    "deny": []
+  }
+}
