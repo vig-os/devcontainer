@@ -490,6 +490,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Requirements parser and `just` install guidance in setup flow** ([#122](https://github.com/vig-os/devcontainer/issues/122))
   - `scripts/init.sh` now supports multiline `install_command` values in `scripts/requirements.yaml`
   - Update `just` install instructions to use `sudo` where required by apt-based installation steps
+- **Taplo pre-commit hook compiles from source instead of using system binary** ([#226](https://github.com/vig-os/devcontainer/issues/226))
+  - Switch taplo pre-commit hooks from `language: rust` (cargo compile) to `language: system` using the binary already installed in the container image
+  - Correct the taplo release URL and pin to the latest version in the Containerfile
+  - Add taplo to the CI `setup-env` action so pre-commit hooks work on bare runners
 
 ### Security
 

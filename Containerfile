@@ -130,6 +130,22 @@ RUN set -eux; \
     rm "$FILE" "$SHA_FILE"; \
     hadolint --version;
 
+# Install taplo binary (TOML formatter/linter)
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+        amd64) ARCH=x86_64 ;; \
+        arm64) ARCH=aarch64 ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    TAPLO_VERSION="$(curl -fsSL https://api.github.com/repos/tamasfe/taplo/releases/latest | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')"; \
+    URL="https://github.com/tamasfe/taplo/releases/download/${TAPLO_VERSION}"; \
+    FILE="taplo-linux-${ARCH}.gz"; \
+    curl -fsSL "${URL}/${FILE}" -o "$FILE"; \
+    gunzip "$FILE"; \
+    install -m 0755 "taplo-linux-${ARCH}" /usr/local/bin/taplo; \
+    rm -f "taplo-linux-${ARCH}"; \
+    taplo --version;
+
 # Install cursor-agent CLI (installs to ~/.local/bin)
 ENV PATH="/root/.local/bin:${PATH}"
 RUN set -eux; \
