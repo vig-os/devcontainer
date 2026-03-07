@@ -70,38 +70,17 @@ dest = ".devcontainer/justfile.base"
 [[entries]]
 src = "justfile.gh"
 dest = ".devcontainer/justfile.gh"
-
-[[entries]]
-src = "scripts/gh_issues.py"
-dest = ".devcontainer/scripts/gh_issues.py"
-
-[[entries]]
-src = "scripts/resolve-branch.sh"
-dest = ".devcontainer/scripts/resolve-branch.sh"
-
-[[entries]]
-src = "scripts/derive-branch-summary.sh"
-dest = ".devcontainer/scripts/derive-branch-summary.sh"
-
-[[entries]]
-src = "scripts/check-skill-names.sh"
-dest = ".devcontainer/scripts/check-skill-names.sh"
-
-[[entries]]
-src = "scripts/prepare-commit-msg-strip-trailers.py"
-dest = ".devcontainer/scripts/prepare-commit-msg-strip-trailers.py"
-
-[[entries]]
-src = "scripts/check-agent-identity.py"
-dest = ".devcontainer/scripts/check-agent-identity.py"
-
-[[entries]]
-src = "scripts/check-pr-agent-fingerprints.py"
-dest = ".devcontainer/scripts/check-pr-agent-fingerprints.py"
+transforms = [
+  { type = "Sed", pattern = "uv run gh-issues", replace = "gh-issues" },
+]
 
 [[entries]]
 src = "justfile.worktree"
 dest = ".devcontainer/justfile.worktree"
+transforms = [
+  { type = "Sed", pattern = "uv run resolve-branch", replace = "resolve-branch" },
+  { type = "Sed", pattern = "uv run derive-branch-summary", replace = "derive-branch-summary" },
+]
 
 [[entries]]
 src = ".pre-commit-config.yaml"
@@ -118,11 +97,8 @@ transforms = [
     "check-agent-identity",
     "validate-commit-msg",
   ] },
-  { type = "Sed", pattern = "bandit -r packages/vig-utils/src/ scripts/ assets/workspace/", replace = "bandit -r src/" },
+  { type = "Sed", pattern = "bandit -r packages/vig-utils/src/ assets/workspace/", replace = "bandit -r src/" },
   { type = "StripTrailingBlankLines" },
-  { type = "Sed", pattern = "scripts/check-skill-names.sh", replace = ".devcontainer/scripts/check-skill-names.sh" },
-  { type = "Sed", pattern = "scripts/prepare-commit-msg-strip-trailers.py", replace = ".devcontainer/scripts/prepare-commit-msg-strip-trailers.py" },
-  { type = "Sed", pattern = "scripts/check-agent-identity.py", replace = ".devcontainer/scripts/check-agent-identity.py" },
   { type = "ReplaceBlock", start_pattern = "^\\s+args: \\[$", end_pattern = "^\\s+\\]$", replacement = """
         # Optional: customize commit types, scopes, or refs-optional types via CLI arguments.
         # By default, scopes are not enforced. Set --scopes to require specific scopes.
@@ -132,6 +108,6 @@ transforms = [
         #   args: ["--refs-optional-types", "chore"]
         #   args: ["--types", "feat,fix,docs", "--scopes", "api,cli,utils", "--refs-optional-types", "chore"]
 """ },
-  { type = "Sed", pattern = "-r packages/vig-utils/src/ scripts/ assets/workspace/ ", replace = "-r src/ " },
+  { type = "Sed", pattern = "-r packages/vig-utils/src/ assets/workspace/ ", replace = "-r src/ " },
   { type = "StripTrailingBlankLines" },
 ]

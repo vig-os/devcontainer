@@ -42,4 +42,4 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
-        run: uv run python scripts/check-pr-agent-fingerprints.py
+        run: uv run check-pr-agent-fingerprints

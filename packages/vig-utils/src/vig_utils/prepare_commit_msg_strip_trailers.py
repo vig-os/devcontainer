@@ -3,8 +3,6 @@
 
 Runs in prepare-commit-msg stage. Reads COMMIT_EDITMSG, removes lines matching
 trailer patterns from .github/agent-blocklist.toml, writes back.
-
-Refs: #163
 """
 
 from __future__ import annotations
@@ -12,6 +10,8 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
+
+from vig_utils.utils import agent_blocklist_path
 
 
 def _load_trailer_patterns(blocklist_path: Path) -> list[re.Pattern[str]]:
@@ -51,10 +51,9 @@ def main() -> int:
         )
         return 2
     msg_path = Path(sys.argv[1])
-    project_root = Path(__file__).resolve().parent.parent
-    blocklist_path = project_root / ".github" / "agent-blocklist.toml"
+    blocklist_path = agent_blocklist_path(start=Path(__file__))
     if not blocklist_path.exists():
-        return 0  # No blocklist, nothing to strip
+        return 0
     if not msg_path.exists():
         print(f"File not found: {msg_path}", file=sys.stderr)
         return 2

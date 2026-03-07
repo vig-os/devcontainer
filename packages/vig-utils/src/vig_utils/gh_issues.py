@@ -375,12 +375,7 @@ def _infer_review(pr: dict) -> tuple[str, str]:
 
 
 def _dedupe_status_checks(rollup: list[dict]) -> list[dict]:
-    """Deduplicate statusCheckRollup by check name, keeping latest by completedAt.
-
-    GitHub includes re-runs of the same check; we keep only the latest result
-    per check name so the CI column matches what GitHub shows on the PR page.
-    Ref: #176
-    """
+    """Deduplicate statusCheckRollup by check name, keeping latest by completedAt."""
     by_name: dict[str, dict] = {}
     for check in rollup:
         name = check.get("name") or "?"
@@ -396,11 +391,7 @@ def _dedupe_status_checks(rollup: list[dict]) -> list[dict]:
 
 
 def _format_ci_status(pr: dict, owner_repo: str) -> str:
-    """Return Rich markup for CI status cell: pass/fail/pending summary with link.
-
-    Uses statusCheckRollup from gh pr list. Links to PR checks tab.
-    Ref: #143
-    """
+    """Return Rich markup for CI status cell: pass/fail/pending summary with link."""
     rollup = _dedupe_status_checks(pr.get("statusCheckRollup") or [])
     if not rollup:
         return _styled("—", "dim")
@@ -549,7 +540,6 @@ def main() -> int:
 
     console = Console()
 
-    # --- Issues ---
     if issues:
         milestones: dict[str, list[dict]] = {}
         no_milestone: list[dict] = []
@@ -594,7 +584,6 @@ def main() -> int:
         console.print()
         console.print("[dim]No open issues.[/]")
 
-    # --- Pull Requests ---
     console.print()
     if prs:
         console.rule(f"[bold]Open Pull Requests ({len(prs)})[/]")
