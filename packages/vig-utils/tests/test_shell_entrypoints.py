@@ -113,6 +113,10 @@ def test_resolve_branch_returns_empty_for_empty_input() -> None:
     assert result.stdout == ""
 
 
+def test_setup_labels_command_available() -> None:
+    assert shutil.which("setup-labels")
+
+
 def test_derive_branch_summary_outputs_summary_when_cmd_succeeds() -> None:
     env = dict(os.environ)
     env["BRANCH_SUMMARY_CMD"] = "echo fix-login-bug"

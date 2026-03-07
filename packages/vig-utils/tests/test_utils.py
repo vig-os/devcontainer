@@ -333,6 +333,14 @@ class TestAgentBlocklistHelpers:
         assert loaded["names"] == ["cursoragent", "claude"]
         assert loaded["emails"] == ["cursoragent@cursor.com"]
 
+    def test_load_blocklist_raises_on_invalid_toml(self, tmp_path):
+        blocklist_path = tmp_path / "agent-blocklist.toml"
+        blocklist_path.write_text("this is not valid toml {{{}}")
+        import tomllib
+
+        with pytest.raises(tomllib.TOMLDecodeError):
+            load_blocklist(blocklist_path)
+
     def test_contains_agent_fingerprint_matches_name(self):
         blocklist = {
             "trailers": [],

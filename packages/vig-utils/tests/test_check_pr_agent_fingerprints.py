@@ -99,4 +99,4 @@ class TestMain:
         ):
             assert check_pr_agent_fingerprints.main() == 0
 
-        assert mock_contains.called
+        mock_contains.assert_called_once_with("\n", blocklist)

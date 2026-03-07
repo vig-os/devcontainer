@@ -57,8 +57,12 @@ class TestGetGitConfig:
 class TestMain:
     """Tests for main entrypoint."""
 
-    def test_ci_environment_skips_check(self):
+    def test_github_actions_environment_skips_check(self):
         with patch.dict("os.environ", {"GITHUB_ACTIONS": "true"}, clear=True):
+            assert check_agent_identity.main() == 0
+
+    def test_ci_environment_skips_check(self):
+        with patch.dict("os.environ", {"CI": "true"}, clear=True):
             assert check_agent_identity.main() == 0
 
     def test_missing_blocklist_skips_check(self, tmp_path):
