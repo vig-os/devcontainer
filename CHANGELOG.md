@@ -369,6 +369,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-commit hook removal transform preserves section comments** ([#171](https://github.com/vig-os/devcontainer/issues/171))
   - `scripts/transforms.py` keeps section comments intact while removing configured hooks during manifest sync
   - `scripts/manifest.toml` and related sync/test updates keep workspace pre-commit outputs aligned with container CI workflow changes
+- **Migrate shared scripts into `vig-utils` package entrypoints** ([#217](https://github.com/vig-os/devcontainer/issues/217), [#161](https://github.com/vig-os/devcontainer/issues/161), [#179](https://github.com/vig-os/devcontainer/issues/179))
+  - Shell scripts (`check-skill-names.sh`, `derive-branch-summary.sh`, `resolve-branch.sh`, `setup-labels.sh`) bundled inside `vig_utils.shell` and exposed as `vig-<name>` CLI entrypoints
+  - Python scripts (`gh_issues.py`, `check-agent-identity.py`, `check-pr-agent-fingerprints.py`, `prepare-commit-msg-strip-trailers.py`) migrated into `vig-utils` modules with entrypoints
+  - Agent fingerprint helpers consolidated into shared `vig_utils.utils` module
+  - Callers (justfiles, pre-commit hooks, CI workflows) switched from direct script paths to `vig-utils` entrypoints
 
 ### Deprecated
 
@@ -379,6 +384,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`scripts/sync-prs-issues.sh`** — deprecated sync script ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **`test.yml` workflow** — replaced by `ci.yml` ([#48](https://github.com/vig-os/devcontainer/issues/48))
 - **Stale `.github_data/` directory** — 98 files superseded by `docs/issues/` and `docs/pull-requests/` ([#91](https://github.com/vig-os/devcontainer/issues/91))
+- **Legacy standalone script copies** ([#217](https://github.com/vig-os/devcontainer/issues/217))
+  - Removed `scripts/check-agent-identity.py`, `scripts/check-skill-names.sh`, `scripts/derive-branch-summary.sh`, `scripts/resolve-branch.sh` — now in `vig-utils`
+  - Removed `assets/workspace/.devcontainer/scripts/gh_issues.py`, `check-pr-agent-fingerprints.py`, `prepare-commit-msg-strip-trailers.py` — now in `vig-utils`
+  - Removed `scripts/utils.py` shim — superseded by `vig_utils.utils`
 
 ### Fixed
 

@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""Utility functions for build scripts."""
+"""Reusable file edit helpers used by build and sync tooling."""
 
 from __future__ import annotations
 
 import argparse
+import os
 import re
+import subprocess
+import sys
+from importlib.resources import files
 from pathlib import Path
 
 VERSION_PATTERN = re.compile(r"^- \*\*Version\*\*:.*$", re.MULTILINE)
@@ -22,7 +26,11 @@ def substitute_in_file(
     p = Path(path)
     if not p.exists():
         raise FileNotFoundError(f"File not found: {p}")
-    content = p.read_text()
+    try:
+        content = p.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        # Some synced trees may include binary artifacts (e.g. .pyc). Skip them.
+        return
     if regex:
         content = re.sub(pattern, replacement, content)
     else:
@@ -30,7 +38,7 @@ def substitute_in_file(
             content = content.replace(pattern, replacement)
         else:
             content = content.replace(pattern, replacement, 1)
-    p.write_text(content)
+    p.write_text(content, encoding="utf-8")
 
 
 def sed_inplace(pattern: str, file_path: Path | str) -> None:
@@ -42,22 +50,18 @@ def sed_inplace(pattern: str, file_path: Path | str) -> None:
     """
     path = Path(file_path)
 
-    # Parse sed substitution pattern: s<delimiter><pattern><delimiter><replacement><delimiter>[flags]
-    # Example: s|{{IMAGE_TAG}}|0.2.0|g
     if not pattern.startswith("s"):
         raise ValueError(
             f"Unsupported sed command: {pattern} (only 's' substitution is supported)"
         )
 
-    if len(pattern) < 4:  # At minimum: s|a|b
+    if len(pattern) < 4:
         raise ValueError(
             f"Invalid sed pattern: {pattern} (expected format: s<delim><pattern><delim><replacement>[<delim><flags>])"
         )
 
-    # Find the delimiter (first character after 's')
     delimiter = pattern[1]
 
-    # Find all delimiter positions after 's'
     delim_positions = []
     pos = 1
     while True:
@@ -97,6 +101,94 @@ def update_version_line(
         raise ValueError(f"Version line not found in {path}")
     path.write_text(updated_text)
     return replacement
+
+
+def run_packaged_shell(script_name: str) -> int:
+    """Execute packaged shell script and forward CLI args/stdin/out/err."""
+    script_path = files("vig_utils.shell").joinpath(script_name)
+    with script_path.open("rb"):
+        pass
+    path = Path(str(script_path))
+    result = subprocess.run(
+        ["bash", str(path), *sys.argv[1:]],
+        stdin=sys.stdin,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        check=False,
+    )
+    return result.returncode
+
+
+def find_repo_root(start: Path | None = None) -> Path:
+    """Resolve repository root.
+
+    Resolution order:
+    1) VIG_UTILS_REPO_ROOT (explicit override)
+    2) current working directory and parents containing `.github/`
+    3) `start` and parents containing `.github/`
+    4) current working directory
+    """
+
+    env_root = os.environ.get("VIG_UTILS_REPO_ROOT")
+    if env_root:
+        return Path(env_root).resolve()
+
+    cwd = Path.cwd().resolve()
+    for candidate in [cwd, *cwd.parents]:
+        if (candidate / ".github").is_dir():
+            return candidate
+
+    if start is not None:
+        start = start.resolve()
+        for candidate in [start, *start.parents]:
+            if (candidate / ".github").is_dir():
+                return candidate
+
+    return cwd
+
+
+def agent_blocklist_path(start: Path | None = None) -> Path:
+    """Return path to canonical agent blocklist TOML."""
+    return find_repo_root(start) / ".github" / "agent-blocklist.toml"
+
+
+def load_blocklist(path: Path) -> dict:
+    """Load blocklist from TOML file. Returns dict with keys: trailers, names, emails."""
+    import tomllib
+
+    with path.open("rb") as f:
+        data = tomllib.load(f)
+    patterns = data.get("patterns", {})
+    return {
+        "trailers": [re.compile(p) for p in patterns.get("trailers", [])],
+        "names": [s.lower() for s in patterns.get("names", [])],
+        "emails": [s.lower() for s in patterns.get("emails", [])],
+    }
+
+
+def contains_agent_fingerprint(
+    content: str,
+    blocklist: dict,
+    *,
+    check_trailers: bool = True,
+) -> str | None:
+    """Check if content contains any blocklisted pattern.
+
+    Returns the first matching pattern string if found, else None.
+    """
+    content_lower = content.lower()
+    for name in blocklist.get("names", []):
+        if name in content_lower:
+            return name
+    for email in blocklist.get("emails", []):
+        if email in content_lower:
+            return email
+    if check_trailers:
+        for line in content.splitlines():
+            for pattern_re in blocklist.get("trailers", []):
+                if pattern_re.match(line.strip()):
+                    return line.strip()
+    return None
 
 
 def parse_args() -> tuple[str, argparse.Namespace]:

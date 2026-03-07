@@ -693,6 +693,12 @@ wheels = [
 name = "vig-utils"
 version = "0.1.0"
 source = { editable = "packages/vig-utils" }
+dependencies = [
+    { name = "rich" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "rich" }]
 
 [[package]]
 name = "virtualenv"
