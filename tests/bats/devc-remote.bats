@@ -119,9 +119,12 @@ setup() {
     chmod +x "$mock_bin/cursor" "$mock_bin/code"
     # Script will fail at check_ssh, but we verify cursor was chosen by checking
     # we get past detect_editor_cli (would fail with "Neither cursor nor code" otherwise)
-    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" nonexistent-host 2>&1
-    # Should not contain "Neither cursor nor code" - fails at check_ssh instead
-    refute_output --partial "Neither cursor nor code"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    # Unset TERM_PROGRAM so auto-detect falls through to CLI availability check
+    TERM_PROGRAM='' PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" nonexistent-host 2>&1
+    # Auto-detect should pick cursor; verify it gets past detect_editor_cli
+    assert_output --partial "IDE: cursor"
     rm -rf "$mock_bin"
 }
 
@@ -130,19 +133,28 @@ setup() {
     mock_bin="$(mktemp -d)"
     echo '#!/bin/sh' > "$mock_bin/code"
     chmod +x "$mock_bin/code"
-    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" nonexistent-host 2>&1
-    refute_output --partial "Neither cursor nor code"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    # Use env -i to ensure system cursor is not in PATH
+    run env -i PATH="$mock_bin" HOME="$HOME" TERM_PROGRAM= /bin/bash "$DEVC_REMOTE" nonexistent-host 2>&1
+    assert_output --partial "IDE: code"
     rm -rf "$mock_bin"
 }
 
-@test "detect_editor_cli fails when neither cursor nor code in PATH" {
-    local empty_path
-    empty_path="$(mktemp -d)"
+@test "detect_editor_cli falls back to ssh when neither cursor nor code in PATH" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
     # Run via /bin/bash so script execution does not depend on PATH/shebang lookup
-    run env -i PATH="$empty_path" HOME="$HOME" /bin/bash "$DEVC_REMOTE" myserver 2>&1
-    assert_failure
-    assert_output --partial "cursor CLI not found"
-    rm -rf "$empty_path"
+    run env -i PATH="$mock_bin" HOME="$HOME" /bin/bash "$DEVC_REMOTE" myserver 2>&1
+    # Should not error about missing CLI — falls back to ssh mode
+    refute_output --partial "cursor CLI not found"
+    refute_output --partial "code CLI not found"
+    assert_output --partial "No IDE CLI found, falling back to --open ssh"
+    # Fails at check_ssh, not editor detection
+    assert_output --partial "Cannot connect to"
+    rm -rf "$mock_bin"
 }
 
 # ── --open flag ──────────────────────────────────────────────────────────────
@@ -170,10 +182,47 @@ setup() {
     rm -rf "$empty_path"
 }
 
+@test "--open ssh skips editor detection" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open ssh myserver 2>&1
+    refute_output --partial "cursor CLI not found"
+    refute_output --partial "code CLI not found"
+    assert_output --partial "Cannot connect to"
+    rm -rf "$mock_bin"
+}
+
+@test "--open auto detects cursor from TERM_PROGRAM" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
+    chmod +x "$mock_bin/cursor"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    TERM_PROGRAM=cursor PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" myserver 2>&1
+    assert_output --partial "IDE: cursor"
+    assert_output --partial "Cannot connect to"
+    rm -rf "$mock_bin"
+}
+
+@test "--open auto falls back to ssh for WezTerm TERM_PROGRAM" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    TERM_PROGRAM=WezTerm PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" myserver 2>&1
+    refute_output --partial "cursor CLI not found"
+    assert_output --partial "Mode: SSH"
+    assert_output --partial "Cannot connect to"
+    rm -rf "$mock_bin"
+}
+
 @test "--open invalid value rejected" {
     run "$DEVC_REMOTE" --open vim myserver 2>&1
     assert_failure
-    assert_output --partial "must be cursor, code, or none"
+    assert_output --partial "must be auto, cursor, code, ssh, or none"
 }
 
 # ── --yes flag ──────────────────────────────────────────────────────────────
@@ -185,13 +234,23 @@ setup() {
     chmod +x "$mock_bin/cursor"
     printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
     chmod +x "$mock_bin/ssh"
-    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --yes myserver 2>&1
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --yes --open cursor myserver 2>&1
     # Should fail at check_ssh, not argument parsing
     assert_output --partial "Cannot connect to"
     rm -rf "$mock_bin"
 }
 
 # ── inject_tailscale_key ────────────────────────────────────────────────────
+
+@test "wait_for_tailscale defines function" {
+    run grep 'wait_for_tailscale()' "$DEVC_REMOTE"
+    assert_success
+}
+
+@test "read_workspace_folder defines function" {
+    run grep 'read_workspace_folder()' "$DEVC_REMOTE"
+    assert_success
+}
 
 @test "inject_tailscale_key defines function" {
     run grep 'inject_tailscale_key()' "$DEVC_REMOTE"
@@ -232,8 +291,9 @@ SSHEOF
     chmod +x "$mock_bin/python3"
     printf '%s\n' '#!/bin/sh' '[ "$1" = "--folder-uri" ] && [ -n "$2" ] && exit 0' 'exit 1' > "$mock_bin/cursor"
     chmod +x "$mock_bin/cursor"
-    # Run WITHOUT TS_CLIENT_ID — should not mention Tailscale at all
-    PATH="$mock_bin:$PATH" run env -u TS_CLIENT_ID -u TS_CLIENT_SECRET "$DEVC_REMOTE" host 2>&1
+    # Run WITHOUT TS_CLIENT_ID — inject_tailscale_key should not mention Tailscale
+    # Use --open none to avoid ssh mode triggering wait_for_tailscale output
+    PATH="$mock_bin:$PATH" run env -u TS_CLIENT_ID -u TS_CLIENT_SECRET "$DEVC_REMOTE" --open none host 2>&1
     assert_success
     refute_output --partial "Tailscale"
     rm -rf "$mock_bin"
@@ -249,7 +309,7 @@ SSHEOF
     # Need cursor for detect_editor_cli
     printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
     chmod +x "$mock_bin/cursor"
-    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" anyhost 2>&1
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none anyhost 2>&1
     # Should get past check_ssh; will fail at remote_preflight (mock ssh just exits)
     refute_output --partial "Cannot connect to"
     rm -rf "$mock_bin"
@@ -262,7 +322,7 @@ SSHEOF
     chmod +x "$mock_bin/ssh"
     printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
     chmod +x "$mock_bin/cursor"
-    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" badhost 2>&1
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none badhost 2>&1
     assert_failure
     assert_output --partial "Cannot connect to"
     rm -rf "$mock_bin"
@@ -287,7 +347,7 @@ SSHEOF
     printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
     chmod +x "$mock_bin/cursor"
     # Will fail at remote_compose_up or open_editor; we verify we get past preflight
-    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" host 2>&1
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none host 2>&1
     refute_output --partial "No container runtime"
     refute_output --partial "Compose not available"
     refute_output --partial "Repository not found"
@@ -307,7 +367,7 @@ SSHEOF
     chmod +x "$mock_bin/ssh"
     printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
     chmod +x "$mock_bin/cursor"
-    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" host 2>&1
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none host 2>&1
     assert_failure
     assert_output --partial "No container runtime"
     rm -rf "$mock_bin"
@@ -340,7 +400,7 @@ SSHEOF
     chmod +x "$mock_bin/python3"
     printf '%s\n' '#!/bin/sh' '[ "$1" = "--folder-uri" ] && [ -n "$2" ] && exit 0' 'exit 1' > "$mock_bin/cursor"
     chmod +x "$mock_bin/cursor"
-    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" host 2>&1
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open cursor host 2>&1
     assert_success
     assert_output --partial "Devcontainer already running"
     rm -rf "$mock_bin"
@@ -373,9 +433,9 @@ SSHEOF
     chmod +x "$mock_bin/python3"
     printf '%s\n' '#!/bin/sh' '[ "$1" = "--folder-uri" ] && [ -n "$2" ] && exit 0' 'exit 1' > "$mock_bin/cursor"
     chmod +x "$mock_bin/cursor"
-    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" host 2>&1
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open cursor host 2>&1
     assert_success
-    assert_output --partial "editor CLI"
+    assert_output --partial "IDE:"
     assert_output --partial "SSH"
     assert_output --partial "pre-flight"
     rm -rf "$mock_bin"
@@ -409,7 +469,7 @@ SSHEOF
     chmod +x "$mock_bin/ssh"
     printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
     chmod +x "$mock_bin/cursor"
-    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" host 2>&1
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none host 2>&1
     refute_output --partial "compose up"
     rm -rf "$mock_bin"
 }
