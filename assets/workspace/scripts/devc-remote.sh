@@ -8,10 +8,12 @@
 #
 # USAGE:
 #   ./scripts/devc-remote.sh [options] <ssh-host>[:<remote-path>]
+#   ./scripts/devc-remote.sh --bootstrap [--yes] <ssh-host>
 #   ./scripts/devc-remote.sh --help
 #
 # Options:
-#   --yes, -y         Auto-accept prompts (reuse running containers)
+#   --bootstrap       One-time remote host setup (config, GHCR auth, image build)
+#   --yes, -y         Auto-accept prompts (use defaults without asking)
 #   --open <mode>     How to connect after compose up:
 #                       auto    - detect IDE from $TERM_PROGRAM or CLI availability (default)
 #                       cursor  - open Cursor via devcontainer protocol
@@ -79,11 +81,16 @@ parse_args() {
     REMOTE_PATH="~"
     YES_MODE=0
     OPEN_MODE="auto"
+    BOOTSTRAP_MODE=0
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --help|-h)
                 show_help
+                ;;
+            --bootstrap)
+                BOOTSTRAP_MODE=1
+                shift
                 ;;
             --yes|-y)
                 # shellcheck disable=SC2034
@@ -483,11 +490,190 @@ for peer in (data.get('Peer') or {}).values():
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# BOOTSTRAP (one-time remote host setup)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+bootstrap_check_config() {
+    # Check if config exists on remote, read values if so
+    local config_output
+    # shellcheck disable=SC2029
+    config_output=$(ssh "$SSH_HOST" "bash -s" << 'CFGEOF'
+CONFIG_DIR="$HOME/.config/devc-remote"
+CONFIG_FILE="$CONFIG_DIR/config.yaml"
+if [ -f "$CONFIG_FILE" ]; then
+    echo "CONFIG_EXISTS=1"
+    # Parse simple flat YAML (key: value) using sed
+    sed -n 's/^projects_dir: *//p'      "$CONFIG_FILE" | while read -r v; do echo "PROJECTS_DIR=$v"; done
+    sed -n 's/^devcontainer_repo: *//p'  "$CONFIG_FILE" | while read -r v; do echo "DEVCONTAINER_REPO=$v"; done
+    sed -n 's/^devcontainer_path: *//p'  "$CONFIG_FILE" | while read -r v; do echo "DEVCONTAINER_PATH=$v"; done
+    sed -n 's/^image_tag: *//p'          "$CONFIG_FILE" | while read -r v; do echo "IMAGE_TAG=$v"; done
+    sed -n 's/^registry: *//p'           "$CONFIG_FILE" | while read -r v; do echo "REGISTRY=$v"; done
+else
+    echo "CONFIG_EXISTS=0"
+fi
+CFGEOF
+    )
+
+    CONFIG_EXISTS=0
+    while IFS= read -r line; do
+        [[ "$line" =~ ^([A-Z_]+)=(.*)$ ]] || continue
+        case "${BASH_REMATCH[1]}" in
+            CONFIG_EXISTS)      CONFIG_EXISTS="${BASH_REMATCH[2]}" ;;
+            PROJECTS_DIR)       BOOTSTRAP_PROJECTS_DIR="${BASH_REMATCH[2]}" ;;
+            DEVCONTAINER_REPO)  BOOTSTRAP_DEVC_REPO="${BASH_REMATCH[2]}" ;;
+            DEVCONTAINER_PATH)  BOOTSTRAP_DEVC_PATH="${BASH_REMATCH[2]}" ;;
+            IMAGE_TAG)          BOOTSTRAP_IMAGE_TAG="${BASH_REMATCH[2]}" ;;
+            REGISTRY)           BOOTSTRAP_REGISTRY="${BASH_REMATCH[2]}" ;;
+        esac
+    done <<< "$config_output"
+}
+
+bootstrap_prompt_config() {
+    # Set defaults
+    BOOTSTRAP_PROJECTS_DIR="${BOOTSTRAP_PROJECTS_DIR:-~/Projects}"
+    BOOTSTRAP_DEVC_REPO="${BOOTSTRAP_DEVC_REPO:-vig-os/devcontainer}"
+    BOOTSTRAP_IMAGE_TAG="${BOOTSTRAP_IMAGE_TAG:-dev}"
+    BOOTSTRAP_REGISTRY="${BOOTSTRAP_REGISTRY:-ghcr.io/vig-os/devcontainer}"
+
+    if [[ "$YES_MODE" == "0" ]]; then
+        log_info "No devc-remote config found on $SSH_HOST."
+        read -rp "Where should projects be cloned? [$BOOTSTRAP_PROJECTS_DIR]: " user_input
+        BOOTSTRAP_PROJECTS_DIR="${user_input:-$BOOTSTRAP_PROJECTS_DIR}"
+    fi
+
+    # Derive devcontainer_path from projects_dir
+    BOOTSTRAP_DEVC_PATH="${BOOTSTRAP_PROJECTS_DIR}/devcontainer"
+}
+
+bootstrap_write_config() {
+    # Write config file on remote
+    # shellcheck disable=SC2029
+    ssh "$SSH_HOST" "bash -s" "$BOOTSTRAP_PROJECTS_DIR" "$BOOTSTRAP_DEVC_REPO" "$BOOTSTRAP_DEVC_PATH" "$BOOTSTRAP_IMAGE_TAG" "$BOOTSTRAP_REGISTRY" << 'WRITEEOF'
+PROJECTS_DIR="$1"
+DEVC_REPO="$2"
+DEVC_PATH="$3"
+IMAGE_TAG="$4"
+REGISTRY="$5"
+CONFIG_DIR="$HOME/.config/devc-remote"
+CONFIG_FILE="$CONFIG_DIR/config.yaml"
+mkdir -p "$CONFIG_DIR"
+cat > "$CONFIG_FILE" << YAML
+projects_dir: ${PROJECTS_DIR}
+devcontainer_repo: ${DEVC_REPO}
+devcontainer_path: ${DEVC_PATH}
+image_tag: ${IMAGE_TAG}
+registry: ${REGISTRY}
+YAML
+WRITEEOF
+
+    log_success "Config written to ~/.config/devc-remote/config.yaml — edit to customize."
+}
+
+bootstrap_forward_ghcr_auth() {
+    # Forward container registry credentials to remote
+    local local_auth=""
+
+    # Check podman auth first, then docker
+    if [[ -f "${HOME}/.config/containers/auth.json" ]]; then
+        local_auth="${HOME}/.config/containers/auth.json"
+    elif [[ -f "${HOME}/.docker/config.json" ]]; then
+        local_auth="${HOME}/.docker/config.json"
+    elif [[ -n "${GHCR_TOKEN:-}" ]]; then
+        # Use token-based auth — create temp auth file
+        local tmp_auth
+        tmp_auth="$(mktemp)"
+        echo "{\"auths\":{\"ghcr.io\":{\"auth\":\"$(echo -n "token:${GHCR_TOKEN}" | base64)\"}}}" > "$tmp_auth"
+        local_auth="$tmp_auth"
+    fi
+
+    if [[ -z "$local_auth" ]]; then
+        log_warning "GHCR auth: no local credentials found, skipping"
+        return 0
+    fi
+
+    # Ensure remote directories exist and copy auth file
+    # shellcheck disable=SC2029
+    ssh "$SSH_HOST" "mkdir -p ~/.config/containers ~/.docker"
+    scp -q "$local_auth" "$SSH_HOST:~/.config/containers/auth.json"
+    scp -q "$local_auth" "$SSH_HOST:~/.docker/config.json"
+
+    # Clean up temp file if we created one
+    if [[ -n "${GHCR_TOKEN:-}" && -n "${tmp_auth:-}" ]]; then
+        rm -f "$tmp_auth"
+    fi
+
+    log_success "GHCR auth forwarded to $SSH_HOST"
+}
+
+bootstrap_clone_and_build() {
+    log_info "Building devcontainer image on $SSH_HOST..."
+    # shellcheck disable=SC2029
+    ssh "$SSH_HOST" "bash -s" "$BOOTSTRAP_DEVC_REPO" "$BOOTSTRAP_DEVC_PATH" "$BOOTSTRAP_IMAGE_TAG" "$BOOTSTRAP_REGISTRY" << 'BUILDEOF'
+DEVC_REPO="$1"
+DEVC_PATH="$2"
+IMAGE_TAG="$3"
+REGISTRY="$4"
+
+# Expand ~ in DEVC_PATH
+DEVC_PATH="${DEVC_PATH/#\~/$HOME}"
+
+if [ -d "$DEVC_PATH/.git" ]; then
+    echo "Repository exists, pulling latest..."
+    cd "$DEVC_PATH" && git pull
+else
+    echo "Cloning $DEVC_REPO..."
+    # Expand ~ in parent dir
+    PARENT_DIR="$(dirname "$DEVC_PATH")"
+    mkdir -p "$PARENT_DIR"
+    cd "$PARENT_DIR"
+    git clone "https://github.com/${DEVC_REPO}.git" "$(basename "$DEVC_PATH")"
+    cd "$DEVC_PATH"
+fi
+
+# Build the image
+if [ -f "scripts/build.sh" ]; then
+    echo "Running scripts/build.sh..."
+    bash scripts/build.sh
+else
+    echo "WARNING: scripts/build.sh not found in $DEVC_PATH"
+fi
+BUILDEOF
+
+    log_success "Devcontainer image built on $SSH_HOST"
+}
+
+bootstrap_remote() {
+    log_info "Bootstrap: checking remote config on $SSH_HOST..."
+    bootstrap_check_config
+
+    if [[ "$CONFIG_EXISTS" == "1" ]]; then
+        log_info "Config: ~/.config/devc-remote/config.yaml (existing, not modified)"
+    else
+        bootstrap_prompt_config
+        bootstrap_write_config
+    fi
+
+    bootstrap_forward_ghcr_auth
+    bootstrap_clone_and_build
+
+    log_success "Bootstrap complete for $SSH_HOST"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
 
 main() {
     parse_args "$@"
+
+    # Bootstrap mode: one-time remote host setup
+    if [[ "$BOOTSTRAP_MODE" == "1" ]]; then
+        log_info "Checking SSH connectivity to $SSH_HOST..."
+        check_ssh
+        log_success "SSH connection OK"
+        bootstrap_remote
+        return
+    fi
 
     detect_editor_cli
     case "$OPEN_MODE" in

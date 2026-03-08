@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`devc-remote --bootstrap`: one-time remote host setup** ([#235](https://github.com/vig-os/devcontainer/issues/235))
+  - Interactive first-run prompts for `projects_dir` with sensible defaults
+  - `--yes` flag skips prompts and uses defaults
+  - Creates `~/.config/devc-remote/config.yaml` on remote (human-editable)
+  - Forwards GHCR auth (podman/docker credentials or `GHCR_TOKEN`) to remote
+  - Clones devcontainer repo and builds image on remote
+  - Re-run reads existing config without re-prompting, pulls latest and rebuilds
 - **Opt-in Tailscale SSH support for devcontainer** ([#208](https://github.com/vig-os/devcontainer/issues/208))
   - New `setup-tailscale.sh` script with `install` and `start` subcommands
   - Hooks into `post-create.sh` (install) and `post-start.sh` (start)
