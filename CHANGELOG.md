@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Opt-in Claude Code CLI support for devcontainer** ([#70](https://github.com/vig-os/devcontainer/issues/70))
+  - New `setup-claude.sh` script with `install` and `start` subcommands
+  - Hooks into `post-create.sh` (install) and `post-start.sh` (start)
+  - Silent no-op when `CLAUDE_CODE_OAUTH_TOKEN` is unset — zero impact on existing users
+  - Uses subscription auth via `claude setup-token` (no API key needed)
+  - `inject_claude_auth()` in `devc-remote.sh` forwards local OAuth token to remote compose
+  - Commented example in `docker-compose.local.yaml` for quick setup
 - **Remote devcontainer lifecycle execution** ([#70](https://github.com/vig-os/devcontainer/issues/70))
   - `run_container_lifecycle()` runs post-create/post-start scripts inside container after compose up
   - `prepare_remote()` writes container socket path and stubs local compose override

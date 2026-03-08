@@ -290,6 +290,65 @@ INJECT_EOF
     log_success "Tailscale: ephemeral auth key injected into remote compose"
 }
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# CLAUDE CODE AUTH INJECTION (opt-in via CLAUDE_CODE_OAUTH_TOKEN)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+inject_claude_auth() {
+    # Skip if no OAuth token in local environment
+    if [[ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
+        return 0
+    fi
+
+    # Check if token already set on remote
+    # shellcheck disable=SC2029
+    if ssh "$SSH_HOST" "grep -q 'CLAUDE_CODE_OAUTH_TOKEN' '$REMOTE_PATH/.devcontainer/docker-compose.local.yaml' 2>/dev/null"; then
+        log_info "Claude: OAuth token already configured on remote"
+        return 0
+    fi
+
+    log_info "Claude: injecting OAuth token into remote compose..."
+
+    # shellcheck disable=SC2029
+    ssh "$SSH_HOST" "bash -s" "$REMOTE_PATH" "$CLAUDE_CODE_OAUTH_TOKEN" << 'INJECT_EOF'
+REPO_PATH="$1"
+TOKEN="$2"
+LOCAL_YAML="$REPO_PATH/.devcontainer/docker-compose.local.yaml"
+
+# Create if missing
+if [ ! -f "$LOCAL_YAML" ]; then
+    cat > "$LOCAL_YAML" << YAML
+services:
+  devcontainer:
+    environment:
+      - CLAUDE_CODE_OAUTH_TOKEN=${TOKEN}
+YAML
+elif grep -q 'services: {}' "$LOCAL_YAML"; then
+    cat > "$LOCAL_YAML" << YAML
+services:
+  devcontainer:
+    environment:
+      - CLAUDE_CODE_OAUTH_TOKEN=${TOKEN}
+YAML
+elif grep -q 'CLAUDE_CODE_OAUTH_TOKEN' "$LOCAL_YAML"; then
+    sed -i "s|CLAUDE_CODE_OAUTH_TOKEN=.*|CLAUDE_CODE_OAUTH_TOKEN=${TOKEN}|" "$LOCAL_YAML"
+elif grep -q 'environment:' "$LOCAL_YAML"; then
+    sed -i "/environment:/a\\      - CLAUDE_CODE_OAUTH_TOKEN=${TOKEN}" "$LOCAL_YAML"
+elif grep -q 'devcontainer:' "$LOCAL_YAML"; then
+    sed -i "/devcontainer:/a\\    environment:\\n      - CLAUDE_CODE_OAUTH_TOKEN=${TOKEN}" "$LOCAL_YAML"
+else
+    cat > "$LOCAL_YAML" << YAML
+services:
+  devcontainer:
+    environment:
+      - CLAUDE_CODE_OAUTH_TOKEN=${TOKEN}
+YAML
+fi
+INJECT_EOF
+
+    log_success "Claude: OAuth token injected into remote compose"
+}
+
 check_ssh() {
     if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "$SSH_HOST" true 2>/dev/null; then
         log_error "Cannot connect to $SSH_HOST. Check your SSH config and network."
@@ -615,6 +674,7 @@ main() {
     prepare_remote
 
     inject_tailscale_key
+    inject_claude_auth
 
     remote_compose_up
 

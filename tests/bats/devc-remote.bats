@@ -252,6 +252,56 @@ setup() {
     assert_success
 }
 
+# ── inject_claude_auth ─────────────────────────────────────────────────────
+
+@test "inject_claude_auth defines function" {
+    run grep 'inject_claude_auth()' "$DEVC_REMOTE"
+    assert_success
+}
+
+@test "inject_claude_auth is called in main" {
+    run grep 'inject_claude_auth' "$DEVC_REMOTE"
+    assert_success
+    # Should appear at least twice: definition + call
+    local count
+    count=$(grep -c 'inject_claude_auth' "$DEVC_REMOTE")
+    [ "$count" -ge 2 ]
+}
+
+@test "inject_claude_auth skips when CLAUDE_CODE_OAUTH_TOKEN unset" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/ssh" << SSHEOF
+#!/bin/sh
+counter="${mock_bin}/ssh_counter"
+count=\$(cat "\$counter" 2>/dev/null || echo 0)
+echo \$((count + 1)) > "\$counter"
+if [ "\$count" = "1" ]; then
+  echo "RUNTIME=podman"
+  echo "COMPOSE_AVAILABLE=1"
+  echo "REPO_PATH_EXISTS=1"
+  echo "DEVCONTAINER_EXISTS=1"
+  echo "DISK_AVAILABLE_GB=5"
+  echo "OS_TYPE=linux"
+elif [ "\$count" = "2" ]; then
+  echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
+fi
+exit 0
+SSHEOF
+    chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'echo "vscode-remote://test"' 'exit 0' > "$mock_bin/python3"
+    chmod +x "$mock_bin/python3"
+    printf '%s\n' '#!/bin/sh' '[ "$1" = "--folder-uri" ] && [ -n "$2" ] && exit 0' 'exit 1' > "$mock_bin/cursor"
+    chmod +x "$mock_bin/cursor"
+    # Run WITHOUT CLAUDE_CODE_OAUTH_TOKEN — inject_claude_auth should not mention Claude
+    PATH="$mock_bin:$PATH" run env -u CLAUDE_CODE_OAUTH_TOKEN "$DEVC_REMOTE" --open none host 2>&1
+    assert_success
+    refute_output --partial "Claude"
+    rm -rf "$mock_bin"
+}
+
+# ── inject_tailscale_key ────────────────────────────────────────────────────
+
 @test "inject_tailscale_key defines function" {
     run grep 'inject_tailscale_key()' "$DEVC_REMOTE"
     assert_success

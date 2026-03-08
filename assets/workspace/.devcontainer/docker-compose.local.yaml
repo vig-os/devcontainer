@@ -32,4 +32,13 @@
 #         - TAILSCALE_AUTHKEY=tskey-auth-XXXX
 #         - TAILSCALE_HOSTNAME=myproject-devc-mybox  # optional override
 
+# Optional: Claude Code CLI (subscription OAuth token)
+# Run `claude setup-token` on your host to generate a long-lived token (1 year).
+# devc-remote.sh auto-injects from your local CLAUDE_CODE_OAUTH_TOKEN env var.
+#
+#   services:
+#     devcontainer:
+#       environment:
+#         - CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-XXXX
+
 services: {}

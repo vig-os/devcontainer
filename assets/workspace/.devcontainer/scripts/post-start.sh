@@ -24,4 +24,7 @@ just --justfile "$PROJECT_ROOT/justfile" --working-directory "$PROJECT_ROOT" syn
 # Tailscale SSH (opt-in: no-op when TAILSCALE_AUTHKEY is unset)
 "$SCRIPT_DIR/setup-tailscale.sh" start
 
+# Claude Code CLI (opt-in: no-op when CLAUDE_CODE_OAUTH_TOKEN is unset)
+"$SCRIPT_DIR/setup-claude.sh" start
+
 echo "Post-start setup complete"
