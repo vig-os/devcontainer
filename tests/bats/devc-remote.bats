@@ -109,6 +109,48 @@ setup() {
     assert_failure
 }
 
+# ── parse_args: gh: target syntax ────────────────────────────────────────────
+
+@test "parse_args recognizes gh:org/repo as second positional arg" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5 2>&1
+    # Should get past parse_args (fail at check_ssh, not "Unexpected argument")
+    refute_output --partial "Unexpected argument"
+    assert_output --partial "Cannot connect to"
+    rm -rf "$mock_bin"
+}
+
+@test "parse_args recognizes gh:org/repo:branch with branch extraction" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5:feature/my-branch 2>&1
+    refute_output --partial "Unexpected argument"
+    assert_output --partial "Cannot connect to"
+    rm -rf "$mock_bin"
+}
+
+@test "parse_args accepts host:path combined with gh:org/repo" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver:~/custom/path gh:vig-os/fd5 2>&1
+    refute_output --partial "Unexpected argument"
+    assert_output --partial "Cannot connect to"
+    rm -rf "$mock_bin"
+}
+
+@test "parse_args rejects gh: with missing repo" {
+    run "$DEVC_REMOTE" --open none myserver gh: 2>&1
+    assert_failure
+    assert_output --partial "Invalid gh: target"
+}
+
 # ── detect_editor_cli ─────────────────────────────────────────────────────────
 
 @test "detect_editor_cli prefers cursor when both cursor and code exist" {
