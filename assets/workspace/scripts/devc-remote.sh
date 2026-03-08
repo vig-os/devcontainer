@@ -229,7 +229,7 @@ inject_tailscale_key() {
                     "create": {
                         "reusable": false,
                         "ephemeral": true,
-                        "tags": ["tag:devcontainer"]
+                        "tags": ["tag:devc"]
                     }
                 }
             }
@@ -332,6 +332,14 @@ if [ "$(uname -s)" = "Darwin" ]; then
 else
     echo "OS_TYPE=linux"
 fi
+# Detect container socket path
+if [ -S /var/run/docker.sock ]; then
+    echo "SOCKET_PATH=/var/run/docker.sock"
+elif [ -S "/run/user/$(id -u)/podman/podman.sock" ]; then
+    echo "SOCKET_PATH=/run/user/$(id -u)/podman/podman.sock"
+else
+    echo "SOCKET_PATH="
+fi
 REMOTEEOF
     )
 
@@ -344,6 +352,7 @@ REMOTEEOF
             DEVCONTAINER_EXISTS) DEVCONTAINER_EXISTS="${BASH_REMATCH[2]}" ;;
             DISK_AVAILABLE_GB) DISK_AVAILABLE_GB="${BASH_REMATCH[2]}" ;;
             OS_TYPE) OS_TYPE="${BASH_REMATCH[2]}" ;;
+            SOCKET_PATH) SOCKET_PATH="${BASH_REMATCH[2]}" ;;
         esac
     done <<< "$preflight_output"
 
@@ -376,24 +385,122 @@ REMOTEEOF
     fi
 }
 
-remote_compose_up() {
-    local ps_output state health
-    # shellcheck disable=SC2029
-    ps_output=$(ssh "$SSH_HOST" "cd $REMOTE_PATH && $COMPOSE_CMD ps --format json 2>/dev/null" || true)
-    state=$(echo "$ps_output" | grep -o '"State":"[^"]*"' | head -1 | cut -d'"' -f4)
-    health=$(echo "$ps_output" | grep -o '"Health":"[^"]*"' | head -1 | cut -d'"' -f4)
+prepare_remote() {
+    local devc_dir="$REMOTE_PATH/.devcontainer"
 
-    if [[ "$state" == "running" && "${health:-}" == "healthy" ]]; then
-        log_success "Devcontainer already running on $SSH_HOST. Opening..."
+    # Write container socket path to .env for compose interpolation
+    if [[ -n "${SOCKET_PATH:-}" ]]; then
+        # shellcheck disable=SC2029
+        ssh "$SSH_HOST" "echo 'CONTAINER_SOCKET_PATH=$SOCKET_PATH' > $devc_dir/.env"
+        log_info "Container socket: $SOCKET_PATH"
+    fi
+
+    # Create stub docker-compose.local.yaml if missing
+    # shellcheck disable=SC2029
+    ssh "$SSH_HOST" "test -f $devc_dir/docker-compose.local.yaml || echo -e '---\nservices: {}' > $devc_dir/docker-compose.local.yaml"
+}
+
+read_compose_files() {
+    # Read dockerComposeFile array from devcontainer.json on remote host
+    local raw
+    # shellcheck disable=SC2029
+    # shellcheck disable=SC2029
+    raw=$(ssh "$SSH_HOST" \
+        "python3 -c \"
+import json, os, sys
+path = os.path.expanduser('${REMOTE_PATH}/.devcontainer/devcontainer.json')
+with open(path) as f:
+    data = json.load(f)
+files = data.get('dockerComposeFile', ['docker-compose.yml'])
+if isinstance(files, str):
+    files = [files]
+for f in files:
+    print(f)
+\" 2>/dev/null" || echo "")
+    if [[ -z "$raw" ]]; then
+        echo "docker-compose.yml"
+        return
+    fi
+    echo "$raw"
+}
+
+compose_cmd_with_files() {
+    # Build compose command with -f flags for each compose file
+    local cmd="$COMPOSE_CMD"
+    local file
+    while IFS= read -r file; do
+        [[ -n "$file" ]] && cmd="$cmd -f $file"
+    done < <(read_compose_files)
+    echo "$cmd"
+}
+
+remote_compose_up() {
+    local ps_output state health compose_full
+    compose_full=$(compose_cmd_with_files)
+    local devc_dir="$REMOTE_PATH/.devcontainer"
+
+    # shellcheck disable=SC2029
+    ps_output=$(ssh "$SSH_HOST" "cd $devc_dir && $compose_full ps --format json 2>/dev/null" || true)
+    state=$(echo "$ps_output" | grep -o '"State":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+    # shellcheck disable=SC2034
+    health=$(echo "$ps_output" | grep -o '"Health":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+
+    if [[ "$state" == "running" ]]; then
+        log_success "Devcontainer already running on $SSH_HOST"
+        CONTAINER_FRESH=0
     else
         log_info "Starting devcontainer on $SSH_HOST..."
         # shellcheck disable=SC2029
-        if ! ssh "$SSH_HOST" "cd $REMOTE_PATH && $COMPOSE_CMD up -d"; then
+        if ! ssh "$SSH_HOST" "cd $devc_dir && $compose_full up -d"; then
             log_error "Failed to start devcontainer on $SSH_HOST."
-            log_error "Debug with: ssh $SSH_HOST 'cd $REMOTE_PATH && $COMPOSE_CMD logs'"
+            log_error "Debug with: ssh $SSH_HOST 'cd $devc_dir && $compose_full logs'"
             exit 1
         fi
         sleep 2
+        CONTAINER_FRESH=1
+    fi
+}
+
+run_container_lifecycle() {
+    local compose_full devc_dir workspace_folder scripts_dir
+    compose_full=$(compose_cmd_with_files)
+    devc_dir="$REMOTE_PATH/.devcontainer"
+    workspace_folder=$(read_workspace_folder)
+    scripts_dir="$workspace_folder/.devcontainer/scripts"
+
+    local has_scripts
+    # shellcheck disable=SC2029
+    has_scripts=$(ssh "$SSH_HOST" "cd $devc_dir && $compose_full exec -T devcontainer \
+        test -f $scripts_dir/post-create.sh && echo 1 || echo 0" 2>/dev/null || echo "0")
+
+    if [[ "$has_scripts" != "1" ]]; then
+        log_info "No lifecycle scripts found at $scripts_dir — skipping"
+        return 0
+    fi
+
+    # post-create: one-time setup (git, precommit, tailscale install, deps)
+    if [[ "${CONTAINER_FRESH:-0}" == "1" ]]; then
+        log_info "Running post-create lifecycle (first start)..."
+        # shellcheck disable=SC2029
+        ssh "$SSH_HOST" "cd $devc_dir && $compose_full exec -T devcontainer \
+            /bin/bash $scripts_dir/post-create.sh" 2>&1 || {
+            log_warning "post-create.sh failed (non-fatal, container still running)"
+        }
+    fi
+
+    # post-start: every-start setup (socket perms, deps sync, tailscale start)
+    local has_post_start
+    # shellcheck disable=SC2029
+    has_post_start=$(ssh "$SSH_HOST" "cd $devc_dir && $compose_full exec -T devcontainer \
+        test -f $scripts_dir/post-start.sh && echo 1 || echo 0" 2>/dev/null || echo "0")
+
+    if [[ "$has_post_start" == "1" ]]; then
+        log_info "Running post-start lifecycle..."
+        # shellcheck disable=SC2029
+        ssh "$SSH_HOST" "cd $devc_dir && $compose_full exec -T devcontainer \
+            /bin/bash $scripts_dir/post-start.sh" 2>&1 || {
+            log_warning "post-start.sh failed (non-fatal, container still running)"
+        }
     fi
 }
 
@@ -488,6 +595,7 @@ for peer in (data.get('Peer') or {}).values():
 
 main() {
     parse_args "$@"
+    CONTAINER_FRESH=0
 
     detect_editor_cli
     case "$OPEN_MODE" in
@@ -504,9 +612,13 @@ main() {
     remote_preflight
     log_success "Pre-flight OK (runtime: $RUNTIME)"
 
+    prepare_remote
+
     inject_tailscale_key
 
     remote_compose_up
+
+    run_container_lifecycle
 
     case "$OPEN_MODE" in
         cursor|code)

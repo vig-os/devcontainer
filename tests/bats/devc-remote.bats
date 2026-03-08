@@ -281,7 +281,7 @@ if [ "\$count" = "1" ]; then
   echo "DEVCONTAINER_EXISTS=1"
   echo "DISK_AVAILABLE_GB=5"
   echo "OS_TYPE=linux"
-elif [ "\$count" = "2" ]; then
+elif [ "\$count" = "4" ]; then
   echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
 fi
 exit 0
@@ -390,7 +390,7 @@ if [ "\$count" = "1" ]; then
   echo "DEVCONTAINER_EXISTS=1"
   echo "DISK_AVAILABLE_GB=5"
   echo "OS_TYPE=linux"
-elif [ "\$count" = "2" ]; then
+elif [ "\$count" = "4" ]; then
   echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
 fi
 exit 0
@@ -423,7 +423,7 @@ if [ "\$count" = "1" ]; then
   echo "DEVCONTAINER_EXISTS=1"
   echo "DISK_AVAILABLE_GB=5"
   echo "OS_TYPE=linux"
-elif [ "\$count" = "2" ]; then
+elif [ "\$count" = "4" ]; then
   echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
 fi
 exit 0
@@ -443,12 +443,44 @@ SSHEOF
 
 # ── remote_compose_up ────────────────────────────────────────────────────────
 
+# ── lifecycle functions (Unit 2) ──────────────────────────────────────────────
+
+@test "run_container_lifecycle defines function" {
+    run grep 'run_container_lifecycle()' "$DEVC_REMOTE"
+    assert_success
+}
+
+@test "run_container_lifecycle is called in main" {
+    run grep 'run_container_lifecycle' "$DEVC_REMOTE"
+    assert_success
+    local count
+    count=$(grep -c 'run_container_lifecycle' "$DEVC_REMOTE")
+    [ "$count" -ge 2 ]
+}
+
+@test "prepare_remote defines function" {
+    run grep 'prepare_remote()' "$DEVC_REMOTE"
+    assert_success
+}
+
+@test "read_compose_files defines function" {
+    run grep 'read_compose_files()' "$DEVC_REMOTE"
+    assert_success
+}
+
+@test "compose_cmd_with_files defines function" {
+    run grep 'compose_cmd_with_files()' "$DEVC_REMOTE"
+    assert_success
+}
+
+# ── remote_compose_up ────────────────────────────────────────────────────────
+
 @test "remote_compose_up skips when container running and healthy" {
     local mock_bin
     mock_bin="$(mktemp -d)"
     cat > "$mock_bin/ssh" << SSHEOF
 #!/bin/sh
-# check_ssh=0, preflight=1, compose_ps=2
+# check_ssh=0, preflight=1, prepare_remote=2+3, compose_ps=4
 counter="${mock_bin}/ssh_counter"
 count=\$(cat "\$counter" 2>/dev/null || echo 0)
 echo \$((count + 1)) > "\$counter"
@@ -459,7 +491,7 @@ if [ "\$count" = "1" ]; then
   echo "DEVCONTAINER_EXISTS=1"
   echo "DISK_AVAILABLE_GB=5"
   echo "OS_TYPE=linux"
-elif [ "\$count" = "2" ]; then
+elif [ "\$count" = "4" ]; then
   echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
 else
   :
