@@ -151,6 +151,99 @@ setup() {
     assert_output --partial "Invalid gh: target"
 }
 
+# ── remote_clone_project ─────────────────────────────────────────────────────
+
+@test "remote_clone_project clones repo on fresh target" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/ssh" << SSHEOF
+#!/bin/sh
+counter="${mock_bin}/ssh_counter"
+count=\$(cat "\$counter" 2>/dev/null || echo 0)
+echo \$((count + 1)) > "\$counter"
+if [ "\$count" = "1" ]; then
+  echo "CLONE_PATH=/home/user/Projects/fd5"
+  echo "CLONE_STATUS=cloned"
+elif [ "\$count" = "2" ]; then
+  echo "RUNTIME=podman"
+  echo "COMPOSE_AVAILABLE=1"
+  echo "REPO_PATH_EXISTS=1"
+  echo "DEVCONTAINER_EXISTS=1"
+  echo "DISK_AVAILABLE_GB=5"
+  echo "OS_TYPE=linux"
+elif [ "\$count" = "3" ]; then
+  echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
+fi
+exit 0
+SSHEOF
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5 2>&1
+    assert_success
+    assert_output --partial "Cloning vig-os/fd5"
+    rm -rf "$mock_bin"
+}
+
+@test "remote_clone_project fetches existing repo" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/ssh" << SSHEOF
+#!/bin/sh
+counter="${mock_bin}/ssh_counter"
+count=\$(cat "\$counter" 2>/dev/null || echo 0)
+echo \$((count + 1)) > "\$counter"
+if [ "\$count" = "1" ]; then
+  echo "CLONE_PATH=/home/user/Projects/fd5"
+  echo "CLONE_STATUS=fetched"
+elif [ "\$count" = "2" ]; then
+  echo "RUNTIME=podman"
+  echo "COMPOSE_AVAILABLE=1"
+  echo "REPO_PATH_EXISTS=1"
+  echo "DEVCONTAINER_EXISTS=1"
+  echo "DISK_AVAILABLE_GB=5"
+  echo "OS_TYPE=linux"
+elif [ "\$count" = "3" ]; then
+  echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
+fi
+exit 0
+SSHEOF
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5 2>&1
+    assert_success
+    assert_output --partial "Fetching vig-os/fd5"
+    rm -rf "$mock_bin"
+}
+
+@test "remote_clone_project checks out specified branch" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/ssh" << SSHEOF
+#!/bin/sh
+counter="${mock_bin}/ssh_counter"
+count=\$(cat "\$counter" 2>/dev/null || echo 0)
+echo \$((count + 1)) > "\$counter"
+if [ "\$count" = "1" ]; then
+  echo "CLONE_PATH=/home/user/Projects/fd5"
+  echo "CLONE_STATUS=cloned"
+  echo "CLONE_BRANCH=feature/my-branch"
+elif [ "\$count" = "2" ]; then
+  echo "RUNTIME=podman"
+  echo "COMPOSE_AVAILABLE=1"
+  echo "REPO_PATH_EXISTS=1"
+  echo "DEVCONTAINER_EXISTS=1"
+  echo "DISK_AVAILABLE_GB=5"
+  echo "OS_TYPE=linux"
+elif [ "\$count" = "3" ]; then
+  echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
+fi
+exit 0
+SSHEOF
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5:feature/my-branch 2>&1
+    assert_success
+    assert_output --partial "Checked out feature/my-branch"
+    rm -rf "$mock_bin"
+}
+
 # ── detect_editor_cli ─────────────────────────────────────────────────────────
 
 @test "detect_editor_cli prefers cursor when both cursor and code exist" {
