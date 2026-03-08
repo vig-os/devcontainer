@@ -443,6 +443,186 @@ SSHEOF
 
 # ── remote_compose_up ────────────────────────────────────────────────────────
 
+# ── --bootstrap flag parsing ──────────────────────────────────────────────
+
+@test "--bootstrap requires ssh-host argument" {
+    run "$DEVC_REMOTE" --bootstrap
+    assert_failure
+    assert_output --partial "Missing required argument"
+}
+
+@test "--bootstrap sets BOOTSTRAP_MODE" {
+    run grep 'BOOTSTRAP_MODE=' "$DEVC_REMOTE"
+    assert_success
+}
+
+@test "--bootstrap defines bootstrap_remote function" {
+    run grep 'bootstrap_remote()' "$DEVC_REMOTE"
+    assert_success
+}
+
+@test "--bootstrap with host runs bootstrap flow" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/ssh" << SSHEOF
+#!/bin/sh
+counter="${mock_bin}/ssh_counter"
+count=\$(cat "\$counter" 2>/dev/null || echo 0)
+echo \$((count + 1)) > "\$counter"
+# check_ssh
+if [ "\$count" = "0" ]; then
+  exit 0
+fi
+# bootstrap_check_config: config does not exist
+if [ "\$count" = "1" ]; then
+  echo "CONFIG_EXISTS=0"
+  exit 0
+fi
+# bootstrap_write_config
+if [ "\$count" = "2" ]; then
+  exit 0
+fi
+# bootstrap_forward_ghcr_auth
+if [ "\$count" = "3" ]; then
+  exit 0
+fi
+# bootstrap_clone_and_build
+if [ "\$count" = "4" ]; then
+  exit 0
+fi
+exit 0
+SSHEOF
+    chmod +x "$mock_bin/ssh"
+    # Provide scp mock (for GHCR auth forwarding)
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --bootstrap --yes myserver 2>&1
+    assert_success
+    assert_output --partial "Bootstrap"
+    rm -rf "$mock_bin"
+}
+
+@test "--bootstrap first-run creates config on remote" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/ssh" << SSHEOF
+#!/bin/sh
+counter="${mock_bin}/ssh_counter"
+count=\$(cat "\$counter" 2>/dev/null || echo 0)
+echo \$((count + 1)) > "\$counter"
+# check_ssh
+if [ "\$count" = "0" ]; then exit 0; fi
+# bootstrap_check_config: no config
+if [ "\$count" = "1" ]; then
+  echo "CONFIG_EXISTS=0"
+  exit 0
+fi
+# write config
+if [ "\$count" = "2" ]; then exit 0; fi
+# clone/build
+exit 0
+SSHEOF
+    chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --bootstrap --yes myserver 2>&1
+    assert_success
+    assert_output --partial "Config written"
+    rm -rf "$mock_bin"
+}
+
+@test "--bootstrap re-run reads existing config without re-prompting" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/ssh" << SSHEOF
+#!/bin/sh
+counter="${mock_bin}/ssh_counter"
+count=\$(cat "\$counter" 2>/dev/null || echo 0)
+echo \$((count + 1)) > "\$counter"
+# check_ssh
+if [ "\$count" = "0" ]; then exit 0; fi
+# bootstrap_check_config: config exists
+if [ "\$count" = "1" ]; then
+  echo "CONFIG_EXISTS=1"
+  echo "PROJECTS_DIR=~/Projects"
+  echo "DEVCONTAINER_REPO=vig-os/devcontainer"
+  echo "DEVCONTAINER_PATH=~/Projects/devcontainer"
+  echo "IMAGE_TAG=dev"
+  echo "REGISTRY=ghcr.io/vig-os/devcontainer"
+  exit 0
+fi
+# pull + rebuild
+exit 0
+SSHEOF
+    chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --bootstrap myserver 2>&1
+    assert_success
+    assert_output --partial "existing, not modified"
+    rm -rf "$mock_bin"
+}
+
+@test "--bootstrap forwards GHCR auth to remote" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    # Create fake local auth file
+    local fake_home
+    fake_home="$(mktemp -d)"
+    mkdir -p "$fake_home/.config/containers"
+    echo '{"auths":{}}' > "$fake_home/.config/containers/auth.json"
+    cat > "$mock_bin/ssh" << SSHEOF
+#!/bin/sh
+counter="${mock_bin}/ssh_counter"
+count=\$(cat "\$counter" 2>/dev/null || echo 0)
+echo \$((count + 1)) > "\$counter"
+if [ "\$count" = "0" ]; then exit 0; fi
+if [ "\$count" = "1" ]; then
+  echo "CONFIG_EXISTS=0"
+  exit 0
+fi
+exit 0
+SSHEOF
+    chmod +x "$mock_bin/ssh"
+    # scp mock that records what was copied
+    cat > "$mock_bin/scp" << SCPEOF
+#!/bin/sh
+echo "SCP_CALLED: \$@" >> "${mock_bin}/scp_log"
+exit 0
+SCPEOF
+    chmod +x "$mock_bin/scp"
+    HOME="$fake_home" PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --bootstrap --yes myserver 2>&1
+    assert_success
+    assert_output --partial "GHCR auth"
+    rm -rf "$mock_bin" "$fake_home"
+}
+
+@test "--bootstrap builds devcontainer image on remote" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/ssh" << SSHEOF
+#!/bin/sh
+counter="${mock_bin}/ssh_counter"
+count=\$(cat "\$counter" 2>/dev/null || echo 0)
+echo \$((count + 1)) > "\$counter"
+if [ "\$count" = "0" ]; then exit 0; fi
+if [ "\$count" = "1" ]; then
+  echo "CONFIG_EXISTS=0"
+  exit 0
+fi
+exit 0
+SSHEOF
+    chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --bootstrap --yes myserver 2>&1
+    assert_success
+    assert_output --partial "Building devcontainer image"
+    rm -rf "$mock_bin"
+}
+
+# ── remote_compose_up ────────────────────────────────────────────────────────
+
 @test "remote_compose_up skips when container running and healthy" {
     local mock_bin
     mock_bin="$(mktemp -d)"
