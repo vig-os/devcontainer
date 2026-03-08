@@ -79,6 +79,9 @@ parse_args() {
     REMOTE_PATH="~"
     YES_MODE=0
     OPEN_MODE="auto"
+    GH_REPO=""
+    GH_BRANCH=""
+    GH_MODE=0
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -103,6 +106,27 @@ parse_args() {
                 log_error "Unknown option: $1"
                 echo "Use --help for usage information"
                 exit 1
+                ;;
+            gh:*)
+                # gh:org/repo or gh:org/repo:branch
+                local gh_target="${1#gh:}"
+                if [[ -z "$gh_target" || "$gh_target" != */* ]]; then
+                    log_error "Invalid gh: target. Use gh:org/repo or gh:org/repo:branch"
+                    exit 1
+                fi
+                # shellcheck disable=SC2034
+                GH_MODE=1
+                # Split on first colon after org/repo (branch may contain slashes)
+                if [[ "$gh_target" =~ ^([^:]+):(.+)$ ]]; then
+                    # shellcheck disable=SC2034
+                    GH_REPO="${BASH_REMATCH[1]}"
+                    # shellcheck disable=SC2034
+                    GH_BRANCH="${BASH_REMATCH[2]}"
+                else
+                    # shellcheck disable=SC2034
+                    GH_REPO="$gh_target"
+                fi
+                shift
                 ;;
             *)
                 if [[ -n "$SSH_HOST" ]]; then
