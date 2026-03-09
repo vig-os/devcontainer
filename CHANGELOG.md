@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - RC candidate publishes now trigger `repository_dispatch` in `vig-os/devcontainer-smoke-test` with the RC tag payload
   - Release process now includes a documented manual smoke gate before running final publish
 
+### Fixed
+
+- **Broken `gh-issues --help` guard in justfile recipe** ([#173](https://github.com/vig-os/devcontainer/issues/173))
+  - `gh-issues` CLI has no `--help` flag, so the availability check always failed even when the binary was installed
+  - Removed the broken guard; binary availability is now verified by the image test suite
+
 ### Changed
 
 - **Update base Python image and GitHub Actions dependencies** ([#240](https://github.com/vig-os/devcontainer/issues/240))
