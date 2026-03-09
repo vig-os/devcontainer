@@ -391,6 +391,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **IN_CONTAINER guard never triggers on host** ([#238](https://github.com/vig-os/devcontainer/issues/238))
+  - Workspace githooks used `= "false"` but `IN_CONTAINER` is unset (not `"false"`) outside the devcontainer
+  - Changed to `!= "true"` in `pre-commit`, `prepare-commit-msg`, and `commit-msg` hooks to fail closed
 - **CHANGELOG extraction truncated on inline `##` markers** ([#172](https://github.com/vig-os/devcontainer/issues/172))
   - `extract_unreleased_content` regex used mid-line lookahead for `##`/`###` which treated inline hash markers (e.g. `` `##` `` in backticks) as heading boundaries
   - Anchored regex to line starts with `re.MULTILINE` so only actual heading lines terminate section capture
