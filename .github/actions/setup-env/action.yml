@@ -101,7 +101,7 @@ runs:
     # ── uv ─────────────────────────────────────────────────────────────
     - name: Install uv
       id: setup-uv
-      uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b  # v7
+      uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7
       with:
         enable-cache: true
         # Install a specific version of uv.
@@ -137,7 +137,7 @@ runs:
     # ── Just (task runner) ──────────────────────────────────────────────
     - name: Install just
       if: inputs.install-just == 'true'
-      uses: taiki-e/install-action@3035223527de4d6eb6207d7b9f901df966359a8e  # just
+      uses: taiki-e/install-action@01159adff8f38113be7211e869405f6f6abf02d7  # just
       with:
         tool: just
 
