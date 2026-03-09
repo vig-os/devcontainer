@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+- **Update base Python image and GitHub Actions dependencies** ([#240](https://github.com/vig-os/devcontainer/issues/240))
+  - Containerfile: pin `python:3.12-slim-bookworm` to latest digest
+  - Bump trivy CLI v0.69.2 → v0.69.3, trivy-action v0.33.1 → v0.35.0
+  - Update astral-sh/setup-uv, taiki-e/install-action, docker/build-push-action, github/codeql-action, actions/dependency-review-action, actions/attest-build-provenance
+
 ### Added
 
 - **Image tools** ([[#212](https://github.com/vig-os/devcontainer/issues/212)])
