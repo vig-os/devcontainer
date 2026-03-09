@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tailscale SSH now works inside containers** ([#70](https://github.com/vig-os/devcontainer/issues/70))
   - Use real TUN device instead of `--tun=userspace-networking` (userspace mode cannot serve SSH)
   - `setup-tailscale.sh` auto-detects `/dev/net/tun` and warns if missing
+  - Pre-flight `check_local_tailscale` fails fast when local Tailscale daemon is stopped or offline
   - `inject_tailscale_key` always regenerates ephemeral auth key (expired keys no longer block deploys)
   - `inject_tailscale_key` adds `devices` + `cap_add` to remote `docker-compose.local.yaml`
   - Template example updated with required `devices` and `cap_add` entries

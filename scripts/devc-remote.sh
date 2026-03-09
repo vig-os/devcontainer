@@ -748,11 +748,33 @@ open_editor() {
 # TAILSCALE WAIT + SSH OUTPUT
 # ═══════════════════════════════════════════════════════════════════════════════
 
-wait_for_tailscale() {
+check_local_tailscale() {
     if ! command -v tailscale &>/dev/null; then
         log_error "tailscale CLI not found locally. Install Tailscale to use --open ssh."
         exit 1
     fi
+
+    local ts_status backend_state self_online
+    ts_status=$(tailscale status --json 2>/dev/null) || {
+        log_error "Tailscale: cannot query local daemon. Is Tailscale running?"
+        exit 1
+    }
+    backend_state=$(echo "$ts_status" | python3 -c "import json,sys; print(json.load(sys.stdin).get('BackendState',''))" 2>/dev/null)
+    self_online=$(echo "$ts_status" | python3 -c "import json,sys; print(json.load(sys.stdin).get('Self',{}).get('Online',False))" 2>/dev/null)
+
+    if [[ "$backend_state" != "Running" ]]; then
+        log_error "Tailscale: local daemon state is '$backend_state' (expected 'Running'). Start Tailscale first."
+        exit 1
+    fi
+    if [[ "$self_online" != "True" ]]; then
+        log_error "Tailscale: local node is offline. Reconnect with: tailscale up"
+        exit 1
+    fi
+    log_success "Tailscale: local client healthy (state=$backend_state)"
+}
+
+wait_for_tailscale() {
+    check_local_tailscale
 
     # Derive expected hostname pattern from devcontainer.json name field
     local devc_name
@@ -995,6 +1017,10 @@ main() {
     check_unpushed_commits
 
     detect_editor_cli
+    # Fail fast: verify local Tailscale before spending time on remote setup
+    if [[ "$OPEN_MODE" == "ssh" ]]; then
+        check_local_tailscale
+    fi
     case "$OPEN_MODE" in
         cursor|code) log_success "IDE: $EDITOR_CLI" ;;
         ssh)         log_info "Mode: SSH (wait for Tailscale, print connection info)" ;;

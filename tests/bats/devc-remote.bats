@@ -314,8 +314,8 @@ SSHEOF
     refute_output --partial "cursor CLI not found"
     refute_output --partial "code CLI not found"
     assert_output --partial "No IDE CLI found, falling back to --open ssh"
-    # Fails at check_ssh, not editor detection
-    assert_output --partial "Cannot connect to"
+    # Fails at check_local_tailscale (no tailscale in PATH), not editor detection
+    assert_output --partial "tailscale CLI not found"
     rm -rf "$mock_bin"
 }
 
@@ -1124,5 +1124,93 @@ SSHEOF
     chmod +x "$mock_bin/cursor"
     PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none host 2>&1
     refute_output --partial "compose up"
+    rm -rf "$mock_bin"
+}
+
+# ── check_local_tailscale ───────────────────────────────────────────────────
+
+@test "check_local_tailscale defines function" {
+    run grep -q 'check_local_tailscale()' "$DEVC_REMOTE"
+    assert_success
+}
+
+@test "check_local_tailscale is called in main for --open ssh" {
+    run grep -A5 'if \[\[ "\$OPEN_MODE" == "ssh" \]\]' "$DEVC_REMOTE"
+    assert_success
+    assert_output --partial "check_local_tailscale"
+}
+
+@test "check_local_tailscale fails when tailscale not found" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    # No tailscale binary in mock_bin, and we override PATH to exclude real one
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
+    printf '%s\n' '#!/bin/sh' 'case "$1" in rev-parse) if [ "$2" = "--is-inside-work-tree" ]; then echo true; exit 0; fi; if [ "$2" = "--abbrev-ref" ]; then echo "origin/main"; exit 0; fi;; branch) echo "main"; exit 0;; rev-list) echo 0; exit 0;; esac; exit 0' > "$mock_bin/git"
+    chmod +x "$mock_bin/git"
+    PATH="$mock_bin:/usr/bin:/bin" run "$DEVC_REMOTE" --open ssh host gh:org/repo 2>&1
+    assert_failure
+    assert_output --partial "tailscale CLI not found"
+    rm -rf "$mock_bin"
+}
+
+@test "check_local_tailscale fails when backend state is not Running" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/tailscale" << 'TSEOF'
+#!/bin/sh
+echo '{"BackendState":"Stopped","Self":{"Online":false}}'
+TSEOF
+    chmod +x "$mock_bin/tailscale"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
+    printf '%s\n' '#!/bin/sh' 'case "$1" in rev-parse) if [ "$2" = "--is-inside-work-tree" ]; then echo true; exit 0; fi; if [ "$2" = "--abbrev-ref" ]; then echo "origin/main"; exit 0; fi;; branch) echo "main"; exit 0;; rev-list) echo 0; exit 0;; esac; exit 0' > "$mock_bin/git"
+    chmod +x "$mock_bin/git"
+    PATH="$mock_bin:/usr/bin:/bin" run "$DEVC_REMOTE" --open ssh host gh:org/repo 2>&1
+    assert_failure
+    assert_output --partial "local daemon state is 'Stopped'"
+    rm -rf "$mock_bin"
+}
+
+@test "check_local_tailscale fails when self is offline" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/tailscale" << 'TSEOF'
+#!/bin/sh
+echo '{"BackendState":"Running","Self":{"Online":false}}'
+TSEOF
+    chmod +x "$mock_bin/tailscale"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
+    printf '%s\n' '#!/bin/sh' 'case "$1" in rev-parse) if [ "$2" = "--is-inside-work-tree" ]; then echo true; exit 0; fi; if [ "$2" = "--abbrev-ref" ]; then echo "origin/main"; exit 0; fi;; branch) echo "main"; exit 0;; rev-list) echo 0; exit 0;; esac; exit 0' > "$mock_bin/git"
+    chmod +x "$mock_bin/git"
+    PATH="$mock_bin:/usr/bin:/bin" run "$DEVC_REMOTE" --open ssh host gh:org/repo 2>&1
+    assert_failure
+    assert_output --partial "local node is offline"
+    rm -rf "$mock_bin"
+}
+
+@test "check_local_tailscale passes when healthy" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/tailscale" << 'TSEOF'
+#!/bin/sh
+echo '{"BackendState":"Running","Self":{"Online":true},"Peer":{}}'
+TSEOF
+    chmod +x "$mock_bin/tailscale"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
+    printf '%s\n' '#!/bin/sh' 'case "$1" in rev-parse) if [ "$2" = "--is-inside-work-tree" ]; then echo true; exit 0; fi; if [ "$2" = "--abbrev-ref" ]; then echo "origin/main"; exit 0; fi;; branch) echo "main"; exit 0;; rev-list) echo 0; exit 0;; esac; exit 0' > "$mock_bin/git"
+    chmod +x "$mock_bin/git"
+    PATH="$mock_bin:/usr/bin:/bin" run "$DEVC_REMOTE" --open ssh host gh:org/repo 2>&1
+    assert_output --partial "local client healthy"
     rm -rf "$mock_bin"
 }
