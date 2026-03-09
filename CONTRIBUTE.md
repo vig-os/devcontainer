@@ -161,33 +161,13 @@ Available recipes:
     [build]
     build no_cache=""                          # Build local development image
     clean version="dev"                        # Remove image (default: dev)
-    clean-artifacts                            # Clean build artifacts
     clean-test-containers                      # Clean up lingering test containers
-
-    [deps]
-    sync                                       # Sync all dependencies (idempotent, fast if nothing changed)
-    update                                     # Update all dependencies
-
-    [devcontainer]
-    down                                       # Stop and remove containers
-    logs *args                                 # Tail container logs
-    open                                       # Open Cursor/VS Code attached to the running container
-    restart *args                              # Restart service(s)
-    shell                                      # Open bash in running devcontainer
-    status                                     # Show container status
-    up                                         # Start devcontainer + sidecars via compose
-
-    [git]
-    branch                                     # Show current branch + list recent branches
-    log                                        # Pretty one-line git log (last 20 commits)
 
     [github]
     gh-issues                                  # List open issues and PRs grouped by milestone [alias: gh-i]
 
     [info]
-    check *args                                # Examples: just check, just check config, just check off, just check 7d
     default                                    # Show available commands (default)
-    devcontainer-upgrade                       # This recipe MUST be run from a host terminal, not inside the container
     docs                                       # Generate documentation from templates
     help                                       # Show available commands
     info                                       # Show image information
@@ -219,18 +199,12 @@ Available recipes:
     pull version="latest"                      # Pull image from registry (default: latest)
     reset-changelog                            # Reset CHANGELOG Unreleased section (after merging release to dev)
 
-    [sidecar]
-    sidecar name *args                         # Example: just sidecar postgres migrate / just sidecar redis flush
-    sidecars                                   # List available sidecar containers
-
     [test]
     test version="dev"                         # Run all test suites
     test-bats                                  # Run BATS shell script tests
-    test-cov *args                             # Run tests with coverage
     test-image version="dev"                   # Run image tests only
     test-install                               # Run install script tests only
     test-integration version="dev"             # Run integration tests only
-    test-pytest *args                          # Run tests with pytest
     test-utils                                 # Run utils tests only
     test-validate-commit-msg                   # Run validate commit msg tests only
     test-vig-utils                             # Run check action pins tests only

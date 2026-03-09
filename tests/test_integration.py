@@ -1790,10 +1790,10 @@ class TestJustRecipes:
         )
 
     def test_just_pytest(self, devcontainer_up):
-        """Test the just pytest command."""
+        """Test the just test command."""
         workspace_path = str(devcontainer_up.resolve())
 
-        just_cmd = self._just_cmd(workspace_path, ["test-pytest"])
+        just_cmd = self._just_cmd(workspace_path, ["test"])
         result = subprocess.run(
             just_cmd,
             capture_output=True,
@@ -1804,7 +1804,7 @@ class TestJustRecipes:
         )
 
         assert result.returncode == 0, (
-            f"`just test-pytest` recipe failed\n"
+            f"`just test` recipe failed\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}\n"
             f"command: {' '.join(just_cmd)}"
@@ -2893,29 +2893,29 @@ class TestVersionCheckJustIntegration:
 
     def test_just_check_command_exists(self, initialized_workspace):
         """Test that 'just check' command is available."""
-        # Check if .devcontainer/justfile.base has the check recipe
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        # Check if .devcontainer/justfile.devc has the check recipe
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
             pytest.skip(
-                "justfile.base not found - workspace may be from older template"
+                "justfile.devc not found - workspace may be from older template"
             )
 
         content = justfile_base.read_text()
-        assert "check" in content, "check recipe not found in justfile.base"
+        assert "check" in content, "check recipe not found in justfile.devc"
 
     def test_just_update_command_exists(self, initialized_workspace):
         """Test that 'just update' command is available."""
-        # Check if .devcontainer/justfile.base has the update recipe
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        # Check if justfile.project has the update recipe
+        justfile_base = initialized_workspace / "justfile.project"
 
         if not justfile_base.exists():
             pytest.skip(
-                "justfile.base not found - workspace may be from older template"
+                "justfile.project not found - workspace may be from older template"
             )
 
         content = justfile_base.read_text()
-        assert "update" in content, "update recipe not found in justfile.base"
+        assert "update" in content, "update recipe not found in justfile.project"
 
     def test_just_check_calls_script(self, initialized_workspace):
         """Test that 'just check config' executes successfully."""
@@ -2927,16 +2927,16 @@ class TestVersionCheckJustIntegration:
         if not script_path.exists():
             pytest.skip("version-check.sh not found - workspace from older template")
 
-        # Check if justfile.base has check recipe
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        # Check if justfile.devc has check recipe
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found - workspace from older template")
+            pytest.skip("justfile.devc not found - workspace from older template")
 
         content = justfile_base.read_text()
         if "check" not in content:
             pytest.skip(
-                "check recipe not in justfile.base - workspace from older template"
+                "check recipe not in justfile.devc - workspace from older template"
             )
 
         # Test that check recipe can be called directly via the script
@@ -2953,10 +2953,10 @@ class TestVersionCheckJustIntegration:
 
     def test_just_check_recipe_calls_version_check_script(self, initialized_workspace):
         """Test that 'just check' recipe properly calls version-check.sh."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found - workspace from older template")
+            pytest.skip("justfile.devc not found - workspace from older template")
 
         content = justfile_base.read_text()
 
@@ -2984,27 +2984,27 @@ class TestVersionCheckJustIntegration:
 
     def test_just_check_verbose_mode(self, initialized_workspace):
         """Test that 'just check' runs in verbose mode (check subcommand)."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
         if "check" not in content:
             pytest.skip("check recipe not found")
 
-        # The recipe should call 'check' subcommand when no args provided
+        # The recipe should default to 'check' subcommand when no args provided
         # This ensures verbose output instead of silent mode
-        assert 'version-check.sh" check' in content or '"$@"' in content, (
-            "check recipe doesn't use verbose mode"
+        assert "{ 'check' }" in content or 'version-check.sh" check' in content, (
+            "check recipe doesn't default to verbose check mode"
         )
 
     def test_just_check_accepts_subcommands(self, initialized_workspace):
         """Test that 'just check' recipe accepts and passes through subcommands."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
         if "check" not in content:
@@ -3045,9 +3045,9 @@ class TestVersionCheckJustIntegration:
 
     def test_just_check_config_via_just_command(self, initialized_workspace):
         """Regression: 'just check config' resolves path correctly (issue #187)."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
         if "check" not in justfile_base.read_text():
             pytest.skip("check recipe not found")
 
@@ -3065,6 +3065,45 @@ class TestVersionCheckJustIntegration:
         assert "Could not locate .devcontainer/scripts directory" not in (
             result.stdout + result.stderr
         ), "Path resolution broken: script dir not found"
+
+    def test_justfile_devc_excludes_project_recipes(self, initialized_workspace):
+        """Test that project-focused recipes are not defined in justfile.devc."""
+        justfile_devc = initialized_workspace / ".devcontainer" / "justfile.devc"
+
+        if not justfile_devc.exists():
+            pytest.skip("justfile.devc not found")
+
+        content = justfile_devc.read_text()
+        for recipe_name in ["lint:", "format:", "precommit:", "sync:", "update:"]:
+            assert recipe_name not in content, (
+                f"{recipe_name.rstrip(':')} should not exist in justfile.devc"
+            )
+
+    def test_workspace_justfile_project_contains_project_recipes(
+        self, initialized_workspace
+    ):
+        """Test that moved project recipes are defined in justfile.project."""
+        justfile_project = initialized_workspace / "justfile.project"
+
+        if not justfile_project.exists():
+            pytest.skip("justfile.project not found")
+
+        content = justfile_project.read_text()
+        for recipe_name in ["lint:", "format:", "precommit:", "sync:", "update:"]:
+            assert recipe_name in content, (
+                f"{recipe_name.rstrip(':')} should exist in justfile.project"
+            )
+
+    def test_workspace_justfile_imports_justfile_devc(self, initialized_workspace):
+        """Test that workspace justfile imports justfile.devc."""
+        workspace_justfile = initialized_workspace / "justfile"
+
+        if not workspace_justfile.exists():
+            pytest.skip("workspace justfile not found")
+
+        content = workspace_justfile.read_text()
+        assert "import '.devcontainer/justfile.devc'" in content
+        assert "import '.devcontainer/justfile.base'" not in content
 
     def test_just_check_mute_functionality(self, initialized_workspace):
         """Test that 'just check 7d' mutes notifications."""
@@ -3366,27 +3405,27 @@ class TestDevcontainerUpgradeRecipe:
     """Test the host-side 'just devcontainer-upgrade' recipe."""
 
     def test_devcontainer_upgrade_recipe_exists(self, initialized_workspace):
-        """Test that 'just devcontainer-upgrade' recipe exists in justfile.base."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        """Test that 'just devcontainer-upgrade' recipe exists in justfile.devc."""
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
 
         # Recipe should exist
         assert "devcontainer-upgrade" in content, (
-            "devcontainer-upgrade recipe not found in justfile.base"
+            "devcontainer-upgrade recipe not found in justfile.devc"
         )
 
     def test_devcontainer_upgrade_detects_container_environment(
         self, initialized_workspace
     ):
         """Test that recipe detects when running inside container."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
 
@@ -3397,10 +3436,10 @@ class TestDevcontainerUpgradeRecipe:
 
     def test_devcontainer_upgrade_shows_error_in_container(self, initialized_workspace):
         """Test that recipe shows clear error when run inside container."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
 
@@ -3441,10 +3480,10 @@ class TestDevcontainerUpgradeRecipe:
 
     def test_devcontainer_upgrade_checks_runtime_available(self, initialized_workspace):
         """Test that recipe checks if podman/docker is available."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
 
@@ -3457,10 +3496,10 @@ class TestDevcontainerUpgradeRecipe:
 
     def test_devcontainer_upgrade_calls_install_script(self, initialized_workspace):
         """Test that recipe calls install.sh with --force flag."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
 
@@ -3473,10 +3512,10 @@ class TestDevcontainerUpgradeRecipe:
 
     def test_devcontainer_upgrade_in_info_group(self, initialized_workspace):
         """Test that devcontainer-upgrade recipe is in the 'info' group."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
         lines = content.split("\n")

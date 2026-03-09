@@ -9,7 +9,7 @@ help:
 
 # Import devcontainer-managed base recipes (replaced on upgrade)
 
-import '.devcontainer/justfile.base'
+import '.devcontainer/justfile.devc'
 import '.devcontainer/justfile.gh'
 
 # Import team-shared project recipes (git-tracked, preserved on upgrade)
