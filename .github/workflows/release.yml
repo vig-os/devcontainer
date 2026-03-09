@@ -524,7 +524,7 @@ jobs:
       - name: Scan image for vulnerabilities
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
         with:
-          version: 'v0.69.2'
+          version: 'v0.69.3'
           input: /tmp/image.tar
           format: 'table'
           severity: 'HIGH,CRITICAL'
