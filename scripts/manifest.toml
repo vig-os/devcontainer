@@ -92,6 +92,8 @@ transforms = [
     "prepare-commit-msg-strip-trailers",
     "check-agent-identity",
     "validate-commit-msg",
+    "taplo-format",
+    "taplo-lint",
   ] },
   { type = "Sed", pattern = "bandit -r packages/vig-utils/src/ assets/workspace/", replace = "bandit -r src/" },
   { type = "StripTrailingBlankLines" },
