@@ -64,7 +64,16 @@ cmd_start() {
     echo "Tailscale: starting (hostname=$hostname)..."
 
     if ! pgrep -x tailscaled &>/dev/null; then
-        setsid tailscaled --tun=userspace-networking --state=/var/lib/tailscale/tailscaled.state &>/dev/null &
+        # Use real TUN if /dev/net/tun exists (required for Tailscale SSH to work).
+        # Falls back to userspace networking (outbound-only, no SSH server).
+        local tun_flag=""
+        if [ ! -c /dev/net/tun ]; then
+            echo "Tailscale: WARNING — /dev/net/tun not available. SSH into container will NOT work." >&2
+            echo "Tailscale: Add 'devices: [\"/dev/net/tun:/dev/net/tun\"]' and 'cap_add: [NET_ADMIN, NET_RAW]' to compose." >&2
+            tun_flag="--tun=userspace-networking"
+        fi
+        # shellcheck disable=SC2086
+        setsid tailscaled $tun_flag --state=/var/lib/tailscale/tailscaled.state &>/dev/null &
         sleep 2
     fi
 

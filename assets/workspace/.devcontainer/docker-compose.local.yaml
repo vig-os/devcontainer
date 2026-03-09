@@ -25,9 +25,15 @@
 # Optional: Tailscale SSH for direct mesh access (e.g. Cursor GUI workaround)
 # Generate an auth key at https://login.tailscale.com/admin/settings/keys
 # Use an ephemeral + reusable key so stale containers auto-expire.
+# The device + cap_add entries are required for Tailscale SSH to work (real TUN).
 #
 #   services:
 #     devcontainer:
+#       devices:
+#         - /dev/net/tun:/dev/net/tun
+#       cap_add:
+#         - NET_ADMIN
+#         - NET_RAW
 #       environment:
 #         - TAILSCALE_AUTHKEY=tskey-auth-XXXX
 #         - TAILSCALE_HOSTNAME=myproject-devc-mybox  # optional override

@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Tailscale SSH now works inside containers** ([#70](https://github.com/vig-os/devcontainer/issues/70))
+  - Use real TUN device instead of `--tun=userspace-networking` (userspace mode cannot serve SSH)
+  - `setup-tailscale.sh` auto-detects `/dev/net/tun` and warns if missing
+  - `inject_tailscale_key` adds `devices` + `cap_add` to remote `docker-compose.local.yaml`
+  - Template example updated with required `devices` and `cap_add` entries
 - **CI Project Checks coverage includes devc_remote_uri tests** ([#70](https://github.com/vig-os/devcontainer/issues/70))
   - Add `tests/test_devc_remote_uri.py` to test-project action pytest run
   - Add build_uri validation tests for empty devcontainer_path, ssh_host, container_workspace

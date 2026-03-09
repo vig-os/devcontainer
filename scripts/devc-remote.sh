@@ -332,43 +332,41 @@ inject_tailscale_key() {
     fi
 
     # Inject into remote docker-compose.local.yaml
+    # Includes devices + cap_add for real TUN (required for Tailscale SSH)
     # shellcheck disable=SC2029
     ssh "$SSH_HOST" "bash -s" "$REMOTE_PATH" "$auth_key" << 'INJECT_EOF'
 REPO_PATH="$1"
 AUTH_KEY="$2"
 LOCAL_YAML="$REPO_PATH/.devcontainer/docker-compose.local.yaml"
 
+# Full Tailscale block with TUN device + capabilities for SSH support
+write_full_ts_yaml() {
+    cat > "$LOCAL_YAML" << YAML
+services:
+  devcontainer:
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      - TAILSCALE_AUTHKEY=${AUTH_KEY}
+YAML
+}
+
 # Create if missing
 if [ ! -f "$LOCAL_YAML" ]; then
-    cat > "$LOCAL_YAML" << 'YAML'
-services:
-  devcontainer:
-    environment:
-      - TAILSCALE_AUTHKEY=PLACEHOLDER
-YAML
-fi
-
-# If file has 'services: {}' (empty), replace with proper structure
-if grep -q 'services: {}' "$LOCAL_YAML"; then
-    cat > "$LOCAL_YAML" << YAML
-services:
-  devcontainer:
-    environment:
-      - TAILSCALE_AUTHKEY=${AUTH_KEY}
-YAML
+    write_full_ts_yaml
+elif grep -q 'services: {}' "$LOCAL_YAML"; then
+    write_full_ts_yaml
 elif grep -q 'TAILSCALE_AUTHKEY' "$LOCAL_YAML"; then
+    # Update existing key, ensure devices/cap_add present
     sed -i "s|TAILSCALE_AUTHKEY=.*|TAILSCALE_AUTHKEY=${AUTH_KEY}|" "$LOCAL_YAML"
-elif grep -q 'environment:' "$LOCAL_YAML"; then
-    sed -i "/environment:/a\\      - TAILSCALE_AUTHKEY=${AUTH_KEY}" "$LOCAL_YAML"
-elif grep -q 'devcontainer:' "$LOCAL_YAML"; then
-    sed -i "/devcontainer:/a\\    environment:\\n      - TAILSCALE_AUTHKEY=${AUTH_KEY}" "$LOCAL_YAML"
+    if ! grep -q '/dev/net/tun' "$LOCAL_YAML"; then
+        sed -i "/devcontainer:/a\\    devices:\\n      - /dev/net/tun:/dev/net/tun\\n    cap_add:\\n      - NET_ADMIN\\n      - NET_RAW" "$LOCAL_YAML"
+    fi
 else
-    cat > "$LOCAL_YAML" << YAML
-services:
-  devcontainer:
-    environment:
-      - TAILSCALE_AUTHKEY=${AUTH_KEY}
-YAML
+    write_full_ts_yaml
 fi
 INJECT_EOF
 
