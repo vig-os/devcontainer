@@ -384,7 +384,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Restructure workspace justfile into devc/project split** ([#219](https://github.com/vig-os/devcontainer/issues/219))
   - Rename `justfile.base` to `justfile.devc` and keep devcontainer lifecycle recipes there
   - Move project-level recipes (`lint`, `format`, `precommit`, `test`, `sync`, `update`, `clean-artifacts`, `log`, `branch`) into `justfile.project`
-  - Add gitignored `justfile.local` template for personal recipes and update workspace imports/manifests to the new structure
+  - Add tracked `justfile.local` template for personal recipes while keeping it ignored in downstream workspaces, and update workspace imports/manifests to the new structure
 
 ### Deprecated
 
