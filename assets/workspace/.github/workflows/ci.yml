@@ -39,6 +39,8 @@ on:  # yamllint disable-line rule:truthy
 
 permissions:
   contents: read
+  # workflow_call ceiling: dependency-review needs this; job-level perms cannot
+  # exceed workflow-level when called via workflow_call (see vig-os/devcontainer#173)
   pull-requests: write
 
 jobs:
