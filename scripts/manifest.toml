@@ -36,6 +36,9 @@ src = ".pymarkdown.config.md"
 src = ".hadolint.yaml"
 
 [[entries]]
+src = ".vscode/settings.json"
+
+[[entries]]
 src = ".github/agent-blocklist.toml"
 
 [[entries]]
