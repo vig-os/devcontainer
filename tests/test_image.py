@@ -444,32 +444,18 @@ class TestDevelopmentTools:
         assert "OK" in result.stdout
 
     @pytest.mark.parametrize(
-        ("name", "command"),
+        "name",
         [
-            (
-                "check-skill-names",
-                "command -v check-skill-names",
-            ),
-            (
-                "derive-branch-summary",
-                "command -v derive-branch-summary",
-            ),
-            (
-                "resolve-branch",
-                "command -v resolve-branch",
-            ),
-            ("setup-labels", "command -v setup-labels"),
-        ],
-        ids=[
             "check-skill-names",
             "derive-branch-summary",
+            "gh-issues",
             "resolve-branch",
             "setup-labels",
         ],
     )
-    def test_vig_utils_shell_scripts(self, host, name, command):
+    def test_vig_utils_shell_scripts(self, host, name):
         """Test vig-utils shell wrapper commands are callable."""
-        result = host.run(f'bash -lc "{command}"')
+        result = host.run(f'bash -lc "command -v {name}"')
         assert result.rc == 0, f"{name} command failed: {result.stderr}"
 
 
