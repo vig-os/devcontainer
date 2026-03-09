@@ -35,6 +35,7 @@ on:  # yamllint disable-line rule:truthy
           - lint
           - test
           - security
+  workflow_call:
 
 permissions:
   contents: read

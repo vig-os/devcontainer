@@ -36,6 +36,13 @@ on:  # yamllint disable-line rule:truthy
           - all
           - lint
           - test
+  workflow_call:
+    inputs:
+      image-tag:
+        description: 'Container image tag to use'
+        required: false
+        default: 'latest'
+        type: string
 
 permissions:
   contents: read
@@ -45,7 +52,7 @@ jobs:
     name: Lint & Format (container)
     runs-on: ubuntu-22.04
     container:
-      image: ghcr.io/vig-os/devcontainer:latest
+      image: ghcr.io/vig-os/devcontainer:${{ inputs.image-tag || 'latest' }}
       env:
         # Image-baked cache; may miss if repo pins hooks by hash (see docs/container-ci-quirks.md)
         PRE_COMMIT_HOME: /opt/pre-commit-cache
@@ -74,7 +81,7 @@ jobs:
     name: Tests (container)
     runs-on: ubuntu-22.04
     container:
-      image: ghcr.io/vig-os/devcontainer:latest
+      image: ghcr.io/vig-os/devcontainer:${{ inputs.image-tag || 'latest' }}
       env:
         # Reuse the venv already present in the image instead of creating a new one
         UV_PROJECT_ENVIRONMENT: /root/assets/workspace/.venv
