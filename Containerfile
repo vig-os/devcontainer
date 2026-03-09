@@ -1,7 +1,7 @@
 # Use Python 3.12 as base image (pinned to digest for supply chain integrity)
 # Dependabot (docker ecosystem) will propose digest updates automatically
 # Updated to bookworm (stable) for better security patch cadence
-FROM python:3.12-slim-bookworm@sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcade98e669c
+FROM python:3.12-slim-bookworm@sha256:4c50375fc4b8ea5ca06ac9485186ccb50171c99390b0e9300c2bac871cc2dc3e
 
 # Add metadata
 # By default, we build the dev version unless specified as an argument

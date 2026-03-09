@@ -250,9 +250,9 @@ jobs:
           path: /tmp
 
       - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
         with:
-          version: 'v0.69.2'
+          version: 'v0.69.3'
           input: /tmp/image.tar
           format: 'table'
           severity: 'HIGH,CRITICAL'
@@ -262,9 +262,9 @@ jobs:
 
       - name: Report unfixed HIGH/CRITICAL vulnerabilities (non-blocking)
         if: always()
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
         with:
-          version: 'v0.69.2'
+          version: 'v0.69.3'
           input: /tmp/image.tar
           format: 'table'
           severity: 'HIGH,CRITICAL'
@@ -273,9 +273,9 @@ jobs:
 
       - name: Report MEDIUM severity vulnerabilities (non-blocking)
         if: always()
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
         with:
-          version: 'v0.69.2'
+          version: 'v0.69.3'
           input: /tmp/image.tar
           format: 'table'
           severity: 'MEDIUM'
@@ -283,18 +283,18 @@ jobs:
 
       - name: Generate container SBOM (CycloneDX)
         if: always()
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
         with:
-          version: 'v0.69.2'
+          version: 'v0.69.3'
           input: /tmp/image.tar
           format: 'cyclonedx'
           output: 'sbom-cyclonedx.json'
 
       - name: Generate SARIF report
         if: always()
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8  # v0.33.1
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
         with:
-          version: 'v0.69.2'
+          version: 'v0.69.3'
           input: /tmp/image.tar
           format: 'sarif'
           output: 'trivy-results.sarif'
@@ -311,7 +311,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security
         if: always()
-        uses: github/codeql-action/upload-sarif@45cbd0c69e560cd9e7cd7f8c32362050c9b7ded2  # v4
+        uses: github/codeql-action/upload-sarif@0d579ffd059c29b07949a3cce3983f0780820c98  # v4
         with:
           sarif_file: trivy-results.sarif
           category: 'container-image'
@@ -387,7 +387,7 @@ jobs:
           echo "Validated ${#VALID[@]} exception(s): ${GHSA_LIST:-none}"
 
       - name: Review dependencies for vulnerabilities
-        uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261  # v4
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48  # v4
         with:
           fail-on-severity: high
           allow-ghsas: ${{ steps.exceptions.outputs.allow-ghsas }}
