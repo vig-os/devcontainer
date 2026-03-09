@@ -158,25 +158,28 @@ setup() {
     mock_bin="$(mktemp -d)"
     cat > "$mock_bin/ssh" << SSHEOF
 #!/bin/sh
+# 0=check_ssh, 1=forward_ghcr_auth(mkdir), 2=clone, 3=preflight, 4+=prepare/compose
 counter="${mock_bin}/ssh_counter"
 count=\$(cat "\$counter" 2>/dev/null || echo 0)
 echo \$((count + 1)) > "\$counter"
-if [ "\$count" = "1" ]; then
+if [ "\$count" = "2" ]; then
   echo "CLONE_PATH=/home/user/Projects/fd5"
   echo "CLONE_STATUS=cloned"
-elif [ "\$count" = "2" ]; then
+elif [ "\$count" = "3" ]; then
   echo "RUNTIME=podman"
   echo "COMPOSE_AVAILABLE=1"
   echo "REPO_PATH_EXISTS=1"
   echo "DEVCONTAINER_EXISTS=1"
   echo "DISK_AVAILABLE_GB=5"
   echo "OS_TYPE=linux"
-elif [ "\$count" = "3" ]; then
+elif [ "\$count" = "6" ]; then
   echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
 fi
 exit 0
 SSHEOF
     chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
     PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5 2>&1
     assert_success
     assert_output --partial "Cloning vig-os/fd5"
@@ -188,25 +191,28 @@ SSHEOF
     mock_bin="$(mktemp -d)"
     cat > "$mock_bin/ssh" << SSHEOF
 #!/bin/sh
+# 0=check_ssh, 1=forward_ghcr_auth(mkdir), 2=clone, 3=preflight, 4+=prepare/compose
 counter="${mock_bin}/ssh_counter"
 count=\$(cat "\$counter" 2>/dev/null || echo 0)
 echo \$((count + 1)) > "\$counter"
-if [ "\$count" = "1" ]; then
+if [ "\$count" = "2" ]; then
   echo "CLONE_PATH=/home/user/Projects/fd5"
   echo "CLONE_STATUS=fetched"
-elif [ "\$count" = "2" ]; then
+elif [ "\$count" = "3" ]; then
   echo "RUNTIME=podman"
   echo "COMPOSE_AVAILABLE=1"
   echo "REPO_PATH_EXISTS=1"
   echo "DEVCONTAINER_EXISTS=1"
   echo "DISK_AVAILABLE_GB=5"
   echo "OS_TYPE=linux"
-elif [ "\$count" = "3" ]; then
+elif [ "\$count" = "6" ]; then
   echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
 fi
 exit 0
 SSHEOF
     chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
     PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5 2>&1
     assert_success
     assert_output --partial "Fetching vig-os/fd5"
@@ -218,26 +224,29 @@ SSHEOF
     mock_bin="$(mktemp -d)"
     cat > "$mock_bin/ssh" << SSHEOF
 #!/bin/sh
+# 0=check_ssh, 1=forward_ghcr_auth(mkdir), 2=clone, 3=preflight, 4+=prepare/compose
 counter="${mock_bin}/ssh_counter"
 count=\$(cat "\$counter" 2>/dev/null || echo 0)
 echo \$((count + 1)) > "\$counter"
-if [ "\$count" = "1" ]; then
+if [ "\$count" = "2" ]; then
   echo "CLONE_PATH=/home/user/Projects/fd5"
   echo "CLONE_STATUS=cloned"
   echo "CLONE_BRANCH=feature/my-branch"
-elif [ "\$count" = "2" ]; then
+elif [ "\$count" = "3" ]; then
   echo "RUNTIME=podman"
   echo "COMPOSE_AVAILABLE=1"
   echo "REPO_PATH_EXISTS=1"
   echo "DEVCONTAINER_EXISTS=1"
   echo "DISK_AVAILABLE_GB=5"
   echo "OS_TYPE=linux"
-elif [ "\$count" = "3" ]; then
+elif [ "\$count" = "6" ]; then
   echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
 fi
 exit 0
 SSHEOF
     chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
     PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5:feature/my-branch 2>&1
     assert_success
     assert_output --partial "Checked out feature/my-branch"
@@ -408,22 +417,25 @@ SSHEOF
     mock_bin="$(mktemp -d)"
     cat > "$mock_bin/ssh" << SSHEOF
 #!/bin/sh
+# 0=check_ssh, 1=forward_ghcr_auth(mkdir), 2=preflight, 3,4=prepare, 5=compose_ps
 counter="${mock_bin}/ssh_counter"
 count=\$(cat "\$counter" 2>/dev/null || echo 0)
 echo \$((count + 1)) > "\$counter"
-if [ "\$count" = "1" ]; then
+if [ "\$count" = "2" ]; then
   echo "RUNTIME=podman"
   echo "COMPOSE_AVAILABLE=1"
   echo "REPO_PATH_EXISTS=1"
   echo "DEVCONTAINER_EXISTS=1"
   echo "DISK_AVAILABLE_GB=5"
   echo "OS_TYPE=linux"
-elif [ "\$count" = "2" ]; then
+elif [ "\$count" = "5" ]; then
   echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
 fi
 exit 0
 SSHEOF
     chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
     printf '%s\n' '#!/bin/sh' 'echo "vscode-remote://test"' 'exit 0' > "$mock_bin/python3"
     chmod +x "$mock_bin/python3"
     printf '%s\n' '#!/bin/sh' '[ "$1" = "--folder-uri" ] && [ -n "$2" ] && exit 0' 'exit 1' > "$mock_bin/cursor"
@@ -456,22 +468,25 @@ SSHEOF
     mock_bin="$(mktemp -d)"
     cat > "$mock_bin/ssh" << SSHEOF
 #!/bin/sh
+# 0=check_ssh, 1=forward_ghcr_auth(mkdir), 2=preflight, 3,4=prepare, 5=compose_ps
 counter="${mock_bin}/ssh_counter"
 count=\$(cat "\$counter" 2>/dev/null || echo 0)
 echo \$((count + 1)) > "\$counter"
-if [ "\$count" = "1" ]; then
+if [ "\$count" = "2" ]; then
   echo "RUNTIME=podman"
   echo "COMPOSE_AVAILABLE=1"
   echo "REPO_PATH_EXISTS=1"
   echo "DEVCONTAINER_EXISTS=1"
   echo "DISK_AVAILABLE_GB=5"
   echo "OS_TYPE=linux"
-elif [ "\$count" = "4" ]; then
+elif [ "\$count" = "5" ]; then
   echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
 fi
 exit 0
 SSHEOF
     chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
     printf '%s\n' '#!/bin/sh' 'echo "vscode-remote://test"' 'exit 0' > "$mock_bin/python3"
     chmod +x "$mock_bin/python3"
     printf '%s\n' '#!/bin/sh' '[ "$1" = "--folder-uri" ] && [ -n "$2" ] && exit 0' 'exit 1' > "$mock_bin/cursor"
@@ -491,6 +506,8 @@ SSHEOF
     mock_bin="$(mktemp -d)"
     printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/ssh"
     chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
     # Need cursor for detect_editor_cli
     printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
     chmod +x "$mock_bin/cursor"
@@ -529,6 +546,8 @@ echo "OS_TYPE=linux"
 exit 0
 SSHEOF
     chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
     printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
     chmod +x "$mock_bin/cursor"
     # Will fail at remote_compose_up or open_editor; we verify we get past preflight
@@ -550,6 +569,8 @@ echo "COMPOSE_AVAILABLE=0"
 exit 0
 SSHEOF
     chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
     printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
     chmod +x "$mock_bin/cursor"
     PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none host 2>&1
@@ -565,22 +586,25 @@ SSHEOF
     mock_bin="$(mktemp -d)"
     cat > "$mock_bin/ssh" << SSHEOF
 #!/bin/sh
+# 0=check_ssh, 1=forward_ghcr_auth(mkdir), 2=preflight, 3,4=prepare, 5=compose_ps
 counter="${mock_bin}/ssh_counter"
 count=\$(cat "\$counter" 2>/dev/null || echo 0)
 echo \$((count + 1)) > "\$counter"
-if [ "\$count" = "1" ]; then
+if [ "\$count" = "2" ]; then
   echo "RUNTIME=podman"
   echo "COMPOSE_AVAILABLE=1"
   echo "REPO_PATH_EXISTS=1"
   echo "DEVCONTAINER_EXISTS=1"
   echo "DISK_AVAILABLE_GB=5"
   echo "OS_TYPE=linux"
-elif [ "\$count" = "4" ]; then
+elif [ "\$count" = "5" ]; then
   echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
 fi
 exit 0
 SSHEOF
     chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
     printf '%s\n' '#!/bin/sh' 'echo "vscode-remote://test"' 'exit 0' > "$mock_bin/python3"
     chmod +x "$mock_bin/python3"
     printf '%s\n' '#!/bin/sh' '[ "$1" = "--folder-uri" ] && [ -n "$2" ] && exit 0' 'exit 1' > "$mock_bin/cursor"
@@ -601,19 +625,22 @@ SSHEOF
 counter="${mock_bin}/ssh_counter"
 count=\$(cat "\$counter" 2>/dev/null || echo 0)
 echo \$((count + 1)) > "\$counter"
-if [ "\$count" = "1" ]; then
+# 0=check_ssh, 1=forward_ghcr_auth(mkdir), 2=preflight, 3,4=prepare_remote, 5=compose_ps
+if [ "\$count" = "2" ]; then
   echo "RUNTIME=podman"
   echo "COMPOSE_AVAILABLE=1"
   echo "REPO_PATH_EXISTS=1"
   echo "DEVCONTAINER_EXISTS=1"
   echo "DISK_AVAILABLE_GB=5"
   echo "OS_TYPE=linux"
-elif [ "\$count" = "4" ]; then
+elif [ "\$count" = "5" ]; then
   echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
 fi
 exit 0
 SSHEOF
     chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
     printf '%s\n' '#!/bin/sh' 'echo "vscode-remote://test"' 'exit 0' > "$mock_bin/python3"
     chmod +x "$mock_bin/python3"
     printf '%s\n' '#!/bin/sh' '[ "$1" = "--folder-uri" ] && [ -n "$2" ] && exit 0' 'exit 1' > "$mock_bin/cursor"
@@ -844,18 +871,18 @@ SSHEOF
     mock_bin="$(mktemp -d)"
     cat > "$mock_bin/ssh" << SSHEOF
 #!/bin/sh
-# check_ssh=0, preflight=1, prepare_remote=2+3, compose_ps=4
+# 0=check_ssh, 1=forward_ghcr_auth(mkdir), 2=preflight, 3,4=prepare, 5=compose_ps
 counter="${mock_bin}/ssh_counter"
 count=\$(cat "\$counter" 2>/dev/null || echo 0)
 echo \$((count + 1)) > "\$counter"
-if [ "\$count" = "1" ]; then
+if [ "\$count" = "2" ]; then
   echo "RUNTIME=podman"
   echo "COMPOSE_AVAILABLE=1"
   echo "REPO_PATH_EXISTS=1"
   echo "DEVCONTAINER_EXISTS=1"
   echo "DISK_AVAILABLE_GB=5"
   echo "OS_TYPE=linux"
-elif [ "\$count" = "4" ]; then
+elif [ "\$count" = "5" ]; then
   echo '[{"Service":"devcontainer","State":"running","Health":"healthy"}]'
 else
   :
@@ -863,6 +890,8 @@ fi
 exit 0
 SSHEOF
     chmod +x "$mock_bin/ssh"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
+    chmod +x "$mock_bin/scp"
     printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
     chmod +x "$mock_bin/cursor"
     PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none host 2>&1

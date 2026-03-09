@@ -848,7 +848,7 @@ WRITEEOF
     log_success "Config written to ~/.config/devc-remote/config.yaml — edit to customize."
 }
 
-bootstrap_forward_ghcr_auth() {
+forward_ghcr_auth() {
     # Forward container registry credentials to remote
     local local_auth=""
 
@@ -932,7 +932,7 @@ bootstrap_remote() {
         bootstrap_write_config
     fi
 
-    bootstrap_forward_ghcr_auth
+    forward_ghcr_auth
     bootstrap_clone_and_build
 
     log_success "Bootstrap complete for $SSH_HOST"
@@ -965,6 +965,8 @@ main() {
     log_info "Checking SSH connectivity to $SSH_HOST..."
     check_ssh
     log_success "SSH connection OK"
+
+    forward_ghcr_auth
 
     remote_clone_project
 
