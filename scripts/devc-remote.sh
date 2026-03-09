@@ -518,8 +518,6 @@ remote_preflight() {
     # shellcheck disable=SC2029
     preflight_output=$(ssh "$SSH_HOST" "bash -s" "$REMOTE_PATH" << 'REMOTEEOF'
 REPO_PATH="${1:-$HOME}"
-# Ensure common user bin dirs are in PATH (SSH non-login shells may miss them)
-export PATH="$HOME/.local/bin:$PATH"
 if command -v podman &>/dev/null; then
     echo "RUNTIME=podman"
 elif command -v docker &>/dev/null; then
@@ -527,20 +525,11 @@ elif command -v docker &>/dev/null; then
 else
     echo "RUNTIME="
 fi
-# Detect compose tool — prefer podman-compose (Python, passes devices/cap_add)
-# over podman compose (docker-compose bridge, drops some fields on podman <5)
-if command -v podman-compose &>/dev/null; then
+if (command -v podman &>/dev/null && podman compose version &>/dev/null) || \
+   (command -v docker &>/dev/null && docker compose version &>/dev/null); then
     echo "COMPOSE_AVAILABLE=1"
-    echo "COMPOSE_TOOL=podman-compose"
-elif command -v podman &>/dev/null && podman compose version &>/dev/null; then
-    echo "COMPOSE_AVAILABLE=1"
-    echo "COMPOSE_TOOL=podman-compose-plugin"
-elif command -v docker &>/dev/null && docker compose version &>/dev/null; then
-    echo "COMPOSE_AVAILABLE=1"
-    echo "COMPOSE_TOOL=docker-compose-plugin"
 else
     echo "COMPOSE_AVAILABLE=0"
-    echo "COMPOSE_TOOL="
 fi
 if [ -d "$REPO_PATH" ]; then
     echo "REPO_PATH_EXISTS=1"
@@ -575,7 +564,6 @@ REMOTEEOF
         case "${BASH_REMATCH[1]}" in
             RUNTIME) RUNTIME="${BASH_REMATCH[2]}" ;;
             COMPOSE_AVAILABLE) COMPOSE_AVAILABLE="${BASH_REMATCH[2]}" ;;
-            COMPOSE_TOOL) COMPOSE_TOOL="${BASH_REMATCH[2]}" ;;
             REPO_PATH_EXISTS) REPO_PATH_EXISTS="${BASH_REMATCH[2]}" ;;
             DEVCONTAINER_EXISTS) DEVCONTAINER_EXISTS="${BASH_REMATCH[2]}" ;;
             DISK_AVAILABLE_GB) DISK_AVAILABLE_GB="${BASH_REMATCH[2]}" ;;
@@ -588,22 +576,11 @@ REMOTEEOF
         log_error "No container runtime found on $SSH_HOST. Install podman or docker."
         exit 1
     fi
-    # Set compose command based on detected tool
-    # REMOTE_ENV_PREFIX ensures ~/.local/bin is in PATH for non-login SSH shells
-    # shellcheck disable=SC2016
-    REMOTE_ENV_PREFIX='export PATH="$HOME/.local/bin:$PATH"'
-    case "${COMPOSE_TOOL:-}" in
-        podman-compose)        COMPOSE_CMD="podman-compose" ;;
-        podman-compose-plugin) COMPOSE_CMD="podman compose" ;;
-        docker-compose-plugin) COMPOSE_CMD="docker compose" ;;
-        *)
-            if [[ "$RUNTIME" == "podman" ]]; then
-                COMPOSE_CMD="podman compose"
-            else
-                COMPOSE_CMD="docker compose"
-            fi
-            ;;
-    esac
+    if [[ "$RUNTIME" == "podman" ]]; then
+        COMPOSE_CMD="podman compose"
+    else
+        COMPOSE_CMD="docker compose"
+    fi
     if [[ "${COMPOSE_AVAILABLE:-0}" != "1" ]]; then
         log_error "Compose not available on $SSH_HOST. Install docker-compose or podman-compose."
         exit 1
@@ -679,7 +656,7 @@ remote_compose_up() {
     local devc_dir="$REMOTE_PATH/.devcontainer"
 
     # shellcheck disable=SC2029
-    ps_output=$(ssh "$SSH_HOST" "${REMOTE_ENV_PREFIX}; cd $devc_dir && $compose_full ps --format json 2>/dev/null" || true)
+    ps_output=$(ssh "$SSH_HOST" "cd $devc_dir && $compose_full ps --format json 2>/dev/null" || true)
     state=$(echo "$ps_output" | grep -o '"State":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
     # shellcheck disable=SC2034
     health=$(echo "$ps_output" | grep -o '"Health":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
@@ -690,7 +667,7 @@ remote_compose_up() {
     else
         log_info "Starting devcontainer on $SSH_HOST..."
         # shellcheck disable=SC2029
-        if ! ssh "$SSH_HOST" "${REMOTE_ENV_PREFIX}; cd $devc_dir && $compose_full up -d"; then
+        if ! ssh "$SSH_HOST" "cd $devc_dir && $compose_full up -d"; then
             log_error "Failed to start devcontainer on $SSH_HOST."
             log_error "Debug with: ssh $SSH_HOST 'cd $devc_dir && $compose_full logs'"
             exit 1
@@ -709,7 +686,7 @@ run_container_lifecycle() {
 
     local has_scripts
     # shellcheck disable=SC2029
-    has_scripts=$(ssh "$SSH_HOST" "${REMOTE_ENV_PREFIX}; cd $devc_dir && $compose_full exec -T devcontainer \
+    has_scripts=$(ssh "$SSH_HOST" "cd $devc_dir && $compose_full exec -T devcontainer \
         test -f $scripts_dir/post-create.sh && echo 1 || echo 0" 2>/dev/null || echo "0")
 
     if [[ "$has_scripts" != "1" ]]; then
@@ -721,7 +698,7 @@ run_container_lifecycle() {
     if [[ "${CONTAINER_FRESH:-0}" == "1" ]]; then
         log_info "Running post-create lifecycle (first start)..."
         # shellcheck disable=SC2029
-        ssh "$SSH_HOST" "${REMOTE_ENV_PREFIX}; cd $devc_dir && $compose_full exec -T devcontainer \
+        ssh "$SSH_HOST" "cd $devc_dir && $compose_full exec -T devcontainer \
             /bin/bash $scripts_dir/post-create.sh" 2>&1 || {
             log_warning "post-create.sh failed (non-fatal, container still running)"
         }
@@ -730,13 +707,13 @@ run_container_lifecycle() {
     # post-start: every-start setup (socket perms, deps sync, tailscale start)
     local has_post_start
     # shellcheck disable=SC2029
-    has_post_start=$(ssh "$SSH_HOST" "${REMOTE_ENV_PREFIX}; cd $devc_dir && $compose_full exec -T devcontainer \
+    has_post_start=$(ssh "$SSH_HOST" "cd $devc_dir && $compose_full exec -T devcontainer \
         test -f $scripts_dir/post-start.sh && echo 1 || echo 0" 2>/dev/null || echo "0")
 
     if [[ "$has_post_start" == "1" ]]; then
         log_info "Running post-start lifecycle..."
         # shellcheck disable=SC2029
-        ssh "$SSH_HOST" "${REMOTE_ENV_PREFIX}; cd $devc_dir && $compose_full exec -T devcontainer \
+        ssh "$SSH_HOST" "cd $devc_dir && $compose_full exec -T devcontainer \
             /bin/bash $scripts_dir/post-start.sh" 2>&1 || {
             log_warning "post-start.sh failed (non-fatal, container still running)"
         }
