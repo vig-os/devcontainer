@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Forwards GHCR auth (podman/docker credentials or `GHCR_TOKEN`) to remote
   - Clones devcontainer repo and builds image on remote
   - Re-run reads existing config without re-prompting, pulls latest and rebuilds
+- **Seamless local-to-remote handoff with `just remote-devc`** ([#246](https://github.com/vig-os/devcontainer/issues/246))
+  - `just remote-devc <host>` auto-detects repo + branch from local git state
+  - `--force` / `-f` flag auto-pushes unpushed commits before deploying
+  - Unpushed commits guard: blocks deploy unless pushed or `--force` used
+  - No-upstream branches auto-pushed with `git push -u origin <branch>` when `--force`
+  - GHCR auth forwarded on every deploy (not just bootstrap)
 - **`gh:org/repo[:branch]` target for devc-remote** ([#236](https://github.com/vig-os/devcontainer/issues/236))
   - Clone a GitHub repo on the remote host and start its devcontainer in one command
   - Supports `gh:org/repo` (default branch) and `gh:org/repo:branch` (specific branch)

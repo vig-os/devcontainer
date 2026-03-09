@@ -380,3 +380,34 @@ sidecar name *args:
 [group('devcontainer')]
 devc-remote *args:
     bash scripts/devc-remote.sh {{args}}
+
+# Deploy current project to a remote host (auto-detects repo + branch)
+# Pushes unpushed commits, clones/fetches on remote, starts devcontainer
+# Usage: just remote-devc <ssh-host>[:<path>] [extra-args...]
+# Example: just remote-devc ksb-meatgrinder
+#          just remote-devc ksb-meatgrinder --open none
+[group('devcontainer')]
+remote-devc host *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    SCRIPT_DIR="$(cd "{{source_directory()}}/scripts" && pwd)"
+    if [[ ! -f "$SCRIPT_DIR/devc-remote.sh" ]]; then
+        echo "[ERROR] devc-remote.sh not found at $SCRIPT_DIR"
+        exit 1
+    fi
+    # Auto-detect org/repo from git remote
+    remote_url=$(git remote get-url origin 2>/dev/null) || {
+        echo "[ERROR] No git remote 'origin' found. Run from inside a git repo."
+        exit 1
+    }
+    # Extract org/repo from SSH or HTTPS URL
+    # ssh: git@github.com:org/repo.git → org/repo
+    # https: https://github.com/org/repo.git → org/repo
+    gh_repo=$(echo "$remote_url" | sed -E 's#(git@|https://)([^:/]+)[:/]##; s/\.git$//')
+    # Auto-detect current branch
+    branch=$(git branch --show-current 2>/dev/null)
+    gh_target="gh:${gh_repo}"
+    if [[ -n "$branch" ]]; then
+        gh_target="gh:${gh_repo}:${branch}"
+    fi
+    bash "$SCRIPT_DIR/devc-remote.sh" --force "{{host}}" "$gh_target" {{args}}

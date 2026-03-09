@@ -14,6 +14,7 @@
 # Options:
 #   --bootstrap       One-time remote host setup (config, GHCR auth, image build)
 #   --yes, -y         Auto-accept prompts (use defaults without asking)
+#   --force, -f       Auto-push unpushed commits before deploying (gh: targets)
 #   --open <mode>     How to connect after compose up:
 #                       auto    - detect IDE from $TERM_PROGRAM or CLI availability (default)
 #                       cursor  - open Cursor via devcontainer protocol
@@ -92,6 +93,7 @@ parse_args() {
     YES_MODE=0
     OPEN_MODE="auto"
     BOOTSTRAP_MODE=0
+    FORCE_PUSH=0
     GH_REPO=""
     GH_BRANCH=""
     GH_MODE=0
@@ -108,6 +110,11 @@ parse_args() {
             --yes|-y)
                 # shellcheck disable=SC2034
                 YES_MODE=1
+                shift
+                ;;
+            --force|-f)
+                # shellcheck disable=SC2034
+                FORCE_PUSH=1
                 shift
                 ;;
             --open)
@@ -168,6 +175,43 @@ parse_args() {
         log_error "Missing required argument: <ssh-host>[:<remote-path>]"
         echo "Use --help for usage information"
         exit 1
+    fi
+}
+
+check_unpushed_commits() {
+    # Only relevant when deploying a gh: target from a local repo
+    [[ "$GH_MODE" == "1" ]] || return 0
+
+    # Check if we're in a git repo
+    if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+        return 0
+    fi
+
+    local branch upstream ahead
+    branch=$(git branch --show-current 2>/dev/null)
+    [[ -n "$branch" ]] || return 0
+
+    upstream=$(git rev-parse --abbrev-ref "@{upstream}" 2>/dev/null) || {
+        log_warning "Branch '$branch' has no upstream. Push with: git push -u origin $branch"
+        if [[ "$FORCE_PUSH" == "1" ]]; then
+            log_info "Pushing $branch to origin..."
+            git push -u origin "$branch"
+            log_success "Pushed $branch"
+            return 0
+        fi
+        exit 1
+    }
+
+    ahead=$(git rev-list --count "$upstream..HEAD" 2>/dev/null || echo 0)
+    if [[ "$ahead" -gt 0 ]]; then
+        if [[ "$FORCE_PUSH" == "1" ]]; then
+            log_info "Pushing $ahead commit(s) on $branch to origin..."
+            git push
+            log_success "Pushed $ahead commit(s)"
+        else
+            log_error "$ahead unpushed commit(s) on $branch. Push first or use --force."
+            exit 1
+        fi
     fi
 }
 
@@ -954,6 +998,8 @@ main() {
         bootstrap_remote
         return
     fi
+
+    check_unpushed_commits
 
     detect_editor_cli
     case "$OPEN_MODE" in

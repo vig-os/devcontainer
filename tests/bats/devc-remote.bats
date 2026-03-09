@@ -116,6 +116,9 @@ setup() {
     mock_bin="$(mktemp -d)"
     printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
     chmod +x "$mock_bin/ssh"
+    # Mock git so check_unpushed_commits passes (0 ahead)
+    printf '%s\n' '#!/bin/sh' 'case "$1" in rev-parse) if [ "$2" = "--is-inside-work-tree" ]; then echo true; exit 0; fi; if [ "$2" = "--abbrev-ref" ]; then echo "origin/main"; exit 0; fi;; branch) echo "main"; exit 0;; rev-list) echo 0; exit 0;; esac; exit 0' > "$mock_bin/git"
+    chmod +x "$mock_bin/git"
     PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5 2>&1
     # Should get past parse_args (fail at check_ssh, not "Unexpected argument")
     refute_output --partial "Unexpected argument"
@@ -128,6 +131,9 @@ setup() {
     mock_bin="$(mktemp -d)"
     printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
     chmod +x "$mock_bin/ssh"
+    # Mock git so check_unpushed_commits passes (0 ahead)
+    printf '%s\n' '#!/bin/sh' 'case "$1" in rev-parse) if [ "$2" = "--is-inside-work-tree" ]; then echo true; exit 0; fi; if [ "$2" = "--abbrev-ref" ]; then echo "origin/main"; exit 0; fi;; branch) echo "main"; exit 0;; rev-list) echo 0; exit 0;; esac; exit 0' > "$mock_bin/git"
+    chmod +x "$mock_bin/git"
     PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5:feature/my-branch 2>&1
     refute_output --partial "Unexpected argument"
     assert_output --partial "Cannot connect to"
@@ -139,6 +145,9 @@ setup() {
     mock_bin="$(mktemp -d)"
     printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
     chmod +x "$mock_bin/ssh"
+    # Mock git so check_unpushed_commits passes (0 ahead)
+    printf '%s\n' '#!/bin/sh' 'case "$1" in rev-parse) if [ "$2" = "--is-inside-work-tree" ]; then echo true; exit 0; fi; if [ "$2" = "--abbrev-ref" ]; then echo "origin/main"; exit 0; fi;; branch) echo "main"; exit 0;; rev-list) echo 0; exit 0;; esac; exit 0' > "$mock_bin/git"
+    chmod +x "$mock_bin/git"
     PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver:~/custom/path gh:vig-os/fd5 2>&1
     refute_output --partial "Unexpected argument"
     assert_output --partial "Cannot connect to"
@@ -180,6 +189,9 @@ SSHEOF
     chmod +x "$mock_bin/ssh"
     printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
     chmod +x "$mock_bin/scp"
+    # Mock git so check_unpushed_commits passes (0 ahead)
+    printf '%s\n' '#!/bin/sh' 'case "$1" in rev-parse) if [ "$2" = "--is-inside-work-tree" ]; then echo true; exit 0; fi; if [ "$2" = "--abbrev-ref" ]; then echo "origin/main"; exit 0; fi;; branch) echo "main"; exit 0;; rev-list) echo 0; exit 0;; esac; exit 0' > "$mock_bin/git"
+    chmod +x "$mock_bin/git"
     PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5 2>&1
     assert_success
     assert_output --partial "Cloning vig-os/fd5"
@@ -213,6 +225,9 @@ SSHEOF
     chmod +x "$mock_bin/ssh"
     printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
     chmod +x "$mock_bin/scp"
+    # Mock git so check_unpushed_commits passes (0 ahead)
+    printf '%s\n' '#!/bin/sh' 'case "$1" in rev-parse) if [ "$2" = "--is-inside-work-tree" ]; then echo true; exit 0; fi; if [ "$2" = "--abbrev-ref" ]; then echo "origin/main"; exit 0; fi;; branch) echo "main"; exit 0;; rev-list) echo 0; exit 0;; esac; exit 0' > "$mock_bin/git"
+    chmod +x "$mock_bin/git"
     PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5 2>&1
     assert_success
     assert_output --partial "Fetching vig-os/fd5"
@@ -247,6 +262,9 @@ SSHEOF
     chmod +x "$mock_bin/ssh"
     printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/scp"
     chmod +x "$mock_bin/scp"
+    # Mock git so check_unpushed_commits passes (0 ahead)
+    printf '%s\n' '#!/bin/sh' 'case "$1" in rev-parse) if [ "$2" = "--is-inside-work-tree" ]; then echo true; exit 0; fi; if [ "$2" = "--abbrev-ref" ]; then echo "origin/main"; exit 0; fi;; branch) echo "main"; exit 0;; rev-list) echo 0; exit 0;; esac; exit 0' > "$mock_bin/git"
+    chmod +x "$mock_bin/git"
     PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5:feature/my-branch 2>&1
     assert_success
     assert_output --partial "Checked out feature/my-branch"
@@ -861,6 +879,216 @@ SSHEOF
     PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --bootstrap --yes myserver 2>&1
     assert_success
     assert_output --partial "Building devcontainer image"
+    rm -rf "$mock_bin"
+}
+
+# ── remote_compose_up ────────────────────────────────────────────────────────
+
+# ── --force flag ──────────────────────────────────────────────────────────
+
+@test "--force flag is accepted" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
+    chmod +x "$mock_bin/cursor"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --force --open cursor myserver 2>&1
+    # Should fail at check_ssh, not argument parsing
+    assert_output --partial "Cannot connect to"
+    rm -rf "$mock_bin"
+}
+
+@test "-f flag is accepted as alias for --force" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    printf '%s\n' '#!/bin/sh' 'exit 0' > "$mock_bin/cursor"
+    chmod +x "$mock_bin/cursor"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" -f --open cursor myserver 2>&1
+    assert_output --partial "Cannot connect to"
+    rm -rf "$mock_bin"
+}
+
+# ── check_unpushed_commits ────────────────────────────────────────────────
+
+@test "check_unpushed_commits defines function" {
+    run grep 'check_unpushed_commits()' "$DEVC_REMOTE"
+    assert_success
+}
+
+@test "check_unpushed_commits is called in main" {
+    run grep 'check_unpushed_commits' "$DEVC_REMOTE"
+    assert_success
+    local count
+    count=$(grep -c 'check_unpushed_commits' "$DEVC_REMOTE")
+    [ "$count" -ge 2 ]
+}
+
+@test "check_unpushed_commits skips when no gh: target" {
+    # Without gh: target, GH_MODE=0 → check_unpushed_commits returns 0 immediately
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    # No gh: target — should skip unpushed check and fail at check_ssh
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver 2>&1
+    refute_output --partial "unpushed"
+    assert_output --partial "Cannot connect to"
+    rm -rf "$mock_bin"
+}
+
+@test "check_unpushed_commits blocks when commits unpushed without --force" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    # Mock git to simulate unpushed commits
+    cat > "$mock_bin/git" << 'GITEOF'
+#!/bin/sh
+case "$1" in
+    rev-parse)
+        if [ "$2" = "--is-inside-work-tree" ]; then echo "true"; exit 0; fi
+        if [ "$2" = "--abbrev-ref" ]; then echo "origin/main"; exit 0; fi
+        ;;
+    branch)
+        if [ "$2" = "--show-current" ]; then echo "main"; exit 0; fi
+        ;;
+    rev-list)
+        echo "3"; exit 0
+        ;;
+esac
+exit 0
+GITEOF
+    chmod +x "$mock_bin/git"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5 2>&1
+    assert_failure
+    assert_output --partial "unpushed commit(s)"
+    assert_output --partial "--force"
+    rm -rf "$mock_bin"
+}
+
+@test "check_unpushed_commits pushes when --force and commits unpushed" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/git" << GITEOF
+#!/bin/sh
+case "\$1" in
+    rev-parse)
+        if [ "\$2" = "--is-inside-work-tree" ]; then echo "true"; exit 0; fi
+        if [ "\$2" = "--abbrev-ref" ]; then echo "origin/main"; exit 0; fi
+        ;;
+    branch)
+        if [ "\$2" = "--show-current" ]; then echo "main"; exit 0; fi
+        ;;
+    rev-list)
+        echo "2"; exit 0
+        ;;
+    push)
+        echo "PUSHED" >> "${mock_bin}/push_log"
+        exit 0
+        ;;
+esac
+exit 0
+GITEOF
+    chmod +x "$mock_bin/git"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --force --open none myserver gh:vig-os/fd5 2>&1
+    # Should push and then fail at check_ssh (not at unpushed check)
+    assert_output --partial "Pushing 2 commit(s)"
+    assert_output --partial "Cannot connect to"
+    # Verify git push was called
+    [ -f "$mock_bin/push_log" ]
+    rm -rf "$mock_bin"
+}
+
+@test "check_unpushed_commits blocks when no upstream without --force" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/git" << 'GITEOF'
+#!/bin/sh
+case "$1" in
+    rev-parse)
+        if [ "$2" = "--is-inside-work-tree" ]; then echo "true"; exit 0; fi
+        if [ "$2" = "--abbrev-ref" ]; then exit 1; fi
+        ;;
+    branch)
+        if [ "$2" = "--show-current" ]; then echo "feature/test"; exit 0; fi
+        ;;
+esac
+exit 0
+GITEOF
+    chmod +x "$mock_bin/git"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5 2>&1
+    assert_failure
+    assert_output --partial "has no upstream"
+    rm -rf "$mock_bin"
+}
+
+@test "check_unpushed_commits pushes -u when no upstream with --force" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/git" << GITEOF
+#!/bin/sh
+case "\$1" in
+    rev-parse)
+        if [ "\$2" = "--is-inside-work-tree" ]; then echo "true"; exit 0; fi
+        if [ "\$2" = "--abbrev-ref" ]; then exit 1; fi
+        ;;
+    branch)
+        if [ "\$2" = "--show-current" ]; then echo "feature/test"; exit 0; fi
+        ;;
+    push)
+        echo "PUSHED: \$@" >> "${mock_bin}/push_log"
+        exit 0
+        ;;
+esac
+exit 0
+GITEOF
+    chmod +x "$mock_bin/git"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --force --open none myserver gh:vig-os/fd5 2>&1
+    # Should push -u and continue to check_ssh
+    assert_output --partial "Pushing feature/test"
+    assert_output --partial "Cannot connect to"
+    # Verify push was called with -u
+    [ -f "$mock_bin/push_log" ]
+    run grep -- "-u" "$mock_bin/push_log"
+    assert_success
+    rm -rf "$mock_bin"
+}
+
+@test "check_unpushed_commits passes when all commits pushed" {
+    local mock_bin
+    mock_bin="$(mktemp -d)"
+    cat > "$mock_bin/git" << 'GITEOF'
+#!/bin/sh
+case "$1" in
+    rev-parse)
+        if [ "$2" = "--is-inside-work-tree" ]; then echo "true"; exit 0; fi
+        if [ "$2" = "--abbrev-ref" ]; then echo "origin/main"; exit 0; fi
+        ;;
+    branch)
+        if [ "$2" = "--show-current" ]; then echo "main"; exit 0; fi
+        ;;
+    rev-list)
+        echo "0"; exit 0
+        ;;
+esac
+exit 0
+GITEOF
+    chmod +x "$mock_bin/git"
+    printf '%s\n' '#!/bin/sh' 'exit 1' > "$mock_bin/ssh"
+    chmod +x "$mock_bin/ssh"
+    PATH="$mock_bin:$PATH" run "$DEVC_REMOTE" --open none myserver gh:vig-os/fd5 2>&1
+    # Should pass through to check_ssh
+    refute_output --partial "unpushed"
+    assert_output --partial "Cannot connect to"
     rm -rf "$mock_bin"
 }
 
