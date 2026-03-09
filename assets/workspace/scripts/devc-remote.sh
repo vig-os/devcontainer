@@ -273,9 +273,17 @@ inject_tailscale_key() {
         return 0
     fi
 
-    # Check if key already set on remote
+    # Check if key already set on remote — still need to ensure TUN device config
     # shellcheck disable=SC2029
     if ssh "$SSH_HOST" "grep -q 'TAILSCALE_AUTHKEY' '$REMOTE_PATH/.devcontainer/docker-compose.local.yaml' 2>/dev/null"; then
+        # Ensure TUN device + capabilities are present even if key already set
+        # shellcheck disable=SC2029
+        if ! ssh "$SSH_HOST" "grep -q '/dev/net/tun' '$REMOTE_PATH/.devcontainer/docker-compose.local.yaml' 2>/dev/null"; then
+            log_info "Tailscale: adding TUN device config to existing compose..."
+            # shellcheck disable=SC2029
+            ssh "$SSH_HOST" "sed -i '/devcontainer:/a\\    devices:\\n      - /dev/net/tun:/dev/net/tun\\n    cap_add:\\n      - NET_ADMIN\\n      - NET_RAW' '$REMOTE_PATH/.devcontainer/docker-compose.local.yaml'"
+            log_success "Tailscale: TUN device config added"
+        fi
         log_info "Tailscale: auth key already configured on remote"
         return 0
     fi
