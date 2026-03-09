@@ -404,14 +404,21 @@ remote_clone_project() {
 
     local clone_output
     # shellcheck disable=SC2029
-    clone_output=$(ssh "$SSH_HOST" "bash -s" "$GH_REPO" "$GH_BRANCH" "$REMOTE_PATH" << 'CLONEEOF'
+    # Use sentinels for empty/default args — SSH drops empty strings and expands ~
+    local _branch="${GH_BRANCH:-_NONE_}"
+    local _path="${REMOTE_PATH}"
+    [[ "$_path" == "~" ]] && _path="_DEFAULT_"
+    # shellcheck disable=SC2029
+    clone_output=$(ssh "$SSH_HOST" "bash -s" "$GH_REPO" "$_branch" "$_path" << 'CLONEEOF'
 GH_REPO="$1"
 GH_BRANCH="$2"
+[ "$GH_BRANCH" = "_NONE_" ] && GH_BRANCH=""
 USER_PATH="$3"
+[ "$USER_PATH" = "_DEFAULT_" ] && USER_PATH=""
 REPO_NAME="${GH_REPO##*/}"
 
 # Resolve target directory
-if [ "$USER_PATH" != "~" ] && [ -n "$USER_PATH" ]; then
+if [ -n "$USER_PATH" ]; then
     TARGET_DIR="$USER_PATH"
 else
     # Read projects_dir from config, fallback to ~/Projects
