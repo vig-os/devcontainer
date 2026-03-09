@@ -3066,6 +3066,45 @@ class TestVersionCheckJustIntegration:
             result.stdout + result.stderr
         ), "Path resolution broken: script dir not found"
 
+    def test_justfile_devc_excludes_project_recipes(self, initialized_workspace):
+        """Test that project-focused recipes are not defined in justfile.devc."""
+        justfile_devc = initialized_workspace / ".devcontainer" / "justfile.devc"
+
+        if not justfile_devc.exists():
+            pytest.skip("justfile.devc not found")
+
+        content = justfile_devc.read_text()
+        for recipe_name in ["lint:", "format:", "precommit:", "sync:", "update:"]:
+            assert recipe_name not in content, (
+                f"{recipe_name.rstrip(':')} should not exist in justfile.devc"
+            )
+
+    def test_workspace_justfile_project_contains_project_recipes(
+        self, initialized_workspace
+    ):
+        """Test that moved project recipes are defined in justfile.project."""
+        justfile_project = initialized_workspace / "justfile.project"
+
+        if not justfile_project.exists():
+            pytest.skip("justfile.project not found")
+
+        content = justfile_project.read_text()
+        for recipe_name in ["lint:", "format:", "precommit:", "sync:", "update:"]:
+            assert recipe_name in content, (
+                f"{recipe_name.rstrip(':')} should exist in justfile.project"
+            )
+
+    def test_workspace_justfile_imports_justfile_devc(self, initialized_workspace):
+        """Test that workspace justfile imports justfile.devc."""
+        workspace_justfile = initialized_workspace / "justfile"
+
+        if not workspace_justfile.exists():
+            pytest.skip("workspace justfile not found")
+
+        content = workspace_justfile.read_text()
+        assert "import '.devcontainer/justfile.devc'" in content
+        assert "import '.devcontainer/justfile.base'" not in content
+
     def test_just_check_mute_functionality(self, initialized_workspace):
         """Test that 'just check 7d' mutes notifications."""
         script_path = (
