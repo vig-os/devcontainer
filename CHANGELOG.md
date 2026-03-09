@@ -526,6 +526,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Sidecar recipes now support both podman and docker runtimes for listing, starting, and executing sidecar commands
   - Worktree and GitHub helper recipes now fail fast with actionable guidance when helper CLIs are unavailable
   - Label taxonomy guidance clarifies that `setup-labels` is provided by devcontainer bootstrap tooling
+- **CodeQL PR trigger no longer blocks merge protection on non-Python changes** ([#247](https://github.com/vig-os/devcontainer/issues/247))
+  - Removed `pull_request` `paths` filter from `codeql.yml` in both root and workspace template so CodeQL always runs for PRs targeting protected branches and uploads SARIF results
 
 ### Security
 
