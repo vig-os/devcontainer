@@ -1,67 +1,9 @@
 # ===============================================================================
-# DEVCONTAINER BASE RECIPES - DO NOT EDIT
+# DEVCONTAINER RECIPES - DO NOT EDIT
 # Managed by vigOS devcontainer. Customizations go in root justfile.
 # ===============================================================================
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
-
-# -------------------------------------------------------------------------------
-# CODE QUALITY
-# -------------------------------------------------------------------------------
-
-# Run all linters
-[group('quality')]
-lint:
-    uv run ruff check .
-
-# Format code
-[group('quality')]
-format:
-    uv run ruff format .
-
-# Run pre-commit hooks on all files
-[group('quality')]
-precommit:
-    uv run pre-commit run --all-files
-
-# -------------------------------------------------------------------------------
-# TESTING
-# -------------------------------------------------------------------------------
-
-# Run tests with pytest
-[group('test')]
-test-pytest *args:
-    uv run pytest {{ args }}
-
-# Run tests with coverage
-[group('test')]
-test-cov *args:
-    uv run pytest --cov --cov-report=term-missing {{ args }}
-
-# -------------------------------------------------------------------------------
-# DEPENDENCIES
-# -------------------------------------------------------------------------------
-
-# Sync all dependencies (idempotent, fast if nothing changed)
-[group('deps')]
-sync:
-    @if [ -f pyproject.toml ]; then uv sync --all-extras; fi
-
-# Update all dependencies
-[group('deps')]
-update:
-    uv lock --upgrade
-    @just sync
-
-# -------------------------------------------------------------------------------
-# BUILD
-# -------------------------------------------------------------------------------
-
-# Clean build artifacts
-[group('build')]
-clean-artifacts:
-    rm -rf .pytest_cache .ruff_cache .coverage htmlcov dist build *.egg-info
-    find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # -------------------------------------------------------------------------------
 # VERSION CHECK
@@ -83,13 +25,9 @@ check *args:
         exit 1
     fi
 
-    if [[ $# -eq 0 ]]; then
-        # No args provided - run in verbose check mode
-        "$SCRIPT_DIR/version-check.sh" check
-    else
-        # Pass all arguments through to the script
-        "$SCRIPT_DIR/version-check.sh" "$@"
-    fi
+    # No args provided: default to verbose check mode.
+    # Otherwise pass all args through as provided by just.
+    "$SCRIPT_DIR/version-check.sh" {{ if args == '' { 'check' } else { args } }}
 
 # Upgrade devcontainer to latest version (host-side only)
 # This recipe MUST be run from a host terminal, not inside the container
@@ -280,24 +218,6 @@ open:
         echo "[ERROR] Neither cursor nor code found. Install Cursor or VS Code."
         exit 1
     fi
-
-# -------------------------------------------------------------------------------
-# GIT
-# -------------------------------------------------------------------------------
-
-# Pretty one-line git log (last 20 commits)
-[group('git')]
-log:
-    git log --oneline -20
-
-# Show current branch + list recent branches
-[group('git')]
-branch:
-    #!/usr/bin/env bash
-    echo "Current: $(git branch --show-current)"
-    echo ""
-    echo "Recent branches:"
-    git branch -a | head -15
 
 # -------------------------------------------------------------------------------
 # SIDECAR
