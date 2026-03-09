@@ -443,7 +443,7 @@ class TestDevContainerJson:
         )
         # postAttachCommand should reference .devcontainer inside project subdirectory
         expected_command = (
-            "/workspace/test_project/.devcontainer/scripts/post-attach.sh"
+            "/bin/bash /workspace/test_project/.devcontainer/scripts/post-attach.sh"
         )
         assert config["postAttachCommand"] == expected_command, (
             f"Expected postAttachCommand='{expected_command}', "
@@ -464,11 +464,32 @@ class TestDevContainerJson:
         )
         # postCreateCommand should reference .devcontainer inside project subdirectory
         expected_command = (
-            "/workspace/test_project/.devcontainer/scripts/post-create.sh"
+            "/bin/bash /workspace/test_project/.devcontainer/scripts/post-create.sh"
         )
         assert config["postCreateCommand"] == expected_command, (
             f"Expected postCreateCommand='{expected_command}', "
             f"got: {config['postCreateCommand']}"
+        )
+
+    def test_devcontainer_json_post_start_command(self, initialized_workspace):
+        """Test that postStartCommand is configured correctly."""
+        devcontainer_json = (
+            initialized_workspace / ".devcontainer" / "devcontainer.json"
+        )
+
+        with devcontainer_json.open() as f:
+            config = json.load(f)
+
+        assert "postStartCommand" in config, (
+            "devcontainer.json missing 'postStartCommand' field"
+        )
+        # postStartCommand should reference .devcontainer inside project subdirectory
+        expected_command = (
+            "/bin/bash /workspace/test_project/.devcontainer/scripts/post-start.sh"
+        )
+        assert config["postStartCommand"] == expected_command, (
+            f"Expected postStartCommand='{expected_command}', "
+            f"got: {config['postStartCommand']}"
         )
 
     def test_devcontainer_json_no_redundant_container_env(self, initialized_workspace):

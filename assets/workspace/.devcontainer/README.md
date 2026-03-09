@@ -71,6 +71,66 @@ Paths to other mounts can be absolute or relative to the main project folder.
    projects you want to see in the editor. The file is git-ignored, so your personal
    configuration stays local.
 
+## Tailscale SSH
+
+Connect to the devcontainer over Tailscale SSH instead of the devcontainer protocol.
+This enables tools like Cursor GUI to execute shell commands inside the container via SSH remote.
+
+### Prerequisites
+
+1. A [Tailscale](https://tailscale.com/) account with SSH enabled in your tailnet ACLs.
+2. An auth key (ephemeral + reusable recommended) from
+   [Tailscale Admin → Settings → Keys](https://login.tailscale.com/admin/settings/keys).
+
+### Setup
+
+1. Add the auth key to your local compose override (git-ignored):
+
+   ```yaml
+   # .devcontainer/docker-compose.local.yaml
+   services:
+     devcontainer:
+       environment:
+         - TAILSCALE_AUTHKEY=tskey-auth-XXXX
+         # Optional: override the auto-generated hostname
+         # - TAILSCALE_HOSTNAME=myproject-devc-mybox
+   ```
+
+2. Rebuild the devcontainer (`Cmd/Ctrl+Shift+P` → "Dev Containers: Rebuild Container").
+
+3. Tailscale installs on first create (~10 s) and connects on every start.
+   The container appears in your tailnet as `<project>-devc-<hostname>`.
+
+4. Connect via SSH from Cursor or any SSH client:
+
+   ```bash
+   ssh root@<tailscale-hostname>
+   ```
+
+### Tailscale ACL configuration
+
+Your tailnet must allow SSH access. Add a rule like this to your
+[ACL policy](https://login.tailscale.com/admin/acls):
+
+```json
+{
+  "ssh": [
+    {
+      "action": "accept",
+      "src": ["autogroup:members"],
+      "dst": ["autogroup:self"],
+      "users": ["root", "autogroup:nonroot"]
+    }
+  ]
+}
+```
+
+### How it works
+
+- `setup-tailscale.sh install` runs during `postCreateCommand` — installs Tailscale if `TAILSCALE_AUTHKEY` is set.
+- `setup-tailscale.sh start` runs during `postStartCommand` — starts `tailscaled` (userspace networking, no `/dev/net/tun` needed) and authenticates.
+- When `TAILSCALE_AUTHKEY` is unset, both hooks are silent no-ops.
+
 ## Updating the template
 
 If you synchronize with a newer release of the vigOS devcontainer image,

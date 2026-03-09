@@ -163,6 +163,7 @@ def load_blocklist(path: Path) -> dict:
         "trailers": [re.compile(p) for p in patterns.get("trailers", [])],
         "names": [s.lower() for s in patterns.get("names", [])],
         "emails": [s.lower() for s in patterns.get("emails", [])],
+        "allow_patterns": [re.compile(p) for p in patterns.get("allow_patterns", [])],
     }
 
 
@@ -176,7 +177,10 @@ def contains_agent_fingerprint(
 
     Returns the first matching pattern string if found, else None.
     """
-    content_lower = content.lower()
+    stripped = content
+    for pattern in blocklist.get("allow_patterns", []):
+        stripped = pattern.sub("", stripped)
+    content_lower = stripped.lower()
     for name in blocklist.get("names", []):
         if name in content_lower:
             return name

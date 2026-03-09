@@ -155,7 +155,7 @@ if [[ "$FORCE" == "true" ]]; then
                 CONFLICTS+=("$rel_path")
             fi
         fi
-    done < <(find "$TEMPLATE_DIR" -type f ! -path "*/.git/*" -print0)
+    done < <(find "$TEMPLATE_DIR" -type f ! -path "*/.git/*" ! -path "*/.venv/*" -print0)
 
     # Show preserved files
     if [[ ${#PRESERVED[@]} -gt 0 ]]; then

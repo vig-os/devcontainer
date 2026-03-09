@@ -16,6 +16,140 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Opt-in Claude Code CLI support for devcontainer** ([#70](https://github.com/vig-os/devcontainer/issues/70))
+  - New `setup-claude.sh` script with `install` and `start` subcommands
+  - Hooks into `post-create.sh` (install) and `post-start.sh` (start)
+  - Silent no-op when `CLAUDE_CODE_OAUTH_TOKEN` is unset — zero impact on existing users
+  - Uses subscription auth via `claude setup-token` (no API key needed)
+  - `inject_claude_auth()` in `devc-remote.sh` forwards local OAuth token to remote compose
+  - Commented example in `docker-compose.local.yaml` for quick setup
+- **Remote devcontainer lifecycle execution** ([#70](https://github.com/vig-os/devcontainer/issues/70))
+  - `run_container_lifecycle()` runs post-create/post-start scripts inside container after compose up
+  - `prepare_remote()` writes container socket path and stubs local compose override
+  - `read_compose_files()` / `compose_cmd_with_files()` parse devcontainer.json for compose file list
+- **`devc-remote --bootstrap`: one-time remote host setup** ([#235](https://github.com/vig-os/devcontainer/issues/235))
+  - Interactive first-run prompts for `projects_dir` with sensible defaults
+  - `--yes` flag skips prompts and uses defaults
+  - Creates `~/.config/devc-remote/config.yaml` on remote (human-editable)
+  - Forwards GHCR auth (podman/docker credentials or `GHCR_TOKEN`) to remote
+  - Clones devcontainer repo and builds image on remote
+  - Re-run reads existing config without re-prompting, pulls latest and rebuilds
+- **`gh:org/repo[:branch]` target for devc-remote** ([#236](https://github.com/vig-os/devcontainer/issues/236))
+  - Clone a GitHub repo on the remote host and start its devcontainer in one command
+  - Supports `gh:org/repo` (default branch) and `gh:org/repo:branch` (specific branch)
+  - Already-cloned repos are fetched, not re-cloned
+  - Clone location resolved from remote config `projects_dir` or overridden via `host:path`
+- **Opt-in Tailscale SSH support for devcontainer** ([#208](https://github.com/vig-os/devcontainer/issues/208))
+  - New `setup-tailscale.sh` script with `install` and `start` subcommands
+  - Hooks into `post-create.sh` (install) and `post-start.sh` (start)
+  - Silent no-op when `TAILSCALE_AUTHKEY` is unset — zero impact on existing users
+  - Commented example in `docker-compose.local.yaml` for quick setup
+  - Documentation in `.devcontainer/README.md` with quick-start and ACL instructions
+
+### Fixed
+
+- **CI Project Checks coverage includes devc_remote_uri tests** ([#70](https://github.com/vig-os/devcontainer/issues/70))
+  - Add `tests/test_devc_remote_uri.py` to test-project action pytest run
+  - Add build_uri validation tests for empty devcontainer_path, ssh_host, container_workspace
+- **just gh-issues fails locally — rich not in .venv dependencies** ([#159](https://github.com/vig-os/devcontainer/issues/159))
+  - Add `devcontainer` dependency group in root `pyproject.toml` as SSoT for container tools (rich, pre-commit, ruff, pip-licenses)
+  - Container build installs from pyproject.toml via `uv export --only-group devcontainer` instead of hardcoding
+  - Add rich to workspace template dev group; change justfile.gh to `uv run python` so both local and container use project venv
+- **just check uses wrong path — justfile_directory() resolves incorrectly in imported justfile.base** ([#187](https://github.com/vig-os/devcontainer/issues/187))
+  - Replace `dirname(justfile_directory())` with `source_directory()/scripts` to correctly locate version-check.sh in deployed workspaces and devcontainer repo
+  - Regression test: `just check config` runs successfully from workspace
+- **Container image missing bandit and check-skill-names.sh for workspace pre-commit hooks** ([#186](https://github.com/vig-os/devcontainer/issues/186))
+  - Add bandit to system-wide pip install in Containerfile
+  - Deploy scripts/check-skill-names.sh to workspace template via manifest
+- **gh-issues CI status deduplicates re-run checks** ([#176](https://github.com/vig-os/devcontainer/issues/176))
+  - Deduplicate `statusCheckRollup` by check name, keeping only the latest result (by `completedAt`)
+  - CI column now matches GitHub PR page when checks are re-run
+- **worktree-start swallows derive-branch-summary error messages** ([#183](https://github.com/vig-os/devcontainer/issues/183))
+  - Remove stderr suppression so error messages from derive-branch-summary.sh are visible
+  - Retry with standard model when lightweight model fails; print manual workaround hint if both fail
+  - Add optional MODEL_TIER parameter to derive-branch-summary.sh; BATS test for retry path
+- **AI agent identity enforcement: blocklist, prepare-commit-msg, author check, PR body scan** ([#163](https://github.com/vig-os/devcontainer/issues/163))
+  - Canonical blocklist `.github/agent-blocklist.toml` (trailers, names, emails) — single source of truth
+  - prepare-commit-msg hook strips Co-authored-by trailers before validation
+  - Pre-commit hook rejects commits when author/committer matches blocklist (skips in CI)
+  - validate-commit-msg accepts `--blocked-patterns` for TOML blocklist; rejects remaining fingerprints
+  - pr-title-check CI scans PR title and body for agent fingerprints
+  - Skill rules strengthened (git_commit, worktree_execute, worktree_pr)
+- **worktree-start preflight gaps — agent hang and gh repo set-default** ([#154](https://github.com/vig-os/devcontainer/issues/154))
+  - Add timeout (30s) to agent-based branch summary derivation; failure produces clear error with manual workaround
+  - Add gh repo set-default preflight before any gh API calls; auto-resolve from origin or fail with instructions
+  - Extract derive-branch-summary.sh with BRANCH_SUMMARY_CMD mock for tests; BATS tests for timeout and error paths
+- **gh-issues cross-ref detects Refs: #N in PR bodies** ([#121](https://github.com/vig-os/devcontainer/issues/121))
+  - `_build_cross_refs` now parses `Refs: #102` and comma-separated variants (`Refs: #102, #103`) alongside Closes/Fixes/Resolves
+- **PR table Reviewer column distinguishes requested vs completed reviewers** ([#105](https://github.com/vig-os/devcontainer/issues/105))
+  - Requested reviewers (no review yet) display as `?login` with dim italic style
+  - Actual reviewers (submitted review) display as plain login with green/red
+- **worktree-attach restarts stopped tmux session when worktree dir exists** ([#132](https://github.com/vig-os/devcontainer/issues/132))
+  - Detect when worktree directory exists but tmux session has terminated
+  - Automatically restart session in existing worktree before attaching
+  - Guard `worktree-start` against branches already checked out elsewhere with an informative error
+  - BATS integration tests for restart, error paths, and checkout detection
+- **Issue numbers in PR table are now clickable hyperlinks** ([#174](https://github.com/vig-os/devcontainer/issues/174))
+  - Replace plain styled text with Rich hyperlink markup in the Issues column of the PR table
+- **Synced justfiles reference scripts not included in workspace manifest** ([#190](https://github.com/vig-os/devcontainer/issues/190))
+  - Add manifest entries for resolve-branch.sh, derive-branch-summary.sh, check-skill-names.sh → `.devcontainer/scripts/`
+  - Update justfile.worktree to use `source_directory() / "scripts"` for portable path resolution
+  - Add Sed transform for check-skill-names.sh path in synced `.pre-commit-config.yaml`
+- **Devcontainer lifecycle commands fail in mock-up folders with crun getcwd error** ([#204](https://github.com/vig-os/devcontainer/issues/204))
+  - Run post-create, post-start, and post-attach commands via `/bin/bash` in `devcontainer.json` for stable command resolution on attach
+  - Prevent attach-time failure where OCI runtime reports `getcwd: No such file or directory`
+  - Update tests in `test-integration.py`
+- **Worktree prerequisites are declared in setup requirements** ([#196](https://github.com/vig-os/devcontainer/issues/196))
+  - Add `tmux`, `agent`, and `jq` to `scripts/requirements.yaml` as required host dependencies with install guidance
+  - `scripts/init.sh --check` now surfaces missing worktree prerequisites before running worktree commands
+- **Cursor Agent shell fails with forkpty(3) when host sets zsh as default terminal profile** ([#206](https://github.com/vig-os/devcontainer/issues/206))
+  - Add `terminal.integrated.defaultProfile.linux: "bash"` to devcontainer.json template settings
+  - Prevents user's host-side shell preference from leaking into the container
+
+### Changed
+
+- **worktree-clean: add filter mode for stopped-only vs all** ([#158](https://github.com/vig-os/devcontainer/issues/158))
+  - Default `just worktree-clean` (no args) now cleans only stopped worktrees, skips running tmux sessions
+  - `just worktree-clean all` retains previous behavior (clean all worktrees) with warning
+  - Summary output shows cleaned vs skipped worktrees
+  - `just wt-clean` alias unchanged
+- **Consolidate sync_manifest.py and utils.py into manifest-as-config architecture** ([#89](https://github.com/vig-os/devcontainer/issues/89))
+  - Extract transform classes (Sed, RemoveLines, etc.) to `scripts/transforms.py`
+  - Unify sed logic: `substitute_in_file()` in utils shared by sed_inplace and Sed transform
+  - Convert MANIFEST from Python code to declarative `scripts/manifest.toml`
+- **justfile.base is canonical at repo root, synced via manifest** ([#71](https://github.com/vig-os/devcontainer/issues/71))
+  - Root `justfile.base` is now the single source of truth; synced to `assets/workspace/.devcontainer/justfile.base` via `sync_manifest.py`
+  - `just sync-workspace` and prepare-build keep workspace template in sync
+- **Autonomous PR skills use pull request template** ([#147](https://github.com/vig-os/devcontainer/issues/147))
+  - `pr_create` and `worktree_pr` now read `.github/pull_request_template.md` and fill each section from available context
+  - Explicit read-then-fill procedure with section-by-section mapping (Description, Type of Change, Changelog Entry, Testing, Checklist, Refs)
+  - Ensures autonomous PRs match manual PR structure and include all checklist items
+- **Rename skill namespace separator from colon to underscore** ([#128](https://github.com/vig-os/devcontainer/issues/128))
+  - All skill directories under `.cursor/skills/` and `assets/workspace/.cursor/skills/` renamed (e.g. `issue:create` → `issue_create`)
+  - All internal cross-references, frontmatter, prose, `CLAUDE.md` command table, and label taxonomy updated
+  - `issue_create` skill enhanced: gathers context via `just gh-issues` before drafting, suggests parent/child relationships and milestones
+  - `issue_create` skill now includes TDD acceptance criterion for testable issue types
+  - Remaining `sync-issues` workflow trigger references removed from skills
+  - `tdd.mdc` expanded with test scenario checklist and test type guidance; switched from always-on to glob-triggered on source/test files
+  - `code_tdd`, `code_execute`, and `worktree_execute` skills now reference `tdd.mdc` explicitly
+- **Clickable issue and PR numbers in gh-issues table** ([#104](https://github.com/vig-os/devcontainer/issues/104))
+  - `#` column in issue and PR tables now uses Rich OSC 8 hyperlinks to GitHub URLs
+  - Clicking an issue or PR number opens it in the browser (or Cursor's integrated terminal)
+- **PR template aligned with canonical commit types** ([#115](https://github.com/vig-os/devcontainer/issues/115))
+  - Replace ad-hoc Type of Change checkboxes with the 10 canonical commit types
+  - Move breaking change from type to a separate modifier checkbox
+  - Add release-branch hint to Related Issues section
+
+### Added
+
+- **devc-remote.sh — bash orchestrator for remote devcontainer** ([#152](https://github.com/vig-os/devcontainer/issues/152))
+  - `scripts/devc-remote.sh`: parse_args, detect_editor_cli, check_ssh, remote_preflight, remote_compose_up, open_editor
+  - `scripts/devc_remote_uri.py`: stub for URI construction (sibling sub-issue)
+  - BATS unit tests with mocked commands
+- **devc_remote_uri.py — Cursor URI construction for remote devcontainers** ([#153](https://github.com/vig-os/devcontainer/issues/153))
+  - Standalone Python module with `hex_encode()` and `build_uri()` for vscode-remote URIs
+  - CLI: `devc_remote_uri.py <workspace_path> <ssh_host> <container_workspace>` prints URI to stdout
+  - Stdlib only (json, argparse); called by devc-remote.sh (sibling sub-issue)
 - **Image tools** ([[#212](https://github.com/vig-os/devcontainer/issues/212)])
   - Install rsync
 - **Preserve user-authored files during `--force` workspace upgrades** ([#212](https://github.com/vig-os/devcontainer/issues/212))

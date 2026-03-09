@@ -75,6 +75,14 @@ transforms = [
 ]
 
 [[entries]]
+src = "scripts/devc-remote.sh"
+dest = "scripts/devc-remote.sh"
+
+[[entries]]
+src = "scripts/devc_remote_uri.py"
+dest = "scripts/devc_remote_uri.py"
+
+[[entries]]
 src = "justfile.worktree"
 dest = ".devcontainer/justfile.worktree"
 transforms = [

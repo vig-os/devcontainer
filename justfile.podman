@@ -16,6 +16,7 @@ alias pdm-rmi-project := podman-rmi-project
 alias pdm-rmi-dangling := podman-rmi-dangling
 alias pdm-prune := podman-prune
 alias pdm-prune-all := podman-prune-all
+alias pdm-push-ssh := podman-push-ssh
 
 # List containers/images (--all for all podman resources)
 [group('podman')]
@@ -181,3 +182,107 @@ podman-prune-all:
     echo "Cleaning Pruning all unused podman resources (including volumes)..."
     podman system prune -af --volumes
     echo "[OK] Full prune complete"
+
+# Push a local image to a remote machine over SSH (no registry needed)
+[group('podman')]
+podman-push-ssh image host:
+    #!/usr/bin/env bash
+    if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "{{ host }}" true 2>/dev/null; then
+        echo "[ERROR] Cannot connect to '{{ host }}' over SSH"
+        exit 1
+    fi
+    REMOTE_ARCH=$(ssh -o ConnectTimeout=5 -o BatchMode=yes "{{ host }}" uname -m 2>/dev/null | tr -d '\r')
+    case "$REMOTE_ARCH" in
+        x86_64|amd64)
+            TARGET_PLATFORM="linux/amd64"
+            TARGET_ARCH="amd64"
+            ;;
+        aarch64|arm64)
+            TARGET_PLATFORM="linux/arm64"
+            TARGET_ARCH="arm64"
+            ;;
+        *)
+            echo "[ERROR] Unsupported remote architecture '$REMOTE_ARCH' on '{{ host }}'"
+            exit 1
+            ;;
+    esac
+    if ! podman image exists "{{ image }}" 2>/dev/null; then
+        echo "[ERROR] Image '{{ image }}' not found locally"
+        FMT_REPO=$(printf '\x7b\x7b.Repository\x7d\x7d')
+        FMT_TAG=$(printf '\x7b\x7b.Tag\x7d\x7d')
+        CANDIDATES=$(podman images --format "${FMT_REPO}:${FMT_TAG}" 2>/dev/null \
+            | grep -v '<none>' \
+            | awk -v q="{{ image }}" '
+                BEGIN { IGNORECASE=1 }
+                {
+                    s = tolower($0); t = tolower(q)
+                    # exact substring match ranks highest
+                    if (index(s, t) > 0)       { print 1, $0; next }
+                    # check if every query char appears in order (fuzzy)
+                    pos = 0; match_len = 0
+                    for (i = 1; i <= length(t); i++) {
+                        c = substr(t, i, 1)
+                        found = 0
+                        for (j = pos + 1; j <= length(s); j++) {
+                            if (substr(s, j, 1) == c) { pos = j; match_len++; found = 1; break }
+                        }
+                        if (!found) break
+                    }
+                    if (match_len == length(t)) { print 2, $0 }
+                }
+            ' | sort -t' ' -k1,1n | head -5 | cut -d' ' -f2-)
+        if [ -n "$CANDIDATES" ]; then
+            echo ""
+            echo "Did you mean one of these?"
+            echo "$CANDIDATES" | while read -r c; do echo "  - $c"; done
+            echo ""
+        fi
+        read -r -p "Build '{{ image }}' for $TARGET_PLATFORM and continue? [y/N] " SHOULD_BUILD
+        if [[ "$SHOULD_BUILD" =~ ^[Yy]$ ]]; then
+            IMAGE_REF="{{ image }}"
+            LAST_SEGMENT="${IMAGE_REF##*/}"
+            if [[ "$LAST_SEGMENT" == *:* ]]; then
+                BUILD_VERSION="${IMAGE_REF##*:}"
+                BUILD_REPO="${IMAGE_REF%:*}"
+            else
+                BUILD_VERSION="latest"
+                BUILD_REPO="$IMAGE_REF"
+            fi
+            ./scripts/build.sh "$BUILD_VERSION" "$BUILD_REPO" "$TARGET_PLATFORM"
+        else
+            exit 1
+        fi
+    else
+        FMT_ARCH=$(printf '\x7b\x7b.Architecture\x7d\x7d')
+        LOCAL_ARCH=$(podman image inspect "{{ image }}" --format "$FMT_ARCH" 2>/dev/null | tr -d '\r')
+        if [ -n "$LOCAL_ARCH" ] && [ "$LOCAL_ARCH" != "$TARGET_ARCH" ]; then
+            echo "[WARN] Local image arch is '$LOCAL_ARCH', remote host arch is '$TARGET_ARCH'"
+            read -r -p "Rebuild '{{ image }}' for $TARGET_PLATFORM before push? [y/N] " REBUILD_IMAGE
+            if [[ "$REBUILD_IMAGE" =~ ^[Yy]$ ]]; then
+                IMAGE_REF="{{ image }}"
+                LAST_SEGMENT="${IMAGE_REF##*/}"
+                if [[ "$LAST_SEGMENT" == *:* ]]; then
+                    BUILD_VERSION="${IMAGE_REF##*:}"
+                    BUILD_REPO="${IMAGE_REF%:*}"
+                else
+                    BUILD_VERSION="latest"
+                    BUILD_REPO="$IMAGE_REF"
+                fi
+                ./scripts/build.sh "$BUILD_VERSION" "$BUILD_REPO" "$TARGET_PLATFORM"
+            fi
+        fi
+    fi
+    if ! podman image exists "{{ image }}" 2>/dev/null; then
+        echo "[ERROR] Image '{{ image }}' still not found after build step"
+        exit 1
+    fi
+    FMT_SIZE=$(printf '\x7b\x7b.Size\x7d\x7d')
+    IMAGE_SIZE=$(podman image inspect "{{ image }}" --format "$FMT_SIZE" 2>/dev/null)
+    HUMAN_SIZE=$(numfmt --to=iec "$IMAGE_SIZE" 2>/dev/null || echo "${IMAGE_SIZE} bytes")
+    echo "Pushing '{{ image }}' ($HUMAN_SIZE) to {{ host }} over SSH..."
+    if command -v pv &>/dev/null && [ -n "$IMAGE_SIZE" ]; then
+        podman image save "{{ image }}" | pv -s "$IMAGE_SIZE" -F "%b/$HUMAN_SIZE %t %r %p %e" | ssh "{{ host }}" podman image load
+    else
+        podman image save "{{ image }}" | ssh "{{ host }}" podman image load
+    fi
+    echo "[OK] Image '{{ image }}' pushed to {{ host }}"
