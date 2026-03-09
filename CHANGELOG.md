@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **VS Code settings synced via manifest**
   - Added `.vscode/settings.json` to `scripts/manifest.toml` to keep editor settings consistent across root repo and workspace template
+- **Cross-repo smoke-test dispatch on RC publish** ([#173](https://github.com/vig-os/devcontainer/issues/173))
+  - RC candidate publishes now trigger `repository_dispatch` in `vig-os/devcontainer-smoke-test` with the RC tag payload
+  - Release process now includes a documented manual smoke gate before running final publish
 
 ### Changed
 

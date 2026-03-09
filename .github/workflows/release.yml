@@ -849,7 +849,42 @@ jobs:
           echo "    - SBOM (SPDX) generated and attested"
           echo ""
           echo "Next steps:"
-          echo "  1. Merge release PR to main (triggers sync-main-to-dev workflow automatically)"
+          if [ "$RELEASE_KIND" = "candidate" ]; then
+            echo "  1. Verify smoke-test repo dispatch run status before final release"
+            echo "  2. If smoke tests pass, run: just finalize-release $BASE_VERSION"
+          else
+            echo "  1. Merge release PR to main (triggers sync-main-to-dev workflow automatically)"
+          fi
+
+      - name: Generate smoke-test dispatch token
+        if: needs.validate.outputs.release_kind == 'candidate'
+        id: smoke-app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: vig-os
+          repositories: devcontainer-smoke-test
+
+      - name: Trigger smoke-test repository dispatch
+        if: needs.validate.outputs.release_kind == 'candidate' && steps.smoke-app-token.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ steps.smoke-app-token.outputs.token }}
+          RC_TAG: ${{ needs.validate.outputs.publish_version }}
+        run: |
+          set -euo pipefail
+          gh api repos/vig-os/devcontainer-smoke-test/dispatches \
+            -f event_type=smoke-test-trigger \
+            -f "client_payload[rc_tag]=$RC_TAG"
+          echo "✓ Triggered smoke-test dispatch for RC tag: $RC_TAG"
+
+      - name: Warn if smoke-test dispatch token generation failed
+        if: needs.validate.outputs.release_kind == 'candidate' && steps.smoke-app-token.outcome != 'success'
+        run: |
+          echo "WARNING: Could not generate cross-repo token for smoke-test dispatch."
+          echo "Install RELEASE_APP on vig-os/devcontainer-smoke-test with contents:read permission."
 
   rollback:
     name: Rollback on Failure
