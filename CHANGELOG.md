@@ -374,6 +374,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Python scripts (`gh_issues.py`, `check-agent-identity.py`, `check-pr-agent-fingerprints.py`, `prepare-commit-msg-strip-trailers.py`) migrated into `vig-utils` modules with entrypoints
   - Agent fingerprint helpers consolidated into shared `vig_utils.utils` module
   - Callers (justfiles, pre-commit hooks, CI workflows) switched from direct script paths to `vig-utils` entrypoints
+- **Restructure workspace justfile into devc/project split** ([#219](https://github.com/vig-os/devcontainer/issues/219))
+  - Rename `justfile.base` to `justfile.devc` and keep devcontainer lifecycle recipes there
+  - Move project-level recipes (`lint`, `format`, `precommit`, `test`, `sync`, `update`, `clean-artifacts`, `log`, `branch`) into `justfile.project`
+  - Add gitignored `justfile.local` template for personal recipes and update workspace imports/manifests to the new structure
 
 ### Deprecated
 
