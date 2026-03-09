@@ -7,7 +7,7 @@
 # compose lifecycle, and optional Tailscale auth key injection.
 #
 # USAGE:
-#   ./scripts/devc-remote.sh [options] <ssh-host>[:<remote-path>]
+#   ./scripts/devc-remote.sh [options] <ssh-host>[:<remote-path>] [gh:<org>/<repo>[:<branch>]]
 #   ./scripts/devc-remote.sh --help
 #
 # Options:
@@ -19,6 +19,13 @@
 #                       ssh     - wait for Tailscale, print hostname (for SSH clients)
 #                       none    - infra only, no IDE
 #
+# GitHub repo target (gh:):
+#   Clone a GitHub repo on the remote host and start its devcontainer.
+#   gh:<org>/<repo>           Clone to <projects_dir>/<repo> (from config or ~/Projects)
+#   gh:<org>/<repo>:<branch>  Clone and checkout specified branch
+#   Combined with host:path to override clone location:
+#     <host>:<path> gh:<org>/<repo>   Clone to <path> instead of default
+#
 # Tailscale key injection (opt-in):
 #   When TS_CLIENT_ID and TS_CLIENT_SECRET are set in the local environment,
 #   generates an ephemeral auth key via the Tailscale API and injects it
@@ -29,8 +36,11 @@
 #   ./scripts/devc-remote.sh --open none myserver:/home/user/repo
 #   ./scripts/devc-remote.sh --open ssh myserver
 #   ./scripts/devc-remote.sh --yes --open code user@host:/opt/projects/myrepo
+#   ./scripts/devc-remote.sh myserver gh:vig-os/fd5
+#   ./scripts/devc-remote.sh myserver gh:vig-os/fd5:feature/my-branch
+#   ./scripts/devc-remote.sh myserver:~/custom/path gh:vig-os/fd5
 #
-# Part of #70. See issues #152, #230, #231 for design.
+# Part of #70. See issues #152, #230, #231, #236 for design.
 ###############################################################################
 
 set -euo pipefail
