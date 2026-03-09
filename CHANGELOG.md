@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Forwards GHCR auth (podman/docker credentials or `GHCR_TOKEN`) to remote
   - Clones devcontainer repo and builds image on remote
   - Re-run reads existing config without re-prompting, pulls latest and rebuilds
+- **`gh:org/repo[:branch]` target for devc-remote** ([#236](https://github.com/vig-os/devcontainer/issues/236))
+  - Clone a GitHub repo on the remote host and start its devcontainer in one command
+  - Supports `gh:org/repo` (default branch) and `gh:org/repo:branch` (specific branch)
+  - Already-cloned repos are fetched, not re-cloned
+  - Clone location resolved from remote config `projects_dir` or overridden via `host:path`
 - **Opt-in Tailscale SSH support for devcontainer** ([#208](https://github.com/vig-os/devcontainer/issues/208))
   - New `setup-tailscale.sh` script with `install` and `start` subcommands
   - Hooks into `post-create.sh` (install) and `post-start.sh` (start)

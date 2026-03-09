@@ -7,7 +7,7 @@
 # compose lifecycle, and optional Tailscale auth key injection.
 #
 # USAGE:
-#   ./scripts/devc-remote.sh [options] <ssh-host>[:<remote-path>]
+#   ./scripts/devc-remote.sh [options] <ssh-host>[:<remote-path>] [gh:<org>/<repo>[:<branch>]]
 #   ./scripts/devc-remote.sh --bootstrap [--yes] <ssh-host>
 #   ./scripts/devc-remote.sh --help
 #
@@ -21,6 +21,13 @@
 #                       ssh     - wait for Tailscale, print hostname (for SSH clients)
 #                       none    - infra only, no IDE
 #
+# GitHub repo target (gh:):
+#   Clone a GitHub repo on the remote host and start its devcontainer.
+#   gh:<org>/<repo>           Clone to <projects_dir>/<repo> (from config or ~/Projects)
+#   gh:<org>/<repo>:<branch>  Clone and checkout specified branch
+#   Combined with host:path to override clone location:
+#     <host>:<path> gh:<org>/<repo>   Clone to <path> instead of default
+#
 # Tailscale key injection (opt-in):
 #   When TS_CLIENT_ID and TS_CLIENT_SECRET are set in the local environment,
 #   generates an ephemeral auth key via the Tailscale API and injects it
@@ -31,8 +38,11 @@
 #   ./scripts/devc-remote.sh --open none myserver:/home/user/repo
 #   ./scripts/devc-remote.sh --open ssh myserver
 #   ./scripts/devc-remote.sh --yes --open code user@host:/opt/projects/myrepo
+#   ./scripts/devc-remote.sh myserver gh:vig-os/fd5
+#   ./scripts/devc-remote.sh myserver gh:vig-os/fd5:feature/my-branch
+#   ./scripts/devc-remote.sh myserver:~/custom/path gh:vig-os/fd5
 #
-# Part of #70. See issues #152, #230, #231 for design.
+# Part of #70. See issues #152, #230, #231, #236 for design.
 ###############################################################################
 
 set -euo pipefail
@@ -82,6 +92,9 @@ parse_args() {
     YES_MODE=0
     OPEN_MODE="auto"
     BOOTSTRAP_MODE=0
+    GH_REPO=""
+    GH_BRANCH=""
+    GH_MODE=0
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -110,6 +123,27 @@ parse_args() {
                 log_error "Unknown option: $1"
                 echo "Use --help for usage information"
                 exit 1
+                ;;
+            gh:*)
+                # gh:org/repo or gh:org/repo:branch
+                local gh_target="${1#gh:}"
+                if [[ -z "$gh_target" || "$gh_target" != */* ]]; then
+                    log_error "Invalid gh: target. Use gh:org/repo or gh:org/repo:branch"
+                    exit 1
+                fi
+                # shellcheck disable=SC2034
+                GH_MODE=1
+                # Split on first colon after org/repo (branch may contain slashes)
+                if [[ "$gh_target" =~ ^([^:]+):(.+)$ ]]; then
+                    # shellcheck disable=SC2034
+                    GH_REPO="${BASH_REMATCH[1]}"
+                    # shellcheck disable=SC2034
+                    GH_BRANCH="${BASH_REMATCH[2]}"
+                else
+                    # shellcheck disable=SC2034
+                    GH_REPO="$gh_target"
+                fi
+                shift
                 ;;
             *)
                 if [[ -n "$SSH_HOST" ]]; then
@@ -360,6 +394,78 @@ check_ssh() {
     if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "$SSH_HOST" true 2>/dev/null; then
         log_error "Cannot connect to $SSH_HOST. Check your SSH config and network."
         exit 1
+    fi
+}
+
+remote_clone_project() {
+    [[ "$GH_MODE" == "1" ]] || return 0
+
+    log_info "Cloning $GH_REPO on $SSH_HOST..."
+
+    local clone_output
+    # shellcheck disable=SC2029
+    clone_output=$(ssh "$SSH_HOST" "bash -s" "$GH_REPO" "$GH_BRANCH" "$REMOTE_PATH" << 'CLONEEOF'
+GH_REPO="$1"
+GH_BRANCH="$2"
+USER_PATH="$3"
+REPO_NAME="${GH_REPO##*/}"
+
+# Resolve target directory
+if [ "$USER_PATH" != "~" ] && [ -n "$USER_PATH" ]; then
+    TARGET_DIR="$USER_PATH"
+else
+    # Read projects_dir from config, fallback to ~/Projects
+    PROJECTS_DIR="$HOME/Projects"
+    CONFIG_FILE="$HOME/.config/devc-remote/config.yaml"
+    if [ -f "$CONFIG_FILE" ]; then
+        CONFIGURED_DIR=$(sed -n 's/^projects_dir: *//p' "$CONFIG_FILE")
+        [ -n "$CONFIGURED_DIR" ] && PROJECTS_DIR="${CONFIGURED_DIR/#\~/$HOME}"
+    fi
+    TARGET_DIR="$PROJECTS_DIR/$REPO_NAME"
+fi
+
+# Clone or fetch
+CLONE_STATUS="fetched"
+if [ ! -d "$TARGET_DIR/.git" ]; then
+    git clone "https://github.com/${GH_REPO}.git" "$TARGET_DIR"
+    CLONE_STATUS="cloned"
+else
+    cd "$TARGET_DIR" && git fetch
+fi
+
+# Checkout branch if specified
+if [ -n "$GH_BRANCH" ]; then
+    cd "$TARGET_DIR" && git checkout "$GH_BRANCH"
+    echo "CLONE_BRANCH=$GH_BRANCH"
+fi
+
+echo "CLONE_PATH=$TARGET_DIR"
+echo "CLONE_STATUS=$CLONE_STATUS"
+CLONEEOF
+    )
+
+    local clone_path="" clone_status="" clone_branch=""
+    while IFS= read -r line; do
+        [[ "$line" =~ ^([A-Z_]+)=(.*)$ ]] || continue
+        case "${BASH_REMATCH[1]}" in
+            CLONE_PATH) clone_path="${BASH_REMATCH[2]}" ;;
+            CLONE_STATUS) clone_status="${BASH_REMATCH[2]}" ;;
+            CLONE_BRANCH) clone_branch="${BASH_REMATCH[2]}" ;;
+        esac
+    done <<< "$clone_output"
+
+    if [[ -n "$clone_path" ]]; then
+        REMOTE_PATH="$clone_path"
+    fi
+
+    if [[ "$clone_status" == "cloned" ]]; then
+        log_success "Cloning $GH_REPO — cloned to $clone_path"
+    else
+        log_success "Fetching $GH_REPO — updated at $clone_path"
+    fi
+
+    if [[ -n "$clone_branch" ]]; then
+        log_success "Checked out $clone_branch"
     fi
 }
 
@@ -852,6 +958,8 @@ main() {
     log_info "Checking SSH connectivity to $SSH_HOST..."
     check_ssh
     log_success "SSH connection OK"
+
+    remote_clone_project
 
     log_info "Running pre-flight checks on $SSH_HOST..."
     remote_preflight
