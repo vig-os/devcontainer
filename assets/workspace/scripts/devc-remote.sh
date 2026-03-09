@@ -273,20 +273,7 @@ inject_tailscale_key() {
         return 0
     fi
 
-    # Check if key already set on remote — still need to ensure TUN device config
-    # shellcheck disable=SC2029
-    if ssh "$SSH_HOST" "grep -q 'TAILSCALE_AUTHKEY' '$REMOTE_PATH/.devcontainer/docker-compose.local.yaml' 2>/dev/null"; then
-        # Ensure TUN device + capabilities are present even if key already set
-        # shellcheck disable=SC2029
-        if ! ssh "$SSH_HOST" "grep -q '/dev/net/tun' '$REMOTE_PATH/.devcontainer/docker-compose.local.yaml' 2>/dev/null"; then
-            log_info "Tailscale: adding TUN device config to existing compose..."
-            # shellcheck disable=SC2029
-            ssh "$SSH_HOST" "sed -i '/devcontainer:/a\\    devices:\\n      - /dev/net/tun:/dev/net/tun\\n    cap_add:\\n      - NET_ADMIN\\n      - NET_RAW' '$REMOTE_PATH/.devcontainer/docker-compose.local.yaml'"
-            log_success "Tailscale: TUN device config added"
-        fi
-        log_info "Tailscale: auth key already configured on remote"
-        return 0
-    fi
+    # Always regenerate — ephemeral keys may have expired since last deploy.
 
     # Verify local prerequisites
     if ! command -v curl &>/dev/null || ! command -v jq &>/dev/null; then
@@ -538,11 +525,20 @@ elif command -v docker &>/dev/null; then
 else
     echo "RUNTIME="
 fi
-if (command -v podman &>/dev/null && podman compose version &>/dev/null) || \
-   (command -v docker &>/dev/null && docker compose version &>/dev/null); then
+# Detect compose tool — prefer podman-compose (Python, passes devices/cap_add)
+# over podman compose (docker-compose bridge, drops some fields on podman <5)
+if command -v podman-compose &>/dev/null; then
     echo "COMPOSE_AVAILABLE=1"
+    echo "COMPOSE_TOOL=podman-compose"
+elif command -v podman &>/dev/null && podman compose version &>/dev/null; then
+    echo "COMPOSE_AVAILABLE=1"
+    echo "COMPOSE_TOOL=podman-compose-plugin"
+elif command -v docker &>/dev/null && docker compose version &>/dev/null; then
+    echo "COMPOSE_AVAILABLE=1"
+    echo "COMPOSE_TOOL=docker-compose-plugin"
 else
     echo "COMPOSE_AVAILABLE=0"
+    echo "COMPOSE_TOOL="
 fi
 if [ -d "$REPO_PATH" ]; then
     echo "REPO_PATH_EXISTS=1"
@@ -577,6 +573,7 @@ REMOTEEOF
         case "${BASH_REMATCH[1]}" in
             RUNTIME) RUNTIME="${BASH_REMATCH[2]}" ;;
             COMPOSE_AVAILABLE) COMPOSE_AVAILABLE="${BASH_REMATCH[2]}" ;;
+            COMPOSE_TOOL) COMPOSE_TOOL="${BASH_REMATCH[2]}" ;;
             REPO_PATH_EXISTS) REPO_PATH_EXISTS="${BASH_REMATCH[2]}" ;;
             DEVCONTAINER_EXISTS) DEVCONTAINER_EXISTS="${BASH_REMATCH[2]}" ;;
             DISK_AVAILABLE_GB) DISK_AVAILABLE_GB="${BASH_REMATCH[2]}" ;;
@@ -589,11 +586,19 @@ REMOTEEOF
         log_error "No container runtime found on $SSH_HOST. Install podman or docker."
         exit 1
     fi
-    if [[ "$RUNTIME" == "podman" ]]; then
-        COMPOSE_CMD="podman compose"
-    else
-        COMPOSE_CMD="docker compose"
-    fi
+    # Set compose command based on detected tool
+    case "${COMPOSE_TOOL:-}" in
+        podman-compose)        COMPOSE_CMD="podman-compose" ;;
+        podman-compose-plugin) COMPOSE_CMD="podman compose" ;;
+        docker-compose-plugin) COMPOSE_CMD="docker compose" ;;
+        *)
+            if [[ "$RUNTIME" == "podman" ]]; then
+                COMPOSE_CMD="podman compose"
+            else
+                COMPOSE_CMD="docker compose"
+            fi
+            ;;
+    esac
     if [[ "${COMPOSE_AVAILABLE:-0}" != "1" ]]; then
         log_error "Compose not available on $SSH_HOST. Install docker-compose or podman-compose."
         exit 1
