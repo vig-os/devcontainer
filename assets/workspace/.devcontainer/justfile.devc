@@ -227,12 +227,20 @@ open:
 [group('sidecar')]
 sidecars:
     #!/usr/bin/env bash
+    if command -v podman &>/dev/null; then
+        RUNTIME="podman"
+    elif command -v docker &>/dev/null; then
+        RUNTIME="docker"
+    else
+        echo "[ERROR] Need podman or docker"
+        exit 1
+    fi
     echo "Available sidecar containers:"
     echo ""
     # Get running sidecars (exclude devcontainer itself)
-    # Construct podman format string using printf to avoid just interpolation
+    # Construct format string using printf to avoid just interpolation
     FORMAT=$(printf '\x7b\x7b.Names\x7d\x7d')
-    RUNNING=$(podman ps --format "$FORMAT" 2>/dev/null | grep -v "^devcontainer$" || true)
+    RUNNING=$($RUNTIME ps --format "$FORMAT" 2>/dev/null | grep -v "^devcontainer$" || true)
     if [ -n "$RUNNING" ]; then
         echo "$RUNNING" | while read -r name; do
             echo "  [OK] $name (running)"
@@ -251,15 +259,23 @@ sidecars:
 [group('sidecar')]
 sidecar name *args:
     #!/usr/bin/env bash
-    # Construct podman format string using printf to avoid just interpolation
+    if command -v podman &>/dev/null; then
+        RUNTIME="podman"
+    elif command -v docker &>/dev/null; then
+        RUNTIME="docker"
+    else
+        echo "[ERROR] Need podman or docker"
+        exit 1
+    fi
+    # Construct format string using printf to avoid just interpolation
     FORMAT=$(printf '\x7b\x7b.Names\x7d\x7d')
 
     # Check if container exists (running or stopped)
-    if ! podman ps -a --format "$FORMAT" 2>/dev/null | grep -q "^{{ name }}$"; then
+    if ! $RUNTIME ps -a --format "$FORMAT" 2>/dev/null | grep -q "^{{ name }}$"; then
         echo "[ERROR] Sidecar container '{{ name }}' not found"
         echo ""
         echo "Available sidecars:"
-        RUNNING=$(podman ps --format "$FORMAT" 2>/dev/null | grep -v "^devcontainer$" || true)
+        RUNNING=$($RUNTIME ps --format "$FORMAT" 2>/dev/null | grep -v "^devcontainer$" || true)
         if [ -n "$RUNNING" ]; then
             echo "$RUNNING" | while read -r n; do
                 echo "  - $n"
@@ -274,10 +290,10 @@ sidecar name *args:
     fi
 
     # Check if container is running
-    if ! podman ps --format "$FORMAT" 2>/dev/null | grep -q "^{{ name }}$"; then
+    if ! $RUNTIME ps --format "$FORMAT" 2>/dev/null | grep -q "^{{ name }}$"; then
         echo "[!]  Sidecar container '{{ name }}' exists but is not running"
         echo "Starting container..."
-        podman start {{ name }} || {
+        $RUNTIME start {{ name }} || {
             echo "[ERROR] Failed to start container '{{ name }}'"
             exit 1
         }
@@ -286,4 +302,4 @@ sidecar name *args:
     fi
 
     # Execute the recipe in the sidecar
-    podman exec {{ name }} just {{ args }}
+    $RUNTIME exec {{ name }} just {{ args }}

@@ -11,4 +11,10 @@ alias gh-i := gh-issues
 # List open issues and PRs grouped by milestone
 [group('github')]
 gh-issues:
+    #!/usr/bin/env bash
+    if ! gh-issues --help >/dev/null 2>&1; then
+        echo "[ERROR] gh-issues command not available."
+        echo "Run workspace/bootstrap sync to install helper CLIs, then retry."
+        exit 1
+    fi
     gh-issues

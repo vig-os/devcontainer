@@ -517,6 +517,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Switch taplo pre-commit hooks from `language: rust` (cargo compile) to `language: system` using the binary already installed in the container image
   - Correct the taplo release URL and pin to the latest version in the Containerfile
   - Add taplo to the CI `setup-env` action so pre-commit hooks work on bare runners
+- **Workspace helper CLI checks and sidecar runtime fallback** ([#173](https://github.com/vig-os/devcontainer/issues/173))
+  - Sidecar recipes now support both podman and docker runtimes for listing, starting, and executing sidecar commands
+  - Worktree and GitHub helper recipes now fail fast with actionable guidance when helper CLIs are unavailable
+  - Label taxonomy guidance clarifies that `setup-labels` is provided by devcontainer bootstrap tooling
 
 ### Security
 
