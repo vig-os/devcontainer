@@ -144,6 +144,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Taplo TOML linting in pre-commit** ([#181](https://github.com/vig-os/devcontainer/issues/181))
   - Add SHA-pinned `taplo-format` and `taplo-lint` hooks to enforce TOML formatting and schema-aware validation
   - Add `.taplo.toml` configuration (local to this repository, not synced downstream)
+- **Add `--smoke-test` flag to deploy smoke-test-specific assets** ([#250](https://github.com/vig-os/devcontainer/issues/250))
+  - `init-workspace.sh --smoke-test` deploys files from `assets/smoke-test/` (currently `repository-dispatch.yml` and `README.md`)
+  - `install.sh` forwards `--smoke-test` flag to `init-workspace.sh`
+  - Smoke mode implies `--force --no-prompts` for unattended use
+  - Refactor `initialized_workspace` fixture into reusable `_init_workspace()` with `smoke_test` parameter
 
 ### Changed
 

@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-03-06T21:57:36Z
-updated: 2026-03-08T19:28:38Z
+updated: 2026-03-09T09:31:02Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/236
@@ -12,7 +12,7 @@ assignees: gerchowl
 milestone: none
 projects: none
 relationship: none
-synced: 2026-03-09T04:23:41.013Z
+synced: 2026-03-10T04:14:46.802Z
 ---
 
 # [Issue 236]: [devc-remote gh:org/repo:branch — clone project repo and start devcontainer](https://github.com/vig-os/devcontainer/issues/236)
@@ -136,6 +136,6 @@ Branch: `feature/236-remote-gh-clone-target`
 - [x] Task 8: Test `remote_clone_project` branch checkout — `tests/bats/devc-remote.bats` — verify: `just test-bats` (RED)
 - [x] Task 9: Implement `remote_clone_project` function — `scripts/devc-remote.sh` — verify: `just test-bats` (GREEN)
 - [x] Task 10: Wire `remote_clone_project` into `main()` between `check_ssh` and `remote_preflight` — `scripts/devc-remote.sh` — verify: `just test-bats` (GREEN)
-- [ ] Task 11: Update help text and usage examples with `gh:` syntax — `scripts/devc-remote.sh` — verify: `just test-bats`
-- [ ] Task 12: Update CHANGELOG.md `## Unreleased` — `CHANGELOG.md` — verify: visual review
+- [x] Task 11: Update help text and usage examples with `gh:` syntax — `scripts/devc-remote.sh` — verify: `just test-bats`
+- [x] Task 12: Update CHANGELOG.md `## Unreleased` — `CHANGELOG.md` — verify: visual review
 

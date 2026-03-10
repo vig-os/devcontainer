@@ -12,6 +12,7 @@
 #   --podman          Force podman
 #   --name NAME       Override project name (SHORT_NAME)
 #   --org ORG         Override organization name (default: vigOS)
+#   --smoke-test      Deploy smoke-test-specific assets
 #   --dry-run         Show what would be done without executing
 #   -h, --help        Show this help message
 #
@@ -33,6 +34,7 @@ SKIP_PULL=false
 PROJECT_PATH=""
 PROJECT_NAME=""
 ORG_NAME="vigOS"
+SMOKE_TEST=""
 
 # Colors (disabled if not a tty)
 if [ -t 1 ]; then
@@ -65,6 +67,7 @@ OPTIONS:
     --podman          Force podman runtime
     --name NAME       Override project name (SHORT_NAME, used for module name)
     --org ORG         Override organization name (default: vigOS)
+    --smoke-test      Deploy smoke-test-specific assets
     --dry-run         Show what would be done
     -h, --help        Show this help
 
@@ -267,6 +270,10 @@ while [ $# -gt 0 ]; do
             DRY_RUN=true
             shift
             ;;
+        --smoke-test)
+            SMOKE_TEST="--smoke-test"
+            shift
+            ;;
         --skip-pull)
             SKIP_PULL=true
             shift
@@ -378,11 +385,18 @@ if [ -n "$FORCE" ]; then
     CMD+=(--force)
 fi
 
+if [ -n "$SMOKE_TEST" ]; then
+    CMD+=(--smoke-test)
+fi
+
 if [ "$DRY_RUN" = true ]; then
     info "Would execute:"
-    printf "  %s" "$RUNTIME run --rm -e SHORT_NAME=\"$PROJECT_NAME\" -e ORG_NAME=\"$ORG_NAME\" -v $PROJECT_PATH:/workspace $IMAGE /root/assets/init-workspace.sh --no-prompts"
+    printf "  %s" "$RUNTIME run --rm -e SHORT_NAME=\"$PROJECT_NAME\" -e ORG_NAME=\"$ORG_NAME\" -v \"$PROJECT_PATH\":/workspace \"$IMAGE\" /root/assets/init-workspace.sh --no-prompts"
     if [ -n "$FORCE" ]; then
         printf " %s" "--force"
+    fi
+    if [ -n "$SMOKE_TEST" ]; then
+        printf " %s" "--smoke-test"
     fi
     printf "\n"
     exit 0
