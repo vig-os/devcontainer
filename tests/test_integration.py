@@ -729,6 +729,35 @@ class TestPlaceholders:
             assert "test_project" in content, f"Short name not replaced in {file}"
 
 
+class TestSmokeRepo:
+    """Tests for smoke-test-specific asset deployment."""
+
+    def test_smoke_test_flag_deploys_assets(self, initialized_smoke_workspace):
+        """Test --smoke-test deploys specific assets."""
+        project_root = Path(__file__).resolve().parents[1]
+        smoke_test_assets_dir = project_root / "assets" / "smoke-test"
+        smoke_test_files = [
+            path for path in smoke_test_assets_dir.rglob("*") if path.is_file()
+        ]
+
+        assert smoke_test_files, "No smoke-test assets found in assets/smoke-test"
+        for source_file in smoke_test_files:
+            relative_path = source_file.relative_to(smoke_test_assets_dir)
+            deployed_path = initialized_smoke_workspace / relative_path
+            assert deployed_path.exists(), f"{relative_path} not deployed"
+
+    def test_default_init_does_not_deploy_repository_dispatch(
+        self, initialized_workspace
+    ):
+        """Test default init does not deploy repository-dispatch workflow."""
+        dispatch_workflow = (
+            initialized_workspace / ".github" / "workflows" / "repository-dispatch.yml"
+        )
+        assert not dispatch_workflow.exists(), (
+            "repository-dispatch.yml should not be deployed without --smoke-test"
+        )
+
+
 class TestDevContainerGit:
     """Test that git configuration files are set up."""
 

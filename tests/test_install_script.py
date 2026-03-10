@@ -98,6 +98,27 @@ class TestInstallScriptIntegration:
         assert devcontainer_dir.exists(), ".devcontainer directory not created"
         assert devcontainer_dir.is_dir(), ".devcontainer is not a directory"
 
+    def test_dry_run_smoke_test_flag_forwarded(self):
+        """Test install.sh forwards --smoke-test to init-workspace.sh in dry-run."""
+        project_root = Path(__file__).resolve().parents[1]
+        install_script = project_root / "install.sh"
+
+        result = subprocess.run(
+            [str(install_script), "--dry-run", "--smoke-test", "."],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            cwd=str(project_root),
+        )
+
+        assert result.returncode == 0, (
+            f"install.sh --dry-run --smoke-test failed:\n"
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        assert "--smoke-test" in result.stdout, (
+            "Expected --smoke-test to be forwarded in dry-run command output"
+        )
+
     def test_install_creates_devcontainer_json(self, install_workspace):
         """Test install.sh creates devcontainer.json."""
         devcontainer_json = install_workspace / ".devcontainer" / "devcontainer.json"

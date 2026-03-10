@@ -49,6 +49,7 @@ setup() {
     assert_output --partial "--name"
     assert_output --partial "--org"
     assert_output --partial "--dry-run"
+    assert_output --partial "--smoke-test"
 }
 
 # ── unknown option ────────────────────────────────────────────────────────────
@@ -75,6 +76,13 @@ setup() {
     assert_output --partial "ghcr.io/vig-os/devcontainer"
 }
 
+@test "dry-run output quotes project path and image for safe copy-paste" {
+    run bash "$INSTALL_SH" --dry-run .
+    assert_success
+    assert_output --regexp '"[^"]+":/workspace'
+    assert_output --regexp '"ghcr.io/vig-os/devcontainer:[^"]+"'
+}
+
 # ── version flag ──────────────────────────────────────────────────────────────
 
 @test "version flag appears in dry-run command" {
@@ -95,6 +103,12 @@ setup() {
     run bash "$INSTALL_SH" --dry-run --force .
     assert_success
     assert_output --partial "--force"
+}
+
+@test "smoke-test flag is forwarded to init-workspace.sh" {
+    run bash "$INSTALL_SH" --dry-run --smoke-test .
+    assert_success
+    assert_output --partial "--smoke-test"
 }
 
 # ── org flag ──────────────────────────────────────────────────────────────────

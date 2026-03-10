@@ -52,3 +52,35 @@ setup() {
     # shellcheck disable=SC2016
     assert_output --partial 'EXCLUDE_ARGS+=("--exclude=$preserved")'
 }
+
+@test "init-workspace.sh accepts --smoke-test flag" {
+    run grep -- '--smoke-test' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+@test "init-workspace.sh uses SCRIPT_DIR smoke-test assets path" {
+    # shellcheck disable=SC2016
+    run grep 'SMOKE_TEST_DIR="$SCRIPT_DIR/smoke-test"' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+@test "init-workspace.sh smoke mode implies --no-prompts" {
+    # shellcheck disable=SC2016
+    run grep -A4 'if \[\[ "\$SMOKE_TEST" == "true" \]\]' "$INIT_WORKSPACE_SH"
+    assert_success
+    # shellcheck disable=SC2016
+    assert_output --partial 'NO_PROMPTS=true'
+}
+
+@test "init-workspace.sh smoke mode implies --force" {
+    # shellcheck disable=SC2016
+    run grep -A4 'if \[\[ "\$SMOKE_TEST" == "true" \]\]' "$INIT_WORKSPACE_SH"
+    assert_success
+    # shellcheck disable=SC2016
+    assert_output --partial 'FORCE=true'
+}
+
+@test "init-workspace.sh smoke mode uses rsync --delete for clean deploy" {
+    run grep 'rsync -av --delete' "$INIT_WORKSPACE_SH"
+    assert_success
+}

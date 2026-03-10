@@ -1,0 +1,94 @@
+name: Repository Dispatch Listener
+
+on:  # yamllint disable-line rule:truthy
+  repository_dispatch:
+    types:
+      - smoke-test-trigger
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    name: Validate dispatch payload
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    outputs:
+      rc_tag: ${{ steps.extract.outputs.rc_tag }}
+    steps:
+      - name: Extract and validate rc_tag
+        id: extract
+        env:
+          EVENT_ACTION: ${{ github.event.action }}
+          EVENT_TYPE: ${{ github.event.client_payload.event_type || '' }}
+          RC_TAG: ${{ github.event.client_payload.rc_tag || '' }}
+          SOURCE_REPO: ${{ github.event.client_payload.source_repo || '' }}
+        run: |
+          echo "repository_dispatch received"
+          echo "action=${EVENT_ACTION}"
+          echo "event_type=${EVENT_TYPE}"
+          echo "rc_tag=${RC_TAG}"
+          echo "source_repo=${SOURCE_REPO}"
+
+          if [ -z "${RC_TAG}" ]; then
+            echo "ERROR: rc_tag is required in github.event.client_payload"
+            exit 1
+          fi
+
+          echo "rc_tag=${RC_TAG}" >> "${GITHUB_OUTPUT}"
+
+  ci-bare:
+    name: Run bare-runner CI
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+
+  ci-container:
+    name: Run container CI
+    needs: validate
+    uses: ./.github/workflows/ci-container.yml
+    with:
+      image-tag: ${{ needs.validate.outputs.rc_tag }}
+
+  summary:
+    name: Dispatch summary
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    needs: [validate, ci-bare, ci-container]
+    if: always()
+    steps:
+      - name: Check orchestration results
+        run: |
+          echo "Repository Dispatch Results Summary"
+          echo "==================================="
+          echo ""
+          echo "Validate:     ${{ needs.validate.result }}"
+          echo "CI (bare):    ${{ needs.ci-bare.result }}"
+          echo "CI (container): ${{ needs.ci-container.result }}"
+          echo ""
+
+          FAILED=false
+
+          if [ "${{ needs.validate.result }}" != "success" ]; then
+            echo "ERROR: Dispatch payload validation failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.ci-bare.result }}" != "success" ]; then
+            echo "ERROR: Bare-runner CI failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.ci-container.result }}" != "success" ]; then
+            echo "ERROR: Container CI failed"
+            FAILED=true
+          fi
+
+          if [ "${FAILED}" = "true" ]; then
+            echo ""
+            echo "Dispatch orchestration failed"
+            exit 1
+          fi
+
+          echo ""
+          echo "Dispatch orchestration passed"
