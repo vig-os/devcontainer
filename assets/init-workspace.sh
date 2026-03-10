@@ -211,20 +211,13 @@ fi
 echo "Initializing workspace from template..."
 echo "Copying files from $TEMPLATE_DIR to $WORKSPACE_DIR..."
 
-# Build exclude list for preserved files that already exist
-EXCLUDE_ARGS=()
-for preserved in "${PRESERVE_FILES[@]}"; do
-    if [[ -e "$WORKSPACE_DIR/$preserved" ]]; then
-        EXCLUDE_ARGS+=("--exclude=$preserved")
-    fi
-done
-
 # Note: Excluding .venv - it is used directly from the container image
 # via UV_PROJECT_ENVIRONMENT environment variable (set in docker-compose.yml)
 # Pre-commit cache is now at /opt/pre-commit-cache (not in assets/workspace)
-rsync -av --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
-
 if [[ "$SMOKE_TEST" == "true" ]]; then
+    # Smoke mode: clean deploy (--delete removes stale files), then overlay smoke-test assets
+    rsync -av --delete --exclude='.git' --exclude='.venv' "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
+
     SMOKE_TEST_DIR="$SCRIPT_DIR/smoke-test"
     if [[ -d "$SMOKE_TEST_DIR" ]]; then
         echo "Deploying smoke-test-specific files..."
@@ -232,6 +225,16 @@ if [[ "$SMOKE_TEST" == "true" ]]; then
     else
         echo "Warning: Smoke-test directory not found at $SMOKE_TEST_DIR" >&2
     fi
+else
+    # Build exclude list for preserved files that already exist
+    EXCLUDE_ARGS=()
+    for preserved in "${PRESERVE_FILES[@]}"; do
+        if [[ -e "$WORKSPACE_DIR/$preserved" ]]; then
+            EXCLUDE_ARGS+=("--exclude=$preserved")
+        fi
+    done
+
+    rsync -av --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
 fi
 
 # Replace placeholders in files (using pre-built manifest from image)
