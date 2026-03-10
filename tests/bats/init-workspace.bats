@@ -79,3 +79,8 @@ setup() {
     # shellcheck disable=SC2016
     assert_output --partial 'FORCE=true'
 }
+
+@test "init-workspace.sh smoke mode uses rsync --delete for clean deploy" {
+    run grep 'rsync -av --delete' "$INIT_WORKSPACE_SH"
+    assert_success
+}
