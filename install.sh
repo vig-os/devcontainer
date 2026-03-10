@@ -391,7 +391,7 @@ fi
 
 if [ "$DRY_RUN" = true ]; then
     info "Would execute:"
-    printf "  %s" "$RUNTIME run --rm -e SHORT_NAME=\"$PROJECT_NAME\" -e ORG_NAME=\"$ORG_NAME\" -v $PROJECT_PATH:/workspace $IMAGE /root/assets/init-workspace.sh --no-prompts"
+    printf "  %s" "$RUNTIME run --rm -e SHORT_NAME=\"$PROJECT_NAME\" -e ORG_NAME=\"$ORG_NAME\" -v \"$PROJECT_PATH\":/workspace \"$IMAGE\" /root/assets/init-workspace.sh --no-prompts"
     if [ -n "$FORCE" ]; then
         printf " %s" "--force"
     fi
