@@ -76,6 +76,13 @@ setup() {
     assert_output --partial "ghcr.io/vig-os/devcontainer"
 }
 
+@test "dry-run output quotes project path and image for safe copy-paste" {
+    run bash "$INSTALL_SH" --dry-run .
+    assert_success
+    assert_output --regexp '"[^"]+":/workspace'
+    assert_output --regexp '"ghcr.io/vig-os/devcontainer:[^"]+"'
+}
+
 # ── version flag ──────────────────────────────────────────────────────────────
 
 @test "version flag appears in dry-run command" {
