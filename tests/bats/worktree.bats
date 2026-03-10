@@ -50,8 +50,9 @@ setup() {
     TESTDIR="/tmp/bats-trust-$$"
     mkdir -p "$TESTDIR"
 
-    tmux new-session -d -s "$SESSION" -c "$TESTDIR" \
-        "agent chat --yolo --approve-mcps 'say hello'"
+    tmux new-session -d -s "$SESSION" -c "$TESTDIR"
+    tmux set-option -t "$SESSION" remain-on-exit on
+    tmux send-keys -t "$SESSION" "agent chat --yolo --approve-mcps 'say hello'" Enter
     sleep 5
     tmux send-keys -t "$SESSION" "a" 2>/dev/null || true
     sleep 5
