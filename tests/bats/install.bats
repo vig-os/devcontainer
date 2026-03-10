@@ -49,6 +49,7 @@ setup() {
     assert_output --partial "--name"
     assert_output --partial "--org"
     assert_output --partial "--dry-run"
+    assert_output --partial "--smoke-test"
 }
 
 # ── unknown option ────────────────────────────────────────────────────────────
@@ -95,6 +96,12 @@ setup() {
     run bash "$INSTALL_SH" --dry-run --force .
     assert_success
     assert_output --partial "--force"
+}
+
+@test "smoke-test flag is forwarded to init-workspace.sh" {
+    run bash "$INSTALL_SH" --dry-run --smoke-test .
+    assert_success
+    assert_output --partial "--smoke-test"
 }
 
 # ── org flag ──────────────────────────────────────────────────────────────────
