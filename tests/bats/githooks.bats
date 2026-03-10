@@ -5,6 +5,8 @@
 # commits when IN_CONTAINER is not "true" (i.e. outside the devcontainer).
 # Refs: #238
 
+bats_require_minimum_version 1.5.0
+
 setup() {
     load test_helper
     HOOKS_DIR="$PROJECT_ROOT/assets/workspace/.githooks"
@@ -31,7 +33,7 @@ setup() {
 }
 
 @test "pre-commit does not show guard message when IN_CONTAINER is true" {
-    run env IN_CONTAINER="true" bash "$HOOKS_DIR/pre-commit"
+    run -127 env IN_CONTAINER="true" bash "$HOOKS_DIR/pre-commit"
     refute_output --partial "Please commit your changes within the dev container"
 }
 
@@ -56,7 +58,7 @@ setup() {
 }
 
 @test "prepare-commit-msg does not show guard message when IN_CONTAINER is true" {
-    run env IN_CONTAINER="true" bash "$HOOKS_DIR/prepare-commit-msg" /dev/null
+    run -127 env IN_CONTAINER="true" bash "$HOOKS_DIR/prepare-commit-msg" /dev/null
     refute_output --partial "Please commit your changes within the dev container"
 }
 
@@ -81,6 +83,6 @@ setup() {
 }
 
 @test "commit-msg does not show guard message when IN_CONTAINER is true" {
-    run env IN_CONTAINER="true" bash "$HOOKS_DIR/commit-msg" /dev/null
+    run -127 env IN_CONTAINER="true" bash "$HOOKS_DIR/commit-msg" /dev/null
     refute_output --partial "Please commit your changes within the dev container"
 }
