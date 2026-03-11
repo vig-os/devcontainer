@@ -7,12 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- **VS Code settings synced via manifest**
+  - Added `.vscode/settings.json` to `scripts/manifest.toml` to keep editor settings consistent across root repo and workspace template
+- **Cross-repo smoke-test dispatch on RC publish** ([#173](https://github.com/vig-os/devcontainer/issues/173))
+  - RC candidate publishes now trigger `repository_dispatch` in `vig-os/devcontainer-smoke-test` with the RC tag payload
+  - Release process now includes a documented manual smoke gate before running final publish
+
+### Fixed
+
+- **`just` default recipe hidden by lint recipe** ([#254](https://github.com/vig-os/devcontainer/issues/254))
+  - The `default` recipe must appear before any other recipe in the justfile; `lint` was placed first, shadowing the recipe listing
+  - Moved `default` recipe above `lint` to restore `just` with no arguments showing available recipes
+- **Broken `gh-issues --help` guard in justfile recipe** ([#173](https://github.com/vig-os/devcontainer/issues/173))
+  - `gh-issues` CLI has no `--help` flag, so the availability check always failed even when the binary was installed
+  - Removed the broken guard; binary availability is now verified by the image test suite
+
 ### Changed
 
 - **Update base Python image and GitHub Actions dependencies** ([#240](https://github.com/vig-os/devcontainer/issues/240))
   - Containerfile: pin `python:3.12-slim-bookworm` to latest digest
   - Bump trivy CLI v0.69.2 → v0.69.3, trivy-action v0.33.1 → v0.35.0
   - Update astral-sh/setup-uv, taiki-e/install-action, docker/build-push-action, github/codeql-action, actions/dependency-review-action, actions/attest-build-provenance
+- **Bump GitHub CLI to 2.88.x**
+  - Update expected `gh` version in image tests from 2.87 to 2.88
 
 ### Added
 
@@ -135,6 +154,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `install.sh` forwards `--smoke-test` flag to `init-workspace.sh`
   - Smoke mode implies `--force --no-prompts` for unattended use
   - Refactor `initialized_workspace` fixture into reusable `_init_workspace()` with `smoke_test` parameter
+- **Root `.vig-os` config file as devcontainer version SSoT** ([#257](https://github.com/vig-os/devcontainer/issues/257))
+  - Add committed `assets/workspace/.vig-os` key/value config with `DEVCONTAINER_VERSION` as the canonical version source
+  - Update `docker-compose.yml`, `initialize.sh`, and `version-check.sh` to consume `.vig-os`-driven version flow
+  - Extend integration/image tests for `.vig-os` presence and graceful handling when `.vig-os` is missing
 
 ### Changed
 
@@ -522,6 +545,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Switch taplo pre-commit hooks from `language: rust` (cargo compile) to `language: system` using the binary already installed in the container image
   - Correct the taplo release URL and pin to the latest version in the Containerfile
   - Add taplo to the CI `setup-env` action so pre-commit hooks work on bare runners
+- **Workspace helper CLI checks and sidecar runtime fallback** ([#173](https://github.com/vig-os/devcontainer/issues/173))
+  - Sidecar recipes now support both podman and docker runtimes for listing, starting, and executing sidecar commands
+  - Worktree and GitHub helper recipes now fail fast with actionable guidance when helper CLIs are unavailable
+  - Label taxonomy guidance clarifies that `setup-labels` is provided by devcontainer bootstrap tooling
+- **CodeQL PR trigger no longer blocks merge protection on non-Python changes** ([#247](https://github.com/vig-os/devcontainer/issues/247))
+  - Removed `pull_request` `paths` filter from `codeql.yml` in both root and workspace template so CodeQL always runs for PRs targeting protected branches and uploads SARIF results
 
 ### Security
 

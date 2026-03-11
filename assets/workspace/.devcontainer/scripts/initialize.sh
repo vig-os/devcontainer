@@ -13,6 +13,33 @@ DEVCONTAINER_DIR="$(dirname "$SCRIPT_DIR")"
 # Copy host user configuration (git, ssh, gh)
 "$SCRIPT_DIR/copy-host-user-conf.sh"
 
+# Load devcontainer version from root .vig-os config
+load_vig_os_config() {
+    local config_file="$DEVCONTAINER_DIR/../.vig-os"
+    local env_file="$DEVCONTAINER_DIR/.env"
+
+    if [[ ! -f "$config_file" ]]; then
+        return 0
+    fi
+
+    # shellcheck source=/dev/null
+    source "$config_file"
+
+    if [[ -z "${DEVCONTAINER_VERSION:-}" ]]; then
+        return 0
+    fi
+
+    if [[ -f "$env_file" ]] && grep -q "^DEVCONTAINER_VERSION=" "$env_file" 2>/dev/null; then
+        if [[ "$(uname -s)" == "Darwin" ]]; then
+            sed -i '' "s|^DEVCONTAINER_VERSION=.*|DEVCONTAINER_VERSION=${DEVCONTAINER_VERSION}|" "$env_file"
+        else
+            sed -i "s|^DEVCONTAINER_VERSION=.*|DEVCONTAINER_VERSION=${DEVCONTAINER_VERSION}|" "$env_file"
+        fi
+    else
+        echo "DEVCONTAINER_VERSION=${DEVCONTAINER_VERSION}" >> "$env_file"
+    fi
+}
+
 # Configure container socket path based on host OS
 configure_socket_path() {
     local env_file="$DEVCONTAINER_DIR/.env"
@@ -89,6 +116,7 @@ configure_socket_path() {
     echo "Socket configuration complete (written to .env)"
 }
 
+load_vig_os_config
 configure_socket_path
 
 echo "Initialization complete"

@@ -36,6 +36,12 @@ src = ".pymarkdown.config.md"
 src = ".hadolint.yaml"
 
 [[entries]]
+src = ".vscode/settings.json"
+transforms = [
+  { type = "Sed", pattern = "\\$\\{workspaceFolder\\}/\\.venv/bin/python3", replace = "/opt/venv/bin/python3" },
+]
+
+[[entries]]
 src = ".github/agent-blocklist.toml"
 
 [[entries]]
@@ -92,6 +98,8 @@ transforms = [
     "prepare-commit-msg-strip-trailers",
     "check-agent-identity",
     "validate-commit-msg",
+    "taplo-format",
+    "taplo-lint",
   ] },
   { type = "Sed", pattern = "bandit -r packages/vig-utils/src/ assets/workspace/", replace = "bandit -r src/" },
   { type = "StripTrailingBlankLines" },

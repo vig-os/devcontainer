@@ -118,7 +118,9 @@ graph TB
     J --> K["just publish-candidate X.Y.Z"]
     K --> L["Workflow: build & test<br/>(no CHANGELOG changes)"]
     L --> M["Publish X.Y.Z-rcN"]
-    J --> N["just finalize-release X.Y.Z"]
+    M --> U{Smoke tests pass?}
+    U -->|No| I
+    U -->|Yes| N["just finalize-release X.Y.Z"]
     N --> O["Workflow: set release date<br/>build & test"]
     O --> P{Tests pass?}
     P -->|No| Q["Automatic rollback<br/>+ issue creation"]
@@ -131,8 +133,9 @@ graph TB
 
 1. **Preparation** (`prepare-release`): Freeze CHANGELOG on dev, create release branch, reset Unreleased on dev, open draft PR
 2. **Review & Testing**: CI validation, mark PR ready, fix issues, get approvals
-3. **Finalization** (GitHub Actions workflow): Candidates skip CHANGELOG changes; final releases set the date. Both build/test/publish.
-4. **Post-Release**: Merge PR to main (manual), then automated: PR-based sync of main to dev
+3. **Candidate Publish** (`publish-candidate`): Build/test/publish `X.Y.Z-rcN` and dispatch smoke-test workflow
+4. **Manual Smoke Gate**: Wait for smoke-test repo workflows to pass before final release
+5. **Finalization & Post-Release**: Publish final image/tag, then merge PR to main and let sync automation update dev
 
 
 ---
@@ -356,6 +359,7 @@ The `release.yml` workflow performs the entire remaining release process. Behavi
 
 4. ✅ **Publish** job (runs only if all builds/tests pass)
    - Candidate mode: infers next `rcN`, creates annotated tag `X.Y.Z-rcN`, publishes candidate manifests
+   - Candidate mode: triggers `repository_dispatch` to `vig-os/devcontainer-smoke-test` with `client_payload.rc_tag`
    - Final mode: creates annotated tag `X.Y.Z`, publishes final manifests
    - Pushes tag to origin
    - Downloads tested images from artifacts
@@ -397,7 +401,39 @@ Release Summary:
 - **Audit trail**: All steps are recorded in GitHub Actions logs with actor information
 - **Reproducible**: Uses consistent CI environment, not dependent on local tooling
 
-### Phase 4: Post-Release Cleanup
+### Phase 4: Manual RC Smoke Gate
+
+After `just publish-candidate X.Y.Z` succeeds, verify smoke tests before running final release.
+
+1. Confirm dispatch-triggered smoke-test run in the smoke-test repo:
+
+   ```bash
+   gh -R vig-os/devcontainer-smoke-test run list --workflow repository-dispatch.yml --limit 1
+   ```
+
+2. Inspect that run and verify both downstream workflows completed successfully:
+
+   ```bash
+   gh -R vig-os/devcontainer-smoke-test run view <RUN_ID>
+   ```
+
+3. Required pass criteria:
+   - `ci.yml` (bare-runner workflow) passed for the RC tag
+   - `ci-container.yml` (container workflow) passed for the RC tag
+
+4. If smoke tests fail:
+   - Fix the issue on the release branch
+   - Publish a new candidate (`just publish-candidate X.Y.Z`) to generate the next RC tag
+   - Re-run this gate
+
+5. If smoke tests pass:
+   - Proceed with final release:
+
+   ```bash
+   just finalize-release X.Y.Z
+   ```
+
+### Phase 5: Post-Release Cleanup
 
 **Manual step:** Merge the release PR to main.
 
@@ -515,11 +551,12 @@ Release automation relies on two GitHub Apps with different scopes:
 
 | App | Secrets | Permissions | Used by | Purpose |
 |-----|---------|-------------|---------|---------|
-| **RELEASE_APP** | `RELEASE_APP_ID`, `RELEASE_APP_PRIVATE_KEY` | Contents read/write, Issues read/write, Pull requests read/write | `release.yml`, `prepare-release.yml`, `sync-main-to-dev.yml` | Release operations, PR creation/updates, rollback |
+| **RELEASE_APP** | `RELEASE_APP_ID`, `RELEASE_APP_PRIVATE_KEY` | Contents read/write, Issues read/write, Pull requests read/write | `release.yml`, `prepare-release.yml`, `sync-main-to-dev.yml` | Release operations, PR creation/updates, rollback, and smoke-test dispatch |
 | **COMMIT_APP** | `COMMIT_APP_ID`, `COMMIT_APP_PRIVATE_KEY` | Contents read/write, Issues read, Pull requests read | `sync-issues.yml`, `sync-main-to-dev.yml` | Commits to protected branches and git ref operations |
 
 Additional requirement:
 - `COMMIT_APP` must be allowed in branch protection bypass rules for `dev` so sync commits can be pushed by automation.
+- `RELEASE_APP` must be installed on `vig-os/devcontainer-smoke-test` with Contents read permission so `release.yml` can send `repository_dispatch` for RC smoke tests.
 
 #### prepare-release.yml (Release Preparation Workflow)
 
