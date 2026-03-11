@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - CI workflows (`ci.yml`, `ci-container.yml`) trigger on the deploy PR, and auto-merge is enabled when checks pass
   - Stale deploy PRs are closed before each new deployment
   - The smoke-test repo keeps audit trail through deploy PRs and merge history instead of a local changelog
+  - Dispatch payload tag validation now enforces semver format `X.Y.Z` or `X.Y.Z-rc.N` before using the tag in refs/URLs
+  - CI security scan now includes a time-bounded exception for `CVE-2026-31812` in `uv`/`uvx` pending upstream dependency patch release
 
 ### Fixed
 
