@@ -105,5 +105,15 @@ CVE-2025-61730
 Expiration: 2026-04-15
 CVE-2025-15558
 
+# CVE-2026-31812: quinn-proto unauthenticated remote DoS via QUIC transport parameter panic
+# Risk Assessment: LOW (devcontainer context)
+# - HIGH severity in quinn-proto v0.11.12 embedded in uv/uvx Rust binaries
+# - Affects QUIC transport parameter handling and may panic on malformed unauthenticated input
+# - uv/uvx in this image is used for package downloads from trusted registries, not as a QUIC server
+# - No user-facing QUIC endpoint is exposed by devcontainer workflows
+# - Fixed in quinn-proto v0.11.14; awaiting upstream uv release with patched dependency
+Expiration: 2026-05-15
+CVE-2026-31812
+
 # Tracking: https://github.com/vig-os/devcontainer
 # Upstream: https://github.com/aquasecurity/trivy/
