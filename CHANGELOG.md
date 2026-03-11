@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`just` default recipe hidden by lint recipe** ([#254](https://github.com/vig-os/devcontainer/issues/254))
+  - The `default` recipe must appear before any other recipe in the justfile; `lint` was placed first, shadowing the recipe listing
+  - Moved `default` recipe above `lint` to restore `just` with no arguments showing available recipes
 - **Broken `gh-issues --help` guard in justfile recipe** ([#173](https://github.com/vig-os/devcontainer/issues/173))
   - `gh-issues` CLI has no `--help` flag, so the availability check always failed even when the binary was installed
   - Removed the broken guard; binary availability is now verified by the image test suite
@@ -27,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Containerfile: pin `python:3.12-slim-bookworm` to latest digest
   - Bump trivy CLI v0.69.2 → v0.69.3, trivy-action v0.33.1 → v0.35.0
   - Update astral-sh/setup-uv, taiki-e/install-action, docker/build-push-action, github/codeql-action, actions/dependency-review-action, actions/attest-build-provenance
+- **Bump GitHub CLI to 2.88.x**
+  - Update expected `gh` version in image tests from 2.87 to 2.88
 
 ### Added
 
