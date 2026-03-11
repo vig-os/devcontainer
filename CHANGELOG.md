@@ -154,6 +154,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `install.sh` forwards `--smoke-test` flag to `init-workspace.sh`
   - Smoke mode implies `--force --no-prompts` for unattended use
   - Refactor `initialized_workspace` fixture into reusable `_init_workspace()` with `smoke_test` parameter
+- **Root `.vig-os` config file as devcontainer version SSoT** ([#257](https://github.com/vig-os/devcontainer/issues/257))
+  - Add committed `assets/workspace/.vig-os` key/value config with `DEVCONTAINER_VERSION` as the canonical version source
+  - Update `docker-compose.yml`, `initialize.sh`, and `version-check.sh` to consume `.vig-os`-driven version flow
+  - Extend integration/image tests for `.vig-os` presence and graceful handling when `.vig-os` is missing
 
 ### Changed
 
