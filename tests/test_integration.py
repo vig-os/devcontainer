@@ -528,7 +528,7 @@ class TestDevContainerDockerCompose:
             "docker-compose.yml missing 'devcontainer' service"
         )
 
-    def test_docker_compose_yml_image(self, initialized_workspace, container_image):
+    def test_docker_compose_yml_image(self, initialized_workspace):
         """Test that docker-compose.yml has correct image reference."""
         docker_compose_yml = (
             initialized_workspace / ".devcontainer" / "docker-compose.yml"
@@ -540,17 +540,10 @@ class TestDevContainerDockerCompose:
         service = config["services"]["devcontainer"]
         assert "image" in service, "devcontainer service missing 'image' field"
 
-        # Verify the docker-compose.yml image matches the container_image fixture
-        # Normalize arch suffix if present (e.g., :X.Y or :X.Y-amd64 -> :X.Y)
-        # Only remove known architecture suffixes (-amd64, -arm64) at the very end
-        expected_image = re.sub(r"-(amd64|arm64)$", "", container_image)
+        # docker-compose now references version from .env / .vig-os
+        expected_image = "ghcr.io/vig-os/devcontainer:${DEVCONTAINER_VERSION:-latest}"
         assert service["image"] == expected_image, (
             f"Expected image to be {expected_image}, got: {service['image']}"
-        )
-
-        # {{IMAGE_TAG}} should be replaced (or at least not present)
-        assert "{{IMAGE_TAG}}" not in service["image"], (
-            f"Image tag placeholder not replaced: {service['image']}"
         )
 
     def test_docker_compose_yml_volumes(self, initialized_workspace):
@@ -660,6 +653,54 @@ class TestDevContainerDockerCompose:
         )
         assert "tty" in service, "devcontainer service missing 'tty' field"
         assert service["tty"] is True, f"Expected tty=True, got: {service['tty']}"
+
+
+class TestVigOsConfig:
+    """Test .vig-os configuration as version source of truth."""
+
+    def test_vig_os_exists(self, initialized_workspace):
+        """Test that .vig-os exists at workspace root."""
+        vig_os_file = initialized_workspace / ".vig-os"
+        assert vig_os_file.exists(), ".vig-os not found in workspace root"
+        assert vig_os_file.is_file(), ".vig-os is not a regular file"
+
+    def test_vig_os_contains_devcontainer_version(self, initialized_workspace):
+        """Test that .vig-os contains DEVCONTAINER_VERSION key."""
+        vig_os_file = initialized_workspace / ".vig-os"
+        content = vig_os_file.read_text(encoding="utf-8")
+        assert "DEVCONTAINER_VERSION=" in content, (
+            "DEVCONTAINER_VERSION key not found in .vig-os"
+        )
+        assert "{{IMAGE_TAG}}" not in content, (
+            "IMAGE_TAG placeholder should be replaced in .vig-os"
+        )
+
+    def test_initialize_writes_devcontainer_version_to_env(self, initialized_workspace):
+        """Test initialize.sh writes DEVCONTAINER_VERSION to .devcontainer/.env."""
+        init_script = (
+            initialized_workspace / ".devcontainer" / "scripts" / "initialize.sh"
+        )
+        env_file = initialized_workspace / ".devcontainer" / ".env"
+
+        if env_file.exists():
+            env_file.unlink()
+
+        result = subprocess.run(
+            [str(init_script)],
+            capture_output=True,
+            text=True,
+            cwd=str(initialized_workspace),
+            timeout=10,
+        )
+        assert result.returncode == 0, (
+            f"initialize.sh failed\nstdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        assert env_file.exists(), ".devcontainer/.env was not created by initialize.sh"
+
+        env_content = env_file.read_text(encoding="utf-8")
+        assert "DEVCONTAINER_VERSION=" in env_content, (
+            "initialize.sh did not write DEVCONTAINER_VERSION to .env"
+        )
 
 
 class TestPlaceholders:
@@ -2575,6 +2616,14 @@ class TestVersionCheckScript:
         assert "on|enable" in result.stdout
         assert "off|disable" in result.stdout
 
+    def test_reads_version_from_vig_os_config(self, version_check_script):
+        """Test that version-check reads version from .vig-os config."""
+        content = version_check_script.read_text(encoding="utf-8")
+        assert ".vig-os" in content, "version-check.sh should reference .vig-os"
+        assert "DEVCONTAINER_VERSION" in content, (
+            "version-check.sh should read DEVCONTAINER_VERSION"
+        )
+
     def test_config_creation(self, version_check_script, local_dir):
         """Test that config file is created with defaults on first run."""
         config_file = local_dir / "version-check.conf"
@@ -3566,3 +3615,28 @@ class TestVersionCheckGracefulFailure:
             # Restore file
             if backup_path.exists():
                 backup_path.rename(compose_file)
+
+    def test_missing_vig_os_silent_failure(
+        self, version_check_script, initialized_workspace
+    ):
+        """Test that missing .vig-os doesn't break silent mode."""
+        vig_os_file = initialized_workspace / ".vig-os"
+        backup_path = initialized_workspace / ".vig-os.backup"
+
+        if vig_os_file.exists():
+            vig_os_file.rename(backup_path)
+
+        try:
+            result = subprocess.run(
+                [str(version_check_script)],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            # Should succeed silently
+            assert result.returncode == 0
+            assert len(result.stderr) == 0
+        finally:
+            if backup_path.exists():
+                backup_path.rename(vig_os_file)

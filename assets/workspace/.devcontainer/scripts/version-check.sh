@@ -190,17 +190,18 @@ record_check() {
 # VERSION DETECTION
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Get current installed version from docker-compose.yml
+# Get current installed version from root .vig-os config
 get_current_version() {
-    local compose_file="$DEVCONTAINER_DIR/docker-compose.yml"
+    local config_file="$DEVCONTAINER_DIR/../.vig-os"
 
-    if [[ ! -f "$compose_file" ]]; then
+    if [[ ! -f "$config_file" ]]; then
         return 1
     fi
 
-    # Extract version from image tag (e.g., ghcr.io/vig-os/devcontainer:1.0.0)
-    local version
-    version=$(grep -o 'ghcr\.io/vig-os/devcontainer:[^"]*' "$compose_file" 2>/dev/null | head -1 | cut -d: -f2)
+    # shellcheck source=/dev/null
+    source "$config_file"
+
+    local version="${DEVCONTAINER_VERSION:-}"
 
     if [[ -z "$version" || "$version" == "dev" || "$version" == "latest" ]]; then
         return 1  # Not a pinned version

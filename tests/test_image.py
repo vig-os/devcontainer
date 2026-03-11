@@ -553,6 +553,7 @@ class TestFileStructure:
             "/root/assets/workspace/CHANGELOG.md",
             "/root/assets/workspace/README.md",
             "/root/assets/workspace/LICENSE",
+            "/root/assets/workspace/.vig-os",
             # .devcontainer files
             "/root/assets/workspace/.devcontainer/.gitignore",
             "/root/assets/workspace/.devcontainer/README.md",
