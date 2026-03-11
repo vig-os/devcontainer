@@ -3,25 +3,6 @@
 # Build automation for devcontainer image development
 # ===============================================================================
 # ===============================================================================
-# CODE QUALITY
-# ===============================================================================
-
-# Run all linters
-[group('quality')]
-lint:
-    uv run ruff check .
-
-# Format code
-[group('quality')]
-format:
-    uv run ruff format .
-
-# Run pre-commit hooks on all files
-[group('quality')]
-precommit:
-    uv run pre-commit run --all-files
-
-# ===============================================================================
 # VARIABLES
 # ===============================================================================
 # Allow TEST_REGISTRY to override REPO for testing (e.g., localhost:5000/test/)
@@ -41,6 +22,25 @@ default:
 [group('info')]
 help:
     @just --list
+
+# ===============================================================================
+# CODE QUALITY
+# ===============================================================================
+
+# Run all linters
+[group('quality')]
+lint:
+    uv run ruff check .
+
+# Format code
+[group('quality')]
+format:
+    uv run ruff format .
+
+# Run pre-commit hooks on all files
+[group('quality')]
+precommit:
+    uv run pre-commit run --all-files
 
 # Show image information
 [group('info')]
