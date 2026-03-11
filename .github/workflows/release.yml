@@ -877,7 +877,7 @@ jobs:
           set -euo pipefail
           gh api repos/vig-os/devcontainer-smoke-test/dispatches \
             -f event_type=smoke-test-trigger \
-            -f "client_payload[rc_tag]=$RC_TAG"
+            -f "client_payload[tag]=$RC_TAG"
           echo "✓ Triggered smoke-test dispatch for RC tag: $RC_TAG"
 
       - name: Warn if smoke-test dispatch token generation failed
