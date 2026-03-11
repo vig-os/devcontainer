@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`just` default recipe hidden by lint recipe** ([#254](https://github.com/vig-os/devcontainer/issues/254))
+  - The `default` recipe must appear before any other recipe in the justfile; `lint` was placed first, shadowing the recipe listing
+  - Moved `default` recipe above `lint` to restore `just` with no arguments showing available recipes
 - **Broken `gh-issues --help` guard in justfile recipe** ([#173](https://github.com/vig-os/devcontainer/issues/173))
   - `gh-issues` CLI has no `--help` flag, so the availability check always failed even when the binary was installed
   - Removed the broken guard; binary availability is now verified by the image test suite
