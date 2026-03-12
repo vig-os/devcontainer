@@ -216,7 +216,7 @@ echo "Copying files from $TEMPLATE_DIR to $WORKSPACE_DIR..."
 # Pre-commit cache is now at /opt/pre-commit-cache (not in assets/workspace)
 if [[ "$SMOKE_TEST" == "true" ]]; then
     # Smoke mode: clean deploy (--delete removes stale files), then overlay smoke-test assets
-    rsync -av --delete --exclude='.git' --exclude='.venv' "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
+    rsync -av --delete --exclude='.git' --exclude='.venv' --exclude='docs/issues/' --exclude='docs/pull-requests/' "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
 
     SMOKE_TEST_DIR="$SCRIPT_DIR/smoke-test"
     if [[ -d "$SMOKE_TEST_DIR" ]]; then

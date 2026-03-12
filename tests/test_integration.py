@@ -19,6 +19,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from .conftest import _build_podman_cmd, _run_noninteractive_init
+
 
 class TestHostGitSignatureSetup:
     """Test that git commit signing is properly configured on the host.
@@ -786,6 +788,40 @@ class TestSmokeRepo:
             relative_path = source_file.relative_to(smoke_test_assets_dir)
             deployed_path = initialized_smoke_workspace / relative_path
             assert deployed_path.exists(), f"{relative_path} not deployed"
+
+    def test_smoke_redeploy_preserves_synced_docs_directories(
+        self, initialized_smoke_workspace, container_image
+    ):
+        """Regression: smoke re-deploy must not delete docs synced by sync-issues."""
+        docs_issues = initialized_smoke_workspace / "docs" / "issues"
+        docs_pull_requests = initialized_smoke_workspace / "docs" / "pull-requests"
+        docs_issues.mkdir(parents=True, exist_ok=True)
+        docs_pull_requests.mkdir(parents=True, exist_ok=True)
+
+        issues_sentinel = docs_issues / "keep.md"
+        prs_sentinel = docs_pull_requests / "keep.md"
+        issues_sentinel.write_text("keep issue docs", encoding="utf-8")
+        prs_sentinel.write_text("keep PR docs", encoding="utf-8")
+
+        cmd = _build_podman_cmd(
+            container_image,
+            f"{initialized_smoke_workspace}:/workspace",
+            smoke_test=True,
+        )
+        _run_noninteractive_init(cmd)
+
+        assert docs_issues.exists(), (
+            "docs/issues directory was deleted by smoke re-deploy"
+        )
+        assert docs_pull_requests.exists(), (
+            "docs/pull-requests directory was deleted by smoke re-deploy"
+        )
+        assert issues_sentinel.exists(), (
+            "docs/issues sentinel was deleted by smoke re-deploy"
+        )
+        assert prs_sentinel.exists(), (
+            "docs/pull-requests sentinel was deleted by smoke re-deploy"
+        )
 
     def test_default_init_does_not_deploy_repository_dispatch(
         self, initialized_workspace
