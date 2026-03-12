@@ -36,7 +36,8 @@ jobs:
         run: |
           TITLE_FILE=$(mktemp)
           printf '%s' "$PR_TITLE" > "$TITLE_FILE"
-          uv run validate-commit-msg "$TITLE_FILE" --subject-only
+          uv run validate-commit-msg "$TITLE_FILE" --subject-only \
+            --blocked-patterns .github/agent-blocklist.toml
 
       - name: Check PR for agent fingerprints
         env:
