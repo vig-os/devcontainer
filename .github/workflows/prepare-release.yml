@@ -152,7 +152,6 @@ jobs:
     if: ${{ github.event.inputs.dry-run != 'true' }}
     permissions:
       contents: read          # checkout dev branch
-      pull-requests: write    # create draft PR
 
     steps:
       - name: Generate Commit App Token
