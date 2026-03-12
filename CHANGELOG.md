@@ -437,6 +437,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Prepare-release uses scoped app tokens for protected branch writes** ([#268](https://github.com/vig-os/devcontainer/issues/268))
   - `prepare-release.yml` now uses `COMMIT_APP_*` for git/ref and `commit-action` operations that touch `dev` and release refs
   - Draft PR creation in prepare-release now uses `RELEASE_APP_*` token scope for pull-request operations
+- **generate-docs picks up unreleased TBD version on release branches** ([#271](https://github.com/vig-os/devcontainer/issues/271))
+  - `get_version_from_changelog()` and `get_release_date_from_changelog()` now skip entries without a concrete release date
 
 ### Security
 
