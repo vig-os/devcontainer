@@ -303,7 +303,7 @@ jobs:
           PR_URL=$(gh pr create \
             --base main \
             --head "$RELEASE_BRANCH" \
-            --title "Release $VERSION" \
+            --title "chore: release $VERSION" \
             --body "$PR_BODY" \
             --draft)
 
