@@ -1366,8 +1366,11 @@ class TestDevContainerCLI:
             # Check if it's a permission denied (keys not authorized) vs connection error
             if "Permission denied" in result.stderr:
                 # Keys exist but aren't authorized - this is acceptable for testing
-                # The important thing is that SSH is configured
-                assert "github.com" in result.stderr, (
+                # Ensure this is an auth failure, not a connectivity/hostname failure.
+                assert (
+                    "Could not resolve hostname" not in result.stderr
+                    and "Name or service not known" not in result.stderr
+                ), (
                     f"SSH connection failed unexpectedly\n"
                     f"stdout: {result.stdout}\n"
                     f"stderr: {result.stderr}"
@@ -1381,7 +1384,12 @@ class TestDevContainerCLI:
                 )
         elif result.returncode == 1:
             # Success - GitHub responded (exit 1 is normal for test connections)
-            assert "Hi" in result.stdout or "github.com" in result.stderr, (
+            output = result.stdout + result.stderr
+            assert (
+                "successfully authenticated" in output
+                or "does not provide shell access" in output
+                or "Hi " in output
+            ), (
                 f"Unexpected SSH response from GitHub\n"
                 f"stdout: {result.stdout}\n"
                 f"stderr: {result.stderr}"
@@ -1632,15 +1640,11 @@ class TestDevContainerCLI:
 
         # Verify we got a successful authentication response
         output = result.stdout + result.stderr
-        assert (
-            "Logged in to github.com" in output
-            or "✓ Logged in" in output
-            or "github.com" in output
-        ), (
+        assert "Logged in to " in output or "✓ Logged in" in output, (
             f"GitHub CLI authentication status unclear\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}\n"
-            f"Expected 'Logged in to github.com' or similar in output"
+            f"Expected a successful gh auth status message in output"
         )
 
     def test_valid_branch_names_commit_succeeds(self, devcontainer_up):
