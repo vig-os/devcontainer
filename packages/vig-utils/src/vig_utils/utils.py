@@ -171,8 +171,7 @@ def load_blocklist(path: Path) -> dict:
 
 
 _ATTRIBUTION_CONTEXT_RE = re.compile(
-    r"(?:authored|generated|created|produced|written|assisted|made|built|suggested|signed|powered)[\s-]+by\b"
-    r"|\b(?:bot|agent|assistant)\b",
+    r"(?:authored|generated|created|produced|written|assisted|made|built|suggested|signed|powered)[\s-]+by\b",
     re.IGNORECASE,
 )
 

@@ -429,6 +429,20 @@ class TestAgentBlocklistHelpers:
         )
         assert contains_agent_fingerprint(body, blocklist) is None
 
+    def test_contains_fingerprint_passes_name_near_agent_word(self):
+        """Blocked name on a line with 'agent' in a compound term should NOT trigger."""
+        blocklist = {
+            "trailers": [],
+            "names": ["cursor", "copilot"],
+            "emails": [],
+            "allow_patterns": [],
+        }
+        text = (
+            "The `check-pr-agent-fingerprints` check blocks "
+            'mentions of "Cursor" or "Copilot".'
+        )
+        assert contains_agent_fingerprint(text, blocklist) is None
+
     def test_contains_fingerprint_blocks_attribution_context(self):
         """Name in an attribution phrase must still be blocked (Refs: #274)."""
         blocklist = {
