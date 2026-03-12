@@ -156,6 +156,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smoke-test redeploy preserves synced docs directories** ([#262](https://github.com/vig-os/devcontainer/issues/262))
   - `init-workspace.sh --smoke-test` now excludes `docs/issues/` and `docs/pull-requests/` from `rsync --delete`
   - Re-deploying smoke assets no longer removes docs synced by `sync-issues`
+- **Prepare-release uses scoped app tokens for protected branch writes** ([#268](https://github.com/vig-os/devcontainer/issues/268))
+  - `prepare-release.yml` now uses `COMMIT_APP_*` for git/ref and `commit-action` operations that touch `dev` and release refs
+  - Draft PR creation in prepare-release now uses `RELEASE_APP_*` token scope for pull-request operations
 
 ### Changed
 
