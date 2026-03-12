@@ -124,6 +124,7 @@ Available recipes:
     down                                       # Stop and remove containers
     logs *args                                 # Tail container logs
     open                                       # Open Cursor/VS Code attached to the running container
+    remote-devc host *args                     # just remote-devc ksb-meatgrinder --open none
     restart *args                              # Restart service(s)
     shell                                      # Open bash in running devcontainer
     status                                     # Show container status
