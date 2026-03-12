@@ -45,6 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Commented example in `docker-compose.local.yaml` for quick setup
   - Documentation in `.devcontainer/README.md` with quick-start and ACL instructions
 
+### Changed
+
+- **Updated expected `gh` CLI version to 2.88** ([#70](https://github.com/vig-os/devcontainer/issues/70))
+  - Updated expected version prefix from `2.87.` to `2.88.` to match GitHub CLI 2.88.1 (released 2026-03-12)
+
 ### Fixed
 
 - **Tailscale SSH now works inside containers** ([#70](https://github.com/vig-os/devcontainer/issues/70))
