@@ -156,7 +156,7 @@ graph TB
 just prepare-release X.Y.Z
 
 # Or directly via GitHub CLI:
-gh workflow run prepare-release.yml -f "version=X.Y.Z"
+gh workflow run prepare-release.yml --ref dev -f "version=X.Y.Z"
 ```
 
 **What the workflow does (automatically):**
@@ -585,10 +585,10 @@ Additional requirement:
 **Manual trigger (for testing):**
 
 ```bash
-gh workflow run prepare-release.yml -f "version=1.0.0" -f "dry-run=false"
+gh workflow run prepare-release.yml --ref dev -f "version=1.0.0" -f "dry-run=false"
 
 # Dry-run mode (validates without making changes)
-gh workflow run prepare-release.yml -f "version=1.0.0" -f "dry-run=true"
+gh workflow run prepare-release.yml --ref dev -f "version=1.0.0" -f "dry-run=true"
 ```
 
 **Key characteristics:**
@@ -596,6 +596,8 @@ gh workflow run prepare-release.yml -f "version=1.0.0" -f "dry-run=true"
 - Push via GitHub App token ensures CI runs on new release branch
 - Audit trail in GitHub Actions logs
 - No dependency on local developer environment
+- Dispatch is pinned to `dev` (`--ref dev`) so workflow behavior matches the development branch
+- On failure, rollback removes partial release branch state and restores `CHANGELOG.md` on `dev`
 
 #### release.yml (Unified Release Workflow)
 
@@ -646,6 +648,7 @@ gh workflow run prepare-release.yml -f "version=1.0.0" -f "dry-run=true"
 
 ```bash
 gh workflow run release.yml \
+  --ref release/X.Y.Z \
   -f "version=1.0.0" \
   -f "release-kind=final" \
   -f "architectures=amd64,arm64" \
@@ -653,6 +656,7 @@ gh workflow run release.yml \
 
 # Dry-run mode (validates without making changes)
 gh workflow run release.yml \
+  --ref release/X.Y.Z \
   -f "version=1.0.0" \
   -f "release-kind=candidate" \
   -f "dry-run=true"
@@ -663,6 +667,7 @@ gh workflow run release.yml \
 - Automatic rollback on failure
 - All in one workflow for atomic operation
 - Audit trail in GitHub Actions logs
+- Dispatch is pinned to `release/X.Y.Z` so candidate/final runs use the release branch workflow definition
 
 #### sync-issues.yml
 

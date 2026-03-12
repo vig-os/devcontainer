@@ -559,6 +559,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Label taxonomy guidance clarifies that `setup-labels` is provided by devcontainer bootstrap tooling
 - **CodeQL PR trigger no longer blocks merge protection on non-Python changes** ([#247](https://github.com/vig-os/devcontainer/issues/247))
   - Removed `pull_request` `paths` filter from `codeql.yml` in both root and workspace template so CodeQL always runs for PRs targeting protected branches and uploads SARIF results
+- **Release workflow dispatch refs and prepare rollback safeguards** ([#266](https://github.com/vig-os/devcontainer/issues/266))
+  - `just prepare-release` dispatches `prepare-release.yml` from `dev` via `--ref dev`
+  - `just publish-candidate` and `just finalize-release` dispatch `release.yml` from `release/X.Y.Z` via `--ref release/X.Y.Z`
+  - `prepare-release.yml` now rolls back partial side effects on failure by deleting a created `release/X.Y.Z` branch and restoring `CHANGELOG.md` on `dev`
 
 ### Security
 
