@@ -57,6 +57,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           sparse-checkout: .vig-os
+          sparse-checkout-cone-mode: false
 
       - name: Resolve image tag
         id: resolve
@@ -158,11 +159,17 @@ jobs:
           echo "CI (Container) Results Summary"
           echo "==============================="
           echo ""
+          echo "Resolve image: ${{ needs.resolve-image.result }}"
           echo "Lint: ${{ needs.lint.result }}"
           echo "Test: ${{ needs.test.result }}"
           echo ""
 
           FAILED=false
+
+          if [ "${{ needs.resolve-image.result }}" = "failure" ] || [ "${{ needs.resolve-image.result }}" = "cancelled" ]; then
+            echo "ERROR: Image resolution failed"
+            FAILED=true
+          fi
 
           if [ "${{ needs.lint.result }}" = "failure" ]; then
             echo "ERROR: Lint checks failed"
