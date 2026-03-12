@@ -410,6 +410,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Update astral-sh/setup-uv, taiki-e/install-action, docker/build-push-action, github/codeql-action, actions/dependency-review-action, actions/attest-build-provenance
 - **Bump GitHub CLI to 2.88.x**
   - Update expected `gh` version in image tests from 2.87 to 2.88
+- **Manifest sync includes `sync-main-to-dev` workflow** ([#278](https://github.com/vig-os/devcontainer/issues/278))
+  - Add `.github/workflows/sync-main-to-dev.yml` to `scripts/manifest.toml` so workspace sync includes the release-to-dev PR automation workflow
+
 
 ### Removed
 
