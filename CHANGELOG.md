@@ -168,6 +168,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replaced deprecated `APP_SYNC_ISSUES_*` secrets with `RELEASE_APP_*` for release and preparation workflows
   - `sync-issues.yml` now uses `COMMIT_APP_*`; `sync-main-to-dev.yml` uses both apps (commit app for refs, release app for PR operations)
   - Removed automatic `sync-issues` trigger from `sync-main-to-dev.yml` and documented the app permission model in `docs/RELEASE_CYCLE.md`
+- **Container CI defaults image tag from `.vig-os`** ([#264](https://github.com/vig-os/devcontainer/issues/264))
+  - `ci.yml` and `ci-container.yml` now run only on `pull_request` and `workflow_dispatch` after removing unused `workflow_call` triggers
+  - `ci-container.yml` now resolves `DEVCONTAINER_VERSION` from `.vig-os` before container jobs start
+  - Manual `workflow_dispatch` runs can still override the image via `image-tag`; fallback remains `latest` when no version is available
+  - Added an early manifest check in `resolve-image` so workflows fail fast if the resolved image tag is unavailable or inaccessible
 
 - **worktree-clean: add filter mode for stopped-only vs all** ([#158](https://github.com/vig-os/devcontainer/issues/158))
   - Default `just worktree-clean` (no args) now cleans only stopped worktrees, skips running tmux sessions
@@ -417,7 +422,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Update astral-sh/setup-uv, taiki-e/install-action, docker/build-push-action, github/codeql-action, actions/dependency-review-action, actions/attest-build-provenance
 - **Bump GitHub CLI to 2.88.x**
   - Update expected `gh` version in image tests from 2.87 to 2.88
-
 ### Deprecated
 
 ### Removed
