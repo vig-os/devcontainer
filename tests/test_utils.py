@@ -26,6 +26,22 @@ generate = importlib.util.module_from_spec(generate_spec)
 generate_spec.loader.exec_module(generate)
 
 
+def _point_generate_to_temp_changelog(
+    monkeypatch, tmp_path: Path, content: str
+) -> Path:
+    """Point generate.py changelog lookup to a temp CHANGELOG.md file."""
+    docs_path = tmp_path / "docs"
+    docs_path.mkdir()
+    fake_generate = docs_path / "generate.py"
+    fake_generate.write_text("# test helper\n")
+
+    changelog = tmp_path / "CHANGELOG.md"
+    changelog.write_text(content)
+
+    monkeypatch.setattr(generate, "__file__", str(fake_generate))
+    return changelog
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # docs/generate.py — function-level unit tests
 # ═════════════════════════════════════════════════════════════════════════════
@@ -121,6 +137,18 @@ class TestGetVersionFromChangelog:
         )
         assert generate.get_version_from_changelog() == "2.0.0"
 
+    def test_skips_tbd_entry(self, tmp_path, monkeypatch):
+        """Should ignore unreleased headings and use latest released version."""
+        _point_generate_to_temp_changelog(
+            monkeypatch,
+            tmp_path,
+            "# Changelog\n\n"
+            "## [0.3.0] - TBD\n\n"
+            "## [0.2.1] - 2026-01-28\n\n"
+            "## [0.2.0] - 2025-12-10\n",
+        )
+        assert generate.get_version_from_changelog() == "0.2.1"
+
     def test_get_version_from_changelog_actual(self):
         """Test version extraction from actual CHANGELOG.md."""
         version = generate.get_version_from_changelog()
@@ -171,6 +199,18 @@ class TestGetReleaseDateFromChangelog:
                             break
 
         assert date_found is None
+
+    def test_skips_tbd_entry(self, tmp_path, monkeypatch):
+        """Should ignore unreleased headings and use latest released date."""
+        _point_generate_to_temp_changelog(
+            monkeypatch,
+            tmp_path,
+            "# Changelog\n\n"
+            "## [0.3.0] - TBD\n\n"
+            "## [0.2.1] - 2026-01-28\n\n"
+            "## [0.2.0] - 2025-12-10\n",
+        )
+        assert generate.get_release_date_from_changelog() == "2026-01-28"
 
     def test_get_release_date_from_changelog_actual(self):
         """Test date extraction from actual CHANGELOG.md."""
