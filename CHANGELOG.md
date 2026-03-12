@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.3.0] - TBD
+
+### Added
+
 - **Image tools** ([[#212](https://github.com/vig-os/devcontainer/issues/212)])
   - Install rsync
 - **Preserve user-authored files during `--force` workspace upgrades** ([#212](https://github.com/vig-os/devcontainer/issues/212))
@@ -144,21 +158,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The smoke-test repo keeps audit trail through deploy PRs and merge history instead of a local changelog
   - Dispatch payload tag validation now enforces semver format `X.Y.Z` or `X.Y.Z-rcN` before using the tag in refs/URLs
   - CI security scan now includes a time-bounded exception for `CVE-2026-31812` in `uv`/`uvx` pending upstream dependency patch release
-
-### Fixed
-
-- **`just` default recipe hidden by lint recipe** ([#254](https://github.com/vig-os/devcontainer/issues/254))
-  - The `default` recipe must appear before any other recipe in the justfile; `lint` was placed first, shadowing the recipe listing
-  - Moved `default` recipe above `lint` to restore `just` with no arguments showing available recipes
-- **Broken `gh-issues --help` guard in justfile recipe** ([#173](https://github.com/vig-os/devcontainer/issues/173))
-  - `gh-issues` CLI has no `--help` flag, so the availability check always failed even when the binary was installed
-  - Removed the broken guard; binary availability is now verified by the image test suite
-- **Smoke-test redeploy preserves synced docs directories** ([#262](https://github.com/vig-os/devcontainer/issues/262))
-  - `init-workspace.sh --smoke-test` now excludes `docs/issues/` and `docs/pull-requests/` from `rsync --delete`
-  - Re-deploying smoke assets no longer removes docs synced by `sync-issues`
-- **Prepare-release uses scoped app tokens for protected branch writes** ([#268](https://github.com/vig-os/devcontainer/issues/268))
-  - `prepare-release.yml` now uses `COMMIT_APP_*` for git/ref and `commit-action` operations that touch `dev` and release refs
-  - Draft PR creation in prepare-release now uses `RELEASE_APP_*` token scope for pull-request operations
 
 ### Changed
 
@@ -425,7 +424,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Update astral-sh/setup-uv, taiki-e/install-action, docker/build-push-action, github/codeql-action, actions/dependency-review-action, actions/attest-build-provenance
 - **Bump GitHub CLI to 2.88.x**
   - Update expected `gh` version in image tests from 2.87 to 2.88
-### Deprecated
 
 ### Removed
 
@@ -441,131 +439,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **IN_CONTAINER guard never triggers on host** ([#238](https://github.com/vig-os/devcontainer/issues/238))
-  - Workspace githooks used `= "false"` but `IN_CONTAINER` is unset (not `"false"`) outside the devcontainer
-  - Changed to `!= "true"` in `pre-commit`, `prepare-commit-msg`, and `commit-msg` hooks to fail closed
-- **CHANGELOG extraction truncated on inline `##` markers** ([#172](https://github.com/vig-os/devcontainer/issues/172))
-  - `extract_unreleased_content` regex used mid-line lookahead for `##`/`###` which treated inline hash markers (e.g. `` `##` `` in backticks) as heading boundaries
-  - Anchored regex to line starts with `re.MULTILINE` so only actual heading lines terminate section capture
-- **install.sh is not idempotent — creates nested src/template_project on second run** ([#197](https://github.com/vig-os/devcontainer/issues/197))
-  - Guard template_project rename: if `src/${SHORT_NAME}` already exists, remove the redundant copy instead of moving it inside
-- **just gh-issues fails locally — rich not in .venv dependencies** ([#159](https://github.com/vig-os/devcontainer/issues/159))
-  - Add `devcontainer` dependency group in root `pyproject.toml` as SSoT for container tools (rich, pre-commit, ruff, pip-licenses)
-  - Container build installs from pyproject.toml via `uv export --only-group devcontainer` instead of hardcoding
-  - Add rich to workspace template dev group; change justfile.gh to `uv run python` so both local and container use project venv
-  - Copy `packages/vig-utils` before `uv export` so the lockfile can resolve the workspace member
-- **just check uses wrong path — justfile_directory() resolves incorrectly in imported justfile.base** ([#187](https://github.com/vig-os/devcontainer/issues/187))
-  - Replace `dirname(justfile_directory())` with `source_directory()/scripts` to correctly locate version-check.sh in deployed workspaces and devcontainer repo
-  - Regression test: `just check config` runs successfully from workspace
-- **gh-issues CI status deduplicates re-run checks** ([#176](https://github.com/vig-os/devcontainer/issues/176))
-  - Deduplicate `statusCheckRollup` by check name, keeping only the latest result (by `completedAt`)
-  - CI column now matches GitHub PR page when checks are re-run
-- **worktree-start swallows derive-branch-summary error messages** ([#183](https://github.com/vig-os/devcontainer/issues/183))
-  - Remove stderr suppression so error messages from derive-branch-summary.sh are visible
-  - Retry with standard model when lightweight model fails; print manual workaround hint if both fail
-  - Add optional MODEL_TIER parameter to derive-branch-summary.sh; BATS test for retry path
-- **AI agent identity enforcement: blocklist, prepare-commit-msg, author check, PR body scan** ([#163](https://github.com/vig-os/devcontainer/issues/163))
-  - Canonical blocklist `.github/agent-blocklist.toml` (trailers, names, emails) — single source of truth
-  - prepare-commit-msg hook strips Co-authored-by trailers before validation
-  - Pre-commit hook rejects commits when author/committer matches blocklist (skips in CI)
-  - validate-commit-msg accepts `--blocked-patterns` for TOML blocklist; rejects remaining fingerprints
-  - pr-title-check CI scans PR title and body for agent fingerprints
-  - Skill rules strengthened (git_commit, worktree_execute, worktree_pr)
-- **worktree-start preflight gaps — agent hang and gh repo set-default** ([#154](https://github.com/vig-os/devcontainer/issues/154))
-  - Add timeout (30s) to agent-based branch summary derivation; failure produces clear error with manual workaround
-  - Add gh repo set-default preflight before any gh API calls; auto-resolve from origin or fail with instructions
-  - Extract derive-branch-summary.sh with BRANCH_SUMMARY_CMD mock for tests; BATS tests for timeout and error paths
-- **gh-issues cross-ref detects Refs: #N in PR bodies** ([#121](https://github.com/vig-os/devcontainer/issues/121))
-  - `_build_cross_refs` now parses `Refs: #102` and comma-separated variants (`Refs: #102, #103`) alongside Closes/Fixes/Resolves
-- **PR table Reviewer column distinguishes requested vs completed reviewers** ([#105](https://github.com/vig-os/devcontainer/issues/105))
-  - Requested reviewers (no review yet) display as `?login` with dim italic style
-  - Actual reviewers (submitted review) display as plain login with green/red
-- **worktree-attach restarts stopped tmux session when worktree dir exists** ([#132](https://github.com/vig-os/devcontainer/issues/132))
-  - Detect when worktree directory exists but tmux session has terminated
-  - Automatically restart session in existing worktree before attaching
-  - Guard `worktree-start` against branches already checked out elsewhere with an informative error
-  - BATS integration tests for restart, error paths, and checkout detection
-- **Issue numbers in PR table are now clickable hyperlinks** ([#174](https://github.com/vig-os/devcontainer/issues/174))
-  - Replace plain styled text with Rich hyperlink markup in the Issues column of the PR table
-- **Synced justfiles reference scripts not included in workspace manifest** ([#190](https://github.com/vig-os/devcontainer/issues/190))
-  - Add manifest entries for resolve-branch.sh, derive-branch-summary.sh, check-skill-names.sh → `.devcontainer/scripts/`
-  - Update justfile.worktree to use `source_directory() / "scripts"` for portable path resolution
-  - Add Sed transform for check-skill-names.sh path in synced `.pre-commit-config.yaml`
-- **Worktree prerequisites are declared in setup requirements** ([#196](https://github.com/vig-os/devcontainer/issues/196))
-  - Add `tmux`, `agent`, and `jq` to `scripts/requirements.yaml` as required host dependencies with install guidance
-  - `scripts/init.sh --check` now surfaces missing worktree prerequisites before running worktree commands
-- **--force preserves excluded files by relying on rsync-only copy path** ([#212](https://github.com/vig-os/devcontainer/issues/212))
-  - Remove the `cp` fallback path that could overwrite preserved files during force upgrades
-  - Pin Trivy in CI and release security scan workflows to `v0.69.2` so scans continue working when older release assets are unavailable
-- **Sync-issues workflow schedule trigger** ([#91](https://github.com/vig-os/devcontainer/issues/91))
-  - `github.event.inputs.target-branch` is null on schedule events, causing `TARGET_BRANCH` to resolve to `refs/heads/` (404 in commit-action)
-  - Added `|| 'dev'` fallbacks for all input references so schedule triggers default to `dev`
-  - Added `output-dir` and `commit-msg` as parameterized `workflow_dispatch` inputs
-- **Host-specific paths in `.gitconfig` and unreliable `postAttachCommand` lifecycle** ([#60](https://github.com/vig-os/devcontainer/issues/60))
-  - `copy-host-user-conf.sh` now generates a container-ready `.gitconfig` with `/root/...` paths and strips host-only entries (credential helpers, `excludesfile`, `includeIf`) at export time
-  - Refactored devcontainer lifecycle: moved all one-time setup (`init-git.sh`, `setup-git-conf.sh`, `init-precommit.sh`) from `postAttachCommand` into `postCreateCommand`
-  - New `verify-auth.sh` script for lightweight SSH agent and `gh` auth verification (read-only, no side effects)
-  - `postAttachCommand` now only runs auth verification and dependency sync — no longer depends on unreliable attach hook for critical setup
-  - `setup-git-conf.sh` simplified to one-time file placement (removed SSH agent scanning logic)
-- **GitHub CLI config copy target path** ([#35](https://github.com/vig-os/devcontainer/issues/35))
-  - Corrected target path for copying GitHub CLI configuration in post-install step
-- **Install script terminal check in dry-run mode** ([#37](https://github.com/vig-os/devcontainer/issues/37))
-  - Moved TTY check to after dry-run flag check to allow --dry-run mode to exit immediately without requiring an interactive terminal
-  - Fixes test_dry_run_shows_command timeout in CI environments
-- **Sync-issues workflow robustness** — pinned runner to ubuntu-22.04, added target branch validation for `workflow_dispatch`, removed overly broad cache restore-key pattern ([#37](https://github.com/vig-os/devcontainer/issues/37))
-- **Integration test image tag normalization** — fixed overly greedy regex that removed commit hashes from image tags; now only removes known architecture suffixes (`-amd64`, `-arm64`) at the end ([#37](https://github.com/vig-os/devcontainer/issues/37))
-- **`just precommit` recipe** - Run pre-commit through `uv run` to ensure it uses the virtual environment ([#46](https://github.com/vig-os/devcontainer/issues/46))
-- **Sidecar tests in CI** — run via host podman to avoid API version mismatch between host (3.4.4) and container client (4.0.0) ([#48](https://github.com/vig-os/devcontainer/issues/48))
-- **Non-ASCII characters in justfiles** - Replaced Unicode box-drawing characters (═, ───) and emojis with ASCII equivalents for just-lsp compatibility ([#49](https://github.com/vig-os/devcontainer/issues/49))
-- **Pre-commit exclusion pattern** for pymarkdown updated to correct regex ([#50](https://github.com/vig-os/devcontainer/issues/50))
-- **Pytest test collection** - Exclude `tests/tmp/` directory (integration test workspaces) from test discovery to prevent import errors
-- **CI/CD release validation and test action checkout refs** ([#72](https://github.com/vig-os/devcontainer/issues/72))
-  - Block release if CI checks are still pending, in progress, queued, or in other non-terminal states
-  - Add `ref` input to `test-image` and `test-integration` composite actions to pin checkout commit
-  - Pass `finalize_sha` to test actions ensuring tests always run against the correct built commit
-  - Fix `install-just` conditional in `setup-env` to respect input flag; was unconditionally running
-  - Remove dead macOS `stat` fallback from `build-image` verification step (action only runs on ubuntu-22.04)
-- **Release tag convention: `v` prefix removed** ([#57](https://github.com/vig-os/devcontainer/issues/57))
-  - Git tags now follow the bare `X.Y.Z` format (e.g. `1.0.0`) instead of `vX.Y.Z`
-  - `release.yml` and `prepare-release.yml` workflows updated to create, push, and validate tags without the `v` prefix
-  - `assets/workspace/.github/workflows/release.yml` template updated to match
-  - CHANGELOG historical release links updated to bare-version URLs (`0.2.1`, `0.2.0`, `0.1`)
-  - Existing repository tags (`v0.1`, `v0.2.0`, `v0.2.1`) renamed to bare versions and pushed
-  - Documentation and inline comments updated across `docs/RELEASE_CYCLE.md`, `CONTRIBUTE.md`, `README.md`, and `build-image` action
-- **`gh` version assertion in `test_gh_version`** ([#93](https://github.com/vig-os/devcontainer/issues/93))
-  - Updated expected version prefix from `2.86.` to `2.87.` to match GitHub CLI 2.87.0 (released 2026-02-18)
-- **BATS test failures in init-workspace and prepare-build suites** ([#67](https://github.com/vig-os/devcontainer/issues/67))
-  - Removed premature init-workspace.bats tests for unimplemented `is_git_dirty` feature (9 tests)
-  - Fixed prepare-build.bats grep pattern for `sync_manifest.py` invocation to handle shell quoting
-- **`just init` fails to install devcontainer CLI on Linux** ([#111](https://github.com/vig-os/devcontainer/issues/111))
-  - `npm install -g` requires root access to `/usr/local/lib/node_modules`, causing EACCES permission denied
-  - Switched to local `npm install` (package already declared in `package.json`), matching the existing `bats` pattern
-  - Updated pytest fixtures in `conftest.py` to also check `node_modules/.bin/devcontainer`
-- **Worktree branch resolution broken by tab-separated `gh` output** ([#103](https://github.com/vig-os/devcontainer/issues/103))
-  - `gh issue develop --list` now returns `branch<TAB>URL`; the previous `grep -oE '[^ ]+$'` captured the entire line
-  - Extracted parsing into `scripts/resolve-branch.sh` (`head -1 | cut -f1`) used by both call sites in `justfile.worktree`
-- **Container build fails when resolving latest cargo-binstall via GitHub API** ([#154](https://github.com/vig-os/devcontainer/issues/154))
-  - Resolve the latest cargo-binstall version from the `releases/latest` redirect URL instead of `api.github.com` to avoid HTTP 22 failures during image build
-  - Add an explicit empty-version guard so the build fails with a clear error message if version resolution fails
-- **CI python security scan fails on unsatisfiable safety pin** ([#213](https://github.com/vig-os/devcontainer/issues/213))
-  - Bump workflow `safety` install pin from `3.2.11` to `3.7.0` in both root and workspace-template CI workflows so `uv pip install` resolves successfully again
-- **Requirements parser and `just` install guidance in setup flow** ([#122](https://github.com/vig-os/devcontainer/issues/122))
-  - `scripts/init.sh` now supports multiline `install_command` values in `scripts/requirements.yaml`
-  - Update `just` install instructions to use `sudo` where required by apt-based installation steps
-- **Taplo pre-commit hook compiles from source instead of using system binary** ([#226](https://github.com/vig-os/devcontainer/issues/226))
-  - Switch taplo pre-commit hooks from `language: rust` (cargo compile) to `language: system` using the binary already installed in the container image
-  - Correct the taplo release URL and pin to the latest version in the Containerfile
-  - Add taplo to the CI `setup-env` action so pre-commit hooks work on bare runners
-- **Workspace helper CLI checks and sidecar runtime fallback** ([#173](https://github.com/vig-os/devcontainer/issues/173))
-  - Sidecar recipes now support both podman and docker runtimes for listing, starting, and executing sidecar commands
-  - Worktree and GitHub helper recipes now fail fast with actionable guidance when helper CLIs are unavailable
-  - Label taxonomy guidance clarifies that `setup-labels` is provided by devcontainer bootstrap tooling
-- **CodeQL PR trigger no longer blocks merge protection on non-Python changes** ([#247](https://github.com/vig-os/devcontainer/issues/247))
-  - Removed `pull_request` `paths` filter from `codeql.yml` in both root and workspace template so CodeQL always runs for PRs targeting protected branches and uploads SARIF results
-- **Release workflow dispatch refs and prepare rollback safeguards** ([#266](https://github.com/vig-os/devcontainer/issues/266))
-  - `just prepare-release` dispatches `prepare-release.yml` from `dev` via `--ref dev`
-  - `just publish-candidate` and `just finalize-release` dispatch `release.yml` from `release/X.Y.Z` via `--ref release/X.Y.Z`
-  - `prepare-release.yml` now rolls back partial side effects on failure by deleting a created `release/X.Y.Z` branch and restoring `CHANGELOG.md` on `dev`
+- **`just` default recipe hidden by lint recipe** ([#254](https://github.com/vig-os/devcontainer/issues/254))
+  - The `default` recipe must appear before any other recipe in the justfile; `lint` was placed first, shadowing the recipe listing
+  - Moved `default` recipe above `lint` to restore `just` with no arguments showing available recipes
+- **Broken `gh-issues --help` guard in justfile recipe** ([#173](https://github.com/vig-os/devcontainer/issues/173))
+  - `gh-issues` CLI has no `--help` flag, so the availability check always failed even when the binary was installed
+  - Removed the broken guard; binary availability is now verified by the image test suite
+- **Smoke-test redeploy preserves synced docs directories** ([#262](https://github.com/vig-os/devcontainer/issues/262))
+  - `init-workspace.sh --smoke-test` now excludes `docs/issues/` and `docs/pull-requests/` from `rsync --delete`
+  - Re-deploying smoke assets no longer removes docs synced by `sync-issues`
+- **Prepare-release uses scoped app tokens for protected branch writes** ([#268](https://github.com/vig-os/devcontainer/issues/268))
+  - `prepare-release.yml` now uses `COMMIT_APP_*` for git/ref and `commit-action` operations that touch `dev` and release refs
+  - Draft PR creation in prepare-release now uses `RELEASE_APP_*` token scope for pull-request operations
 
 ### Security
 
