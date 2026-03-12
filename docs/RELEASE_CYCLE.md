@@ -359,7 +359,7 @@ The `release.yml` workflow performs the entire remaining release process. Behavi
 
 4. ✅ **Publish** job (runs only if all builds/tests pass)
    - Candidate mode: infers next `rcN`, creates annotated tag `X.Y.Z-rcN`, publishes candidate manifests
-   - Candidate mode: triggers `repository_dispatch` to `vig-os/devcontainer-smoke-test` with `client_payload.rc_tag`
+   - Candidate mode: triggers `repository_dispatch` to `vig-os/devcontainer-smoke-test` with `client_payload.tag`
    - Final mode: creates annotated tag `X.Y.Z`, publishes final manifests
    - Pushes tag to origin
    - Downloads tested images from artifacts
