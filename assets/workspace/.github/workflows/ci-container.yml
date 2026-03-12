@@ -36,8 +36,6 @@ on:  # yamllint disable-line rule:truthy
           - all
           - lint
           - test
-  workflow_call:
-    inputs:
       image-tag:
         description: 'Container image tag to use'
         required: false
