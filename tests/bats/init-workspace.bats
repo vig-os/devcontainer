@@ -84,3 +84,10 @@ setup() {
     run grep 'rsync -av --delete' "$INIT_WORKSPACE_SH"
     assert_success
 }
+
+@test "init-workspace.sh smoke mode excludes synced docs directories from delete" {
+    run grep -A1 'rsync -av --delete' "$INIT_WORKSPACE_SH"
+    assert_success
+    assert_output --partial "--exclude='docs/issues/'"
+    assert_output --partial "--exclude='docs/pull-requests/'"
+}
