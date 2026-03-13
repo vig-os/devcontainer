@@ -23,7 +23,7 @@ load_vig_os_config() {
         return 0
     fi
 
-    while IFS= read -r line || [[ -n "$line" ]]; do
+    while IFS= read -r line || [[ -n "${line:-}" ]]; do
         [[ -z "${line//[[:space:]]/}" ]] && continue
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
 
