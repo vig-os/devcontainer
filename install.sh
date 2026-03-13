@@ -209,7 +209,11 @@ show_install_instructions() {
 
 # Sanitize project name: replace hyphens and spaces with underscore; lowercase; remove other special chars
 sanitize_name() {
-    echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[ -]/_/g' | sed 's/[^a-z0-9_]/_/g'
+    local sanitized
+    sanitized=$(echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[ -]/_/g' | sed 's/[^a-z0-9_]/_/g')
+    # Ensure generated package names start/end with alphanumeric characters.
+    sanitized=$(echo "$sanitized" | sed 's/__*/_/g' | sed 's/^[^a-z0-9]*//; s/[^a-z0-9]*$//')
+    echo "${sanitized:-project}"
 }
 
 # Sanitize for security only: remove shell metacharacters but preserve capitalization

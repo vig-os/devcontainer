@@ -454,6 +454,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smoke-test deploy commit no longer references non-local issue IDs** ([#284](https://github.com/vig-os/devcontainer/issues/284))
   - `assets/smoke-test/.github/workflows/repository-dispatch.yml` no longer injects `Refs: #258` into automated `chore: deploy <tag>` commits in the smoke-test repository
   - Added maintainer note that workflow-template changes require manual redeploy to `vig-os/devcontainer-smoke-test` and promotion through PRs to `main`
+- **Install name sanitization trims invalid package boundaries** ([#291](https://github.com/vig-os/devcontainer/issues/291))
+  - `install.sh` now normalizes sanitized project names to ensure they start/end with alphanumeric characters before passing `SHORT_NAME`
+  - `init-workspace.sh` mirrors the same normalization so generated `pyproject.toml` names cannot end with separators like `_`
 
 ### Security
 
