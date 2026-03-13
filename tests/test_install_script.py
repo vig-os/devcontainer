@@ -119,6 +119,30 @@ class TestInstallScriptIntegration:
             "Expected --smoke-test to be forwarded in dry-run command output"
         )
 
+    def test_dry_run_name_sanitization_trims_trailing_separator(self):
+        """Test --name sanitization trims trailing separators for valid package name."""
+        project_root = Path(__file__).resolve().parents[1]
+        install_script = project_root / "install.sh"
+
+        result = subprocess.run(
+            [str(install_script), "--dry-run", "--name", "Install-Test-Project-", "."],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            cwd=str(project_root),
+        )
+
+        assert result.returncode == 0, (
+            f"install.sh --dry-run --name failed:\n"
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        assert 'SHORT_NAME="install_test_project"' in result.stdout, (
+            "Expected sanitized name without trailing underscore in dry-run output"
+        )
+        assert 'SHORT_NAME="install_test_project_"' not in result.stdout, (
+            "Sanitized name should not end with an underscore"
+        )
+
     def test_install_creates_devcontainer_json(self, install_workspace):
         """Test install.sh creates devcontainer.json."""
         devcontainer_json = install_workspace / ".devcontainer" / "devcontainer.json"
