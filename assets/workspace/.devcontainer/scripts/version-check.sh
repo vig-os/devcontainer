@@ -193,15 +193,32 @@ record_check() {
 # Get current installed version from root .vig-os config
 get_current_version() {
     local config_file="$DEVCONTAINER_DIR/../.vig-os"
+    local line
+    local version=""
 
     if [[ ! -f "$config_file" ]]; then
         return 1
     fi
 
-    # shellcheck source=/dev/null
-    source "$config_file"
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ -z "${line//[[:space:]]/}" ]] && continue
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
 
-    local version="${DEVCONTAINER_VERSION:-}"
+        case "$line" in
+            DEVCONTAINER_VERSION=*)
+                version="${line#*=}"
+                version="${version#"${version%%[![:space:]]*}"}"
+                version="${version%"${version##*[![:space:]]}"}"
+
+                if [[ "$version" =~ ^\".*\"$ ]]; then
+                    version="${version:1:-1}"
+                elif [[ "$version" =~ ^\'.*\'$ ]]; then
+                    version="${version:1:-1}"
+                fi
+                break
+                ;;
+        esac
+    done < "$config_file"
 
     if [[ -z "$version" || "$version" == "dev" || "$version" == "latest" ]]; then
         return 1  # Not a pinned version
