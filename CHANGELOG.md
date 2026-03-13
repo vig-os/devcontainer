@@ -448,6 +448,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release candidate publish retags loaded images before push** ([#281](https://github.com/vig-os/devcontainer/issues/281))
   - `release.yml` now tags `ghcr.io/vig-os/devcontainer:X.Y.Z-arch` artifacts as `X.Y.Z-rcN-arch` before `docker push` in candidate runs
   - Prevents publish failures caused by pushing candidate tags that were never created locally after `docker load`
+- **Pinned commit-action to the malformed path fix release** ([#286](https://github.com/vig-os/devcontainer/issues/286))
+  - Updated smoke-test and release-related workflows to `vig-os/commit-action@c0024cbad0e501764127cccab732c6cd465b4646` (`v0.1.5`)
+  - Resolves failures when commit-action receives `FILE_PATHS: .` and accidentally includes invalid `.git/*` tree paths
 
 ### Security
 
