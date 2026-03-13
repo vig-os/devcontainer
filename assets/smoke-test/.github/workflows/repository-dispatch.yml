@@ -132,7 +132,7 @@ jobs:
           if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${BRANCH_NAME}" >/dev/null 2>&1; then
             gh api -X PATCH "repos/${GITHUB_REPOSITORY}/git/refs/heads/${BRANCH_NAME}" \
               -f sha="${DEV_SHA}" \
-              -f force=true >/dev/null
+              -F force=true >/dev/null
           else
             gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
               -f ref="refs/heads/${BRANCH_NAME}" \
