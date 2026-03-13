@@ -383,7 +383,7 @@ jobs:
 
       - name: Commit finalization changes via API
         if: needs.validate.outputs.release_kind == 'final'
-        uses: vig-os/commit-action@b70c2d87acd0f146c40e8d88a9bda40b76c084b5  # v0.1.3
+        uses: vig-os/commit-action@c0024cbad0e501764127cccab732c6cd465b4646  # v0.1.5
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -604,7 +604,7 @@ jobs:
           echo "✓ Tag pushed: $PUBLISH_VERSION"
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad  # v4
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22  # v4
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
@@ -772,7 +772,7 @@ jobs:
           fi
 
       - name: Generate SBOM
-        uses: anchore/sbom-action@28d71544de8eaf1b958d335707167c5f783590ad  # v0.22.2
+        uses: anchore/sbom-action@57aae528053a48a3f6235f2d9461b05fbcb7366d  # v0.23.1
         with:
           image: ghcr.io/vig-os/devcontainer:${{ needs.validate.outputs.publish_version }}
           artifact-name: sbom-${{ needs.validate.outputs.publish_version }}.spdx.json
