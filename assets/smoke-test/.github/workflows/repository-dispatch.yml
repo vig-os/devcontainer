@@ -10,6 +10,9 @@ name: Repository Dispatch Listener
 # Dispatch payload:
 # - Preferred:   client_payload.tag
 # - Optional:    client_payload.event_type, client_payload.source_repo
+#
+# NOTE: Changes to this template may require manual redeploy to
+# vig-os/devcontainer-smoke-test and promotion through PRs until merged to main.
 
 on:  # yamllint disable-line rule:truthy
   repository_dispatch:
@@ -129,7 +132,7 @@ jobs:
           if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${BRANCH_NAME}" >/dev/null 2>&1; then
             gh api -X PATCH "repos/${GITHUB_REPOSITORY}/git/refs/heads/${BRANCH_NAME}" \
               -f sha="${DEV_SHA}" \
-              -f force=true >/dev/null
+              -F force=true >/dev/null
           else
             gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
               -f ref="refs/heads/${BRANCH_NAME}" \
@@ -137,7 +140,7 @@ jobs:
           fi
 
       - name: Commit and push deploy changes via signed commit-action
-        uses: vig-os/commit-action@e7dc876fbb73df9099831fed9bfc402108fd04c3  # v0.1.4
+        uses: vig-os/commit-action@c0024cbad0e501764127cccab732c6cd465b4646  # v0.1.5
         env:
           GH_TOKEN: ${{ steps.generate_commit_token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -145,8 +148,6 @@ jobs:
           ALLOW_EMPTY: "true"
           COMMIT_MESSAGE: |-
             chore: deploy ${{ needs.validate.outputs.tag }}
-
-            Refs: #258
           FILE_PATHS: .
 
       - name: Create deploy PR

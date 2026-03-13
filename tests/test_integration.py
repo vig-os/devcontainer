@@ -704,6 +704,64 @@ class TestVigOsConfig:
             "initialize.sh did not write DEVCONTAINER_VERSION to .env"
         )
 
+    def test_initialize_does_not_execute_vig_os_shell_content(
+        self, initialized_workspace
+    ):
+        """Test initialize.sh parses .vig-os as data, not executable shell."""
+        init_script = (
+            initialized_workspace / ".devcontainer" / "scripts" / "initialize.sh"
+        )
+        vig_os_file = initialized_workspace / ".vig-os"
+        env_file = initialized_workspace / ".devcontainer" / ".env"
+        marker_file = initialized_workspace / ".issue285_init_marker"
+        original_vig_os = (
+            vig_os_file.read_text(encoding="utf-8") if vig_os_file.exists() else None
+        )
+
+        try:
+            if env_file.exists():
+                env_file.unlink()
+            if marker_file.exists():
+                marker_file.unlink()
+
+            vig_os_file.write_text(
+                "\n".join(
+                    [
+                        "DEVCONTAINER_VERSION=1.2.3",
+                        f'EVIL=$(touch "{marker_file}")',
+                        "UNRELATED_KEY=ignored",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [str(init_script)],
+                capture_output=True,
+                text=True,
+                cwd=str(initialized_workspace),
+                timeout=10,
+            )
+
+            assert result.returncode == 0, (
+                f"initialize.sh failed\nstdout: {result.stdout}\nstderr: {result.stderr}"
+            )
+            assert marker_file.exists() is False, (
+                "initialize.sh executed shell content from .vig-os"
+            )
+            assert env_file.exists(), (
+                ".devcontainer/.env was not created by initialize.sh"
+            )
+            env_content = env_file.read_text(encoding="utf-8")
+            assert "DEVCONTAINER_VERSION=1.2.3" in env_content
+        finally:
+            if original_vig_os is None:
+                if vig_os_file.exists():
+                    vig_os_file.unlink()
+            else:
+                vig_os_file.write_text(original_vig_os, encoding="utf-8")
+
 
 class TestPlaceholders:
     """Test that placeholders are replaced correctly."""
@@ -1366,8 +1424,11 @@ class TestDevContainerCLI:
             # Check if it's a permission denied (keys not authorized) vs connection error
             if "Permission denied" in result.stderr:
                 # Keys exist but aren't authorized - this is acceptable for testing
-                # The important thing is that SSH is configured
-                assert "github.com" in result.stderr, (
+                # Ensure this is an auth failure, not a connectivity/hostname failure.
+                assert (
+                    "Could not resolve hostname" not in result.stderr
+                    and "Name or service not known" not in result.stderr
+                ), (
                     f"SSH connection failed unexpectedly\n"
                     f"stdout: {result.stdout}\n"
                     f"stderr: {result.stderr}"
@@ -1381,7 +1442,12 @@ class TestDevContainerCLI:
                 )
         elif result.returncode == 1:
             # Success - GitHub responded (exit 1 is normal for test connections)
-            assert "Hi" in result.stdout or "github.com" in result.stderr, (
+            output = result.stdout + result.stderr
+            assert (
+                "successfully authenticated" in output
+                or "does not provide shell access" in output
+                or "Hi " in output
+            ), (
                 f"Unexpected SSH response from GitHub\n"
                 f"stdout: {result.stdout}\n"
                 f"stderr: {result.stderr}"
@@ -1632,15 +1698,11 @@ class TestDevContainerCLI:
 
         # Verify we got a successful authentication response
         output = result.stdout + result.stderr
-        assert (
-            "Logged in to github.com" in output
-            or "✓ Logged in" in output
-            or "github.com" in output
-        ), (
+        assert "Logged in to " in output or "✓ Logged in" in output, (
             f"GitHub CLI authentication status unclear\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}\n"
-            f"Expected 'Logged in to github.com' or similar in output"
+            f"Expected a successful gh auth status message in output"
         )
 
     def test_valid_branch_names_commit_succeeds(self, devcontainer_up):
@@ -2659,6 +2721,54 @@ class TestVersionCheckScript:
         assert "DEVCONTAINER_VERSION" in content, (
             "version-check.sh should read DEVCONTAINER_VERSION"
         )
+
+    def test_config_does_not_execute_vig_os_shell_content(
+        self, version_check_script, initialized_workspace
+    ):
+        """Test config command does not execute shell code from .vig-os."""
+        vig_os_file = initialized_workspace / ".vig-os"
+        marker_file = initialized_workspace / ".issue285_version_marker"
+        original_vig_os = (
+            vig_os_file.read_text(encoding="utf-8") if vig_os_file.exists() else None
+        )
+
+        try:
+            if marker_file.exists():
+                marker_file.unlink()
+
+            vig_os_file.write_text(
+                "\n".join(
+                    [
+                        "DEVCONTAINER_VERSION=1.2.3",
+                        f'EVIL=$(touch "{marker_file}")',
+                        "NOT_RELEVANT=ok",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [str(version_check_script), "config"],
+                capture_output=True,
+                text=True,
+                cwd=str(initialized_workspace),
+                timeout=10,
+            )
+
+            assert result.returncode == 0, (
+                f"version-check.sh config failed\nstdout: {result.stdout}\nstderr: {result.stderr}"
+            )
+            assert marker_file.exists() is False, (
+                "version-check.sh executed shell content from .vig-os"
+            )
+            assert "Current ver:    1.2.3" in result.stdout
+        finally:
+            if original_vig_os is None:
+                if vig_os_file.exists():
+                    vig_os_file.unlink()
+            else:
+                vig_os_file.write_text(original_vig_os, encoding="utf-8")
 
     def test_config_creation(self, version_check_script, local_dir):
         """Test that config file is created with defaults on first run."""
