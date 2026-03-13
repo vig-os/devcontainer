@@ -10,6 +10,9 @@ name: Repository Dispatch Listener
 # Dispatch payload:
 # - Preferred:   client_payload.tag
 # - Optional:    client_payload.event_type, client_payload.source_repo
+#
+# NOTE: Changes to this template may require manual redeploy to
+# vig-os/devcontainer-smoke-test and promotion through PRs until merged to main.
 
 on:  # yamllint disable-line rule:truthy
   repository_dispatch:
@@ -145,8 +148,6 @@ jobs:
           ALLOW_EMPTY: "true"
           COMMIT_MESSAGE: |-
             chore: deploy ${{ needs.validate.outputs.tag }}
-
-            Refs: #258
           FILE_PATHS: .
 
       - name: Create deploy PR
