@@ -4,33 +4,54 @@ version = "0.1.1"
 description = "vigOS development environment"
 requires-python = "==3.12.10"
 dependencies = [
-    "github-backup>=0.50.3",
-    "jinja2>=3.1.0",
-    "pexpect>=4.9.0",
-    "pre-commit>=4.3.0",
-    "pytest>=9.0.1",
-    "pyyaml>=6.0.3",
-    "testinfra>=6.0.0",
+  "github-backup>=0.50.3",
+  "jinja2>=3.1.0",
+  "pexpect>=4.9.0",
+  "pre-commit>=4.3.0",
+  "pytest>=9.0.1",
+  "pyyaml>=6.0.3",
+  "testinfra>=6.0.0",
 ]
 
 [dependency-groups]
 dev = [
-    {include-group = "lint"},
-    {include-group = "test"},
+  "vig-utils",
+  { include-group = "devcontainer" },
+  { include-group = "lint" },
+  { include-group = "test" },
+]
+devcontainer = [
+  "rich>=13.0.0",
+  "pre-commit>=4.3.0",
+  "ruff>=0.14.3",
+  "pip-licenses>=5.0.0",
+  "bandit[toml]>=1.7.5",
 ]
 lint = [
-    "pre-commit>=4.3.0",
-    "ruff>=0.14.3",
-    "pip-licenses>=5.0.0",
+  "pre-commit>=4.3.0",
+  "ruff>=0.14.3",
+  "pip-licenses>=5.0.0",
+  "bandit[toml]>=1.7.5",
 ]
 test = [
-    "pytest>=8.4.1",
-    "pytest-testinfra>=10.2.2",
-    "pytest-docker>=3.2.3",
-    "pexpect>=4.8.0",
-    "testcontainers>=4.9.0",
-    "bcrypt>=5.0.0",
+  "pytest>=8.4.1",
+  "pytest-cov>=6.0",
+  "pytest-testinfra>=10.2.2",
+  "pytest-docker>=3.2.3",
+  "pexpect>=4.8.0",
+  "testcontainers>=4.9.0",
+  "bcrypt>=5.0.0",
 ]
+
+[tool.uv]
+constraint-dependencies = [
+  "urllib3>=2.6.3",
+  "filelock>=3.20.3",
+  "virtualenv>=20.36.1",
+]
+
+[tool.uv.sources]
+vig-utils = { path = "packages/vig-utils", editable = true }
 
 [tool.ruff]
 # Black-compatible line length
@@ -42,14 +63,14 @@ target-version = "py312"
 [tool.ruff.lint]
 
 extend-select = [
-    "I",    # isort
-    "N",    # pep8-naming
-    "UP",   # pyupgrade
-    "B",    # flake8-bugbear
-    "C4",   # flake8-comprehensions
-    "SIM",  # flake8-simplify
-    "TCH",  # flake8-type-checking
-    "PTH",  # flake8-use-pathlib
+  "I",   # isort
+  "N",   # pep8-naming
+  "UP",  # pyupgrade
+  "B",   # flake8-bugbear
+  "C4",  # flake8-comprehensions
+  "SIM", # flake8-simplify
+  "TCH", # flake8-type-checking
+  "PTH", # flake8-use-pathlib
 ]
 
 # Ignore specific rules if needed
@@ -64,6 +85,30 @@ indent-style = "space"
 
 [tool.pytest.ini_options]
 # Suppress deprecation warnings from testcontainers library
-filterwarnings = [
-    "ignore::DeprecationWarning:testcontainers",
-]
+filterwarnings = ["ignore::DeprecationWarning:testcontainers"]
+# Discover tests in both root tests/ and vig-utils package tests
+testpaths = ["tests", "packages/vig-utils/tests"]
+# Do not collect tests from tests/tmp (integration-test workspace dirs with template tests)
+norecursedirs = "tmp"
+
+# ---------------------------------------------------------------------------
+# Coverage (pytest-cov / coverage.py)
+# ---------------------------------------------------------------------------
+# Coverage targets project-level Python code (vig_utils, scripts/, docs/).
+# Image and integration tests run inside containers and are not instrumented.
+
+[tool.coverage.run]
+source = ["packages/vig-utils/src/vig_utils", "scripts", "docs"]
+omit = ["tests/*", "assets/*", "**/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+# Minimum coverage threshold — CI will fail if total drops below this value.
+# Currently 50% because some modules (prepare-changelog.py CLI functions,
+# docs/generate.py workflow coordination) are harder to instrument.
+# Unit tests added for core functions; subprocess tests validate CLI.
+fail_under = 50
+
+[tool.coverage.xml]
+output = "coverage.xml"

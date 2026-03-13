@@ -1,0 +1,120 @@
+# Workspace sync manifest — declarative config for sync_manifest.py
+# Single source of truth for files copied into assets/workspace/ and their transforms.
+
+[[entries]]
+src = "docs/COMMIT_MESSAGE_STANDARD.md"
+
+[[entries]]
+src = ".cursor/rules/"
+transforms = [
+  { type = "RemoveLines", pattern = "Full reference: \\[docs/COMMIT_MESSAGE_STANDARD\\.md\\]", target = "commit-messages.mdc" },
+]
+
+[[entries]]
+src = ".cursor/skills/"
+transforms = [
+  { type = "Sed", pattern = "just test-image", replace = "just test", target = "code:verify/SKILL.md" },
+  { type = "Sed", pattern = "just test-image", replace = "just test", target = "design:plan/SKILL.md" },
+]
+
+[[entries]]
+src = ".cursor/worktrees.json"
+
+[[entries]]
+src = ".gitmessage"
+
+[[entries]]
+src = ".yamllint"
+
+[[entries]]
+src = ".pymarkdown"
+
+[[entries]]
+src = ".pymarkdown.config.md"
+
+[[entries]]
+src = ".hadolint.yaml"
+
+[[entries]]
+src = ".vscode/settings.json"
+transforms = [
+  { type = "Sed", pattern = "\\$\\{workspaceFolder\\}/\\.venv/bin/python3", replace = "/opt/venv/bin/python3" },
+]
+
+[[entries]]
+src = ".github/agent-blocklist.toml"
+
+[[entries]]
+src = ".github/label-taxonomy.toml"
+
+[[entries]]
+src = ".github/pull_request_template.md"
+
+[[entries]]
+src = ".github/ISSUE_TEMPLATE/"
+
+[[entries]]
+src = ".github/dependabot.yml"
+transforms = [
+  { type = "RemoveBlock", start_pattern = "^\\s+# Docker", end_pattern = "^$" },
+  { type = "StripTrailingBlankLines" },
+]
+
+[[entries]]
+src = ".github/workflows/scorecard.yml"
+
+[[entries]]
+src = ".github/workflows/sync-issues.yml"
+
+[[entries]]
+src = ".github/workflows/sync-main-to-dev.yml"
+
+[[entries]]
+src = ".github/workflows/codeql.yml"
+
+[[entries]]
+src = "justfile.gh"
+dest = ".devcontainer/justfile.gh"
+transforms = [
+  { type = "Sed", pattern = "uv run gh-issues", replace = "gh-issues" },
+]
+
+[[entries]]
+src = "justfile.worktree"
+dest = ".devcontainer/justfile.worktree"
+transforms = [
+  { type = "Sed", pattern = "uv run resolve-branch", replace = "resolve-branch" },
+  { type = "Sed", pattern = "uv run derive-branch-summary", replace = "derive-branch-summary" },
+]
+
+[[entries]]
+src = ".pre-commit-config.yaml"
+transforms = [
+  { type = "RemovePrecommitHooks", hook_ids = [
+    "hadolint",
+    "generate-docs",
+    "sync-manifest",
+    "pip-licenses",
+    "check-action-pins",
+    "bandit",
+    "check-skill-names",
+    "prepare-commit-msg-strip-trailers",
+    "check-agent-identity",
+    "validate-commit-msg",
+    "taplo-format",
+    "taplo-lint",
+  ] },
+  { type = "Sed", pattern = "bandit -r packages/vig-utils/src/ assets/workspace/", replace = "bandit -r src/" },
+  { type = "StripTrailingBlankLines" },
+  { type = "ReplaceBlock", start_pattern = "^\\s+args: \\[$", end_pattern = "^\\s+\\]$", replacement = """
+        # Optional: customize commit types, scopes, or refs-optional types via CLI arguments.
+        # By default, scopes are not enforced. Set --scopes to require specific scopes.
+        # Examples (choose one args line):
+        #   args: ["--types", "feat,fix,docs,chore"]
+        #   args: ["--scopes", "api,cli,utils"]
+        #   args: ["--refs-optional-types", "chore"]
+        #   args: ["--types", "feat,fix,docs", "--scopes", "api,cli,utils", "--refs-optional-types", "chore"]
+""" },
+  { type = "Sed", pattern = "-r packages/vig-utils/src/ assets/workspace/ ", replace = "-r src/ " },
+  { type = "StripTrailingBlankLines" },
+]

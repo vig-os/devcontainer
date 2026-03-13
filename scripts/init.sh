@@ -181,6 +181,7 @@ parse_requirements() {
     local in_dependencies=false
     local in_optional=false
     local current_section=""
+    local multiline_install_field=""
 
     # Reset global arrays
     DEPS_NAMES=()
@@ -208,6 +209,19 @@ parse_requirements() {
     local current_install_manual=""
 
     while IFS= read -r line || [ -n "$line" ]; do
+        # Handle multiline install commands (YAML block scalar, e.g. "debian: |")
+        if [ -n "$multiline_install_field" ]; then
+            if [[ "$line" =~ ^[[:space:]]{8}(.*)$ ]]; then
+                if [ -n "${!multiline_install_field}" ]; then
+                    printf -v "$multiline_install_field" '%s\n%s' "${!multiline_install_field}" "${BASH_REMATCH[1]}"
+                else
+                    printf -v "$multiline_install_field" '%s' "${BASH_REMATCH[1]}"
+                fi
+                continue
+            fi
+            multiline_install_field=""
+        fi
+
         # Skip comments and empty lines
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
         [[ -z "${line// /}" ]] && continue
@@ -271,16 +285,27 @@ parse_requirements() {
                 current_section="install"
             elif [[ "$line" =~ ^[[:space:]]{6}command:[[:space:]]*(.+) ]] && [ "$current_section" = "check" ]; then
                 current_check_cmd="${BASH_REMATCH[1]}"
-            elif [[ "$line" =~ ^[[:space:]]{6}macos:[[:space:]]*(.+) ]] && [ "$current_section" = "install" ]; then
-                current_install_macos="${BASH_REMATCH[1]}"
-            elif [[ "$line" =~ ^[[:space:]]{6}debian:[[:space:]]*(.+) ]] && [ "$current_section" = "install" ]; then
-                current_install_debian="${BASH_REMATCH[1]}"
-            elif [[ "$line" =~ ^[[:space:]]{6}fedora:[[:space:]]*(.+) ]] && [ "$current_section" = "install" ]; then
-                current_install_fedora="${BASH_REMATCH[1]}"
-            elif [[ "$line" =~ ^[[:space:]]{6}alpine:[[:space:]]*(.+) ]] && [ "$current_section" = "install" ]; then
-                current_install_alpine="${BASH_REMATCH[1]}"
-            elif [[ "$line" =~ ^[[:space:]]{6}all:[[:space:]]*(.+) ]] && [ "$current_section" = "install" ]; then
-                current_install_all="${BASH_REMATCH[1]}"
+            elif [[ "$line" =~ ^[[:space:]]{6}(macos|debian|fedora|alpine|all):[[:space:]]*(.*)$ ]] && [ "$current_section" = "install" ]; then
+                local install_key="${BASH_REMATCH[1]}"
+                local install_value="${BASH_REMATCH[2]}"
+                local target_var=""
+
+                case "$install_key" in
+                    macos) target_var="current_install_macos" ;;
+                    debian) target_var="current_install_debian" ;;
+                    fedora) target_var="current_install_fedora" ;;
+                    alpine) target_var="current_install_alpine" ;;
+                    all) target_var="current_install_all" ;;
+                esac
+
+                local scalar_marker
+                scalar_marker="$(echo "$install_value" | tr -d '[:space:]')"
+                if [ "$scalar_marker" = "|" ] || [ "$scalar_marker" = "|-" ] || [ "$scalar_marker" = "|+" ] || [ "$scalar_marker" = ">" ] || [ "$scalar_marker" = ">-" ] || [ "$scalar_marker" = ">+" ]; then
+                    printf -v "$target_var" '%s' ""
+                    multiline_install_field="$target_var"
+                else
+                    printf -v "$target_var" '%s' "$install_value"
+                fi
             elif [[ "$line" =~ ^[[:space:]]{6}manual:[[:space:]]*(.+) ]] && [ "$current_section" = "install" ]; then
                 current_install_manual="${BASH_REMATCH[1]}"
             fi
@@ -580,10 +605,17 @@ main() {
 
     # Setup hooks
     log_info "Setting up hooks..."
-    if git config core.hooksPath .githooks && chmod +x .githooks/pre-commit 2>/dev/null; then
+    if git config core.hooksPath .githooks && chmod +x .githooks/pre-commit .githooks/prepare-commit-msg .githooks/commit-msg 2>/dev/null; then
         log_success "Git hooks path configured"
     else
         log_warning "Could not configure Git hooks path (may not exist yet)"
+    fi
+
+    # Commit message template (see docs/COMMIT_MESSAGE_STANDARD.md)
+    if [ -f .gitmessage ]; then
+        if git config commit.template .gitmessage 2>/dev/null; then
+            log_success "Commit message template configured (.gitmessage)"
+        fi
     fi
 
     if uv run pre-commit install-hooks 2>/dev/null; then

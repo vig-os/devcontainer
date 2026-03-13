@@ -19,6 +19,7 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -288,51 +289,184 @@ def host(test_container):
     return host
 
 
-@pytest.fixture(scope="session")
-def initialized_workspace(container_image):
+# --- Helpers and fixtures for init-workspace.sh ---
+
+
+def _build_podman_cmd(container_image, workspace_mount, smoke_test):
+    """Build podman command for init-workspace script."""
+    cmd = ["podman", "run", "--rm", "-v", workspace_mount]
+    if smoke_test:
+        cmd.extend(["-e", "SHORT_NAME=test_project", "-e", "ORG_NAME=Test Org"])
+    else:
+        cmd.append("-it")
+    cmd.extend([container_image, "/root/assets/init-workspace.sh"])
+    if smoke_test:
+        cmd.append("--smoke-test")
+    return cmd
+
+
+def _run_noninteractive_init(cmd):
+    """Run init-workspace in non-interactive mode."""
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    if result.returncode != 0:
+        pytest.fail(
+            "Failed to initialize workspace with init-workspace.sh (non-interactive)\n"
+            f"Command: {' '.join(cmd)}\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}"
+        )
+
+
+def _run_interactive_init(cmd, container_image):
+    """Run init-workspace in interactive mode with pexpect progress tracking."""
+    project_name = "test_project"
+    organization_name = "Test Org"
+    stages = {
+        "started": None,
+        "short_name_prompt": None,
+        "org_name_prompt": None,
+        "copying_files": None,
+        "replacing_placeholders": None,
+        "setting_permissions": None,
+        "syncing_deps": None,
+        "completed": None,
+    }
+    current_stage = "started"
+    stages["started"] = time.time()
+    stage_patterns = [
+        ("Copying files from", "copying_files", 30),
+        ("Replacing placeholders", "replacing_placeholders", 60),
+        ("Setting executable permissions", "setting_permissions", 30),
+        ("Syncing dependencies", "syncing_deps", 60),
+        ("Workspace initialized successfully", "completed", 30),
+    ]
+
+    try:
+        child = pexpect.spawn(" ".join(cmd), encoding="utf-8", timeout=60)
+        child.expect("Enter a short name", timeout=30)
+        stages["short_name_prompt"] = time.time()
+        current_stage = "short_name_prompt"
+        child.sendline(project_name)
+
+        child.expect("Enter the name of your organization", timeout=30)
+        stages["org_name_prompt"] = time.time()
+        current_stage = "org_name_prompt"
+        child.sendline(organization_name)
+
+        for pattern, stage_name, timeout in stage_patterns:
+            try:
+                child.expect(pattern, timeout=timeout)
+                stages[stage_name] = time.time()
+                current_stage = stage_name
+            except pexpect.TIMEOUT:
+                stage_start = stages.get(current_stage) or stages["started"]
+                time_in_stage = time.time() - stage_start
+                pytest.fail(
+                    f"⏱️  Timeout waiting for: '{pattern}'\n"
+                    f"\n"
+                    f"📊 Progress tracking:\n"
+                    f"   Current stage: {current_stage}\n"
+                    f"   Time in stage: {time_in_stage:.1f}s (timeout: {timeout}s)\n"
+                    f"\n"
+                    f"📈 Stage timings:\n"
+                    + "\n".join(
+                        f"   {'✓' if stages[s] else '✗'} {s}: "
+                        + (
+                            f"{stages[s] - stages['started']:.1f}s"
+                            if stages[s]
+                            else "not reached"
+                        )
+                        for s in stages
+                    )
+                    + "\n\n"
+                    "💡 If stuck on 'copying_files':\n"
+                    "   - Check if .pre-commit-cache is being copied (should be excluded)\n"
+                    "   - Volume mounts can be slow\n"
+                    f"   - Check: podman run --rm {container_image} du -sh /root/assets/workspace/\n"
+                    "\n"
+                    f"📤 Last output:\n{child.before}"
+                )
+
+        child.expect(pexpect.EOF, timeout=30)
+        child.close()
+        if child.exitstatus != 0:
+            pytest.fail(
+                "Failed to initialize workspace with init-workspace.sh\n"
+                f"Return code: {child.exitstatus}\n"
+                f"Output: {child.before}"
+            )
+
+        total_time = time.time() - stages["started"]
+        print(f"[DEBUG] Workspace initialized in {total_time:.1f}s")
+    except pexpect.TIMEOUT:
+        output = child.before if "child" in locals() else "N/A"
+        stage_start = stages.get(current_stage) or stages.get("started") or time.time()
+        time_in_stage = time.time() - stage_start
+        pytest.fail(
+            "⏱️  Timeout while initializing workspace\n"
+            "\n"
+            "📊 Progress tracking:\n"
+            f"   Current stage: {current_stage}\n"
+            f"   Time in stage: {time_in_stage:.1f}s\n"
+            "\n"
+            "📈 Stage timings:\n"
+            + "\n".join(
+                f"   {'✓' if stages[s] else '✗'} {s}: "
+                + (
+                    f"{stages[s] - stages['started']:.1f}s"
+                    if stages[s]
+                    else "not reached"
+                )
+                for s in stages
+            )
+            + "\n\n"
+            f"Command: {' '.join(cmd)}\n"
+            "\n"
+            f"📤 Last output:\n{output}"
+        )
+    except pexpect.EOF:
+        output = child.before if "child" in locals() else "N/A"
+        pytest.fail(
+            "Error while initializing workspace with init-workspace.sh: EOF\n"
+            f"Command: {' '.join(cmd)}\n"
+            f"Output so far: {output}\n"
+            "This usually means the container exited before responding.\n"
+            "Check that the image exists and the command is correct."
+        )
+    except pexpect.ExceptionPexpect as e:
+        output = child.before if "child" in locals() else "N/A"
+        pytest.fail(
+            f"Error while initializing workspace with init-workspace.sh: {e}\n"
+            f"Command: {' '.join(cmd)}\n"
+            f"Output: {output}"
+        )
+
+
+def _init_workspace(container_image, *, smoke_test=False):
     """
     Create a temporary workspace directory and initialize it with init-workspace.
 
-    This fixture supports running from both:
-    1. Host machine - uses direct bind mounts
-    2. Inside a devcontainer - uses podman compose with named volumes
-
-    When running inside a container (Docker-out-of-Docker), we use compose
-    to handle volume management, avoiding the host path translation issue.
-
-    The workspace will be cleaned up when the test session ends.
+    Supports running from host and from inside a container.
     """
-    # Get the project root (assuming conftest.py is in tests/)
     project_root = Path(__file__).resolve().parents[1]
     tests_dir = project_root / "tests"
-
-    # Check if we're running inside a container
     in_container = is_running_in_container()
 
-    # Always use tests/tmp - it's in the shared workspace which is mounted
-    # both on host and in container, so both can access it
     tests_tmp_dir = tests_dir / "tmp"
     tests_tmp_dir.mkdir(parents=True, exist_ok=True)
     workspace_dir = tempfile.mkdtemp(
         dir=str(tests_tmp_dir), prefix="workspace-devcontainer-"
     )
-
     workspace_path = Path(workspace_dir)
 
-    # Generate unique names for compose project and volume
     unique_id = workspace_path.name.replace("workspace-devcontainer-", "")
-    compose_project = f"test-{unique_id}"
     volume_name = f"test-workspace-{unique_id}"
+    using_compose = in_container
 
-    # Track whether we're using compose (for cleanup)
-    using_compose = False
-
-    # Register cleanup function
     def cleanup():
         if workspace_path.exists():
             shutil.rmtree(workspace_path, ignore_errors=True)
         if using_compose:
-            # Clean up the named volume
             subprocess.run(
                 ["podman", "volume", "rm", "-f", volume_name],
                 capture_output=True,
@@ -341,375 +475,81 @@ def initialized_workspace(container_image):
 
     atexit.register(cleanup)
 
-    # Run init-workspace in the container
-    # The script requires an interactive terminal (-it) and expects input
-    project_name = "test_project"
-    organization_name = "Test Org"
-
-    if in_container:
-        # Use podman with named volumes to avoid path translation issues
-        # Named volumes work everywhere without needing compose
-        using_compose = True  # We still track this for volume cleanup
-
-        # Create the named volume
-        create_volume_cmd = ["podman", "volume", "create", volume_name]
-        create_result = subprocess.run(
-            create_volume_cmd, capture_output=True, text=True, timeout=30
-        )
-
-        if create_result.returncode != 0:
-            cleanup()
-            pytest.fail(
-                f"Failed to create volume {volume_name}\n"
-                f"stdout: {create_result.stdout}\n"
-                f"stderr: {create_result.stderr}"
+    try:
+        if in_container:
+            create_result = subprocess.run(
+                ["podman", "volume", "create", volume_name],
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
-
-        print(f"[DEBUG] Created volume: {volume_name}")
-
-        # Run init-workspace with the named volume
-        cmd = [
-            "podman",
-            "run",
-            "-it",
-            "--rm",
-            "-v",
-            f"{volume_name}:/workspace",
-            container_image,
-            "/root/assets/init-workspace.sh",
-        ]
-
-        # Track progress through stages for better timeout diagnostics
-        stages = {
-            "started": None,
-            "short_name_prompt": None,
-            "org_name_prompt": None,
-            "copying_files": None,
-            "replacing_placeholders": None,
-            "setting_permissions": None,
-            "completed": None,
-        }
-        current_stage = "started"
-        stages["started"] = time.time()
-
-        try:
-            # Spawn the process with pexpect
-            print(f"[DEBUG] Running podman command: {' '.join(cmd)}")
-            print(f"[DEBUG] Volume: {volume_name}, Image: {container_image}")
-
-            child = pexpect.spawn(" ".join(cmd), encoding="utf-8", timeout=60)
-
-            # Stage 1: Wait for short name prompt
-            child.expect("Enter a short name", timeout=30)
-            stages["short_name_prompt"] = time.time()
-            current_stage = "short_name_prompt"
-            child.sendline(project_name)
-
-            # Stage 2: Wait for org name prompt
-            child.expect("Enter the name of your organization", timeout=30)
-            stages["org_name_prompt"] = time.time()
-            current_stage = "org_name_prompt"
-            child.sendline(organization_name)
-
-            # Stage 3: Monitor progress through remaining stages
-            stage_patterns = [
-                ("Copying files from", "copying_files", 30),
-                ("Replacing placeholders", "replacing_placeholders", 60),
-                ("Setting executable permissions", "setting_permissions", 30),
-                ("Workspace initialized successfully", "completed", 30),
-            ]
-
-            for pattern, stage_name, timeout in stage_patterns:
-                try:
-                    child.expect(pattern, timeout=timeout)
-                    stages[stage_name] = time.time()
-                    current_stage = stage_name
-                except pexpect.TIMEOUT:
-                    stage_start = stages.get(current_stage) or stages["started"]
-                    time_in_stage = time.time() - stage_start
-
-                    cleanup()
-                    pytest.fail(
-                        f"⏱️  Timeout waiting for: '{pattern}'\n"
-                        f"\n"
-                        f"📊 Progress tracking:\n"
-                        f"   Current stage: {current_stage}\n"
-                        f"   Time in stage: {time_in_stage:.1f}s (timeout: {timeout}s)\n"
-                        f"\n"
-                        f"📈 Stage timings:\n"
-                        + "\n".join(
-                            f"   {'✓' if stages[s] else '✗'} {s}: "
-                            + (
-                                f"{stages[s] - stages['started']:.1f}s"
-                                if stages[s]
-                                else "not reached"
-                            )
-                            for s in stages
-                        )
-                        + f"\n\n"
-                        f"💡 If stuck on 'copying_files':\n"
-                        f"   - Check if .pre-commit-cache is being copied (should be excluded)\n"
-                        f"   - Volume mounts can be slow\n"
-                        f"\n"
-                        f"📤 Last output:\n{child.before}"
-                    )
-
-            # Wait for EOF
-            child.expect(pexpect.EOF, timeout=30)
-            child.close()
-
-            # Check return code
-            if child.exitstatus != 0:
-                cleanup()
+            if create_result.returncode != 0:
                 pytest.fail(
-                    f"Failed to initialize workspace with init-workspace.sh\n"
-                    f"Return code: {child.exitstatus}\n"
-                    f"Output: {child.before}"
+                    f"Failed to create volume {volume_name}\n"
+                    f"stdout: {create_result.stdout}\n"
+                    f"stderr: {create_result.stderr}"
                 )
+            print(f"[DEBUG] Created volume: {volume_name}")
+            workspace_mount = f"{volume_name}:/workspace"
+        else:
+            workspace_mount = f"{workspace_path}:/workspace"
 
-            # Log successful timing
-            total_time = time.time() - stages["started"]
-            print(f"[DEBUG] Workspace initialized in {total_time:.1f}s")
+        cmd = _build_podman_cmd(container_image, workspace_mount, smoke_test)
+        if smoke_test:
+            _run_noninteractive_init(cmd)
+        else:
+            _run_interactive_init(cmd, container_image)
 
-        except pexpect.TIMEOUT:
-            cleanup()
-            output = child.before if "child" in locals() else "N/A"
-            stage_start = (
-                stages.get(current_stage) or stages.get("started") or time.time()
-            )
-            time_in_stage = time.time() - stage_start
-
-            pytest.fail(
-                f"⏱️  Timeout while initializing workspace\n"
-                f"\n"
-                f"📊 Progress tracking:\n"
-                f"   Current stage: {current_stage}\n"
-                f"   Time in stage: {time_in_stage:.1f}s\n"
-                f"\n"
-                f"📈 Stage timings:\n"
-                + "\n".join(
-                    f"   {'✓' if stages[s] else '✗'} {s}: "
-                    + (
-                        f"{stages[s] - stages['started']:.1f}s"
-                        if stages[s]
-                        else "not reached"
-                    )
-                    for s in stages
-                )
-                + f"\n\n"
-                f"Command: {' '.join(cmd)}\n"
-                f"\n"
-                f"📤 Last output:\n{output}"
-            )
-        except pexpect.EOF:
-            cleanup()
-            output = child.before if "child" in locals() else "N/A"
-            pytest.fail(
-                f"Error while initializing workspace with init-workspace.sh: EOF\n"
-                f"Command: {' '.join(cmd)}\n"
-                f"Output so far: {output}\n"
-                f"This usually means the container exited before responding.\n"
-                f"Check that the image exists and the compose file is correct."
-            )
-        except pexpect.ExceptionPexpect as e:
-            cleanup()
-            output = child.before if "child" in locals() else "N/A"
-            pytest.fail(
-                f"Error while initializing workspace with init-workspace.sh: {e}\n"
-                f"Command: {' '.join(cmd)}\n"
-                f"Output: {output}"
-            )
-
-        # Copy files from the named volume to the local temp directory
-        # The temp directory is in /workspace/devcontainer/tests/tmp which is
-        # shared between host and container, so we use host path for the mount
-        workspace_path_host = get_host_path(workspace_path)
-
-        copy_cmd = [
-            "podman",
-            "run",
-            "--rm",
-            "-v",
-            f"{volume_name}:/source:ro",
-            "-v",
-            f"{workspace_path_host}:/dest",  # Use host path!
-            "alpine",
-            "sh",
-            "-c",
-            "cp -a /source/. /dest/",
-        ]
-
-        print(
-            f"[DEBUG] Copying files from volume {volume_name} to {workspace_path_host}"
-        )
-        copy_result = subprocess.run(
-            copy_cmd, capture_output=True, text=True, timeout=30
-        )
-
-        if copy_result.returncode != 0:
-            cleanup()
-            pytest.fail(
-                f"Failed to copy files from volume to workspace\n"
-                f"Command: {' '.join(copy_cmd)}\n"
-                f"stdout: {copy_result.stdout}\n"
-                f"stderr: {copy_result.stderr}"
-            )
-    else:
-        # Running on host - use direct bind mount (original behavior)
-        cmd = [
-            "podman",
-            "run",
-            "-it",
-            "--rm",
-            "-v",
-            f"{workspace_path}:/workspace",
-            container_image,
-            "/root/assets/init-workspace.sh",
-        ]
-
-        # Track progress through stages for better timeout diagnostics
-        stages = {
-            "started": None,
-            "short_name_prompt": None,
-            "org_name_prompt": None,
-            "copying_files": None,
-            "replacing_placeholders": None,
-            "setting_permissions": None,
-            "completed": None,
-        }
-        current_stage = "started"
-        stages["started"] = time.time()
-
-        try:
-            # Spawn the process with pexpect
-            child = pexpect.spawn(" ".join(cmd), encoding="utf-8", timeout=60)
-
-            # Stage 1: Wait for short name prompt
-            child.expect("Enter a short name", timeout=30)
-            stages["short_name_prompt"] = time.time()
-            current_stage = "short_name_prompt"
-            child.sendline(project_name)
-
-            # Stage 2: Wait for org name prompt
-            child.expect("Enter the name of your organization", timeout=30)
-            stages["org_name_prompt"] = time.time()
-            current_stage = "org_name_prompt"
-            child.sendline(organization_name)
-
-            # Stage 3: Monitor progress through remaining stages
-            # Use shorter timeouts to detect slow operations
-            stage_patterns = [
-                ("Copying files from", "copying_files", 30),
-                ("Replacing placeholders", "replacing_placeholders", 60),
-                ("Setting executable permissions", "setting_permissions", 30),
-                ("Workspace initialized successfully", "completed", 30),
+        if in_container:
+            workspace_path_host = get_host_path(workspace_path)
+            copy_cmd = [
+                "podman",
+                "run",
+                "--rm",
+                "-v",
+                f"{volume_name}:/source:ro",
+                "-v",
+                f"{workspace_path_host}:/dest",
+                "alpine",
+                "sh",
+                "-c",
+                "cp -a /source/. /dest/",
             ]
-
-            for pattern, stage_name, timeout in stage_patterns:
-                try:
-                    child.expect(pattern, timeout=timeout)
-                    stages[stage_name] = time.time()
-                    current_stage = stage_name
-                except pexpect.TIMEOUT:
-                    # Calculate time spent in current stage
-                    stage_start = stages.get(current_stage) or stages["started"]
-                    time_in_stage = time.time() - stage_start
-
-                    cleanup()
-                    pytest.fail(
-                        f"⏱️  Timeout waiting for: '{pattern}'\n"
-                        f"\n"
-                        f"📊 Progress tracking:\n"
-                        f"   Current stage: {current_stage}\n"
-                        f"   Time in stage: {time_in_stage:.1f}s (timeout: {timeout}s)\n"
-                        f"\n"
-                        f"📈 Stage timings:\n"
-                        + "\n".join(
-                            f"   {'✓' if stages[s] else '✗'} {s}: "
-                            + (
-                                f"{stages[s] - stages['started']:.1f}s"
-                                if stages[s]
-                                else "not reached"
-                            )
-                            for s in stages
-                        )
-                        + f"\n\n"
-                        f"💡 If stuck on 'copying_files':\n"
-                        f"   - Check if .pre-commit-cache is being copied (should be excluded)\n"
-                        f"   - Volume mounts on macOS are slow (Podman VM overhead)\n"
-                        f"   - Check: podman run --rm {container_image} du -sh /root/assets/workspace/\n"
-                        f"\n"
-                        f"📤 Last output:\n{child.before}"
-                    )
-
-            # Wait for EOF
-            child.expect(pexpect.EOF, timeout=30)
-            child.close()
-
-            # Check return code
-            if child.exitstatus != 0:
-                cleanup()
+            print(
+                f"[DEBUG] Copying files from volume {volume_name} to {workspace_path_host}"
+            )
+            copy_result = subprocess.run(
+                copy_cmd, capture_output=True, text=True, timeout=30
+            )
+            if copy_result.returncode != 0:
                 pytest.fail(
-                    f"Failed to initialize workspace with init-workspace.sh\n"
-                    f"Return code: {child.exitstatus}\n"
-                    f"Output: {child.before}"
+                    "Failed to copy files from volume to workspace\n"
+                    f"Command: {' '.join(copy_cmd)}\n"
+                    f"stdout: {copy_result.stdout}\n"
+                    f"stderr: {copy_result.stderr}"
                 )
 
-            # Log successful timing
-            total_time = time.time() - stages["started"]
-            print(f"[DEBUG] Workspace initialized in {total_time:.1f}s")
-
-        except pexpect.TIMEOUT:
-            cleanup()
-            output = child.before if "child" in locals() else "N/A"
-            stage_start = (
-                stages.get(current_stage) or stages.get("started") or time.time()
-            )
-            time_in_stage = time.time() - stage_start
-
+        if not (workspace_path / "README.md").exists():
             pytest.fail(
-                f"⏱️  Timeout while initializing workspace\n"
-                f"\n"
-                f"📊 Progress tracking:\n"
-                f"   Current stage: {current_stage}\n"
-                f"   Time in stage: {time_in_stage:.1f}s\n"
-                f"\n"
-                f"📈 Stage timings:\n"
-                + "\n".join(
-                    f"   {'✓' if stages[s] else '✗'} {s}: "
-                    + (
-                        f"{stages[s] - stages['started']:.1f}s"
-                        if stages[s]
-                        else "not reached"
-                    )
-                    for s in stages
-                )
-                + f"\n\n"
-                f"💡 Common causes:\n"
-                f"   - Large .pre-commit-cache being copied (should be excluded now)\n"
-                f"   - Slow volume mount (macOS Podman runs through VM)\n"
-                f"   - Script hanging on a prompt or I/O operation\n"
-                f"\n"
-                f"📤 Last output:\n{output}"
-            )
-        except pexpect.ExceptionPexpect as e:
-            cleanup()
-            pytest.fail(
-                f"Error while initializing workspace with init-workspace.sh: {e}"
+                f"Workspace initialization failed - README.md not found in {workspace_path}\n"
+                f"Workspace contents: {list(workspace_path.iterdir()) if workspace_path.exists() else 'N/A'}"
             )
 
-    # Verify the workspace was initialized
-    if not (workspace_path / "README.md").exists():
+        yield workspace_path
+    finally:
         cleanup()
-        pytest.fail(
-            f"Workspace initialization failed - README.md not found in {workspace_path}\n"
-            f"Workspace contents: {list(workspace_path.iterdir()) if workspace_path.exists() else 'N/A'}"
-        )
 
-    yield workspace_path
 
-    # Cleanup
-    cleanup()
+@pytest.fixture(scope="session")
+def initialized_workspace(container_image):
+    """Default workspace initialization fixture."""
+    yield from _init_workspace(container_image, smoke_test=False)
+
+
+@pytest.fixture(scope="session")
+def initialized_smoke_workspace(container_image):
+    """Smoke-test workspace initialization fixture."""
+    yield from _init_workspace(container_image, smoke_test=True)
 
 
 # --- Shared helpers for devcontainer_up and devcontainer_with_sidecar ---
@@ -801,12 +641,24 @@ def _ensure_project_yaml_test_mount(project_config, workspace_path, in_container
     return project_config
 
 
+def _find_devcontainer_cli():
+    """Resolve the devcontainer CLI binary, checking PATH then node_modules/.bin/."""
+    path_bin = shutil.which("devcontainer")
+    if path_bin:
+        return path_bin
+    local_bin = Path("node_modules/.bin/devcontainer")
+    if local_bin.is_file():
+        return str(local_bin.resolve())
+    return None
+
+
 def _run_devcontainer_up(
     workspace_path_for_cli, workspace_path, env, docker_path="podman"
 ):
     """Run devcontainer up. Returns subprocess.CompletedProcess."""
+    devcontainer_bin = _find_devcontainer_cli() or "devcontainer"
     up_cmd = [
-        "devcontainer",
+        devcontainer_bin,
         "up",
         "--workspace-folder",
         str(workspace_path_for_cli),
@@ -880,11 +732,11 @@ def devcontainer_up(initialized_workspace):
     workspace_path, workspace_path_for_cli, in_container = (
         _resolve_devcontainer_cli_workspace(initialized_workspace)
     )
-    if not shutil.which("devcontainer"):
-        pytest.skip(
-            "devcontainer CLI not available. "
-            "Install with: npm install -g @devcontainers/cli@0.80.1"
-        )
+    if not _find_devcontainer_cli():
+        pytest.skip("devcontainer CLI not available. Install with: npm install")
+    bin_dir = str(Path("node_modules/.bin").resolve())
+    if bin_dir not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")
 
     docker_path = "podman"
     env, original_config = _prepare_devcontainer_env(
@@ -994,11 +846,8 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
     workspace_path, workspace_path_for_cli, in_container = (
         _resolve_devcontainer_cli_workspace(initialized_workspace)
     )
-    if not shutil.which("devcontainer"):
-        pytest.skip(
-            "devcontainer CLI not available. "
-            "Install with: npm install -g @devcontainers/cli@0.80.1"
-        )
+    if not _find_devcontainer_cli():
+        pytest.skip("devcontainer CLI not available. Install with: npm install")
 
     docker_path = "podman"
     env, _ = _prepare_devcontainer_env(
@@ -1183,3 +1032,34 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
         with devcontainer_json_path.open("w") as f:
             f.write(original_config)
         print("[DEBUG] Restored original devcontainer.json")
+
+
+@pytest.fixture
+def parse_manifest():
+    """
+    Fixture that returns manifest entries from the declarative Python manifest.
+
+    Each entry is a tuple of (src, dest, is_transformed).
+
+    Returns:
+        Function that returns list of (src, dest, is_transformed) tuples
+    """
+
+    def _parse():
+        """Read manifest entries from scripts/sync_manifest.py."""
+        # Import the manifest directly
+        import importlib.util
+
+        project_root = Path(__file__).parent.parent
+        spec = importlib.util.spec_from_file_location(
+            "sync_manifest", project_root / "scripts" / "sync_manifest.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["sync_manifest"] = module
+        spec.loader.exec_module(module)
+
+        return [
+            (entry.src, entry.dest, entry.is_transformed) for entry in module.MANIFEST
+        ]
+
+    return _parse

@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""Generate documentation from narrative sources, requirements.yaml, and just help output.
+"""Generate documentation from narrative sources, requirements.yaml, skills, and just help output.
 
 This script implements "docs as code" by generating documentation from:
 - Narrative markdown files (docs/narrative/)
 - Requirements definitions (scripts/requirements.yaml)
+- Agent skill definitions (.cursor/skills/*/SKILL.md frontmatter)
 - Just recipe help output (just --list)
 
-Single source of truth principle: All dependency information comes from requirements.yaml.
+Single source of truth principle: All dependency information comes from requirements.yaml,
+all skill metadata comes from SKILL.md frontmatter.
 """
 
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -39,8 +42,8 @@ def get_version_from_changelog() -> str:
     if changelog.exists():
         with changelog.open() as f:
             for line in f:
-                if line.startswith("## ["):
-                    # Extract version from "## [X.Y]" format
+                # Skip unreleased headings (e.g., "TBD") and use latest dated release.
+                if line.startswith("## [") and re.search(r"\d{4}-\d{2}-\d{2}", line):
                     version = line.split("[")[1].split("]")[0]
                     return version
     return "dev"
@@ -53,7 +56,9 @@ def get_release_date_from_changelog() -> str:
         with changelog.open() as f:
             for line in f:
                 if line.startswith("## ["):
-                    return line.split("]")[1].split(" - ")[1].strip()
+                    match = re.search(r"\d{4}-\d{2}-\d{2}", line)
+                    if match:
+                        return match.group()
     return datetime.now().isoformat(timespec="seconds")
 
 
@@ -80,6 +85,106 @@ def load_requirements() -> dict:
         "dependencies": data.get("dependencies", []),
         "optional": data.get("optional", []),
     }
+
+
+SKILL_GROUP_ORDER = [
+    ("inception", "Inception (Project Bootstrap)"),
+    ("issue", "Issue Management"),
+    ("design", "Design (Interactive)"),
+    ("code", "Code (Interactive)"),
+    ("git", "Git & PR (Interactive)"),
+    ("pr", "Git & PR (Interactive)"),
+    ("ci", "CI"),
+    ("solve-and-pr", "Autonomous Launcher"),
+    ("worktree", "Autonomous Worktree Pipeline"),
+]
+
+SKILL_GROUP_INTROS = {
+    "inception": (
+        "Run when starting a new repo or major initiative. "
+        "Explores the problem space, scopes boundaries, validates architecture, "
+        "and decomposes the result into actionable issues."
+    ),
+    "solve-and-pr": (
+        "Interactive entry point to kick off autonomous work. "
+        "Launches a worktree where the agent runs design → plan → execute → verify → PR → CI "
+        "with no further human interaction. All progress is posted as issue comments."
+    ),
+    "worktree": (
+        "These are non-blocking counterparts of the interactive skills. "
+        "They run in a git worktree with no user prompts — designed for "
+        "`just worktree-start <issue>`. "
+        "**Do not invoke these directly in your editor session.** "
+        "They only work inside a worktree environment launched via `just`."
+    ),
+}
+
+
+def load_skills() -> list[dict]:
+    """Scan .cursor/skills/*/SKILL.md and return parsed skill metadata.
+
+    Each entry has: name, trigger, description, group (prefix before underscore).
+    """
+    skills_dir = Path(__file__).parent.parent / ".cursor" / "skills"
+    skills = []
+
+    if not skills_dir.is_dir():
+        print(f"Warning: Skills directory not found: {skills_dir}", file=sys.stderr)
+        return skills
+
+    for skill_file in sorted(skills_dir.glob("*/SKILL.md")):
+        text = skill_file.read_text()
+        if not text.startswith("---"):
+            continue
+        parts = text.split("---", 2)
+        if len(parts) < 3:
+            continue
+        meta = yaml.safe_load(parts[1])
+        if not meta or "name" not in meta:
+            continue
+
+        name = meta["name"]
+        skills.append(
+            {
+                "name": name,
+                "trigger": "/" + name.replace("_", "-"),
+                "description": meta.get("description", ""),
+                "group": name.split("_")[0],
+            }
+        )
+
+    return skills
+
+
+def group_skills(skills: list[dict]) -> list[dict]:
+    """Organize skills into ordered groups for the template."""
+    seen_headings: dict[str, dict] = {}
+    groups: list[dict] = []
+
+    for prefix, heading in SKILL_GROUP_ORDER:
+        if heading in seen_headings:
+            seen_headings[heading]["prefixes"].add(prefix)
+            continue
+        group = {
+            "heading": heading,
+            "intro": SKILL_GROUP_INTROS.get(prefix, ""),
+            "prefixes": {prefix},
+            "skills": [],
+        }
+        seen_headings[heading] = group
+        groups.append(group)
+
+    for skill in skills:
+        for group in groups:
+            if skill["group"] in group["prefixes"]:
+                group["skills"].append(skill)
+                break
+
+    # Drop the internal prefixes set before returning
+    for group in groups:
+        del group["prefixes"]
+
+    return [g for g in groups if g["skills"]]
 
 
 def format_requirements_table(requirements: dict) -> str:
@@ -174,18 +279,23 @@ def generate_docs() -> bool:
 
     env.globals["include_narrative"] = include_narrative
 
+    # Load skills
+    skills = load_skills()
+
     # Context for templates
     context = {
         "project_name": "vigOS Development Environment",
         "just_help_output": get_just_help(),
         "version": get_version_from_changelog(),
         "release_date": get_release_date_from_changelog(),
-        "release_url": f"https://github.com/vig-os/devcontainer/releases/tag/v{get_version_from_changelog()}",
+        "release_url": f"https://github.com/vig-os/devcontainer/releases/tag/{get_version_from_changelog()}",
         # Requirements data
         "requirements": requirements,
         "requirements_table": format_requirements_table(requirements),
         "install_macos": format_install_commands(requirements, "macos"),
         "install_debian": format_install_commands(requirements, "debian"),
+        # Skill data
+        "skill_groups": group_skills(skills),
     }
 
     # Generate each template
@@ -193,6 +303,7 @@ def generate_docs() -> bool:
         ("README.md.j2", "README.md"),
         ("CONTRIBUTE.md.j2", "CONTRIBUTE.md"),
         ("TESTING.md.j2", "TESTING.md"),
+        ("SKILL_PIPELINE.md.j2", "docs/SKILL_PIPELINE.md"),
     ]
 
     generated_count = 0

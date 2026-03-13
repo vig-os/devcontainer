@@ -4,6 +4,7 @@
 # - Podman (for container operations)
 # - Node.js (for JS tooling)
 # - Devcontainer CLI + docker-compose wrapper (for integration tests)
+# - hadolint (for Containerfile linting in pre-commit)
 # - BATS + helper libraries (for shell script testing)
 #
 # IMPORTANT: The caller must checkout the repository before using this action.
@@ -16,6 +17,8 @@
 #   install-node:             Install Node.js (default: false)
 #   node-version:             Node.js version (default: '20')
 #   install-devcontainer-cli: Install devcontainer CLI + docker-compose wrapper (default: false)
+#   install-hadolint:         Install hadolint binary (default: false)
+#   install-taplo:            Install taplo TOML linter/formatter (default: false)
 #   install-bats:             Install BATS + helper libraries (default: false)
 #
 # Outputs:
@@ -41,7 +44,7 @@
 #       install-devcontainer-cli: 'true'
 
 name: 'Setup Environment'
-description: 'Set up CI environment with Python, uv, and optional tools (podman, Node.js, devcontainer CLI, BATS)'
+description: 'Set up CI environment with Python, uv, and optional tools (podman, Node.js, devcontainer CLI, hadolint, BATS)'
 
 inputs:
   sync-dependencies:
@@ -64,10 +67,18 @@ inputs:
     description: 'Install @devcontainers/cli and docker-compose wrapper (requires Node.js)'
     required: false
     default: 'false'
+  install-hadolint:
+    description: 'Install hadolint binary for Containerfile linting'
+    required: false
+    default: 'false'
   install-just:
     description: 'Install just command runner for Justfile support'
     required: false
     default: 'true'
+  install-taplo:
+    description: 'Install taplo TOML linter/formatter'
+    required: false
+    default: 'false'
   install-bats:
     description: 'Install BATS and helper libraries (support, assert, file) for shell testing'
     required: false
@@ -90,7 +101,7 @@ runs:
     # ── uv ─────────────────────────────────────────────────────────────
     - name: Install uv
       id: setup-uv
-      uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b  # v7
+      uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7
       with:
         enable-cache: true
         # Install a specific version of uv.
@@ -125,9 +136,69 @@ runs:
 
     # ── Just (task runner) ──────────────────────────────────────────────
     - name: Install just
-      uses: taiki-e/install-action@3035223527de4d6eb6207d7b9f901df966359a8e  # just
+      if: inputs.install-just == 'true'
+      uses: taiki-e/install-action@01159adff8f38113be7211e869405f6f6abf02d7  # just
       with:
         tool: just
+
+    # ── hadolint (Containerfile linter) ───────────────────────────────────
+    - name: Install hadolint
+      if: inputs.install-hadolint == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        case "$(uname -m)" in
+          x86_64) ARCH="linux-x86_64" ;;
+          aarch64|arm64) ARCH="linux-arm64" ;;
+          *)
+            echo "Unsupported architecture: $(uname -m)"
+            exit 1
+            ;;
+        esac
+
+        HADOLINT_VERSION="v2.14.0"
+        BASE_URL="https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}"
+        BIN_FILE="hadolint-${ARCH}"
+        SHA_FILE="${BIN_FILE}.sha256"
+
+        curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
+        curl -fsSL "${BASE_URL}/${SHA_FILE}" -o "${SHA_FILE}"
+
+        EXPECTED_SHA="$(awk '{print $1}' "${SHA_FILE}")"
+        echo "${EXPECTED_SHA}  ${BIN_FILE}" | sha256sum -c -
+
+        sudo install -m 0755 "${BIN_FILE}" /usr/local/bin/hadolint
+        rm -f "${BIN_FILE}" "${SHA_FILE}"
+
+        hadolint --version
+
+    # ── taplo (TOML linter/formatter) ──────────────────────────────────
+    - name: Install taplo
+      if: inputs.install-taplo == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        case "$(uname -m)" in
+          x86_64) ARCH="x86_64" ;;
+          aarch64|arm64) ARCH="aarch64" ;;
+          *)
+            echo "Unsupported architecture: $(uname -m)"
+            exit 1
+            ;;
+        esac
+
+        TAPLO_VERSION="$(curl -fsSL https://api.github.com/repos/tamasfe/taplo/releases/latest | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')"
+        BASE_URL="https://github.com/tamasfe/taplo/releases/download/${TAPLO_VERSION}"
+        BIN_FILE="taplo-linux-${ARCH}.gz"
+
+        curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
+        gunzip "${BIN_FILE}"
+        sudo install -m 0755 "taplo-linux-${ARCH}" /usr/local/bin/taplo
+        rm -f "taplo-linux-${ARCH}"
+
+        taplo --version
 
     # ── Devcontainer CLI + docker-compose wrapper ───────────────────────
     # Requires Node.js (automatically installed above when this flag is set)

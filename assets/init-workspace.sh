@@ -1,11 +1,12 @@
 #!/bin/bash
 # Initialize workspace by copying template files
 #
-# Usage: init-workspace [--force] [--no-prompts]
+# Usage: init-workspace [--force] [--no-prompts] [--smoke-test]
 #
 # Options:
 #   --force       Overwrite existing files (for upgrades)
 #   --no-prompts  Run non-interactively (requires SHORT_NAME env var)
+#   --smoke-test  Deploy smoke-test-specific assets
 #
 # Environment variables (used with --no-prompts):
 #   SHORT_NAME  - Project short name (required)
@@ -17,12 +18,18 @@ TEMPLATE_DIR="/root/assets/workspace"
 WORKSPACE_DIR="/workspace"
 FORCE=false
 NO_PROMPTS=false
+SMOKE_TEST=false
 
 # Files to preserve during --force upgrades (never overwrite if they exist)
 # These are user/project customization files that should survive upgrades
 PRESERVE_FILES=(
     ".devcontainer/docker-compose.project.yaml"
     ".devcontainer/docker-compose.local.yaml"
+    "README.md"
+    "CHANGELOG.md"
+    "LICENSE"
+    ".github/CODEOWNERS"
+    "justfile.project"
 )
 
 # Get script directory for manifest location
@@ -38,13 +45,22 @@ for arg in "$@"; do
         --no-prompts)
             NO_PROMPTS=true
             ;;
+        --smoke-test)
+            SMOKE_TEST=true
+            ;;
         *)
             echo "Unknown option: $arg" >&2
-            echo "Usage: init-workspace [--force] [--no-prompts]" >&2
+            echo "Usage: init-workspace [--force] [--no-prompts] [--smoke-test]" >&2
             exit 1
             ;;
     esac
 done
+
+# Smoke mode must run unattended and allow overwriting existing content.
+if [[ "$SMOKE_TEST" == "true" ]]; then
+    NO_PROMPTS=true
+    FORCE=true
+fi
 
 # Check if running in interactive mode (only if prompts are needed)
 if [[ "$NO_PROMPTS" != "true" ]] && [[ ! -t 0 ]]; then
@@ -103,6 +119,8 @@ fi
 
 # Sanitize: replace hyphens and spaces with underscore; lowercase; remove other special chars
 SHORT_NAME=$(echo "$SHORT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[ -]/_/g' | sed 's/[^a-z0-9_]/_/g')
+SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/__*/_/g' | sed 's/^[^a-z0-9]*//; s/[^a-z0-9]*$//')
+SHORT_NAME="${SHORT_NAME:-project}"
 echo "Project short name set to: $SHORT_NAME"
 
 # Get ORG_NAME - from env var, default, or prompt
@@ -195,32 +213,30 @@ fi
 echo "Initializing workspace from template..."
 echo "Copying files from $TEMPLATE_DIR to $WORKSPACE_DIR..."
 
-# Build exclude list for preserved files that already exist
-EXCLUDE_ARGS=()
-for preserved in "${PRESERVE_FILES[@]}"; do
-    if [[ -e "$WORKSPACE_DIR/$preserved" ]]; then
-        EXCLUDE_ARGS+=("--exclude=$preserved")
-    fi
-done
-
-# Use rsync if available, otherwise cp
 # Note: Excluding .venv - it is used directly from the container image
 # via UV_PROJECT_ENVIRONMENT environment variable (set in docker-compose.yml)
 # Pre-commit cache is now at /opt/pre-commit-cache (not in assets/workspace)
-if command -v rsync &> /dev/null; then
-    rsync -av --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
+if [[ "$SMOKE_TEST" == "true" ]]; then
+    # Smoke mode: clean deploy (--delete removes stale files), then overlay smoke-test assets
+    rsync -av --delete --exclude='.git' --exclude='.venv' --exclude='docs/issues/' --exclude='docs/pull-requests/' "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
+
+    SMOKE_TEST_DIR="$SCRIPT_DIR/smoke-test"
+    if [[ -d "$SMOKE_TEST_DIR" ]]; then
+        echo "Deploying smoke-test-specific files..."
+        rsync -av "$SMOKE_TEST_DIR/" "$WORKSPACE_DIR/"
+    else
+        echo "Warning: Smoke-test directory not found at $SMOKE_TEST_DIR" >&2
+    fi
 else
-    # Fallback to cp with proper handling (less precise, may overwrite preserved files)
-    echo "Warning: rsync not available, preserved files may be overwritten"
-    for item in "$TEMPLATE_DIR"/*; do
-        [[ -e "$item" ]] || continue
-        cp -r "$item" "$WORKSPACE_DIR/" 2>/dev/null || true
+    # Build exclude list for preserved files that already exist
+    EXCLUDE_ARGS=()
+    for preserved in "${PRESERVE_FILES[@]}"; do
+        if [[ -e "$WORKSPACE_DIR/$preserved" ]]; then
+            EXCLUDE_ARGS+=("--exclude=$preserved")
+        fi
     done
-    for item in "$TEMPLATE_DIR"/.[!.]*; do
-        [[ -e "$item" ]] || continue
-        [[ "$(basename "$item")" == ".venv" ]] && continue
-        cp -r "$item" "$WORKSPACE_DIR/" 2>/dev/null || true
-    done
+
+    rsync -av --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
 fi
 
 # Replace placeholders in files (using pre-built manifest from image)
@@ -254,8 +270,13 @@ fi
 
 # Rename template_project directory to match project short name
 if [[ -d "$WORKSPACE_DIR/src/template_project" ]]; then
-    echo "Renaming src/template_project to src/${SHORT_NAME}..."
-    mv "$WORKSPACE_DIR/src/template_project" "$WORKSPACE_DIR/src/${SHORT_NAME}"
+    if [[ -d "$WORKSPACE_DIR/src/${SHORT_NAME}" ]] && [[ "$SHORT_NAME" != "template_project" ]]; then
+        echo "Removing duplicate src/template_project (src/${SHORT_NAME} already exists)..."
+        rm -rf "$WORKSPACE_DIR/src/template_project"
+    else
+        echo "Renaming src/template_project to src/${SHORT_NAME}..."
+        mv "$WORKSPACE_DIR/src/template_project" "$WORKSPACE_DIR/src/${SHORT_NAME}"
+    fi
 fi
 
 # Update test imports to use actual project name (template_project -> $SHORT_NAME)
@@ -268,6 +289,10 @@ echo "Setting executable permissions on shell scripts and hooks..."
 find "$WORKSPACE_DIR" -type f -name "*.sh" -exec chmod +x {} \;
 find "$WORKSPACE_DIR/.githooks" -type f -exec chmod +x {} \; 2>/dev/null || true
 
+# Sync dependencies: resolves uv.lock for the new project name and installs the project
+echo "Syncing dependencies..."
+cd "$WORKSPACE_DIR"
+just sync
 
 echo "Workspace initialized successfully!"
 echo ""

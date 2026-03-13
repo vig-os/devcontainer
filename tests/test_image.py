@@ -9,20 +9,69 @@ Derived containers can inherit from these test classes to verify that
 base functionality is preserved in their containers.
 """
 
+import hashlib
+from pathlib import Path
+
+import pytest
+
 # Expected versions for installed tools
 # These should be updated when the Containerfile is updated
 EXPECTED_VERSIONS = {
     "git": "2.",  # Major version check (from apt package)
     "curl": "8.",  # Major version check (from apt package)
-    "gh": "2.86.",  # Minor version check (GitHub CLI (manually installed from latest release)
-    "uv": "0.9.",  # Minor version check (manually installed from latest release)
+    "gh": "2.88.",  # Minor version check (GitHub CLI (manually installed from latest release)
+    "uv": "0.10.",  # Minor version check (manually installed from latest release)
     "python": "3.12",  # Python (from base image)
     "pre_commit": "4.5.",  # Minor version check (installed via uv pip)
-    "ruff": "0.14.",  # Minor version check (installed via uv pip)
+    "ruff": "0.15.",  # Minor version check (installed via uv pip)
+    "bandit": "1.9.",  # Minor version check (installed via uv pip)
+    "pip_licenses": "5.",  # Major version check (installed via uv pip)
     "just": "1.46.",  # Minor version check (manually installed from latest release)
+    "hadolint": "2.14.",  # Minor version check (manually installed from pinned release)
+    "taplo": "0.10.",  # Minor version check (manually installed from latest release)
     "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),
     "typstyle": "0.14.",  # Minor version check (installed from latest release)
+    "vig_utils": "0.1.",  # Minor version check (installed via uv pip)
+    "tmux": "3.3",  # Major.minor version check (from apt package)
+    "rsync": "3.2",  # Major.minor version check (from apt package)
 }
+
+
+def verify_file_identity(host, src_rel, dest_path):
+    """
+    Verify that a file in the project is identical to its image counterpart.
+
+    Uses SHA-256 checksums for comparison, which works reliably for both
+    text and binary files across the local/container boundary.
+
+    Args:
+        host: testinfra host object
+        src_rel: Source path relative to project root
+        dest_path: Full destination path in image
+
+    Raises:
+        AssertionError: If files are not identical
+    """
+    # Local file
+    project_root = Path(__file__).parent.parent
+    local_src_path = project_root / src_rel
+    assert local_src_path.exists(), f"Source path not found: {src_rel}"
+    assert local_src_path.is_file(), f"Source path is not a file: {src_rel}"
+    local_sha = hashlib.sha256(local_src_path.read_bytes()).hexdigest()
+
+    # Remote file
+    assert host.file(dest_path).exists, f"Manifest file not found at {dest_path}"
+    assert host.file(dest_path).is_file, f"Path is not a regular file: {dest_path}"
+    result = host.run(f"sha256sum {dest_path}")
+    assert result.rc == 0, f"sha256sum failed on {dest_path}: {result.stderr}"
+    remote_sha = result.stdout.split()[0]
+
+    # Verify that the local and remote files are identical
+    assert local_sha == remote_sha, (
+        f"Manifest file checksum mismatch: {dest_path}\n"
+        f"Source: {src_rel} (sha256: {local_sha})\n"
+        f"Destination: {dest_path} (sha256: {remote_sha})"
+    )
 
 
 class TestSystemTools:
@@ -62,6 +111,10 @@ class TestSystemTools:
             "openssh-client is not installed"
         )
 
+    def test_nano_installed(self, host):
+        """Test that nano is installed."""
+        assert host.package("nano").is_installed, "nano is not installed"
+
     def test_gh_installed(self, host):
         """Test that GitHub CLI (gh) is installed."""
         # gh is manually installed, so check for the binary file
@@ -94,6 +147,40 @@ class TestSystemTools:
             f"Expected just {expected}, got: {result.stdout}"
         )
 
+    def test_hadolint_installed(self, host):
+        """Test that hadolint is installed."""
+        # hadolint is manually installed, so check for the binary file
+        assert host.file("/usr/local/bin/hadolint").exists, "hadolint binary not found"
+        assert host.file("/usr/local/bin/hadolint").is_file, "hadolint is not a file"
+
+    def test_hadolint_version(self, host):
+        """Test that hadolint version is correct."""
+        result = host.run("hadolint --version")
+        assert result.rc == 0, "hadolint --version failed"
+        expected = EXPECTED_VERSIONS["hadolint"]
+        assert expected in result.stdout, (
+            f"Expected hadolint {expected}, got: {result.stdout}"
+        )
+
+    def test_taplo_installed(self, host):
+        """Test that taplo (TOML formatter/linter) is installed."""
+        assert host.file("/usr/local/bin/taplo").exists, "taplo binary not found"
+        assert host.file("/usr/local/bin/taplo").is_file, "taplo is not a file"
+
+    def test_taplo_version(self, host):
+        """Test that taplo version is correct."""
+        result = host.run("taplo --version")
+        assert result.rc == 0, "taplo --version failed"
+        expected = EXPECTED_VERSIONS["taplo"]
+        assert expected in result.stdout, (
+            f"Expected taplo {expected}, got: {result.stdout}"
+        )
+
+    def test_cursor_agent_installed(self, host):
+        """Test that cursor-agent CLI (agent) is installed."""
+        result = host.run("agent --version")
+        assert result.rc == 0, "agent --version failed"
+
     def test_cargo_binstall(self, host):
         """Test that cargo-binstall is installed and right version."""
         result = host.run("cargo-binstall -V")
@@ -111,6 +198,63 @@ class TestSystemTools:
         assert expected in result.stdout, (
             f"Expected typstyle {expected}, got: {result.stdout}"
         )
+
+    def test_just_lsp_installed(self, host):
+        """Test that just-lsp is installed."""
+        result = host.run("just-lsp --version")
+        assert result.rc == 0, "just-lsp --version failed"
+        assert "just-lsp" in result.stdout.lower(), (
+            f"Expected just-lsp version output, got: {result.stdout}"
+        )
+
+    def test_tmux_installed(self, host):
+        """Test that tmux is installed."""
+        assert host.package("tmux").is_installed, "tmux is not installed"
+
+    def test_tmux_version(self, host):
+        """Test that tmux version is correct."""
+        result = host.run("tmux -V")
+        assert result.rc == 0, "tmux -V failed"
+        expected = EXPECTED_VERSIONS["tmux"]
+        assert expected in result.stdout, (
+            f"Expected tmux {expected}, got: {result.stdout}"
+        )
+
+    def test_rsync_installed(self, host):
+        """Test that rsync is installed."""
+        assert host.package("rsync").is_installed, "rsync is not installed"
+
+    def test_rsync_version(self, host):
+        """Test that rsync version is correct."""
+        result = host.run("rsync --version")
+        assert result.rc == 0, "rsync --version failed"
+        expected = EXPECTED_VERSIONS["rsync"]
+        assert expected in result.stdout, (
+            f"Expected rsync {expected}, got: {result.stdout}"
+        )
+
+    def test_tmux_detached_session_survives(self, host):
+        """Test that tmux can create a detached session with a background process."""
+        session = "test-session"
+        host.run(f"tmux kill-session -t {session} 2>/dev/null")
+        try:
+            result = host.run(f"tmux new-session -d -s {session} 'sleep 60'")
+            assert result.rc == 0, f"Failed to create tmux session: {result.stderr}"
+
+            result = host.run("tmux list-sessions")
+            assert result.rc == 0, "tmux list-sessions failed"
+            assert session in result.stdout, (
+                f"Session '{session}' not found in: {result.stdout}"
+            )
+
+            result = host.run(f"tmux list-panes -t {session} -F '#{{pane_pid}}'")
+            assert result.rc == 0, "Failed to get pane PID"
+            pid = result.stdout.strip()
+            assert pid, "No PID returned for tmux pane"
+            result = host.run(f"kill -0 {pid}")
+            assert result.rc == 0, f"Process {pid} is not running"
+        finally:
+            host.run(f"tmux kill-session -t {session} 2>/dev/null")
 
 
 class TestPythonEnvironment:
@@ -161,14 +305,17 @@ PYPROJECT_EOF"""
             assert result.rc == 0, f"Failed to create pyproject.toml: {result.stderr}"
 
             # Step 2: Run uv sync (should create .venv by default)
-            result = host.run(f"cd {test_dir} && uv sync")
+            # Unset UV_PROJECT_ENVIRONMENT so uv creates a local .venv
+            result = host.run(f"cd {test_dir} && UV_PROJECT_ENVIRONMENT= uv sync")
             assert result.rc == 0, f"uv sync failed: {result.stderr}"
             assert host.file(lockfile_path).exists, "uv.lock file was not created"
             assert host.file(venv_path).is_directory, ".venv directory was not created"
 
             # Step 3: Run uv add with a lightweight package (typing-extensions is very lightweight)
             package_name = "typing-extensions"
-            result = host.run(f"cd {test_dir} && uv add {package_name}")
+            result = host.run(
+                f"cd {test_dir} && UV_PROJECT_ENVIRONMENT= uv add {package_name}"
+            )
             assert result.rc == 0, f"uv add {package_name} failed: {result.stderr}"
 
             # Verify package was added to pyproject.toml
@@ -178,13 +325,13 @@ PYPROJECT_EOF"""
             )
 
             # Step 4: Run uv sync again
-            result = host.run(f"cd {test_dir} && uv sync")
+            result = host.run(f"cd {test_dir} && UV_PROJECT_ENVIRONMENT= uv sync")
             assert result.rc == 0, f"Second uv sync failed: {result.stderr}"
 
             # Verify the package is installed in venv (not system-wide)
             # Use uv run to execute in the venv context
             result = host.run(
-                f"cd {test_dir} && uv run python -c 'import {package_name.replace('-', '_')}; print(\"OK\")'"
+                f"cd {test_dir} && UV_PROJECT_ENVIRONMENT= uv run python -c 'import {package_name.replace('-', '_')}; print(\"OK\")'"
             )
             assert result.rc == 0, (
                 f"{package_name} is not importable in venv after uv sync"
@@ -236,32 +383,133 @@ class TestDevelopmentTools:
             f"Expected ruff {expected}, got: {result.stdout}"
         )
 
+    def test_bandit_installed(self, host):
+        """Test that bandit is installed."""
+        result = host.run("bandit --version")
+        assert result.rc == 0, "bandit --version failed"
+        assert "bandit" in result.stdout.lower()
+        expected = EXPECTED_VERSIONS["bandit"]
+        assert expected in result.stdout, (
+            f"Expected bandit {expected}, got: {result.stdout}"
+        )
+
+    def test_pip_licenses_installed(self, host):
+        """Test that pip-licenses is installed."""
+        result = host.run("pip-licenses --version")
+        assert result.rc == 0, "pip-licenses --version failed"
+        assert "pip-licenses" in result.stdout.lower()
+        expected = EXPECTED_VERSIONS["pip_licenses"]
+        assert expected in result.stdout, (
+            f"Expected pip-licenses {expected}, got: {result.stdout}"
+        )
+
+    def test_vig_utils_installed(self, host):
+        """Test that vig-utils is installed and importable."""
+        result = host.run("python3 -c 'import vig_utils; print(\"OK\")'")
+        assert result.rc == 0, (
+            f"vig-utils is not installed or not importable: {result.stderr}"
+        )
+        assert "OK" in result.stdout, "Failed to import vig_utils"
+
+    def test_vig_utils_version(self, host):
+        """Test that vig-utils version is correct."""
+        result = host.run("python3 -c 'import vig_utils; print(vig_utils.__version__)'")
+        assert result.rc == 0, "Failed to get vig-utils version"
+        expected = EXPECTED_VERSIONS["vig_utils"]
+        assert expected in result.stdout, (
+            f"Expected vig-utils {expected}x, got: {result.stdout}"
+        )
+
+    @pytest.mark.parametrize(
+        "module",
+        [
+            "vig_utils.gh_issues",
+            "vig_utils.validate_commit_msg",
+            "vig_utils.check_action_pins",
+            "vig_utils.prepare_changelog",
+            "vig_utils.prepare_commit_msg_strip_trailers",
+            "vig_utils.check_agent_identity",
+            "vig_utils.check_pr_agent_fingerprints",
+            "vig_utils.resolve_branch",
+            "vig_utils.derive_branch_summary",
+            "vig_utils.check_skill_names",
+            "vig_utils.setup_labels",
+            "vig_utils.utils",
+        ],
+    )
+    def test_vig_utils_required_modules_importable(self, host, module):
+        """Test that core vig_utils modules are importable."""
+        result = host.run(f"python3 -c 'import {module}; print(\"OK\")'")
+        assert result.rc == 0, f"{module} is not importable: {result.stderr}"
+        assert "OK" in result.stdout
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "check-skill-names",
+            "derive-branch-summary",
+            "gh-issues",
+            "resolve-branch",
+            "setup-labels",
+        ],
+    )
+    def test_vig_utils_shell_scripts(self, host, name):
+        """Test vig-utils shell wrapper commands are callable."""
+        result = host.run(f'bash -lc "command -v {name}"')
+        assert result.rc == 0, f"{name} command failed: {result.stderr}"
+
 
 class TestEnvironmentVariables:
     """Test that environment variables are set correctly."""
 
-    def test_pythonunbuffered_set(self, host):
-        """Test that PYTHONUNBUFFERED is set."""
-        result = host.run("echo $PYTHONUNBUFFERED")
-        assert result.rc == 0, "Failed to read PYTHONUNBUFFERED"
-        assert result.stdout.strip() == "1", (
-            f"Expected PYTHONUNBUFFERED=1, got: {result.stdout.strip()}"
+    @pytest.mark.parametrize(
+        ("name", "expected"),
+        [
+            ("DEBIAN_FRONTEND", "noninteractive"),
+            ("LANG", "en_US.UTF-8"),
+            ("LANGUAGE", "en_US:en"),
+            ("LC_ALL", "en_US.UTF-8"),
+            ("PYTHONUNBUFFERED", "1"),
+            ("IN_CONTAINER", "true"),
+            ("PRE_COMMIT_HOME", "/opt/pre-commit-cache"),
+            ("UV_PROJECT_ENVIRONMENT", "/root/assets/workspace/.venv"),
+            ("VIRTUAL_ENV", "/root/assets/workspace/.venv"),
+        ],
+        ids=[
+            "debian_frontend",
+            "lang",
+            "language",
+            "lc_all",
+            "pythonunbuffered",
+            "in_container",
+            "pre_commit_home",
+            "uv_project_environment",
+            "virtual_env",
+        ],
+    )
+    def test_env_vars_set(self, host, name, expected):
+        """Test that required environment variables are set to expected values."""
+        result = host.run(f"printenv {name}")
+        assert result.rc == 0, f"Failed to read {name}"
+        assert result.stdout.strip() == expected, (
+            f"Expected {name}={expected}, got: {result.stdout.strip()}"
         )
 
-    def test_in_container_set(self, host):
-        """Test that IN_CONTAINER is set."""
-        result = host.run("echo $IN_CONTAINER")
-        assert result.rc == 0, "Failed to read IN_CONTAINER"
-        assert result.stdout.strip() == "true", (
-            f"Expected IN_CONTAINER=true, got: {result.stdout.strip()}"
-        )
-
-    def test_locale_set(self, host):
-        """Test that locale environment variables are set."""
-        result = host.run("echo $LANG")
-        assert result.rc == 0, "Failed to read LANG"
-        assert "en_US.UTF-8" in result.stdout, (
-            f"Expected LANG=en_US.UTF-8, got: {result.stdout.strip()}"
+    @pytest.mark.parametrize(
+        "path_entry",
+        [
+            "/root/.local/bin",
+            "/root/.cargo/bin",
+        ],
+        ids=["cursor_agent_path", "cargo_path"],
+    )
+    def test_path_contains_required_entries(self, host, path_entry):
+        """Test that PATH includes required binary locations."""
+        result = host.run("printenv PATH")
+        assert result.rc == 0, "Failed to read PATH"
+        path_entries = result.stdout.strip().split(":")
+        assert path_entry in path_entries, (
+            f"Expected PATH to contain {path_entry}, got: {result.stdout.strip()}"
         )
 
 
@@ -305,6 +553,7 @@ class TestFileStructure:
             "/root/assets/workspace/CHANGELOG.md",
             "/root/assets/workspace/README.md",
             "/root/assets/workspace/LICENSE",
+            "/root/assets/workspace/.vig-os",
             # .devcontainer files
             "/root/assets/workspace/.devcontainer/.gitignore",
             "/root/assets/workspace/.devcontainer/README.md",
@@ -321,6 +570,7 @@ class TestFileStructure:
             "/root/assets/workspace/.devcontainer/scripts/init-git.sh",
             "/root/assets/workspace/.devcontainer/scripts/init-precommit.sh",
             "/root/assets/workspace/.devcontainer/scripts/setup-git-conf.sh",
+            "/root/assets/workspace/.devcontainer/scripts/verify-auth.sh",
             # Git hooks
             "/root/assets/workspace/.githooks/pre-commit",
         ]
@@ -370,6 +620,41 @@ class TestFileStructure:
         assert result.rc == 0, (
             "Pre-commit cache directory is empty - hooks were not initialized"
         )
+
+    def test_manifest_files(self, host, parse_manifest):
+        """Test that all files in manifest are copied to the image.
+
+        Non-transformed entries are verified via SHA-256 checksum comparison.
+        Transformed entries are only checked for existence (content differs
+        intentionally due to post-copy transformations).
+        """
+        manifest_entries = parse_manifest()
+        project_root = Path(__file__).parent.parent
+        workspace_base = "/root/assets/workspace"
+
+        for src_rel, dest_rel, is_transformed in manifest_entries:
+            src_path = project_root / src_rel
+            if src_path.is_file():
+                if is_transformed:
+                    dest_path = f"{workspace_base}/{dest_rel}"
+                    assert host.file(dest_path).exists, (
+                        f"Transformed manifest file not found at {dest_path}"
+                    )
+                else:
+                    verify_file_identity(host, src_rel, f"{workspace_base}/{dest_rel}")
+            elif src_path.is_dir():
+                files = sorted(f for f in src_path.rglob("*") if f.is_file())
+                assert files, f"Manifest local directory is empty: {src_rel}"
+                for file_path in files:
+                    rel = file_path.relative_to(project_root)
+                    dest_file_rel = f"{dest_rel}/{file_path.relative_to(src_path)}"
+                    dest_file_path = f"{workspace_base}/{dest_file_rel}"
+                    if is_transformed:
+                        assert host.file(dest_file_path).exists, (
+                            f"Transformed manifest file not found at {dest_file_path}"
+                        )
+                    else:
+                        verify_file_identity(host, str(rel), dest_file_path)
 
 
 class TestPlaceholders:

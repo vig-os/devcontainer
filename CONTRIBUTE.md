@@ -15,29 +15,71 @@ This guide explains how to develop, build, test, and release the vigOS developme
 | **git** | >=2.34 | Version control and pre-commit hooks |
 | **ssh** | latest | GitHub authentication and commit signing |
 | **gh** | latest | GitHub CLI for repository and PR/issue management |
+| **jq** | latest | JSON parsing for worktree commands and issue metadata |
+| **tmux** | latest | Session manager required by worktree-start and worktree-attach |
+| **agent** | latest | Cursor Agent CLI required by worktree-start/worktree-attach flows |
 | **npm** | latest | Node.js package manager (for DevContainer CLI) |
 | **uv** | >=0.8 | Python package and project manager |
-| **devcontainer** | 0.80.1 | DevContainer CLI for testing devcontainer functionality |
+| **bats** | 1.13.0 | Bash Automated Testing System for shell script tests |
+| **devcontainer** | 0.81.1 | DevContainer CLI for testing devcontainer functionality |
+| **hadolint** | latest | Containerfile/Dockerfile linter used by pre-commit |
+| **taplo** | latest | TOML formatter and linter used by pre-commit |
+| **parallel** | latest | Parallelizes BATS test execution for faster test runs |
 
 **Ubuntu/Debian:**
 
 ```bash
 sudo apt update
-sudo apt install -y podman git openssh-client nodejs npm
+sudo apt install -y podman git openssh-client jq tmux nodejs npm parallel
 # just
-curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
 
 # gh
 curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
 sudo apt update && sudo apt install -y gh
 
+# hadolint
+case "$(dpkg --print-architecture)" in
+  amd64) ARCH="linux-x86_64" ;;
+  arm64) ARCH="linux-arm64" ;;
+  *)
+    echo "Unsupported architecture: $(dpkg --print-architecture)"
+    exit 1
+    ;;
+esac
+BASE_URL="https://github.com/hadolint/hadolint/releases/latest/download"
+BIN_FILE="hadolint-${ARCH}"
+SHA_FILE="${BIN_FILE}.sha256"
+curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
+curl -fsSL "${BASE_URL}/${SHA_FILE}" -o "${SHA_FILE}"
+EXPECTED_SHA="$(awk '{print $1}' "${SHA_FILE}")"
+echo "${EXPECTED_SHA}  ${BIN_FILE}" | sha256sum -c -
+sudo install -m 0755 "${BIN_FILE}" /usr/local/bin/hadolint
+rm -f "${BIN_FILE}" "${SHA_FILE}"
+
+# taplo
+case "$(dpkg --print-architecture)" in
+  amd64) ARCH="x86_64" ;;
+  arm64) ARCH="aarch64" ;;
+  *)
+    echo "Unsupported architecture: $(dpkg --print-architecture)"
+    exit 1
+    ;;
+esac
+BASE_URL="https://github.com/tamasfe/taplo/releases/latest/download"
+BIN_FILE="taplo-linux-${ARCH}.gz"
+curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
+gunzip "${BIN_FILE}"
+sudo install -m 0755 "taplo-linux-${ARCH}" /usr/local/bin/taplo
+rm -f "taplo-linux-${ARCH}"
+
 ```
 
 **macOS (Homebrew):**
 
 ```bash
-brew install podman just git openssh gh node
+brew install podman just git openssh gh jq tmux node hadolint taplo parallel
 ```
 
 - For other Linux distributions, use your package manager (e.g., `dnf`, `yum`, `zypper`, `apk`) to install these dependencies.
@@ -117,119 +159,109 @@ When contributing to this project, follow this workflow:
 ```text
 Available recipes:
     [build]
-    build no_cache=""              # Build local development image
-    clean version="dev"            # Remove image (default: dev)
-    clean-artifacts                # Clean build artifacts
-    clean-test-containers          # Clean up lingering test containers
+    build no_cache=""                          # Build local development image
+    clean version="dev"                        # Remove image (default: dev)
+    clean-test-containers                      # Clean up lingering test containers
 
-    [deps]
-    sync                           # Sync dependencies from pyproject.toml
-    update                         # Update all dependencies
+    [github]
+    gh-issues                                  # List open issues and PRs grouped by milestone [alias: gh-i]
 
     [info]
-    default                        # Show available commands (default)
-    docs                           # Generate documentation from templates
-    help                           # Show available commands
-    info                           # Show image information
-    init *args                     # Install system dependencies and setup development environment
-    login                          # Test login to GHCR
+    default                                    # Show available commands (default)
+    docs                                       # Generate documentation from templates
+    help                                       # Show available commands
+    info                                       # Show image information
+    init *args                                 # Install system dependencies and setup development environment
+    login                                      # Test login to GHCR
+    sync-workspace                             # Sync workspace templates from repo root to assets/workspace/
 
     [podman]
-    podman-kill name               # Stop and remove a container by name or ID
-    podman-kill-all                # Stop and remove all containers (with confirmation)
-    podman-kill-project            # Stop and remove project-related containers
-    podman-prune                   # Prune unused containers, images, networks, and volumes
-    podman-prune-all               # Full cleanup: prune including volumes
-    podman-ps *args                # List containers/images (--all for all podman resources)
-    podman-rmi image               # Remove an image by name, tag, or ID
-    podman-rmi-all                 # Remove all images (with confirmation)
-    podman-rmi-dangling            # Remove dangling images (untagged)
-    podman-rmi-project             # Remove project-related images
+    podman-kill name                           # Stop and remove a container by name or ID [alias: pdm-kill]
+    podman-kill-all                            # Stop and remove all containers (with confirmation) [alias: pdm-kill-all]
+    podman-kill-project                        # Stop and remove project-related containers [alias: pdm-kill-project]
+    podman-prune                               # Prune unused containers, images, networks, and volumes [alias: pdm-prune]
+    podman-prune-all                           # Full cleanup: prune including volumes [alias: pdm-prune-all]
+    podman-ps *args                            # List containers/images (--all for all podman resources) [alias: pdm-ps]
+    podman-rmi image                           # Remove an image by name, tag, or ID [alias: pdm-rmi]
+    podman-rmi-all                             # Remove all images (with confirmation) [alias: pdm-rmi-all]
+    podman-rmi-dangling                        # Remove dangling images (untagged) [alias: pdm-rmi-dangling]
+    podman-rmi-project                         # Remove project-related images [alias: pdm-rmi-project]
 
     [quality]
-    format                         # Format code
-    lint                           # Run all linters
-    precommit                      # Run pre-commit hooks on all files
+    format                                     # Format code
+    lint                                       # Run all linters
+    precommit                                  # Run pre-commit hooks on all files
 
     [release]
-    pull version="latest"          # Pull image from registry (default: latest)
-    push version                   # Push versioned release to registry (builds, tests, tags, pushes)
-
-    [sidecar]
-    sidecar name *args             # just sidecar redis flush
-    sidecars                       # List available sidecar containers
-    test-sidecar *args             # Convenience alias for test-sidecar (uses generic sidecar recipe)
+    finalize-release version ref="" *flags     # Finalize and publish release via GitHub Actions workflow (step 3, after testing)
+    prepare-release version ref="" *flags      # Prepare release branch for testing (step 1)
+    publish-candidate version ref="" *flags    # Publish release candidate via GitHub Actions workflow
+    pull version="latest"                      # Pull image from registry (default: latest)
+    reset-changelog                            # Reset CHANGELOG Unreleased section (after merging release to dev)
 
     [test]
-    test version="dev"             # Run all test suites
-    test-cov *args                 # Run tests with coverage
-    test-image version="dev"       # Run image tests only
-    test-integration version="dev" # Run integration tests only
-    test-pytest *args              # Run tests with pytest
-    test-utils                     # Run utils tests only
-    test-version-check             # Run version check tests only
+    test version="dev"                         # Run all test suites
+    test-bats                                  # Run BATS shell script tests
+    test-image version="dev"                   # Run image tests only
+    test-install                               # Run install script tests only
+    test-integration version="dev"             # Run integration tests only
+    test-utils                                 # Run utils tests only
+    test-validate-commit-msg                   # Run validate commit msg tests only
+    test-vig-utils                             # Run check action pins tests only
+
+    [worktree]
+    worktree-attach issue                      # before attaching. See tests/bats/worktree.bats for integration tests. [alias: wt-attach]
+    worktree-clean mode=""                     # Default (no args): clean only stopped worktrees. Use 'all' to clean everything. [alias: wt-clean]
+    worktree-list                              # List active worktrees and their tmux sessions [alias: wt-list]
+    worktree-start issue prompt="" reviewer="" # Create a worktree for an issue, open tmux session, launch cursor-agent [alias: wt-start]
+    worktree-stop issue                        # Stop a worktree's tmux session and remove the worktree [alias: wt-stop]
 
 ```
 
 ## Release Workflow
 
-When releasing a new version of the devcontainer image, follow these steps:
+Releases are managed through automated GitHub Actions workflows. For the full
+reference, see [docs/RELEASE_CYCLE.md](docs/RELEASE_CYCLE.md).
 
-1. **Update documentation**
-   - Ensure documentation templates are up to date
-   - Run `just docs` to regenerate all documentation
-   - Update [CHANGELOG.md](CHANGELOG.md):
-     - Move all `[Unreleased]` entries to a new version section (e.g., `[1.0.0]`)
-     - Add the release date in YYYY-MM-DD format
-     - Update the version links at the bottom of the file
-     - Clear the `[Unreleased]` section for future changes
-   - Verify all documentation reflects the current state
+### Quick Reference
 
-2. **Run tests**
+1. **Ensure all features are merged to `dev`** and tests are passing
 
    ```bash
-   # Run all test suites to ensure everything works
+   git checkout dev
+   git pull origin dev
    just test
    ```
 
-3. **Ensure clean git state**
+2. **Prepare the release** (creates release branch, prepares CHANGELOG, opens draft PR)
 
    ```bash
-   # Make sure you are on the dev branch
-   git checkout dev
-   git pull origin dev
-
-   # Ensure no uncommitted changes
-   git status
-   # All changes should be committed before releasing
+   just prepare-release X.Y.Z
    ```
 
-4. **Create and push the version tag to trigger the release workflow**
+3. **Review and test the release**
+   - Monitor CI on the draft PR
+   - Fix any issues via bugfix PRs to `release/X.Y.Z`
+   - Mark PR as ready for review and get approval
 
-   Releases are published by the [GitHub Actions workflow](.github/workflows/publish-container-image.yml) when a version tag (e.g. `v1.0.0`) is pushed.
+4. **Finalize and publish** (validates, finalizes CHANGELOG, builds, tests, signs, and publishes)
 
    ```bash
-   # Replace X.Y.Z with the semantic version (e.g. 1.0.0, 1.1.0, 2.0.0)
-   # Version must follow Semantic Versioning: MAJOR.MINOR.PATCH
-   git tag -a vX.Y.Z -m "Release X.Y.Z"
-   git push origin vX.Y.Z
+   just finalize-release X.Y.Z
    ```
 
    The workflow will:
-   - Build the image for the specified version (multi-arch: amd64, arm64)
-   - Run image tests before push
+   - Validate CI status and PR approval
+   - Set the release date in CHANGELOG
+   - Build and test multi-arch images (amd64, arm64)
+   - Scan for vulnerabilities with Trivy
    - Push to GHCR with `:latest` and `:X.Y.Z` tags
-   - Create a multi-architecture manifest
+   - Sign images with Sigstore cosign
+   - Generate SBOM and attest provenance
+   - Automatically roll back on failure
 
-   Ensure [CHANGELOG.md](CHANGELOG.md) and any version references are updated before tagging.
-
-5. **Create pull request to merge into `main`**
-   - After the version tag is pushed and the publish workflow completes, create a [pull request](https://github.com/vig-os/devcontainer/pulls) from `dev` to `main`
-   - The PR should include:
-     - Summary of changes in this release
-     - Reference to the version tag created
-     - Any important notes for users
-   - Once merged, `main` will reflect the stable release
+5. **Merge the release PR into `main`**
+   - The `sync-main-to-dev` workflow automatically opens a PR to merge `main` into `dev`
 
 ## Version Tagging
 
@@ -243,7 +275,7 @@ vigOS Development Environment uses **Semantic Versioning** ([SemVer](https://sem
 - **Stable versions** (e.g., `1.2.0`, `2.0.0`):
   - Follow Semantic Versioning format: `MAJOR.MINOR.PATCH` (e.g., `1.0.0`, `1.2.3`, `2.0.0`)
   - Pushes to GHCR with both `:latest` and `:version` tags
-  - Creates git tag `v{version}` (e.g., `v1.2.0`)
+  - Creates git tag `{version}` (e.g., `1.2.0`)
   - Use `just push X.Y.Z` where X.Y.Z is the semantic version
 
 This ensures that `:latest` always points to the latest stable release, and git tags provide traceability for all stable container versions.

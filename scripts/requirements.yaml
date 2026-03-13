@@ -46,7 +46,7 @@ dependencies:
     install:
       macos: brew install just
       debian: |
-        curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+        curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
       fedora: sudo dnf install -y just
       manual: https://github.com/casey/just#installation
 
@@ -98,6 +98,51 @@ dependencies:
       fedora: sudo dnf install -y gh
       manual: https://cli.github.com/
 
+  # JSON processor (required by worktree trust/config commands)
+  - name: jq
+    version: latest
+    purpose: JSON parsing for worktree commands and issue metadata
+    required: true
+    check:
+      command: command -v jq
+      version_command: jq --version
+      version_regex: 'jq-(\d+\.\d+)'
+    install:
+      macos: brew install jq
+      debian: sudo apt install -y jq
+      fedora: sudo dnf install -y jq
+      alpine: sudo apk add jq
+      manual: https://jqlang.github.io/jq/download/
+
+  # Terminal multiplexer (required by worktree tmux sessions)
+  - name: tmux
+    version: latest
+    purpose: Session manager required by worktree-start and worktree-attach
+    required: true
+    check:
+      command: command -v tmux
+      version_command: tmux -V
+      version_regex: 'tmux (\d+\.\d+)'
+    install:
+      macos: brew install tmux
+      debian: sudo apt install -y tmux
+      fedora: sudo dnf install -y tmux
+      alpine: sudo apk add tmux
+      manual: https://github.com/tmux/tmux/wiki/Installing
+
+  # Cursor agent CLI (required by worktree autonomous flows)
+  - name: agent
+    version: latest
+    purpose: Cursor Agent CLI required by worktree-start/worktree-attach flows
+    required: true
+    check:
+      command: command -v agent
+      version_command: agent --version
+      version_regex: '([0-9]+\.[0-9]+\.[0-9]+)'
+    install:
+      all: curl https://cursor.com/install -fsSL | bash
+      manual: https://cursor.com/install
+
   # Node.js (for devcontainer CLI)
   - name: npm
     version: latest
@@ -126,32 +171,103 @@ dependencies:
       all: curl -LsSf https://astral.sh/uv/install.sh | sh
       manual: https://github.com/astral-sh/uv
 
-  # DevContainer CLI (auto-installed by setup.sh)
+  # Shell testing (auto-installed by npm install)
+  - name: bats
+    version: "1.13.0"
+    purpose: Bash Automated Testing System for shell script tests
+    required: true
+    check:
+      command: command -v bats || test -x node_modules/.bin/bats
+      version_command: npx bats --version
+      version_regex: 'Bats (\d+\.\d+)'
+    install:
+      all: npm install
+      manual: https://bats-core.readthedocs.io/en/stable/installation.html#any-os-npm
+
+  # DevContainer CLI (auto-installed by npm install)
   - name: devcontainer
-    version: "0.80.1"
+    version: "0.81.1"
     purpose: DevContainer CLI for testing devcontainer functionality
     required: true
     check:
-      command: command -v devcontainer
-      version_command: devcontainer --version
+      command: command -v devcontainer || test -x node_modules/.bin/devcontainer
+      version_command: npx devcontainer --version
       version_regex: '(\d+\.\d+\.\d+)'
     install:
-      all: npm install -g @devcontainers/cli@{{version}}
+      all: npm install
       manual: https://github.com/devcontainers/cli
 
-# Optional dependencies for multi-arch builds
-optional:
-  - name: qemu-user-static
+  # Containerfile linting
+  - name: hadolint
     version: latest
-    purpose: Multi-architecture container builds (AMD64/ARM64)
+    purpose: Containerfile/Dockerfile linter used by pre-commit
+    required: true
+    check:
+      command: command -v hadolint
+      version_command: hadolint --version
+      version_regex: 'Haskell Dockerfile Linter (\d+\.\d+)'
+    install:
+      macos: brew install hadolint
+      debian: |
+        case "$(dpkg --print-architecture)" in
+          amd64) ARCH="linux-x86_64" ;;
+          arm64) ARCH="linux-arm64" ;;
+          *)
+            echo "Unsupported architecture: $(dpkg --print-architecture)"
+            exit 1
+            ;;
+        esac
+        BASE_URL="https://github.com/hadolint/hadolint/releases/latest/download"
+        BIN_FILE="hadolint-${ARCH}"
+        SHA_FILE="${BIN_FILE}.sha256"
+        curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
+        curl -fsSL "${BASE_URL}/${SHA_FILE}" -o "${SHA_FILE}"
+        EXPECTED_SHA="$(awk '{print $1}' "${SHA_FILE}")"
+        echo "${EXPECTED_SHA}  ${BIN_FILE}" | sha256sum -c -
+        sudo install -m 0755 "${BIN_FILE}" /usr/local/bin/hadolint
+        rm -f "${BIN_FILE}" "${SHA_FILE}"
+      manual: https://github.com/hadolint/hadolint/releases
+
+  # TOML linting
+  - name: taplo
+    version: latest
+    purpose: TOML formatter and linter used by pre-commit
+    required: true
+    check:
+      command: command -v taplo
+      version_command: taplo --version
+      version_regex: 'taplo (\d+\.\d+)'
+    install:
+      macos: brew install taplo
+      debian: |
+        case "$(dpkg --print-architecture)" in
+          amd64) ARCH="x86_64" ;;
+          arm64) ARCH="aarch64" ;;
+          *)
+            echo "Unsupported architecture: $(dpkg --print-architecture)"
+            exit 1
+            ;;
+        esac
+        BASE_URL="https://github.com/tamasfe/taplo/releases/latest/download"
+        BIN_FILE="taplo-linux-${ARCH}.gz"
+        curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
+        gunzip "${BIN_FILE}"
+        sudo install -m 0755 "taplo-linux-${ARCH}" /usr/local/bin/taplo
+        rm -f "taplo-linux-${ARCH}"
+      manual: https://github.com/tamasfe/taplo/releases
+
+  # Parallel (auto-installed by npm install)
+  - name: parallel
+    version: latest
+    purpose: Parallelizes BATS test execution for faster test runs
     required: false
     check:
-      command: test -f /proc/sys/fs/binfmt_misc/qemu-aarch64
+      command: command -v parallel
+      version_command: parallel --version
+      version_regex: 'GNU parallel (\d+)'
     install:
-      debian: |
-        sudo apt install -y qemu-user-static
-        sudo podman run --privileged --rm docker.io/tonistiigi/binfmt --install all
-      fedora: |
-        sudo dnf install -y qemu-user-static
-        sudo podman run --privileged --rm docker.io/tonistiigi/binfmt --install all
-      manual: Only needed for cross-architecture builds
+      macos: brew install parallel
+      debian: sudo apt install -y parallel
+      fedora: sudo dnf install -y parallel
+      alpine: sudo apk add parallel
+      manual: https://www.gnu.org/software/parallel/

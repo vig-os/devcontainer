@@ -150,9 +150,11 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
+# Nix / direnv
+.direnv/
+
 # Environments
 .env
-.envrc
 .venv
 env/
 venv/
@@ -220,3 +222,6 @@ __marimo__/
 
 # Pre-commit cache
 .pre-commit-cache/
+
+# Bats
+node_modules/
