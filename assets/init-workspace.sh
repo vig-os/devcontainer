@@ -119,6 +119,8 @@ fi
 
 # Sanitize: replace hyphens and spaces with underscore; lowercase; remove other special chars
 SHORT_NAME=$(echo "$SHORT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[ -]/_/g' | sed 's/[^a-z0-9_]/_/g')
+SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/__*/_/g' | sed 's/^[^a-z0-9]*//; s/[^a-z0-9]*$//')
+SHORT_NAME="${SHORT_NAME:-project}"
 echo "Project short name set to: $SHORT_NAME"
 
 # Get ORG_NAME - from env var, default, or prompt
