@@ -1,18 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-18T01:02:45Z
-updated: 2026-02-18T12:24:59Z
+updated: 2026-03-03T09:13:28Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/69
-comments: 1
-labels: none
+comments: 2
+labels: chore, priority:low, area:ci, effort:small, semver:patch
 assignees: none
-milestone: none
+milestone: 0.3
 projects: none
-relationship: none
-synced: 2026-02-18T12:55:27.757Z
+parent: none
+children: none
+synced: 2026-03-14T04:16:24.872Z
 ---
 
 # [Issue 69]: [[TASK] Run pre-commit formatting in sync-issues workflow before committing](https://github.com/vig-os/devcontainer/issues/69)
@@ -58,4 +59,12 @@ _Posted on February 18, 2026 at 12:24 PM_
 The fails were happening because the output directory was changed in the workflow, but not excluded in the pre-commit configuration. This has been fixed, and I would keep it excluded since we cannot guarantee that auto-fix will actually fix all issues.
 
 The question remains whether to actually run pre-commit once with auto-fix during the sync-issues workflow, overriding the exclusion rule.
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on March 3, 2026 at 09:13 AM_
+
+This has moved to [sync-issues-action/#17](https://github.com/vig-os/sync-issues-action/issues/17)
 

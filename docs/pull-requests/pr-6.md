@@ -12,9 +12,8 @@ labels: none
 assignees: c-vigo
 milestone: Initial release
 projects: none
-relationship: none
 merged: 2025-12-09T05:58:54Z
-synced: 2026-02-18T08:57:14.282Z
+synced: 2026-03-14T04:18:48.716Z
 ---
 
 # [PR 6](https://github.com/vig-os/devcontainer/pull/6) Release Candidate 0.1 for the vigOS Development Environment
@@ -175,9 +174,9 @@ code .
 ---
 ---
 
-## Comments (9)
+# Comments (9)
 
-### [Comment #1](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3605990335) by [@c-vigo](https://github.com/c-vigo)
+## [Comment #1](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3605990335) by [@c-vigo](https://github.com/c-vigo)
 
 _Posted on December 3, 2025 at 09:53 AM_
 
@@ -192,7 +191,7 @@ For me this takes less than 5 seconds running with "dev" tag, maybe it had to bu
 
 ---
 
-### [Comment #2](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3606003142) by [@c-vigo](https://github.com/c-vigo)
+## [Comment #2](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3606003142) by [@c-vigo](https://github.com/c-vigo)
 
 _Posted on December 3, 2025 at 09:56 AM_
 
@@ -226,7 +225,7 @@ services:
 
 ---
 
-### [Comment #3](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3606043989) by [@c-vigo](https://github.com/c-vigo)
+## [Comment #3](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3606043989) by [@c-vigo](https://github.com/c-vigo)
 
 _Posted on December 3, 2025 at 10:06 AM_
 
@@ -238,7 +237,7 @@ git push --force-with-lease
 
 ---
 
-### [Comment #4](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3606082389) by [@gerchowl](https://github.com/gerchowl)
+## [Comment #4](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3606082389) by [@gerchowl](https://github.com/gerchowl)
 
 _Posted on December 3, 2025 at 10:15 AM_
 
@@ -269,7 +268,7 @@ Date:   Tue Dec 2 18:15:23 2025 +0100
 
 ---
 
-### [Comment #5](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3606101015) by [@c-vigo](https://github.com/c-vigo)
+## [Comment #5](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3606101015) by [@c-vigo](https://github.com/c-vigo)
 
 _Posted on December 3, 2025 at 10:18 AM_
 
@@ -280,7 +279,7 @@ I still see it unsigned [here](https://github.com/vig-os/devcontainer/compare/ma
 
 ---
 
-### [Comment #6](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3606106742) by [@gerchowl](https://github.com/gerchowl)
+## [Comment #6](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3606106742) by [@gerchowl](https://github.com/gerchowl)
 
 _Posted on December 3, 2025 at 10:20 AM_
 
@@ -357,20 +356,20 @@ services:
 
 ---
 
-### [Comment #7](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3606161603) by [@c-vigo](https://github.com/c-vigo)
+## [Comment #7](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3606161603) by [@c-vigo](https://github.com/c-vigo)
 
 _Posted on December 3, 2025 at 10:32 AM_
 
-## Build time
+### Build time
 No clue, I tried with --force and it is still fast in my test. Maybe the problem is the "find" command in line 100 of init_workspace.sh?
 
-## {{IMAGE_TAG}}
+### {{IMAGE_TAG}}
 - did you use make build?
 - do the tests pass? in particular, TestDevContainerPlaceholders in test_integration.py
 
 ---
 
-### [Comment #8](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3606269248) by [@gerchowl](https://github.com/gerchowl)
+## [Comment #8](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3606269248) by [@gerchowl](https://github.com/gerchowl)
 
 _Posted on December 3, 2025 at 10:54 AM_
 
@@ -458,7 +457,7 @@ make: *** [test-integration] Error 1
 
 ---
 
-### [Comment #9](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3607479024) by [@c-vigo](https://github.com/c-vigo)
+## [Comment #9](https://github.com/vig-os/devcontainer/pull/6#issuecomment-3607479024) by [@c-vigo](https://github.com/c-vigo)
 
 _Posted on December 3, 2025 at 03:42 PM_
 
