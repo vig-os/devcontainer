@@ -369,6 +369,7 @@ jobs:
 
       - name: Wait for sync-issues completion
         if: ${{ inputs.release_kind == 'final' }}
+        id: wait_sync
         env:
           GH_TOKEN: ${{ steps.auth.outputs.token }}
         run: |
@@ -376,6 +377,7 @@ jobs:
           TIMEOUT=120
           ELAPSED=0
           INTERVAL=10
+          RUN_STATUS="unknown"
           sleep 5
           ELAPSED=5
 
@@ -393,6 +395,21 @@ jobs:
             sleep "$INTERVAL"
             ELAPSED=$((ELAPSED + INTERVAL))
           done
+
+          if [ "$RUN_STATUS" != "completed" ]; then
+            echo "ERROR: Timed out waiting for sync-issues workflow completion"
+            exit 1
+          fi
+
+          RUN_CONCLUSION=$(gh run list \
+            --workflow sync-issues.yml \
+            --limit 1 \
+            --json conclusion \
+            --jq '.[0].conclusion' 2>/dev/null || echo "unknown")
+          if [ "$RUN_CONCLUSION" != "success" ]; then
+            echo "ERROR: sync-issues workflow finished with conclusion '$RUN_CONCLUSION'"
+            exit 1
+          fi
 
       - name: Pull sync-issues changes
         if: ${{ inputs.release_kind == 'final' }}

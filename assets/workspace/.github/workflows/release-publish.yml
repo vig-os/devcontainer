@@ -81,6 +81,17 @@ jobs:
             echo "token=$FALLBACK_TOKEN" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Validate release kind
+        env:
+          RELEASE_KIND: ${{ inputs.release_kind }}
+        run: |
+          set -euo pipefail
+          if [ "$RELEASE_KIND" != "candidate" ] && [ "$RELEASE_KIND" != "final" ]; then
+            echo "ERROR: Invalid release_kind '$RELEASE_KIND'"
+            echo "release_kind must be one of: candidate, final"
+            exit 1
+          fi
+
       - name: Checkout finalized commit
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:

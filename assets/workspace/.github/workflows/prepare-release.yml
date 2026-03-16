@@ -111,11 +111,20 @@ jobs:
             exit 1
           fi
 
-      - name: Verify CHANGELOG has Unreleased section with content
+      - name: Verify CHANGELOG has Unreleased section entries
         run: |
           set -euo pipefail
           if ! grep -q "^## Unreleased" CHANGELOG.md; then
             echo "ERROR: CHANGELOG.md is missing '## Unreleased' section"
+            exit 1
+          fi
+          if ! awk '
+            /^## Unreleased$/ {in_unreleased=1; next}
+            /^## \[/ && in_unreleased {exit 1}
+            in_unreleased && /^[[:space:]]*-[[:space:]]/ {found_entry=1}
+            END {exit(found_entry ? 0 : 1)}
+          ' CHANGELOG.md; then
+            echo "ERROR: CHANGELOG.md Unreleased section has no entries"
             exit 1
           fi
 
