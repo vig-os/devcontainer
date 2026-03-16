@@ -29,6 +29,7 @@ PRESERVE_FILES=(
     "CHANGELOG.md"
     "LICENSE"
     ".github/CODEOWNERS"
+    ".github/workflows/release-extension.yml"
     "justfile.project"
 )
 
