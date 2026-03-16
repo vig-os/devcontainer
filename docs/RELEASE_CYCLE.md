@@ -360,7 +360,6 @@ The `release.yml` workflow performs the entire remaining release process. Behavi
 4. ✅ **Publish** job (runs only if all builds/tests pass)
    - Candidate mode: infers next `rcN`, creates annotated tag `X.Y.Z-rcN`, publishes candidate manifests
    - Final mode: creates annotated tag `X.Y.Z`, publishes final manifests
-   - Candidate and final modes: trigger `repository_dispatch` to `vig-os/devcontainer-smoke-test` with `client_payload[tag]` plus source metadata (`source_repo`, `source_workflow`, `source_run_id`, `source_run_url`, `source_sha`, `correlation_id`)
    - Pushes tag to origin
    - Downloads tested images from artifacts
    - Logs in to GitHub Container Registry
@@ -368,6 +367,7 @@ The `release.yml` workflow performs the entire remaining release process. Behavi
    - Creates multi-architecture manifest `ghcr.io/vig-os/devcontainer:<publish-tag>`
    - Creates/updates `ghcr.io/vig-os/devcontainer:latest` only in final mode (and only when both architectures are built)
    - Verifies manifests exist
+   - Candidate and final modes: trigger `repository_dispatch` to `vig-os/devcontainer-smoke-test` with `client_payload[tag]` plus source metadata (`source_repo`, `source_workflow`, `source_run_id`, `source_run_url`, `source_sha`, `correlation_id`)
 
 5. ✅ **Rollback** job (runs if ANY job failed)
    - Resets release branch to pre-finalization state
@@ -655,13 +655,13 @@ gh workflow run prepare-release.yml --ref dev -f "version=1.0.0" -f "dry-run=tru
 4. **publish** (runs if all builds/tests pass) - Creates tag and publishes
    - Candidate mode creates and pushes `X.Y.Z-rcN` (next available `N`)
    - Final mode creates and pushes `X.Y.Z`
-   - Candidate and final modes trigger smoke-test `repository_dispatch` with `client_payload[tag]=<publish-tag>`
    - Pushes tag
    - Downloads tested images from artifacts
    - Pushes images to GHCR
    - Creates multi-architecture manifest for computed publish tag
    - Updates `latest` only in final mode
    - Verifies manifests exist
+   - Candidate and final modes trigger smoke-test `repository_dispatch` with `client_payload[tag]=<publish-tag>`
 
 5. **rollback** (runs if any job failed) - Cleans up partial state
    - Resets release branch to pre-finalization state

@@ -914,7 +914,7 @@ jobs:
           echo "    - SBOM (SPDX) generated and attested"
           echo ""
           echo "Next steps:"
-          echo "  1. Verify smoke-test repo dispatch run status"
+          echo "  1. After publish completion, verify smoke-test repo dispatch run status (dispatch runs later in this job)"
           if [ "$RELEASE_KIND" = "candidate" ]; then
             echo "  2. If smoke tests pass, run: just finalize-release $BASE_VERSION"
           else
