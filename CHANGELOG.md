@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smoke-test repository dispatch now runs for final releases too** ([#173](https://github.com/vig-os/devcontainer/issues/173))
   - `release.yml` now triggers the existing smoke-test dispatch contract for both `candidate` and `final` release kinds
   - Final release summaries and release-cycle documentation now reflect dispatch behavior for both release modes
+- **Workspace CI templates now use a single container-based workflow** ([#327](https://github.com/vig-os/devcontainer/issues/327))
+  - Consolidate `assets/workspace/.github/workflows/ci.yml` as the canonical CI workflow and remove the obsolete `ci-container.yml` template
+  - Extract reusable `assets/workspace/.github/actions/resolve-image` and run workspace release tests in the same containerized workflow model
+  - Update smoke-test and release-cycle documentation to reference the single CI workflow contract
 
 ### Deprecated
 
