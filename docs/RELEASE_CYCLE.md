@@ -753,6 +753,20 @@ gh workflow run release.yml \
 
 ---
 
+## Downstream Integration
+
+Downstream repositories that use the workspace template consume release workflows from:
+
+- `assets/workspace/.github/workflows/prepare-release.yml`
+- `assets/workspace/.github/workflows/release.yml`
+- `assets/workspace/.github/workflows/release-core.yml`
+- `assets/workspace/.github/workflows/release-extension.yml`
+- `assets/workspace/.github/workflows/release-publish.yml`
+
+The orchestrator (`release.yml`) runs core -> extension -> publish and uses contract validation for local `workflow_call` interfaces.
+
+For contract details and extension ownership boundaries, see `docs/DOWNSTREAM_RELEASE.md`.
+
 ## QMS and Compliance
 
 ### Traceability
@@ -1030,6 +1044,7 @@ Follow [Semantic Versioning 2.0.0](https://semver.org/):
 
 - [CHANGELOG Format](../CHANGELOG.md) - Keep a Changelog standard
 - [Commit Message Standard](COMMIT_MESSAGE_STANDARD.md) - Commit format and validation
+- [Downstream Release Workflows](DOWNSTREAM_RELEASE.md) - Downstream release contract and extension model
 - [Branch Naming Rules](../.cursor/rules/branch-naming.mdc) - Topic branch conventions
 - [IEC 62304](https://www.iso.org/standard/38421.html) - Medical device software lifecycle
 - [Semantic Versioning](https://semver.org/) - Version numbering scheme

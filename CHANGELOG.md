@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Split downstream release workflow with project-owned extension hook** ([#326](https://github.com/vig-os/devcontainer/issues/326))
+  - Add local `workflow_call` release phases (`release-core.yml`, `release-publish.yml`) and a lightweight `release.yml` orchestrator in `assets/workspace/.github/workflows/`
+  - Add `release_kind` support with candidate mode (`X.Y.Z-rcN`) and final mode (`X.Y.Z`) in downstream release workflows
+  - Candidate mode now auto-computes the next RC tag, skips CHANGELOG finalization/sync-issues, and publishes a GitHub pre-release
+  - Add project-owned `release-extension.yml` stub and preserve it during `init-workspace.sh --force` upgrades
+  - Add `validate-contract` composite action for single-source contract version validation
+  - Add downstream release contract documentation and GHCR extension example in `docs/DOWNSTREAM_RELEASE.md`
+
 ### Changed
 
 - **Dependabot dependency update batch** ([#302](https://github.com/vig-os/devcontainer/pull/302), [#303](https://github.com/vig-os/devcontainer/pull/303), [#305](https://github.com/vig-os/devcontainer/pull/305), [#306](https://github.com/vig-os/devcontainer/pull/306), [#307](https://github.com/vig-os/devcontainer/pull/307), [#308](https://github.com/vig-os/devcontainer/pull/308), [#309](https://github.com/vig-os/devcontainer/pull/309))

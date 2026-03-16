@@ -1,0 +1,27 @@
+name: Validate release contract version
+description: Validate that the caller's contract version matches the expected version
+
+inputs:
+  contract_version:
+    description: "Contract version received from caller"
+    required: true
+  expected_version:
+    description: "Expected contract version"
+    required: false
+    default: "1"
+
+runs:
+  using: composite
+  steps:
+    - name: Validate contract version
+      shell: bash
+      env:
+        CONTRACT_VERSION: ${{ inputs.contract_version }}
+        EXPECTED: ${{ inputs.expected_version }}
+      run: |
+        set -euo pipefail
+        if [ "$CONTRACT_VERSION" != "$EXPECTED" ]; then
+          echo "ERROR: Unsupported contract_version '$CONTRACT_VERSION' (expected '$EXPECTED')."
+          echo "Update your workflow template and set contract_version: \"$EXPECTED\"."
+          exit 1
+        fi
