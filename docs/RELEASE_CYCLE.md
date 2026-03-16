@@ -359,7 +359,6 @@ The `release.yml` workflow performs the entire remaining release process. Behavi
 
 4. ✅ **Publish** job (runs only if all builds/tests pass)
    - Candidate mode: infers next `rcN`, creates annotated tag `X.Y.Z-rcN`, publishes candidate manifests
-   - Candidate mode: triggers `repository_dispatch` to `vig-os/devcontainer-smoke-test` with `client_payload[tag]` plus source metadata (`source_repo`, `source_workflow`, `source_run_id`, `source_run_url`, `source_sha`, `correlation_id`)
    - Final mode: creates annotated tag `X.Y.Z`, publishes final manifests
    - Pushes tag to origin
    - Downloads tested images from artifacts
@@ -368,6 +367,7 @@ The `release.yml` workflow performs the entire remaining release process. Behavi
    - Creates multi-architecture manifest `ghcr.io/vig-os/devcontainer:<publish-tag>`
    - Creates/updates `ghcr.io/vig-os/devcontainer:latest` only in final mode (and only when both architectures are built)
    - Verifies manifests exist
+   - Candidate and final modes: trigger `repository_dispatch` to `vig-os/devcontainer-smoke-test` with `client_payload[tag]` plus source metadata (`source_repo`, `source_workflow`, `source_run_id`, `source_run_url`, `source_sha`, `correlation_id`)
 
 5. ✅ **Rollback** job (runs if ANY job failed)
    - Resets release branch to pre-finalization state
@@ -404,6 +404,7 @@ Release Summary:
 ### Phase 4: Manual RC Smoke Gate
 
 After `just publish-candidate X.Y.Z` succeeds, verify smoke tests before running final release.
+The final release run (`just finalize-release X.Y.Z`) also emits the same dispatch event for release-tag smoke traceability.
 
 Dispatch payload contract for the smoke-test repository:
 
@@ -578,7 +579,7 @@ Release automation relies on two GitHub Apps with different scopes:
 
 Additional requirement:
 - `COMMIT_APP` must be allowed in branch protection bypass rules for `dev` so sync commits can be pushed by automation.
-- `RELEASE_APP` must be installed on `vig-os/devcontainer-smoke-test` with Contents read permission so `release.yml` can send `repository_dispatch` for RC smoke tests.
+- `RELEASE_APP` must be installed on `vig-os/devcontainer-smoke-test` with Contents read permission so `release.yml` can send `repository_dispatch` for candidate and final release smoke-test events.
 
 #### prepare-release.yml (Release Preparation Workflow)
 
@@ -660,6 +661,7 @@ gh workflow run prepare-release.yml --ref dev -f "version=1.0.0" -f "dry-run=tru
    - Creates multi-architecture manifest for computed publish tag
    - Updates `latest` only in final mode
    - Verifies manifests exist
+   - Candidate and final modes trigger smoke-test `repository_dispatch` with `client_payload[tag]=<publish-tag>`
 
 5. **rollback** (runs if any job failed) - Cleans up partial state
    - Resets release branch to pre-finalization state

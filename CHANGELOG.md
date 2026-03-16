@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Candidate release dispatches now include source repo/workflow/run/SHA metadata plus a deterministic `correlation_id`
   - Smoke-test dispatch receiver logs normalized source context, derives source run URL when possible, and writes it to workflow summary output
   - Release-cycle docs now define required vs optional dispatch payload keys and the future callback contract path for `publish-candidate`
+- **Smoke-test repository dispatch now runs for final releases too** ([#173](https://github.com/vig-os/devcontainer/issues/173))
+  - `release.yml` now triggers the existing smoke-test dispatch contract for both `candidate` and `final` release kinds
+  - Final release summaries and release-cycle documentation now reflect dispatch behavior for both release modes
 
 ### Deprecated
 
