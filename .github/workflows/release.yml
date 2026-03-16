@@ -938,11 +938,24 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.smoke-app-token.outputs.token }}
           RC_TAG: ${{ needs.validate.outputs.publish_version }}
+          SOURCE_REPO: ${{ github.repository }}
+          SOURCE_WORKFLOW: ${{ github.workflow }}
+          SOURCE_RUN_ID: ${{ github.run_id }}
+          SOURCE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SOURCE_SHA: ${{ needs.finalize.outputs.finalize_sha }}
+          CORRELATION_ID: ${{ github.repository }}:${{ github.run_id }}:${{ needs.validate.outputs.publish_version }}
         run: |
           set -euo pipefail
           gh api repos/vig-os/devcontainer-smoke-test/dispatches \
             -f event_type=smoke-test-trigger \
-            -f "client_payload[tag]=$RC_TAG"
+            -f "client_payload[tag]=$RC_TAG" \
+            -f "client_payload[event_type]=smoke-test-trigger" \
+            -f "client_payload[source_repo]=$SOURCE_REPO" \
+            -f "client_payload[source_workflow]=$SOURCE_WORKFLOW" \
+            -f "client_payload[source_run_id]=$SOURCE_RUN_ID" \
+            -f "client_payload[source_run_url]=$SOURCE_RUN_URL" \
+            -f "client_payload[source_sha]=$SOURCE_SHA" \
+            -f "client_payload[correlation_id]=$CORRELATION_ID"
           echo "✓ Triggered smoke-test dispatch for RC tag: $RC_TAG"
 
       - name: Warn if smoke-test dispatch token generation failed
