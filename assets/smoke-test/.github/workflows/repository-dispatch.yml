@@ -235,7 +235,7 @@ jobs:
           {
             echo "## Source Dispatch Context"
             echo ""
-            echo "- Tag: ${TAG}"
+            echo "- Tag: ${TAG:-n/a}"
             echo "- Source Repo: ${SOURCE_REPO:-n/a}"
             echo "- Source Workflow: ${SOURCE_WORKFLOW:-n/a}"
             echo "- Source Run ID: ${SOURCE_RUN_ID:-n/a}"
