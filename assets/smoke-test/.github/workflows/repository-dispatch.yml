@@ -9,7 +9,10 @@ name: Repository Dispatch Listener
 #
 # Dispatch payload:
 # - Preferred:   client_payload.tag
-# - Optional:    client_payload.event_type, client_payload.source_repo
+# - Optional:    client_payload.event_type, client_payload.source_repo,
+#                client_payload.source_workflow, client_payload.source_run_id,
+#                client_payload.source_run_url, client_payload.source_sha,
+#                client_payload.correlation_id
 #
 # NOTE: Changes to this template may require manual redeploy to
 # vig-os/devcontainer-smoke-test and promotion through PRs until merged to main.
@@ -29,6 +32,12 @@ jobs:
     timeout-minutes: 5
     outputs:
       tag: ${{ steps.extract.outputs.tag }}
+      source_repo: ${{ steps.extract.outputs.source_repo }}
+      source_workflow: ${{ steps.extract.outputs.source_workflow }}
+      source_run_id: ${{ steps.extract.outputs.source_run_id }}
+      source_run_url: ${{ steps.extract.outputs.source_run_url }}
+      source_sha: ${{ steps.extract.outputs.source_sha }}
+      correlation_id: ${{ steps.extract.outputs.correlation_id }}
     steps:
       - name: Extract and validate tag
         id: extract
@@ -37,12 +46,23 @@ jobs:
           EVENT_TYPE: ${{ github.event.client_payload.event_type || '' }}
           TAG: ${{ github.event.client_payload.tag || '' }}
           SOURCE_REPO: ${{ github.event.client_payload.source_repo || '' }}
+          SOURCE_WORKFLOW: ${{ github.event.client_payload.source_workflow || '' }}
+          SOURCE_RUN_ID: ${{ github.event.client_payload.source_run_id || '' }}
+          SOURCE_RUN_URL: ${{ github.event.client_payload.source_run_url || '' }}
+          SOURCE_SHA: ${{ github.event.client_payload.source_sha || '' }}
+          CORRELATION_ID: ${{ github.event.client_payload.correlation_id || '' }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
         run: |
           echo "repository_dispatch received"
           echo "action=${EVENT_ACTION}"
           echo "event_type=${EVENT_TYPE}"
           echo "tag=${TAG}"
           echo "source_repo=${SOURCE_REPO}"
+          echo "source_workflow=${SOURCE_WORKFLOW}"
+          echo "source_run_id=${SOURCE_RUN_ID}"
+          echo "source_run_url=${SOURCE_RUN_URL}"
+          echo "source_sha=${SOURCE_SHA}"
+          echo "correlation_id=${CORRELATION_ID}"
 
           if [ -z "${TAG}" ]; then
             echo "ERROR: tag is required in github.event.client_payload"
@@ -54,7 +74,18 @@ jobs:
             exit 1
           fi
 
+          EFFECTIVE_SOURCE_RUN_URL="${SOURCE_RUN_URL}"
+          if [ -z "${EFFECTIVE_SOURCE_RUN_URL}" ] && [ -n "${SOURCE_REPO}" ] && [ -n "${SOURCE_RUN_ID}" ]; then
+            EFFECTIVE_SOURCE_RUN_URL="${GITHUB_SERVER_URL}/${SOURCE_REPO}/actions/runs/${SOURCE_RUN_ID}"
+          fi
+
           echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "source_repo=${SOURCE_REPO}" >> "${GITHUB_OUTPUT}"
+          echo "source_workflow=${SOURCE_WORKFLOW}" >> "${GITHUB_OUTPUT}"
+          echo "source_run_id=${SOURCE_RUN_ID}" >> "${GITHUB_OUTPUT}"
+          echo "source_run_url=${EFFECTIVE_SOURCE_RUN_URL}" >> "${GITHUB_OUTPUT}"
+          echo "source_sha=${SOURCE_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "correlation_id=${CORRELATION_ID}" >> "${GITHUB_OUTPUT}"
 
   deploy:
     name: Deploy tag and open PR to dev
@@ -191,6 +222,28 @@ jobs:
     needs: [validate, deploy]
     if: always()
     steps:
+      - name: Write source context summary
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+          SOURCE_REPO: ${{ needs.validate.outputs.source_repo }}
+          SOURCE_WORKFLOW: ${{ needs.validate.outputs.source_workflow }}
+          SOURCE_RUN_ID: ${{ needs.validate.outputs.source_run_id }}
+          SOURCE_RUN_URL: ${{ needs.validate.outputs.source_run_url }}
+          SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+          CORRELATION_ID: ${{ needs.validate.outputs.correlation_id }}
+        run: |
+          {
+            echo "## Source Dispatch Context"
+            echo ""
+            echo "- Tag: ${TAG:-n/a}"
+            echo "- Source Repo: ${SOURCE_REPO:-n/a}"
+            echo "- Source Workflow: ${SOURCE_WORKFLOW:-n/a}"
+            echo "- Source Run ID: ${SOURCE_RUN_ID:-n/a}"
+            echo "- Source Run URL: ${SOURCE_RUN_URL:-n/a}"
+            echo "- Source SHA: ${SOURCE_SHA:-n/a}"
+            echo "- Correlation ID: ${CORRELATION_ID:-n/a}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Check orchestration results
         run: |
           echo "Repository Dispatch Results Summary"

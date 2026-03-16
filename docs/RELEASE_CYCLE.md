@@ -359,7 +359,7 @@ The `release.yml` workflow performs the entire remaining release process. Behavi
 
 4. ✅ **Publish** job (runs only if all builds/tests pass)
    - Candidate mode: infers next `rcN`, creates annotated tag `X.Y.Z-rcN`, publishes candidate manifests
-   - Candidate mode: triggers `repository_dispatch` to `vig-os/devcontainer-smoke-test` with `client_payload.tag`
+   - Candidate mode: triggers `repository_dispatch` to `vig-os/devcontainer-smoke-test` with `client_payload[tag]` plus source metadata (`source_repo`, `source_workflow`, `source_run_id`, `source_run_url`, `source_sha`, `correlation_id`)
    - Final mode: creates annotated tag `X.Y.Z`, publishes final manifests
    - Pushes tag to origin
    - Downloads tested images from artifacts
@@ -405,6 +405,22 @@ Release Summary:
 
 After `just publish-candidate X.Y.Z` succeeds, verify smoke tests before running final release.
 
+Dispatch payload contract for the smoke-test repository:
+
+- Required key:
+  - `client_payload[tag]`
+- Optional source-context keys:
+  - `client_payload[event_type]`
+  - `client_payload[source_repo]`
+  - `client_payload[source_workflow]`
+  - `client_payload[source_run_id]`
+  - `client_payload[source_run_url]`
+  - `client_payload[source_sha]`
+  - `client_payload[correlation_id]`
+- Backward compatibility:
+  - Receiver validation requires only `tag`.
+  - If `source_run_url` is absent, the receiver derives a deterministic link from `source_repo + source_run_id` when both are present.
+
 1. Confirm dispatch-triggered smoke-test run in the smoke-test repo:
 
    ```bash
@@ -432,6 +448,12 @@ After `just publish-candidate X.Y.Z` succeeds, verify smoke tests before running
    ```bash
    just finalize-release X.Y.Z
    ```
+
+Future automation path (not enabled as a gate in this issue):
+
+- The smoke-test workflow can emit a completion callback keyed by `correlation_id`.
+- The callback can later be consumed by the release orchestration path behind `publish-candidate` to post result context and eventually support automated gating.
+- Until that callback flow is implemented, this phase remains a manual operator gate.
 
 ### Phase 5: Post-Release Cleanup
 

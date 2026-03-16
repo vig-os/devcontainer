@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Update Docker build path pins in `build-image` (`docker/setup-buildx-action`, `docker/metadata-action`, `docker/build-push-action`) to Node24-compatible releases
   - Set `setup-env` default Node runtime to `24` and upgrade `actions/setup-node`
   - Align test composite actions with newer pins (`actions/checkout`, `actions/cache`, `actions/upload-artifact`)
+- **Smoke-test dispatch payload now carries source run traceability metadata** ([#289](https://github.com/vig-os/devcontainer/issues/289))
+  - Candidate release dispatches now include source repo/workflow/run/SHA metadata plus a deterministic `correlation_id`
+  - Smoke-test dispatch receiver logs normalized source context, derives source run URL when possible, and writes it to workflow summary output
+  - Release-cycle docs now define required vs optional dispatch payload keys and the future callback contract path for `publish-candidate`
 
 ### Deprecated
 
