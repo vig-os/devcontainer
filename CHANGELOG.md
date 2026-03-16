@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Bump GitHub Actions: `actions/attest-sbom` (`3.0.0` -> `4.0.0`), `actions/upload-artifact` (`4.6.2` -> `7.0.0`), `actions/create-github-app-token` (`2.2.1` -> `3.0.0`)
   - Bump `docker/login-action` from `3.7.0` to `4.0.0`
   - Bump `just` minor version from `1.46` to `1.47`
+- **Node24-ready GitHub Actions pin refresh for shared composite actions** ([#321](https://github.com/vig-os/devcontainer/issues/321))
+  - Update Docker build path pins in `build-image` (`docker/setup-buildx-action`, `docker/metadata-action`, `docker/build-push-action`) to Node24-compatible releases
+  - Set `setup-env` default Node runtime to `24` and upgrade `actions/setup-node`
+  - Align test composite actions with newer pins (`actions/checkout`, `actions/cache`, `actions/upload-artifact`)
 
 ### Deprecated
 

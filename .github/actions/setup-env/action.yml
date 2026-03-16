@@ -15,7 +15,7 @@
 #   sync-dependencies:        Run uv sync to install project deps (default: false)
 #   install-podman:           Install podman (default: false)
 #   install-node:             Install Node.js (default: false)
-#   node-version:             Node.js version (default: '20')
+#   node-version:             Node.js version (default: '24')
 #   install-devcontainer-cli: Install devcontainer CLI + docker-compose wrapper (default: false)
 #   install-hadolint:         Install hadolint binary (default: false)
 #   install-taplo:            Install taplo TOML linter/formatter (default: false)
@@ -62,7 +62,7 @@ inputs:
   node-version:
     description: 'Node.js version (when install-node is true)'
     required: false
-    default: '20'
+    default: '24'
   install-devcontainer-cli:
     description: 'Install @devcontainers/cli and docker-compose wrapper (requires Node.js)'
     required: false
@@ -130,7 +130,7 @@ runs:
     # Also installed when install-devcontainer-cli is true (npm is required)
     - name: Install Node.js
       if: inputs.install-node == 'true' || inputs.install-devcontainer-cli == 'true'
-      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+      uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6.3.0
       with:
         node-version: ${{ inputs.node-version }}
 
