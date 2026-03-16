@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Bump `@devcontainers/cli` from `0.81.1` to `0.84.0` and `bats-assert` from `v2.2.0` to `v2.2.4`
   - Bump GitHub Actions: `actions/download-artifact` (`4.3.0` -> `8.0.1`), `actions/github-script` (`7.1.0` -> `8.0.0`), `actions/attest-build-provenance` (`3.0.0` -> `4.1.0`), `actions/checkout` (`4.3.1` -> `6.0.2`)
   - Bump release workflow action pins: `sigstore/cosign-installer` (`4.0.0` -> `4.1.0`) and `anchore/sbom-action` (`0.22.2` -> `0.23.1`)
+- **Dependabot dependency update batch** ([#314](https://github.com/vig-os/devcontainer/pull/314), [#315](https://github.com/vig-os/devcontainer/pull/315), [#316](https://github.com/vig-os/devcontainer/pull/316), [#317](https://github.com/vig-os/devcontainer/pull/317))
+  - Bump GitHub Actions: `actions/attest-sbom` (`3.0.0` -> `4.0.0`), `actions/upload-artifact` (`4.6.2` -> `7.0.0`), `actions/create-github-app-token` (`2.2.1` -> `3.0.0`)
+  - Bump `docker/login-action` from `3.7.0` to `4.0.0`
 
 ### Deprecated
 
