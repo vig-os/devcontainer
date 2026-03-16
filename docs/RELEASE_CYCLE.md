@@ -134,7 +134,7 @@ graph TB
 1. **Preparation** (`prepare-release`): Freeze CHANGELOG on dev, create release branch, reset Unreleased on dev, open draft PR
 2. **Review & Testing**: CI validation, mark PR ready, fix issues, get approvals
 3. **Candidate Publish** (`publish-candidate`): Build/test/publish `X.Y.Z-rcN` and dispatch smoke-test workflow
-4. **Manual Smoke Gate**: Wait for smoke-test repo workflows to pass before final release
+4. **Smoke-Test Gate (automated prerequisite)**: Final release validate step requires downstream pre-release for the latest RC tag
 5. **Finalization & Post-Release**: Publish final image/tag, then merge PR to main and let sync automation update dev
 
 
@@ -401,15 +401,23 @@ Release Summary:
 - **Audit trail**: All steps are recorded in GitHub Actions logs with actor information
 - **Reproducible**: Uses consistent CI environment, not dependent on local tooling
 
-### Phase 4: Manual RC Smoke Gate
+### Phase 4: Smoke-Test Gate (automated)
 
-After `just publish-candidate X.Y.Z` succeeds, verify smoke tests before running final release.
-The final release run (`just finalize-release X.Y.Z`) also emits the same dispatch event for release-tag smoke traceability.
+The upstream `release.yml` workflow now enforces downstream smoke-test completion as part of the release run:
+
+- Candidate/final publish dispatches `repository_dispatch` to `vig-os/devcontainer-smoke-test`
+- The upstream `smoke-test` job waits for downstream release creation for the dispatched tag
+- Expected downstream release type is validated by release kind:
+  - `candidate` -> downstream pre-release
+  - `final` -> downstream full release
+- Final release validation additionally requires that the latest RC tag exists downstream as a pre-release before `just finalize-release X.Y.Z` can publish the final tag
 
 Dispatch payload contract for the smoke-test repository:
 
 - Required key:
   - `client_payload[tag]`
+- Release-kind key:
+  - `client_payload[release_kind]` (`candidate` or `final`)
 - Optional source-context keys:
   - `client_payload[event_type]`
   - `client_payload[source_repo]`
@@ -422,25 +430,31 @@ Dispatch payload contract for the smoke-test repository:
   - Receiver validation requires only `tag`.
   - If `source_run_url` is absent, the receiver derives a deterministic link from `source_repo + source_run_id` when both are present.
 
-1. Confirm dispatch-triggered smoke-test run in the smoke-test repo:
+1. Confirm dispatch-triggered smoke-test run in the smoke-test repo (optional verification):
 
    ```bash
    gh -R vig-os/devcontainer-smoke-test run list --workflow repository-dispatch.yml --limit 1
    ```
 
-2. Inspect that run and verify the downstream CI workflow completed successfully:
+2. Inspect that run and verify the downstream workflow completed successfully:
 
    ```bash
    gh -R vig-os/devcontainer-smoke-test run view <RUN_ID>
    ```
 
 3. Required pass criteria:
-   - `ci.yml` (container-based workflow) passed for the RC tag
+   - For candidate release completion: downstream `repository-dispatch.yml` creates a pre-release for the candidate tag
+   - For final release completion: downstream `repository-dispatch.yml` creates a full release for the final tag
+   - Before final publish starts: latest RC tag already exists downstream as a pre-release
 
-4. If smoke tests fail:
+4. If dispatch or downstream smoke tests fail:
    - Fix the issue on the release branch
-   - Publish a new candidate (`just publish-candidate X.Y.Z`) to generate the next RC tag
-   - Re-run this gate
+   - Trigger a fresh candidate publish (`just publish-candidate X.Y.Z`) to generate the next RC tag and dispatch a new downstream run
+   - If needed, manually inspect recent downstream runs:
+
+   ```bash
+   gh -R vig-os/devcontainer-smoke-test run list --workflow repository-dispatch.yml --limit 5
+   ```
 
 5. If smoke tests pass:
    - Proceed with final release:
@@ -448,12 +462,6 @@ Dispatch payload contract for the smoke-test repository:
    ```bash
    just finalize-release X.Y.Z
    ```
-
-Future automation path (not enabled as a gate in this issue):
-
-- The smoke-test workflow can emit a completion callback keyed by `correlation_id`.
-- The callback can later be consumed by the release orchestration path behind `publish-candidate` to post result context and eventually support automated gating.
-- Until that callback flow is implemented, this phase remains a manual operator gate.
 
 ### Phase 5: Post-Release Cleanup
 
@@ -762,8 +770,9 @@ Downstream repositories that use the workspace template consume release workflow
 - `assets/workspace/.github/workflows/release-core.yml`
 - `assets/workspace/.github/workflows/release-extension.yml`
 - `assets/workspace/.github/workflows/release-publish.yml`
+- `assets/workspace/.github/workflows/repository-dispatch.yml`
 
-The orchestrator (`release.yml`) runs core -> extension -> publish and uses contract validation for local `workflow_call` interfaces.
+The orchestrator (`release.yml`) runs core -> extension -> publish and uses contract validation for local `workflow_call` interfaces. The dispatch handler (`repository-dispatch.yml`) runs downstream smoke tests and publishes downstream pre-releases/final releases used by upstream final-release gating.
 
 For contract details and extension ownership boundaries, see `docs/DOWNSTREAM_RELEASE.md`.
 

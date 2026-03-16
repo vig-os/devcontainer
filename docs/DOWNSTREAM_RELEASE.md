@@ -58,6 +58,47 @@ Extension contract inputs include both `release_kind` and `publish_version`, so 
 
 `release.yml` requires extension success before publish, so extension failures block release publication.
 
+## Repository Dispatch Smoke-Test Release
+
+The workspace template now includes `.github/workflows/repository-dispatch.yml` for downstream smoke-test release handling.
+
+### Trigger
+
+- `repository_dispatch`
+- `event_type: smoke-test-trigger`
+
+### Payload Contract
+
+- Required:
+  - `client_payload[tag]`
+- Release kind:
+  - `client_payload[release_kind]` (`candidate` or `final`)
+- Optional source context:
+  - `client_payload[event_type]`
+  - `client_payload[source_repo]`
+  - `client_payload[source_workflow]`
+  - `client_payload[source_run_id]`
+  - `client_payload[source_run_url]`
+  - `client_payload[source_sha]`
+  - `client_payload[correlation_id]`
+
+If `release_kind` is missing, the workflow infers it from `tag` (`-rcN` => `candidate`, otherwise `final`) for backward compatibility.
+
+### Behavior
+
+On dispatch, the downstream workflow:
+
+1. Validates payload and resolves release kind
+2. Runs smoke tests (`just test`)
+3. Creates a GitHub release for the dispatched tag:
+   - `candidate`: pre-release (`--prerelease`)
+   - `final`: full release
+
+This release object is consumed by upstream release gating in two ways:
+
+- release run completion waits for downstream release creation for the dispatched tag
+- upstream final publish additionally requires the latest RC pre-release to exist downstream during validation
+
 ### Example: GHCR Publishing
 
 The following shows how a downstream project could customize `release-extension.yml` to build and push a container image to GHCR:
