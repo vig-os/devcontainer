@@ -381,6 +381,40 @@ jobs:
           uv run prepare-changelog finalize "$VERSION" "$RELEASE_DATE"
           echo "✓ Release date set in CHANGELOG.md"
 
+      - name: Regenerate docs for finalized release
+        if: needs.validate.outputs.release_kind == 'final'
+        run: |
+          set -euo pipefail
+          uv run python docs/generate.py
+          echo "✓ Regenerated docs from finalized CHANGELOG.md"
+
+      - name: Collect finalization files
+        if: needs.validate.outputs.release_kind == 'final'
+        id: finalize-files
+        run: |
+          set -euo pipefail
+
+          CHANGED_FILES="$(git diff --name-only)"
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "ERROR: Finalization produced no tracked file changes."
+            echo "Expected CHANGELOG.md and possibly generated docs to change."
+            exit 1
+          fi
+
+          FILE_PATHS="$(echo "$CHANGED_FILES" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+          echo "file_paths=$FILE_PATHS" >> "$GITHUB_OUTPUT"
+          echo "Finalization files: $FILE_PATHS"
+
+          for expected_doc in README.md CONTRIBUTE.md TESTING.md docs/SKILL_PIPELINE.md; do
+            if git diff --quiet -- "$expected_doc"; then
+              continue
+            fi
+            if ! printf '%s\n' "$CHANGED_FILES" | grep -Fxq -- "$expected_doc"; then
+              echo "ERROR: Expected modified doc '$expected_doc' missing from commit file list."
+              exit 1
+            fi
+          done
+
       - name: Commit finalization changes via API
         if: needs.validate.outputs.release_kind == 'final'
         uses: vig-os/commit-action@c0024cbad0e501764127cccab732c6cd465b4646  # v0.1.5
@@ -391,10 +425,10 @@ jobs:
           COMMIT_MESSAGE: |-
             chore: finalize release ${{ needs.validate.outputs.version }}
 
-            Set release date to ${{ needs.validate.outputs.release_date }} in CHANGELOG.md
+            Set release date to ${{ needs.validate.outputs.release_date }} and regenerate release docs.
 
             Refs: #${{ needs.validate.outputs.pr_number }}
-          FILE_PATHS: CHANGELOG.md
+          FILE_PATHS: ${{ steps.finalize-files.outputs.file_paths }}
 
       - name: Trigger sync-issues workflow
         if: needs.validate.outputs.release_kind == 'final'
@@ -462,6 +496,35 @@ jobs:
           git fetch origin "release/$VERSION"
           git reset --hard "origin/release/$VERSION"
           echo "✓ Synced with remote release branch"
+
+      - name: Refresh release PR body from finalized changelog
+        if: needs.validate.outputs.release_kind == 'final'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_DATE: ${{ needs.validate.outputs.release_date }}
+          PR_NUMBER: ${{ needs.validate.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          CHANGELOG_CONTENT=$(sed -n "/## \[$VERSION\]/,/^## \[/p" CHANGELOG.md | sed '$d')
+
+          if [ -z "$CHANGELOG_CONTENT" ]; then
+            echo "ERROR: Could not extract release section for version $VERSION from CHANGELOG.md"
+            exit 1
+          fi
+
+          cat > /tmp/release-pr-body.md <<EOF
+          # [Release $VERSION](https://github.com/${GITHUB_REPOSITORY}/releases/tag/$VERSION) - $RELEASE_DATE
+
+          This PR prepares release $VERSION for merge to main.
+
+          ### Release Content
+
+          $CHANGELOG_CONTENT
+          EOF
+
+          gh pr edit "$PR_NUMBER" --body-file /tmp/release-pr-body.md
+          echo "✓ Refreshed PR #$PR_NUMBER body from finalized CHANGELOG.md"
 
       - name: Output finalize SHA
         id: finalize

@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Release finalization now commits generated docs and refreshes PR content** ([#300](https://github.com/vig-os/devcontainer/issues/300))
+  - Final release automation regenerates docs before committing so pre-commit `generate-docs` does not fail CI with tracked file diffs
+  - Release PR body is refreshed from finalized `CHANGELOG.md`
+
 ### Security
 
 ## [0.3.0](https://github.com/vig-os/devcontainer/releases/tag/0.3.0) - 2026-03-13
