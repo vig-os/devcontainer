@@ -348,7 +348,7 @@ The `release.yml` workflow performs the entire remaining release process. Behavi
 
 2. ✅ **Finalize** job (skipped if --dry-run)
    - **Candidate**: No CHANGELOG changes. Outputs current release branch HEAD SHA.
-   - **Final**: Sets actual release date in CHANGELOG (TBD → YYYY-MM-DD), commits, triggers sync-issues workflow, outputs finalized SHA.
+   - **Final**: Sets actual release date in CHANGELOG (TBD → YYYY-MM-DD), regenerates docs from templates, commits all tracked finalization changes (dynamic file list), refreshes release PR body from finalized CHANGELOG, triggers sync-issues workflow, outputs finalized SHA.
 
 3. ✅ **Build & Test** jobs (per-architecture, runs in parallel)
    - Builds container image as tar file
@@ -620,7 +620,7 @@ gh workflow run prepare-release.yml --ref dev -f "version=1.0.0" -f "dry-run=tru
 
 2. **finalize** (skipped if dry-run) - Conditionally updates release branch
    - **Candidate**: No CHANGELOG changes, no sync-issues. Outputs current release branch HEAD SHA.
-   - **Final**: Sets release date in CHANGELOG (TBD → YYYY-MM-DD), commits, triggers sync-issues, outputs finalized SHA.
+   - **Final**: Sets release date in CHANGELOG (TBD → YYYY-MM-DD), regenerates docs, commits all tracked finalization changes via dynamic file list, refreshes release PR body from finalized changelog content, triggers sync-issues, outputs finalized SHA.
 
 3. **build-and-test** (matrix: amd64, arm64) - Builds and validates images
    - Builds container image for architecture
