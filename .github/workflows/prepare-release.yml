@@ -285,19 +285,6 @@ jobs:
           ### Release Content
 
           $CHANGELOG_CONTENT
-
-          ### Testing Checklist
-          - [ ] All tests pass (\`just test\`)
-          - [ ] Manual testing complete
-          - [ ] No critical bugs found
-          - [ ] Ready for release
-
-          ### When Ready to Release
-          - Publish candidate: \`just publish-candidate $VERSION\`
-          - Publish final release: \`just finalize-release $VERSION\`
-
-          ### Related
-          - Release automation: #48, #172
           "
 
           PR_URL=$(gh pr create \
