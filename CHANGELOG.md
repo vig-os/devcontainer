@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dependabot dependency update batch** ([#314](https://github.com/vig-os/devcontainer/pull/314), [#315](https://github.com/vig-os/devcontainer/pull/315), [#316](https://github.com/vig-os/devcontainer/pull/316), [#317](https://github.com/vig-os/devcontainer/pull/317))
   - Bump GitHub Actions: `actions/attest-sbom` (`3.0.0` -> `4.0.0`), `actions/upload-artifact` (`4.6.2` -> `7.0.0`), `actions/create-github-app-token` (`2.2.1` -> `3.0.0`)
   - Bump `docker/login-action` from `3.7.0` to `4.0.0`
+  - Bump `just` minor version from `1.46` to `1.47`
 
 ### Deprecated
 
