@@ -428,15 +428,14 @@ Dispatch payload contract for the smoke-test repository:
    gh -R vig-os/devcontainer-smoke-test run list --workflow repository-dispatch.yml --limit 1
    ```
 
-2. Inspect that run and verify both downstream workflows completed successfully:
+2. Inspect that run and verify the downstream CI workflow completed successfully:
 
    ```bash
    gh -R vig-os/devcontainer-smoke-test run view <RUN_ID>
    ```
 
 3. Required pass criteria:
-   - `ci.yml` (bare-runner workflow) passed for the RC tag
-   - `ci-container.yml` (container workflow) passed for the RC tag
+   - `ci.yml` (container-based workflow) passed for the RC tag
 
 4. If smoke tests fail:
    - Fix the issue on the release branch

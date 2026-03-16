@@ -65,6 +65,7 @@ jobs:
       pr_number: ${{ steps.pr.outputs.pr_number }}
       release_date: ${{ steps.vars.outputs.release_date }}
       pre_finalize_sha: ${{ steps.pre_sha.outputs.pre_finalize_sha }}
+      image_tag: ${{ steps.resolve_image.outputs.image-tag }}
 
     steps:
       - name: Validate and prepare variables
@@ -92,6 +93,10 @@ jobs:
         with:
           ref: release/${{ steps.vars.outputs.version }}
           fetch-depth: 0
+
+      - name: Resolve container image
+        id: resolve_image
+        uses: ./.github/actions/resolve-image
 
       - name: Record pre-finalization SHA
         id: pre_sha
@@ -302,6 +307,10 @@ jobs:
     name: Test (Finalized)
     needs: [validate, finalize]
     runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/vig-os/devcontainer:${{ needs.validate.outputs.image_tag }}
+      env:
+        UV_PROJECT_ENVIRONMENT: /root/assets/workspace/.venv
     timeout-minutes: 15
 
     steps:
@@ -310,13 +319,14 @@ jobs:
         with:
           ref: ${{ needs.finalize.outputs.finalize_sha }}
 
-      - name: Set up environment
-        uses: ./.github/actions/setup-env
-        with:
-          sync-dependencies: 'true'
+      - name: Fix git safe.directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Sync Python dependencies
+        run: just sync
 
       - name: Run tests
-        run: uv run pytest
+        run: just test
 
   release:
     name: Create Release
