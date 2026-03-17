@@ -46,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Add upstream final-release validation that requires a downstream GitHub pre-release for the latest published RC tag
   - Move smoke-test dispatch to a dedicated release job and include `release_kind` in the dispatch payload
   - Add downstream `repository-dispatch.yml` template that runs smoke tests and creates pre-release/final release artifacts
+- **Ship changelog into workspace payload and smoke-test deploy root** ([#333](https://github.com/vig-os/devcontainer/issues/333))
+  - Sync canonical `CHANGELOG.md` into both workspace root and `.devcontainer/` template paths
+  - Smoke-test dispatch now copies `.devcontainer/CHANGELOG.md` to repository root so deploy output keeps a root changelog
 
 ### Deprecated
 
