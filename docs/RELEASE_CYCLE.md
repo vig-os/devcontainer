@@ -612,9 +612,13 @@ gh workflow run prepare-release.yml --ref dev -f "version=1.0.0" -f "dry-run=tru
    - Creates multi-architecture manifest for computed publish tag
    - Updates `latest` only in final mode
    - Verifies manifests exist
-   - Candidate and final modes trigger cross-repository validation `repository_dispatch` with `client_payload[tag]=<publish-tag>`
 
-5. **rollback** (runs if any job failed) - Cleans up partial state
+5. **smoke-test** (runs after publish) - Triggers downstream validation
+   - Candidate and final modes trigger cross-repository validation `repository_dispatch` with `client_payload[tag]=<publish-tag>`
+   - Dispatch failures mark the workflow as failed and create a targeted issue
+   - Dispatch failures do **not** rollback branch/tag, because published artifacts are already immutable at this point
+
+6. **rollback** (runs if validate/finalize/build-and-test/publish fails) - Cleans up partial state
    - Resets release branch to pre-finalization state
    - Deletes tag if it was created
    - Creates GitHub issue with failure details
@@ -639,7 +643,7 @@ gh workflow run release.yml \
 
 **Key characteristics:**
 - Tag created AFTER successful build/test (safer than before)
-- Automatic rollback on failure
+- Automatic rollback on validate/finalize/build-and-test/publish failure
 - All in one workflow for atomic operation
 - Audit trail in GitHub Actions logs
 - Dispatch is pinned to `release/X.Y.Z` so candidate/final runs use the release branch workflow definition
