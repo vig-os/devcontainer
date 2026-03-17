@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Add bounded retries to the final-release downstream RC pre-release gate API check
   - Move final GitHub Release creation to the end of publish so artifact publication/signing completes before release object creation
   - Add concurrency control to `assets/smoke-test/.github/workflows/repository-dispatch.yml` to prevent overlapping dispatch races
+  - Handle smoke-test dispatch failures with a targeted issue while avoiding destructive rollback after publish artifacts are already released
 
 ### Deprecated
 
