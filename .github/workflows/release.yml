@@ -149,13 +149,20 @@ jobs:
               while IFS= read -r tag; do
                 [ -z "$tag" ] && continue
 
-                if ! echo "$tag" | grep -qE "^${VERSION}-rc[0-9]+$"; then
+                rc_prefix="${VERSION}-rc"
+                if [[ "$tag" != "$rc_prefix"* ]]; then
                   echo "ERROR: Malformed candidate tag detected: $tag"
                   echo "Expected format: ${VERSION}-rcN"
                   exit 1
                 fi
 
-                rc_num="${tag##*-rc}"
+                rc_num="${tag#"$rc_prefix"}"
+                if ! printf '%s' "$rc_num" | grep -qE '^[0-9]+$'; then
+                  echo "ERROR: Malformed candidate tag detected: $tag"
+                  echo "Expected format: ${VERSION}-rcN"
+                  exit 1
+                fi
+
                 if [ "$rc_num" -gt "$MAX_RC" ]; then
                   MAX_RC="$rc_num"
                 fi
@@ -194,7 +201,15 @@ jobs:
           while IFS= read -r tag; do
             [ -z "$tag" ] && continue
 
-            if ! echo "$tag" | grep -qE "^${VERSION}-rc[0-9]+$"; then
+            rc_prefix="${VERSION}-rc"
+            if [[ "$tag" != "$rc_prefix"* ]]; then
+              echo "ERROR: Malformed candidate tag detected: $tag"
+              echo "Expected format: ${VERSION}-rcN"
+              exit 1
+            fi
+
+            rc_num="${tag#"$rc_prefix"}"
+            if ! printf '%s' "$rc_num" | grep -qE '^[0-9]+$'; then
               echo "ERROR: Malformed candidate tag detected: $tag"
               echo "Expected format: ${VERSION}-rcN"
               exit 1
@@ -1089,10 +1104,10 @@ jobs:
 
   rollback:
     name: Rollback on Failure
-    needs: [validate, finalize, build-and-test, publish]
+    needs: [validate, finalize, build-and-test, publish, smoke-test]
     runs-on: ubuntu-22.04
     timeout-minutes: 10
-    if: ${{ always() && (needs.validate.result == 'failure' || needs.finalize.result == 'failure' || needs.build-and-test.result == 'failure' || needs.publish.result == 'failure') }}
+    if: ${{ always() && (needs.validate.result == 'failure' || needs.finalize.result == 'failure' || needs.build-and-test.result == 'failure' || needs.publish.result == 'failure' || needs.smoke-test.result == 'failure') }}
     permissions:
       issues: write          # create failure issue
       # Branch rollback and tag deletion use the RELEASE_APP token (not GITHUB_TOKEN),
