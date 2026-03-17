@@ -1088,6 +1088,9 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 35
     if: ${{ github.event.inputs.dry-run != 'true' }}
+    permissions:
+      contents: read
+      issues: write
     steps:
       - name: Generate smoke-test dispatch token
         id: smoke-app-token
@@ -1131,12 +1134,50 @@ jobs:
           echo "✓ Triggered smoke-test dispatch for release tag: $RELEASE_TAG"
           echo "Downstream validation is asynchronous; verify in devcontainer-smoke-test."
 
+      - name: Create issue for smoke dispatch failure
+        if: ${{ failure() }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8.0.0
+        with:
+          script: |
+            const publishVersion = '${{ needs.validate.outputs.publish_version }}';
+            const releaseKind = '${{ needs.validate.outputs.release_kind }}';
+            const workflowUrl = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            const title = `Release ${publishVersion} smoke dispatch failed`;
+            const body = `
+            Release ${publishVersion} (${releaseKind}) failed while triggering downstream smoke-test dispatch.
+
+            **Workflow Run:** [View logs](${workflowUrl})
+            **Failed Job:** smoke-test
+
+            **Important:**
+            - Upstream publish already completed before this dispatch step.
+            - Published artifacts (GHCR images, tag, signatures, attestations, and final GitHub Release if applicable) are intentionally left intact.
+            - No branch reset or tag deletion is performed for dispatch-only failures.
+
+            **Next Steps:**
+            1. Review smoke-test dispatch logs in this workflow run.
+            2. Validate token/repository_dispatch permissions for \`vig-os/devcontainer-smoke-test\`.
+            3. Re-trigger dispatch after fixing the root cause.
+            `;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['bug', 'area:ci']
+            });
+
+            core.info(`Created issue: ${title}`);
+
   rollback:
     name: Rollback on Failure
-    needs: [validate, finalize, build-and-test, publish, smoke-test]
+    # Rollback is intentionally scoped to pre-publish/publish failures.
+    # Dispatch-only smoke-test failures happen after publish and should not delete tags or reset branches.
+    needs: [validate, finalize, build-and-test, publish]
     runs-on: ubuntu-22.04
     timeout-minutes: 10
-    if: ${{ always() && (needs.validate.result == 'failure' || needs.finalize.result == 'failure' || needs.build-and-test.result == 'failure' || needs.publish.result == 'failure' || needs.smoke-test.result == 'failure') }}
+    if: ${{ always() && (needs.validate.result == 'failure' || needs.finalize.result == 'failure' || needs.build-and-test.result == 'failure' || needs.publish.result == 'failure') }}
     permissions:
       issues: write          # create failure issue
       # Branch rollback and tag deletion use the RELEASE_APP token (not GITHUB_TOKEN),
