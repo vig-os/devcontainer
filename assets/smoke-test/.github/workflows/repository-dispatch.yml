@@ -23,7 +23,7 @@ on:  # yamllint disable-line rule:truthy
       - smoke-test-trigger
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -32,6 +32,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       tag: ${{ steps.extract.outputs.tag }}
+      release_kind: ${{ steps.extract.outputs.release_kind }}
       source_repo: ${{ steps.extract.outputs.source_repo }}
       source_workflow: ${{ steps.extract.outputs.source_workflow }}
       source_run_id: ${{ steps.extract.outputs.source_run_id }}
@@ -45,6 +46,7 @@ jobs:
           EVENT_ACTION: ${{ github.event.action }}
           EVENT_TYPE: ${{ github.event.client_payload.event_type || '' }}
           TAG: ${{ github.event.client_payload.tag || '' }}
+          RELEASE_KIND: ${{ github.event.client_payload.release_kind || '' }}
           SOURCE_REPO: ${{ github.event.client_payload.source_repo || '' }}
           SOURCE_WORKFLOW: ${{ github.event.client_payload.source_workflow || '' }}
           SOURCE_RUN_ID: ${{ github.event.client_payload.source_run_id || '' }}
@@ -57,6 +59,7 @@ jobs:
           echo "action=${EVENT_ACTION}"
           echo "event_type=${EVENT_TYPE}"
           echo "tag=${TAG}"
+          echo "release_kind=${RELEASE_KIND}"
           echo "source_repo=${SOURCE_REPO}"
           echo "source_workflow=${SOURCE_WORKFLOW}"
           echo "source_run_id=${SOURCE_RUN_ID}"
@@ -74,12 +77,37 @@ jobs:
             exit 1
           fi
 
+          EFFECTIVE_RELEASE_KIND="${RELEASE_KIND}"
+          if [ -z "${EFFECTIVE_RELEASE_KIND}" ]; then
+            if printf '%s' "${TAG}" | grep -Eq -- '-rc[0-9]+$'; then
+              EFFECTIVE_RELEASE_KIND="candidate"
+            else
+              EFFECTIVE_RELEASE_KIND="final"
+            fi
+          fi
+
+          if [ "${EFFECTIVE_RELEASE_KIND}" != "candidate" ] && [ "${EFFECTIVE_RELEASE_KIND}" != "final" ]; then
+            echo "ERROR: release_kind must be candidate or final (got '${EFFECTIVE_RELEASE_KIND}')"
+            exit 1
+          fi
+
+          if [ "${EFFECTIVE_RELEASE_KIND}" = "candidate" ] && ! printf '%s' "${TAG}" | grep -Eq -- '-rc[0-9]+$'; then
+            echo "ERROR: candidate release_kind requires RC tag format (expected X.Y.Z-rcN, got '${TAG}')"
+            exit 1
+          fi
+
+          if [ "${EFFECTIVE_RELEASE_KIND}" = "final" ] && printf '%s' "${TAG}" | grep -Eq -- '-rc[0-9]+$'; then
+            echo "ERROR: final release_kind requires final tag format (expected X.Y.Z, got '${TAG}')"
+            exit 1
+          fi
+
           EFFECTIVE_SOURCE_RUN_URL="${SOURCE_RUN_URL}"
           if [ -z "${EFFECTIVE_SOURCE_RUN_URL}" ] && [ -n "${SOURCE_REPO}" ] && [ -n "${SOURCE_RUN_ID}" ]; then
             EFFECTIVE_SOURCE_RUN_URL="${GITHUB_SERVER_URL}/${SOURCE_REPO}/actions/runs/${SOURCE_RUN_ID}"
           fi
 
           echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "release_kind=${EFFECTIVE_RELEASE_KIND}" >> "${GITHUB_OUTPUT}"
           echo "source_repo=${SOURCE_REPO}" >> "${GITHUB_OUTPUT}"
           echo "source_workflow=${SOURCE_WORKFLOW}" >> "${GITHUB_OUTPUT}"
           echo "source_run_id=${SOURCE_RUN_ID}" >> "${GITHUB_OUTPUT}"
@@ -215,11 +243,87 @@ jobs:
           gh pr merge "${PR_URL}" --auto --merge || \
             echo "Warning: could not enable auto-merge"
 
+  publish-release:
+    name: Publish smoke-test release artifact
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    needs: [validate, deploy]
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Create release note
+        id: notes
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+          SOURCE_REPO: ${{ needs.validate.outputs.source_repo }}
+          SOURCE_WORKFLOW: ${{ needs.validate.outputs.source_workflow }}
+          SOURCE_RUN_ID: ${{ needs.validate.outputs.source_run_id }}
+          SOURCE_RUN_URL: ${{ needs.validate.outputs.source_run_url }}
+          SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+          CORRELATION_ID: ${{ needs.validate.outputs.correlation_id }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/smoke-test-release-notes.md <<EOF
+          Smoke-test release automation for upstream tag \`$TAG\`.
+
+          - source_repo: \`${SOURCE_REPO:-unknown}\`
+          - source_workflow: \`${SOURCE_WORKFLOW:-unknown}\`
+          - source_run_id: \`${SOURCE_RUN_ID:-unknown}\`
+          - source_run_url: ${SOURCE_RUN_URL:-N/A}
+          - source_sha: \`${SOURCE_SHA:-unknown}\`
+          - correlation_id: \`${CORRELATION_ID:-unknown}\`
+          EOF
+
+      - name: Create or validate GitHub release
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+          RELEASE_KIND: ${{ needs.validate.outputs.release_kind }}
+        run: |
+          set -euo pipefail
+          if [ "$RELEASE_KIND" = "candidate" ]; then
+            EXPECTED_PRERELEASE=true
+          else
+            EXPECTED_PRERELEASE=false
+          fi
+
+          EXISTING_RELEASE=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" 2>/dev/null || true)
+          if [ -n "$EXISTING_RELEASE" ]; then
+            EXISTING_PRERELEASE=$(echo "$EXISTING_RELEASE" | jq -r '.prerelease')
+            if [ "$EXISTING_PRERELEASE" != "$EXPECTED_PRERELEASE" ]; then
+              echo "ERROR: Existing release '$TAG' prerelease=$EXISTING_PRERELEASE (expected $EXPECTED_PRERELEASE)"
+              exit 1
+            fi
+
+            gh release edit "$TAG" \
+              --title "$TAG" \
+              --notes-file /tmp/smoke-test-release-notes.md
+            echo "Release '$TAG' already exists with expected prerelease value."
+            exit 0
+          fi
+
+          if [ "$EXPECTED_PRERELEASE" = "true" ]; then
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --notes-file /tmp/smoke-test-release-notes.md \
+              --prerelease
+          else
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --notes-file /tmp/smoke-test-release-notes.md
+          fi
+
+      - name: Summary
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          echo "✓ Smoke-test release artifact ready"
+          echo "  Tag: $TAG"
+
   summary:
     name: Dispatch summary
     runs-on: ubuntu-22.04
     timeout-minutes: 5
-    needs: [validate, deploy]
+    needs: [validate, deploy, publish-release]
     if: always()
     steps:
       - name: Write source context summary
@@ -251,6 +355,7 @@ jobs:
           echo ""
           echo "Validate:     ${{ needs.validate.result }}"
           echo "Deploy:       ${{ needs.deploy.result }}"
+          echo "Release:      ${{ needs.publish-release.result }}"
           echo "Deploy PR:    ${{ needs.deploy.outputs.pr_url }}"
           echo ""
 
@@ -263,6 +368,11 @@ jobs:
 
           if [ "${{ needs.deploy.result }}" != "success" ]; then
             echo "ERROR: Deploy job failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.publish-release.result }}" != "success" ]; then
+            echo "ERROR: Release publication job failed"
             FAILED=true
           fi
 

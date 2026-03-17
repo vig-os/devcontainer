@@ -58,6 +58,10 @@ Extension contract inputs include both `release_kind` and `publish_version`, so 
 
 `release.yml` requires extension success before publish, so extension failures block release publication.
 
+## Cross-Repo Validation Gate
+
+Cross-repository validation gate details are documented in `docs/CROSS_REPO_RELEASE_GATE.md`.
+
 ### Example: GHCR Publishing
 
 The following shows how a downstream project could customize `release-extension.yml` to build and push a container image to GHCR:

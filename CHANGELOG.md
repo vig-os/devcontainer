@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Consolidate `assets/workspace/.github/workflows/ci.yml` as the canonical CI workflow and remove the obsolete `ci-container.yml` template
   - Extract reusable `assets/workspace/.github/actions/resolve-image` and run workspace release tests in the same containerized workflow model
   - Update smoke-test and release-cycle documentation to reference the single CI workflow contract
+- **Final release now requires downstream RC pre-release gate** ([#331](https://github.com/vig-os/devcontainer/issues/331))
+  - Add upstream final-release validation that requires a downstream GitHub pre-release for the latest published RC tag
+  - Move smoke-test dispatch to a dedicated release job and include `release_kind` in the dispatch payload
+  - Add downstream `repository-dispatch.yml` template that runs smoke tests and creates pre-release/final release artifacts
 
 ### Deprecated
 

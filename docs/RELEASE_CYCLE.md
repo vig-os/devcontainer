@@ -118,7 +118,7 @@ graph TB
     J --> K["just publish-candidate X.Y.Z"]
     K --> L["Workflow: build & test<br/>(no CHANGELOG changes)"]
     L --> M["Publish X.Y.Z-rcN"]
-    M --> U{Smoke tests pass?}
+    M --> U{External gate pass?}
     U -->|No| I
     U -->|Yes| N["just finalize-release X.Y.Z"]
     N --> O["Workflow: set release date<br/>build & test"]
@@ -133,8 +133,8 @@ graph TB
 
 1. **Preparation** (`prepare-release`): Freeze CHANGELOG on dev, create release branch, reset Unreleased on dev, open draft PR
 2. **Review & Testing**: CI validation, mark PR ready, fix issues, get approvals
-3. **Candidate Publish** (`publish-candidate`): Build/test/publish `X.Y.Z-rcN` and dispatch smoke-test workflow
-4. **Manual Smoke Gate**: Wait for smoke-test repo workflows to pass before final release
+3. **Candidate Publish** (`publish-candidate`): Build/test/publish `X.Y.Z-rcN` and dispatch cross-repo validation workflow
+4. **Cross-Repo Validation Gate (automated prerequisite)**: Final release validate step requires downstream pre-release for the latest RC tag
 5. **Finalization & Post-Release**: Publish final image/tag, then merge PR to main and let sync automation update dev
 
 
@@ -367,7 +367,7 @@ The `release.yml` workflow performs the entire remaining release process. Behavi
    - Creates multi-architecture manifest `ghcr.io/vig-os/devcontainer:<publish-tag>`
    - Creates/updates `ghcr.io/vig-os/devcontainer:latest` only in final mode (and only when both architectures are built)
    - Verifies manifests exist
-   - Candidate and final modes: trigger `repository_dispatch` to `vig-os/devcontainer-smoke-test` with `client_payload[tag]` plus source metadata (`source_repo`, `source_workflow`, `source_run_id`, `source_run_url`, `source_sha`, `correlation_id`)
+   - Candidate and final modes: trigger cross-repository validation dispatch with `client_payload[tag]` plus source metadata (`source_repo`, `source_workflow`, `source_run_id`, `source_run_url`, `source_sha`, `correlation_id`)
 
 5. ✅ **Rollback** job (runs if ANY job failed)
    - Resets release branch to pre-finalization state
@@ -401,59 +401,9 @@ Release Summary:
 - **Audit trail**: All steps are recorded in GitHub Actions logs with actor information
 - **Reproducible**: Uses consistent CI environment, not dependent on local tooling
 
-### Phase 4: Manual RC Smoke Gate
+### Phase 4: Cross-Repo Validation Gate (automated)
 
-After `just publish-candidate X.Y.Z` succeeds, verify smoke tests before running final release.
-The final release run (`just finalize-release X.Y.Z`) also emits the same dispatch event for release-tag smoke traceability.
-
-Dispatch payload contract for the smoke-test repository:
-
-- Required key:
-  - `client_payload[tag]`
-- Optional source-context keys:
-  - `client_payload[event_type]`
-  - `client_payload[source_repo]`
-  - `client_payload[source_workflow]`
-  - `client_payload[source_run_id]`
-  - `client_payload[source_run_url]`
-  - `client_payload[source_sha]`
-  - `client_payload[correlation_id]`
-- Backward compatibility:
-  - Receiver validation requires only `tag`.
-  - If `source_run_url` is absent, the receiver derives a deterministic link from `source_repo + source_run_id` when both are present.
-
-1. Confirm dispatch-triggered smoke-test run in the smoke-test repo:
-
-   ```bash
-   gh -R vig-os/devcontainer-smoke-test run list --workflow repository-dispatch.yml --limit 1
-   ```
-
-2. Inspect that run and verify the downstream CI workflow completed successfully:
-
-   ```bash
-   gh -R vig-os/devcontainer-smoke-test run view <RUN_ID>
-   ```
-
-3. Required pass criteria:
-   - `ci.yml` (container-based workflow) passed for the RC tag
-
-4. If smoke tests fail:
-   - Fix the issue on the release branch
-   - Publish a new candidate (`just publish-candidate X.Y.Z`) to generate the next RC tag
-   - Re-run this gate
-
-5. If smoke tests pass:
-   - Proceed with final release:
-
-   ```bash
-   just finalize-release X.Y.Z
-   ```
-
-Future automation path (not enabled as a gate in this issue):
-
-- The smoke-test workflow can emit a completion callback keyed by `correlation_id`.
-- The callback can later be consumed by the release orchestration path behind `publish-candidate` to post result context and eventually support automated gating.
-- Until that callback flow is implemented, this phase remains a manual operator gate.
+Cross-repository validation gate rationale, mechanics, payload contract, and pass/fail interpretation are documented in `docs/CROSS_REPO_RELEASE_GATE.md`.
 
 ### Phase 5: Post-Release Cleanup
 
@@ -573,12 +523,12 @@ Release automation relies on two GitHub Apps with different scopes:
 
 | App | Secrets | Permissions | Used by | Purpose |
 |-----|---------|-------------|---------|---------|
-| **RELEASE_APP** | `RELEASE_APP_ID`, `RELEASE_APP_PRIVATE_KEY` | Contents read/write, Issues read/write, Pull requests read/write | `release.yml`, `prepare-release.yml`, `sync-main-to-dev.yml` | Release operations, PR creation/updates, rollback, and smoke-test dispatch |
+| **RELEASE_APP** | `RELEASE_APP_ID`, `RELEASE_APP_PRIVATE_KEY` | Contents read/write, Issues read/write, Pull requests read/write | `release.yml`, `prepare-release.yml`, `sync-main-to-dev.yml` | Release operations, PR creation/updates, rollback, and cross-repo validation dispatch |
 | **COMMIT_APP** | `COMMIT_APP_ID`, `COMMIT_APP_PRIVATE_KEY` | Contents read/write, Issues read, Pull requests read | `sync-issues.yml`, `sync-main-to-dev.yml` | Commits to protected branches and git ref operations |
 
 Additional requirement:
 - `COMMIT_APP` must be allowed in branch protection bypass rules for `dev` so sync commits can be pushed by automation.
-- `RELEASE_APP` must be installed on `vig-os/devcontainer-smoke-test` with Contents read permission so `release.yml` can send `repository_dispatch` for candidate and final release smoke-test events.
+- `RELEASE_APP` must be installed on the validation repository with Contents read permission so `release.yml` can send `repository_dispatch` for candidate and final release validation events.
 
 #### prepare-release.yml (Release Preparation Workflow)
 
@@ -660,7 +610,7 @@ gh workflow run prepare-release.yml --ref dev -f "version=1.0.0" -f "dry-run=tru
    - Creates multi-architecture manifest for computed publish tag
    - Updates `latest` only in final mode
    - Verifies manifests exist
-   - Candidate and final modes trigger smoke-test `repository_dispatch` with `client_payload[tag]=<publish-tag>`
+   - Candidate and final modes trigger cross-repository validation `repository_dispatch` with `client_payload[tag]=<publish-tag>`
 
 5. **rollback** (runs if any job failed) - Cleans up partial state
    - Resets release branch to pre-finalization state
@@ -763,7 +713,7 @@ Downstream repositories that use the workspace template consume release workflow
 - `assets/workspace/.github/workflows/release-extension.yml`
 - `assets/workspace/.github/workflows/release-publish.yml`
 
-The orchestrator (`release.yml`) runs core -> extension -> publish and uses contract validation for local `workflow_call` interfaces.
+The orchestrator (`release.yml`) runs core -> extension -> publish and uses contract validation for local `workflow_call` interfaces. Cross-repository validation details are documented in `docs/CROSS_REPO_RELEASE_GATE.md`.
 
 For contract details and extension ownership boundaries, see `docs/DOWNSTREAM_RELEASE.md`.
 
