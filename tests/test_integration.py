@@ -913,9 +913,12 @@ class TestSmokeRepo:
         assert "## Unreleased" in root_content, (
             "Root changelog should expose workspace Unreleased section"
         )
-        assert "## [0." in devcontainer_content, (
-            ".devcontainer changelog should include released version history"
+        assert "## [" not in root_content, (
+            "Root changelog should remain a workspace stub without versioned releases"
         )
+        assert re.search(
+            r"^## \[\d+\.\d+\.\d+\]", devcontainer_content, re.MULTILINE
+        ), ".devcontainer changelog should include semver release history"
 
 
 class TestDevContainerGit:
