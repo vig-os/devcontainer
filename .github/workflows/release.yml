@@ -991,7 +991,22 @@ jobs:
             done
           fi
 
-      - name: Generate SBOM
+      - name: Generate SBOM (attempt 1)
+        id: sbom_generate
+        continue-on-error: true
+        uses: anchore/sbom-action@57aae528053a48a3f6235f2d9461b05fbcb7366d  # v0.23.1
+        with:
+          image: ghcr.io/vig-os/devcontainer:${{ needs.validate.outputs.publish_version }}
+          artifact-name: sbom-${{ needs.validate.outputs.publish_version }}.spdx.json
+          output-file: /tmp/sbom.spdx.json
+          format: spdx-json
+
+      - name: Wait before retrying SBOM generation
+        if: steps.sbom_generate.outcome == 'failure'
+        run: sleep 15
+
+      - name: Generate SBOM (retry)
+        if: steps.sbom_generate.outcome == 'failure'
         uses: anchore/sbom-action@57aae528053a48a3f6235f2d9461b05fbcb7366d  # v0.23.1
         with:
           image: ghcr.io/vig-os/devcontainer:${{ needs.validate.outputs.publish_version }}
@@ -1018,7 +1033,20 @@ jobs:
           echo "Signing image: $REPO@$DIGEST"
 
           # Keyless signing using GitHub Actions OIDC identity
-          cosign sign --yes "$REPO@$DIGEST"
+          RETRIES=3
+          for i in $(seq 1 $RETRIES); do
+            if cosign sign --yes "$REPO@$DIGEST"; then
+              break
+            fi
+
+            if [ $i -lt $RETRIES ]; then
+              echo "Cosign sign failed, retrying ($i/$RETRIES)..."
+              sleep 15
+            else
+              echo "ERROR: Failed to sign image after $RETRIES attempts"
+              exit 1
+            fi
+          done
           echo "✓ Image signed with cosign (keyless)"
 
       - name: Capture image digest for attestation
@@ -1031,15 +1059,44 @@ jobs:
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
           echo "Image digest: $DIGEST"
 
-      - name: Attest build provenance
+      - name: Attest build provenance (attempt 1)
+        id: attest_provenance
+        continue-on-error: true
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32  # v4.1.0
         with:
           subject-name: ghcr.io/vig-os/devcontainer
           subject-digest: ${{ steps.digest.outputs.digest }}
           push-to-registry: true
 
-      - name: Attest SBOM
-        uses: actions/attest-sbom@07e74fc4e78d1aad915e867f9a094073a9f71527  # v4.0.0
+      - name: Wait before retrying build provenance attestation
+        if: steps.attest_provenance.outcome == 'failure'
+        run: sleep 30
+
+      - name: Attest build provenance (retry)
+        if: steps.attest_provenance.outcome == 'failure'
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32  # v4.1.0
+        with:
+          subject-name: ghcr.io/vig-os/devcontainer
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest SBOM (attempt 1)
+        id: attest_sbom
+        continue-on-error: true
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26  # v4.1.0
+        with:
+          subject-name: ghcr.io/vig-os/devcontainer
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          sbom-path: /tmp/sbom.spdx.json
+          push-to-registry: true
+
+      - name: Wait before retrying SBOM attestation
+        if: steps.attest_sbom.outcome == 'failure'
+        run: sleep 30
+
+      - name: Attest SBOM (retry)
+        if: steps.attest_sbom.outcome == 'failure'
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26  # v4.1.0
         with:
           subject-name: ghcr.io/vig-os/devcontainer
           subject-digest: ${{ steps.digest.outputs.digest }}
@@ -1128,17 +1185,30 @@ jobs:
           CORRELATION_ID: ${{ github.repository }}:${{ github.run_id }}:${{ needs.validate.outputs.publish_version }}
         run: |
           set -euo pipefail
-          gh api repos/vig-os/devcontainer-smoke-test/dispatches \
-            -f event_type=smoke-test-trigger \
-            -f "client_payload[tag]=$RELEASE_TAG" \
-            -f "client_payload[release_kind]=$RELEASE_KIND" \
-            -f "client_payload[event_type]=smoke-test-trigger" \
-            -f "client_payload[source_repo]=$SOURCE_REPO" \
-            -f "client_payload[source_workflow]=$SOURCE_WORKFLOW" \
-            -f "client_payload[source_run_id]=$SOURCE_RUN_ID" \
-            -f "client_payload[source_run_url]=$SOURCE_RUN_URL" \
-            -f "client_payload[source_sha]=$SOURCE_SHA" \
-            -f "client_payload[correlation_id]=$CORRELATION_ID"
+          RETRIES=3
+          for i in $(seq 1 $RETRIES); do
+            if gh api repos/vig-os/devcontainer-smoke-test/dispatches \
+              -f event_type=smoke-test-trigger \
+              -f "client_payload[tag]=$RELEASE_TAG" \
+              -f "client_payload[release_kind]=$RELEASE_KIND" \
+              -f "client_payload[event_type]=smoke-test-trigger" \
+              -f "client_payload[source_repo]=$SOURCE_REPO" \
+              -f "client_payload[source_workflow]=$SOURCE_WORKFLOW" \
+              -f "client_payload[source_run_id]=$SOURCE_RUN_ID" \
+              -f "client_payload[source_run_url]=$SOURCE_RUN_URL" \
+              -f "client_payload[source_sha]=$SOURCE_SHA" \
+              -f "client_payload[correlation_id]=$CORRELATION_ID"; then
+              break
+            fi
+
+            if [ $i -lt $RETRIES ]; then
+              echo "Dispatch failed, retrying ($i/$RETRIES)..."
+              sleep 10
+            else
+              echo "ERROR: Failed to trigger smoke-test dispatch after $RETRIES attempts"
+              exit 1
+            fi
+          done
           echo "✓ Triggered smoke-test dispatch for release tag: $RELEASE_TAG"
 
       - name: Summary
