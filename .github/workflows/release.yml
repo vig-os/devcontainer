@@ -240,8 +240,43 @@ jobs:
           set -euo pipefail
           echo "Checking downstream pre-release for $LATEST_RC..."
 
-          RELEASE_JSON=$(gh api "repos/vig-os/devcontainer-smoke-test/releases/tags/$LATEST_RC" 2>/dev/null) || {
+          RELEASE_JSON=""
+          LAST_ERROR=""
+          RETRIES=5
+          for i in $(seq 1 "$RETRIES"); do
+            API_OUTPUT=""
+            if API_OUTPUT=$(gh api "repos/vig-os/devcontainer-smoke-test/releases/tags/$LATEST_RC" 2>&1); then
+              RELEASE_JSON="$API_OUTPUT"
+              break
+            fi
+
+            LAST_ERROR="$API_OUTPUT"
+            if printf '%s' "$API_OUTPUT" | grep -Eqi "401|403|forbidden|bad credentials|authentication|authorization|insufficient scopes"; then
+              echo "ERROR: Non-retryable authentication/authorization failure while querying downstream release API for $LATEST_RC"
+              echo "$API_OUTPUT"
+              exit 1
+            fi
+
+            if printf '%s' "$API_OUTPUT" | grep -Eqi "404|not found|429|5[0-9]{2}|timed out|timeout|temporary|connection reset|connection refused|network|tls"; then
+              if [ "$i" -lt "$RETRIES" ]; then
+                BACKOFF=$((i * 5))
+                echo "Downstream release lookup failed transiently, retrying in ${BACKOFF}s ($i/$RETRIES)..."
+                sleep "$BACKOFF"
+              fi
+              continue
+            fi
+
+            echo "ERROR: Failed querying downstream release API for $LATEST_RC"
+            echo "$API_OUTPUT"
+            exit 1
+          done
+
+          if [ -z "$RELEASE_JSON" ]; then
             echo "ERROR: No downstream release found for RC tag $LATEST_RC"
+            if [ -n "$LAST_ERROR" ]; then
+              echo "Last API error:"
+              echo "$LAST_ERROR"
+            fi
             echo ""
             echo "The final release requires a successful smoke-test pre-release."
             echo "Steps to resolve:"
@@ -251,7 +286,7 @@ jobs:
             echo "     just publish-candidate $VERSION"
             echo "  3. Wait for the downstream pre-release to appear, then retry."
             exit 1
-          }
+          fi
 
           TAG_NAME=$(echo "$RELEASE_JSON" | jq -r '.tag_name')
           IS_PRERELEASE=$(echo "$RELEASE_JSON" | jq -r '.prerelease')
@@ -779,25 +814,6 @@ jobs:
             exit 1
           fi
 
-      - name: Publish final GitHub Release
-        if: needs.validate.outputs.release_kind == 'final'
-        env:
-          PUBLISH_VERSION: ${{ needs.validate.outputs.publish_version }}
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          set -euo pipefail
-          if gh release view "$PUBLISH_VERSION" >/dev/null 2>&1; then
-            echo "ERROR: GitHub Release already exists for tag $PUBLISH_VERSION"
-            exit 1
-          fi
-
-          gh release create "$PUBLISH_VERSION" \
-            --title "$PUBLISH_VERSION" \
-            --notes-file /tmp/github-release-notes.md \
-            --verify-tag
-
-          echo "✓ GitHub Release published: $PUBLISH_VERSION"
-
       - name: Install cosign
         uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22  # v4
 
@@ -1023,6 +1039,25 @@ jobs:
           sbom-path: /tmp/sbom.spdx.json
           push-to-registry: true
 
+      - name: Publish final GitHub Release
+        if: needs.validate.outputs.release_kind == 'final'
+        env:
+          PUBLISH_VERSION: ${{ needs.validate.outputs.publish_version }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$PUBLISH_VERSION" >/dev/null 2>&1; then
+            echo "ERROR: GitHub Release already exists for tag $PUBLISH_VERSION"
+            exit 1
+          fi
+
+          gh release create "$PUBLISH_VERSION" \
+            --title "$PUBLISH_VERSION" \
+            --notes-file /tmp/github-release-notes.md \
+            --verify-tag
+
+          echo "✓ GitHub Release published: $PUBLISH_VERSION"
+
       - name: Summary
         env:
           BASE_VERSION: ${{ needs.validate.outputs.version }}
@@ -1060,6 +1095,9 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 35
     if: ${{ github.event.inputs.dry-run != 'true' }}
+    permissions:
+      contents: read
+      issues: write
     steps:
       - name: Generate smoke-test dispatch token
         id: smoke-app-token
@@ -1096,55 +1134,57 @@ jobs:
             -f "client_payload[correlation_id]=$CORRELATION_ID"
           echo "✓ Triggered smoke-test dispatch for release tag: $RELEASE_TAG"
 
-      - name: Wait for downstream smoke-test release completion
+      - name: Summary
         env:
-          GH_TOKEN: ${{ steps.smoke-app-token.outputs.token }}
           RELEASE_TAG: ${{ needs.validate.outputs.publish_version }}
-          RELEASE_KIND: ${{ needs.validate.outputs.release_kind }}
         run: |
-          set -euo pipefail
+          echo "✓ Triggered smoke-test dispatch for release tag: $RELEASE_TAG"
+          echo "Downstream validation is asynchronous; verify in devcontainer-smoke-test."
 
-          if [ "$RELEASE_KIND" = "candidate" ]; then
-            EXPECTED_PRERELEASE=true
-          else
-            EXPECTED_PRERELEASE=false
-          fi
+      - name: Create issue for smoke dispatch failure
+        if: ${{ failure() }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8.0.0
+        with:
+          script: |
+            const publishVersion = '${{ needs.validate.outputs.publish_version }}';
+            const releaseKind = '${{ needs.validate.outputs.release_kind }}';
+            const workflowUrl = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            const title = `Release ${publishVersion} smoke dispatch failed`;
+            const body = `
+            Release ${publishVersion} (${releaseKind}) failed while triggering downstream smoke-test dispatch.
 
-          TIMEOUT=1800
-          INTERVAL=15
-          ELAPSED=0
+            **Workflow Run:** [View logs](${workflowUrl})
+            **Failed Job:** smoke-test
 
-          echo "Waiting for downstream release '$RELEASE_TAG' (prerelease=$EXPECTED_PRERELEASE)..."
-          while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
-            RELEASE_JSON=$(gh api "repos/vig-os/devcontainer-smoke-test/releases/tags/$RELEASE_TAG" 2>/dev/null || true)
+            **Important:**
+            - Upstream publish already completed before this dispatch step.
+            - Published artifacts (GHCR images, tag, signatures, attestations, and final GitHub Release if applicable) are intentionally left intact.
+            - No branch reset or tag deletion is performed for dispatch-only failures.
 
-            if [ -n "$RELEASE_JSON" ]; then
-              IS_PRERELEASE=$(echo "$RELEASE_JSON" | jq -r '.prerelease')
-              if [ "$IS_PRERELEASE" = "$EXPECTED_PRERELEASE" ]; then
-                echo "✓ Downstream smoke-test release completed successfully for $RELEASE_TAG"
-                exit 0
-              fi
+            **Next Steps:**
+            1. Review smoke-test dispatch logs in this workflow run.
+            2. Validate token/repository_dispatch permissions for \`vig-os/devcontainer-smoke-test\`.
+            3. Re-trigger dispatch after fixing the root cause.
+            `;
 
-              echo "ERROR: Downstream release '$RELEASE_TAG' has prerelease=$IS_PRERELEASE (expected $EXPECTED_PRERELEASE)"
-              exit 1
-            fi
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['bug', 'area:ci']
+            });
 
-            sleep "$INTERVAL"
-            ELAPSED=$((ELAPSED + INTERVAL))
-            echo "Still waiting for downstream release creation... (${ELAPSED}s / ${TIMEOUT}s)"
-          done
-
-          echo "ERROR: Timed out waiting for downstream release '$RELEASE_TAG'"
-          echo "Inspect downstream run status:"
-          echo "  gh -R vig-os/devcontainer-smoke-test run list --workflow repository-dispatch.yml --limit 5"
-          exit 1
+            core.info(`Created issue: ${title}`);
 
   rollback:
     name: Rollback on Failure
-    needs: [validate, finalize, build-and-test, publish, smoke-test]
+    # Rollback is intentionally scoped to pre-publish/publish failures.
+    # Dispatch-only smoke-test failures happen after publish and should not delete tags or reset branches.
+    needs: [validate, finalize, build-and-test, publish]
     runs-on: ubuntu-22.04
     timeout-minutes: 10
-    if: ${{ always() && (needs.validate.result == 'failure' || needs.finalize.result == 'failure' || needs.build-and-test.result == 'failure' || needs.publish.result == 'failure' || needs.smoke-test.result == 'failure') }}
+    if: ${{ always() && (needs.validate.result == 'failure' || needs.finalize.result == 'failure' || needs.build-and-test.result == 'failure' || needs.publish.result == 'failure') }}
     permissions:
       issues: write          # create failure issue
       # Branch rollback and tag deletion use the RELEASE_APP token (not GITHUB_TOKEN),
