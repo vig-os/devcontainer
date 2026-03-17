@@ -67,6 +67,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release attestation warnings reduced by granting artifact metadata permission** ([#348](https://github.com/vig-os/devcontainer/issues/348))
   - Add `artifact-metadata: write` to the release publish job so attestation steps can persist metadata storage records
   - Keep `actions/attest`-based SBOM attestation path and remove missing-permission warnings from publish runs
+- **Smoke-test dispatch deploy now repairs workspace ownership before changelog copy** ([#352](https://github.com/vig-os/devcontainer/issues/352))
+  - Add a write probe and conditional `sudo chown -R` in `assets/smoke-test/.github/workflows/repository-dispatch.yml` after installer execution
+  - Prevent `Permission denied` failures when copying `.devcontainer/CHANGELOG.md` to repository root in GitHub-hosted runner jobs
 
 ### Security
 

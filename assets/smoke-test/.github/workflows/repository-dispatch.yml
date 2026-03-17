@@ -182,6 +182,23 @@ jobs:
           curl -sSf "https://raw.githubusercontent.com/vig-os/devcontainer/${TAG}/install.sh" \
             | bash -s -- --version "${TAG}" --smoke-test --force --docker .
 
+          # Docker-based initialization can leave bind-mounted files owned by root.
+          # Probe writability of actual copy source/destination paths before repair.
+          NEEDS_CHOWN=false
+          if [ ! -r ".devcontainer/CHANGELOG.md" ]; then
+            NEEDS_CHOWN=true
+          fi
+          if [ -e "CHANGELOG.md" ]; then
+            if [ ! -w "CHANGELOG.md" ]; then
+              NEEDS_CHOWN=true
+            fi
+          elif [ ! -w "." ]; then
+            NEEDS_CHOWN=true
+          fi
+          if [ "${NEEDS_CHOWN}" = "true" ]; then
+            sudo chown -R "$(id -u):$(id -g)" .
+          fi
+
           if [ ! -f ".devcontainer/CHANGELOG.md" ]; then
             echo "ERROR: expected .devcontainer/CHANGELOG.md after install"
             exit 1
