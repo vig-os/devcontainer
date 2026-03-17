@@ -64,6 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release finalization now commits generated docs and refreshes PR content** ([#300](https://github.com/vig-os/devcontainer/issues/300))
   - Final release automation regenerates docs before committing so pre-commit `generate-docs` does not fail CI with tracked file diffs
   - Release PR body is refreshed from finalized `CHANGELOG.md`
+- **Release attestation warnings reduced by granting artifact metadata permission** ([#348](https://github.com/vig-os/devcontainer/issues/348))
+  - Add `artifact-metadata: write` to the release publish job so attestation steps can persist metadata storage records
+  - Keep `actions/attest`-based SBOM attestation path and remove missing-permission warnings from publish runs
 
 ### Security
 
