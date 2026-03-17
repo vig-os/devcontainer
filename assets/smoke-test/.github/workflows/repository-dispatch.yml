@@ -185,7 +185,7 @@ jobs:
           # Docker-based initialization can leave bind-mounted files owned by root.
           # Probe writability of actual copy source/destination paths before repair.
           NEEDS_CHOWN=false
-          if [ ! -w ".devcontainer/CHANGELOG.md" ]; then
+          if [ ! -r ".devcontainer/CHANGELOG.md" ]; then
             NEEDS_CHOWN=true
           fi
           if [ -e "CHANGELOG.md" ]; then
