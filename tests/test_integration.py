@@ -895,7 +895,7 @@ class TestSmokeRepo:
     def test_smoke_workspace_changelog_available_in_devcontainer_and_root(
         self, initialized_smoke_workspace
     ):
-        """Smoke template should ship changelog in both expected locations."""
+        """Smoke template should ship root and devcontainer changelogs with distinct roles."""
         root_changelog = initialized_smoke_workspace / "CHANGELOG.md"
         devcontainer_changelog = (
             initialized_smoke_workspace / ".devcontainer" / "CHANGELOG.md"
@@ -905,10 +905,16 @@ class TestSmokeRepo:
         assert devcontainer_changelog.exists(), (
             ".devcontainer/CHANGELOG.md not found in smoke workspace"
         )
-        assert root_changelog.read_text(
-            encoding="utf-8"
-        ) == devcontainer_changelog.read_text(encoding="utf-8"), (
-            "Root and .devcontainer changelogs differ"
+        root_content = root_changelog.read_text(encoding="utf-8")
+        devcontainer_content = devcontainer_changelog.read_text(encoding="utf-8")
+
+        # Root changelog is workspace-owned; .devcontainer changelog is the canonical
+        # upstream release history synced from the template manifest.
+        assert "## Unreleased" in root_content, (
+            "Root changelog should expose workspace Unreleased section"
+        )
+        assert "## [0." in devcontainer_content, (
+            ".devcontainer changelog should include released version history"
         )
 
 
