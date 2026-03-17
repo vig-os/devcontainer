@@ -754,6 +754,7 @@ jobs:
       packages: write       # push images to GHCR
       id-token: write       # keyless cosign signing via OIDC
       attestations: write   # build provenance attestations
+      artifact-metadata: write  # persist attestation storage records
 
     steps:
       - name: Generate GitHub App Token
