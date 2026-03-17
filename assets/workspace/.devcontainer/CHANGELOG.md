@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.3.1] - TBD
 
 ### Added
 
@@ -58,10 +58,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Move final GitHub Release creation to the end of publish so artifact publication/signing completes before release object creation
   - Add concurrency control to `assets/smoke-test/.github/workflows/repository-dispatch.yml` to prevent overlapping dispatch races
   - Handle smoke-test dispatch failures with a targeted issue while avoiding destructive rollback after publish artifacts are already released
-
-### Deprecated
-
-### Removed
 
 ### Fixed
 
