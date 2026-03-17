@@ -518,6 +518,13 @@ jobs:
           uv run python docs/generate.py
           echo "✓ Regenerated docs from finalized CHANGELOG.md"
 
+      - name: Sync workspace manifest for finalized release
+        if: needs.validate.outputs.release_kind == 'final'
+        run: |
+          set -euo pipefail
+          uv run python scripts/sync_manifest.py sync assets/workspace/
+          echo "✓ Synced workspace manifest after changelog finalization"
+
       - name: Collect finalization files
         if: needs.validate.outputs.release_kind == 'final'
         id: finalize-files

@@ -198,6 +198,12 @@ jobs:
           uv run prepare-changelog prepare "$VERSION" CHANGELOG.md
           echo "✓ CHANGELOG prepared (Unreleased → [${VERSION}] - TBD + fresh Unreleased)"
 
+      - name: Sync workspace manifest after changelog prepare
+        run: |
+          set -euo pipefail
+          uv run python scripts/sync_manifest.py sync assets/workspace/
+          echo "✓ Synced workspace manifest after changelog prepare"
+
       - name: Extract CHANGELOG content for PR body
         id: changelog
         env:
@@ -222,7 +228,7 @@ jobs:
 
             Move Unreleased content to [${{ needs.validate.outputs.version }}] - TBD
             and create fresh empty Unreleased section for continued development.
-          FILE_PATHS: CHANGELOG.md
+          FILE_PATHS: CHANGELOG.md assets/workspace/.devcontainer/CHANGELOG.md
 
       - name: Create release branch from dev
         id: create-branch
@@ -255,6 +261,12 @@ jobs:
           "
           echo "✓ Stripped empty Unreleased section from CHANGELOG"
 
+      - name: Sync workspace manifest after release changelog strip
+        run: |
+          set -euo pipefail
+          uv run python scripts/sync_manifest.py sync assets/workspace/
+          echo "✓ Synced workspace manifest after release changelog strip"
+
       - name: Commit stripped CHANGELOG to release branch via API
         uses: vig-os/commit-action@c0024cbad0e501764127cccab732c6cd465b4646  # v0.1.5
         env:
@@ -266,7 +278,7 @@ jobs:
 
             Strip empty Unreleased section from release branch.
             Release date TBD (set during finalization).
-          FILE_PATHS: CHANGELOG.md
+          FILE_PATHS: CHANGELOG.md assets/workspace/.devcontainer/CHANGELOG.md
 
       - name: Create draft PR to main
         id: pr
@@ -348,6 +360,7 @@ jobs:
             echo "i dev CHANGELOG already matches pre-prepare state"
           else
             cp /tmp/changelog.pre-prepare.md CHANGELOG.md
+            uv run python scripts/sync_manifest.py sync assets/workspace/
             CHANGELOG_ROLLBACK_NEEDED=true
             echo "✓ Prepared CHANGELOG rollback content for dev"
           fi
@@ -366,7 +379,7 @@ jobs:
             chore: rollback failed prepare-release ${{ needs.validate.outputs.version }}
 
             Restore CHANGELOG.md on dev to pre-prepare state after prepare-release failed.
-          FILE_PATHS: CHANGELOG.md
+          FILE_PATHS: CHANGELOG.md assets/workspace/.devcontainer/CHANGELOG.md
 
       - name: Rollback summary
         if: ${{ failure() }}
