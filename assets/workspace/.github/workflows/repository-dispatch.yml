@@ -64,9 +64,15 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Run smoke tests
+        env:
+          TAG: ${{ steps.payload.outputs.tag }}
         run: |
           set -euo pipefail
-          just test
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            "ghcr.io/vig-os/devcontainer:${TAG}" \
+            just test
 
       - name: Create downstream release note
         id: notes
@@ -100,12 +106,29 @@ jobs:
         run: |
           set -euo pipefail
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "ERROR: Release '$TAG' already exists in downstream repository"
-            exit 1
+          if [ "$RELEASE_KIND" = "candidate" ]; then
+            EXPECTED_PRERELEASE=true
+          else
+            EXPECTED_PRERELEASE=false
           fi
 
-          if [ "$RELEASE_KIND" = "candidate" ]; then
+          EXISTING_RELEASE=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" 2>/dev/null || true)
+
+          if [ -n "$EXISTING_RELEASE" ]; then
+            EXISTING_PRERELEASE=$(echo "$EXISTING_RELEASE" | jq -r '.prerelease')
+            if [ "$EXISTING_PRERELEASE" != "$EXPECTED_PRERELEASE" ]; then
+              echo "ERROR: Existing release '$TAG' prerelease=$EXISTING_PRERELEASE (expected $EXPECTED_PRERELEASE)"
+              exit 1
+            fi
+
+            gh release edit "$TAG" \
+              --title "$TAG" \
+              --notes-file /tmp/smoke-test-release-notes.md
+            echo "✓ Existing release '$TAG' already matches expected kind; notes updated"
+            exit 0
+          fi
+
+          if [ "$EXPECTED_PRERELEASE" = "true" ]; then
             gh release create "$TAG" \
               --title "$TAG" \
               --notes-file /tmp/smoke-test-release-notes.md \
