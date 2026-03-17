@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Final release now publishes a GitHub Release with finalized notes** ([#310](https://github.com/vig-os/devcontainer/issues/310))
   - Add a final-only publish step in `.github/workflows/release.yml` that creates a GitHub Release for `X.Y.Z`
   - Source GitHub Release notes from the finalized `CHANGELOG.md` section and fail the run if notes extraction or release publishing fails
+- **Release dispatch and publish ordering hardened for 0.3.1** ([#336](https://github.com/vig-os/devcontainer/issues/336))
+  - Make smoke-test dispatch fire-and-forget in `.github/workflows/release.yml` and decouple rollback from downstream completion timing
+  - Add bounded retries to the final-release downstream RC pre-release gate API check
+  - Move final GitHub Release creation to the end of publish so artifact publication/signing completes before release object creation
+  - Add concurrency control to `assets/smoke-test/.github/workflows/repository-dispatch.yml` to prevent overlapping dispatch races
 
 ### Deprecated
 
