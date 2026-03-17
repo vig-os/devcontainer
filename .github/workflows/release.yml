@@ -251,10 +251,17 @@ jobs:
             fi
 
             LAST_ERROR="$API_OUTPUT"
-            if printf '%s' "$API_OUTPUT" | grep -Eqi "404|not found"; then
+            if printf '%s' "$API_OUTPUT" | grep -Eqi "401|403|forbidden|bad credentials|authentication|authorization|insufficient scopes"; then
+              echo "ERROR: Non-retryable authentication/authorization failure while querying downstream release API for $LATEST_RC"
+              echo "$API_OUTPUT"
+              exit 1
+            fi
+
+            if printf '%s' "$API_OUTPUT" | grep -Eqi "404|not found|429|5[0-9]{2}|timed out|timeout|temporary|connection reset|connection refused|network|tls"; then
               if [ "$i" -lt "$RETRIES" ]; then
-                echo "Downstream release not visible yet, retrying ($i/$RETRIES)..."
-                sleep 5
+                BACKOFF=$((i * 5))
+                echo "Downstream release lookup failed transiently, retrying in ${BACKOFF}s ($i/$RETRIES)..."
+                sleep "$BACKOFF"
               fi
               continue
             fi
