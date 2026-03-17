@@ -69,3 +69,8 @@ setup() {
     run bash -lc "grep -Fq -- 'EFFECTIVE_SOURCE_RUN_URL=' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'source_run_url=' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'correlation_id=' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'GITHUB_STEP_SUMMARY' assets/smoke-test/.github/workflows/repository-dispatch.yml"
     assert_success
 }
+
+@test "smoke-test dispatch copies changelog from devcontainer to repo root" {
+    run bash -lc "grep -Fq -- 'cp \".devcontainer/CHANGELOG.md\" \"CHANGELOG.md\"' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    assert_success
+}

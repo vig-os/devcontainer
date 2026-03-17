@@ -556,6 +556,7 @@ class TestFileStructure:
             "/root/assets/workspace/.vig-os",
             # .devcontainer files
             "/root/assets/workspace/.devcontainer/.gitignore",
+            "/root/assets/workspace/.devcontainer/CHANGELOG.md",
             "/root/assets/workspace/.devcontainer/README.md",
             "/root/assets/workspace/.devcontainer/devcontainer.json",
             "/root/assets/workspace/.devcontainer/docker-compose.yml",

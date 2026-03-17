@@ -892,6 +892,25 @@ class TestSmokeRepo:
             "repository-dispatch.yml should not be deployed without --smoke-test"
         )
 
+    def test_smoke_workspace_changelog_available_in_devcontainer_and_root(
+        self, initialized_smoke_workspace
+    ):
+        """Smoke template should ship changelog in both expected locations."""
+        root_changelog = initialized_smoke_workspace / "CHANGELOG.md"
+        devcontainer_changelog = (
+            initialized_smoke_workspace / ".devcontainer" / "CHANGELOG.md"
+        )
+
+        assert root_changelog.exists(), "Root CHANGELOG.md not found in smoke workspace"
+        assert devcontainer_changelog.exists(), (
+            ".devcontainer/CHANGELOG.md not found in smoke workspace"
+        )
+        assert root_changelog.read_text(
+            encoding="utf-8"
+        ) == devcontainer_changelog.read_text(encoding="utf-8"), (
+            "Root and .devcontainer changelogs differ"
+        )
+
 
 class TestDevContainerGit:
     """Test that git configuration files are set up."""
