@@ -1,0 +1,2 @@
+# devcontainer image configuration
+DEVCONTAINER_VERSION=latest
