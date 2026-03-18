@@ -68,9 +68,29 @@ permissions:
   contents: read
 
 jobs:
+  resolve-image:
+    name: Resolve image tag
+    runs-on: ubuntu-22.04
+    timeout-minutes: 2
+    outputs:
+      image-tag: ${{ steps.resolve.outputs.image-tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          sparse-checkout: .vig-os
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve container image
+        id: resolve
+        uses: ./.github/actions/resolve-image
+
   validate:
     name: Validate Release Core
+    needs: [resolve-image]
     runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 10
     outputs:
       version: ${{ steps.vars.outputs.version }}
@@ -79,7 +99,7 @@ jobs:
       pre_finalize_sha: ${{ steps.pre_sha.outputs.pre_finalize_sha }}
       release_kind: ${{ steps.vars.outputs.release_kind }}
       publish_version: ${{ steps.publish_meta.outputs.publish_version }}
-      image_tag: ${{ steps.resolve_image.outputs.image_tag }}
+      image_tag: ${{ needs.resolve-image.outputs.image-tag }}
 
     steps:
       - name: Validate contract version
@@ -133,27 +153,14 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.auth.outputs.token }}
 
-      - name: Resolve container image tag
-        id: resolve_image
-        run: |
-          set -euo pipefail
-          TAG=""
-          if [ -f ".vig-os" ]; then
-            TAG=$(awk -F= '/^DEVCONTAINER_VERSION=/{gsub(/^[ \t"]+|[ \t"]+$/, "", $2); print $2; exit}' .vig-os || true)
-          fi
-          if [ -z "${TAG:-}" ]; then
-            TAG="latest"
-          fi
-          echo "image_tag=$TAG" >> "$GITHUB_OUTPUT"
-
       - name: Validate image accessibility
         env:
-          IMAGE_TAG: ${{ steps.resolve_image.outputs.image_tag }}
+          IMAGE_TAG: ${{ needs.resolve-image.outputs.image-tag }}
         run: |
           set -euo pipefail
           IMAGE="ghcr.io/vig-os/devcontainer:${IMAGE_TAG}"
           echo "Validating image availability: $IMAGE"
-          if ! docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
+          if ! retry --retries 3 --backoff 5 --max-backoff 30 -- docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
             echo "ERROR: Cannot access image manifest: $IMAGE"
             echo "Check whether the tag exists and whether this workflow has access to GHCR."
             exit 1
@@ -237,7 +244,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          PR_JSON=$(gh pr list \
+          PR_JSON=$(retry --retries 3 --backoff 5 --max-backoff 30 -- gh pr list \
             --head "release/$VERSION" \
             --base main \
             --json number,isDraft,reviewDecision,statusCheckRollup \
@@ -279,7 +286,7 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           RELEASE_DATE: ${{ steps.vars.outputs.release_date }}
           DRY_RUN: ${{ inputs.dry_run }}
-          IMAGE_TAG: ${{ steps.resolve_image.outputs.image_tag }}
+          IMAGE_TAG: ${{ needs.resolve-image.outputs.image-tag }}
         run: |
           echo "Validation passed"
           echo ""
@@ -365,7 +372,8 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          gh workflow run sync-issues.yml -f "target-branch=release/$VERSION"
+          retry --retries 2 --backoff 5 --max-backoff 20 -- \
+            gh workflow run sync-issues.yml -f "target-branch=release/$VERSION"
 
       - name: Wait for sync-issues completion
         if: ${{ inputs.release_kind == 'final' }}
@@ -417,7 +425,7 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          git fetch origin "release/$VERSION"
+          retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin "release/$VERSION"
           git reset --hard "origin/release/$VERSION"
 
       - name: Output finalize SHA
@@ -431,7 +439,8 @@ jobs:
           if [ "$RELEASE_KIND" = "final" ]; then
             FINALIZE_SHA=$(git rev-parse HEAD)
           else
-            FINALIZE_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/$VERSION" --jq '.object.sha')
+            FINALIZE_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
+              gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/$VERSION" --jq '.object.sha')
           fi
           echo "finalize_sha=$FINALIZE_SHA" >> "$GITHUB_OUTPUT"
 

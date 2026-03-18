@@ -171,7 +171,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          PREPARE_START_SHA=$(gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
+          PREPARE_START_SHA=$(retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
           echo "prepare_start_sha=$PREPARE_START_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Prepare CHANGELOG (freeze + reset)
@@ -214,10 +215,19 @@ jobs:
           RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
         run: |
           set -euo pipefail
-          DEV_SHA=$(gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
-          gh api "repos/${{ github.repository }}/git/refs" \
+          DEV_SHA=$(retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
+          retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/git/refs" \
             -f ref="refs/heads/$RELEASE_BRANCH" \
-            -f sha="$DEV_SHA"
+            -f sha="$DEV_SHA" || {
+              if retry --retries 2 --backoff 5 --max-backoff 20 -- \
+                gh api "repos/${{ github.repository }}/git/ref/heads/$RELEASE_BRANCH" >/dev/null 2>&1; then
+                echo "Release branch already exists: $RELEASE_BRANCH"
+              else
+                exit 1
+              fi
+            }
           echo "dev_sha=$DEV_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Strip empty Unreleased section for release branch
@@ -266,12 +276,19 @@ jobs:
           $CHANGELOG_CONTENT
           "
 
-          PR_URL=$(gh pr create \
-            --base main \
-            --head "$RELEASE_BRANCH" \
-            --title "chore: release $VERSION" \
-            --body "$PR_BODY" \
-            --draft)
+          EXISTING_PR_URL=$(retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh pr list --head "$RELEASE_BRANCH" --base main --state open --json url --jq '.[0].url // empty')
+          if [ -n "$EXISTING_PR_URL" ]; then
+            PR_URL="$EXISTING_PR_URL"
+          else
+            PR_URL=$(retry --retries 3 --backoff 5 --max-backoff 60 -- \
+              gh pr create \
+                --base main \
+                --head "$RELEASE_BRANCH" \
+                --title "chore: release $VERSION" \
+                --body "$PR_BODY" \
+                --draft)
+          fi
 
           PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
           echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
@@ -287,21 +304,25 @@ jobs:
         run: |
           set -euo pipefail
           CHANGELOG_ROLLBACK_NEEDED=false
-          gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/$RELEASE_BRANCH" || true
+          retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/$RELEASE_BRANCH" || true
 
           if [ -z "${PREPARE_START_SHA:-}" ] || [ -z "${POST_FREEZE_DEV_SHA:-}" ]; then
             echo "changelog_rollback_needed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          CURRENT_DEV_SHA=$(gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
+          CURRENT_DEV_SHA=$(retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
           if [ "$CURRENT_DEV_SHA" != "$POST_FREEZE_DEV_SHA" ]; then
             echo "changelog_rollback_needed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          gh api "repos/${{ github.repository }}/contents/CHANGELOG.md?ref=$PREPARE_START_SHA" --jq '.content' | tr -d '\n' | base64 -d > /tmp/changelog.pre.md
-          gh api "repos/${{ github.repository }}/contents/CHANGELOG.md?ref=dev" --jq '.content' | tr -d '\n' | base64 -d > /tmp/changelog.current.md
+          retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/contents/CHANGELOG.md?ref=$PREPARE_START_SHA" --jq '.content' | tr -d '\n' | base64 -d > /tmp/changelog.pre.md
+          retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/contents/CHANGELOG.md?ref=dev" --jq '.content' | tr -d '\n' | base64 -d > /tmp/changelog.current.md
           if ! cmp -s /tmp/changelog.pre.md /tmp/changelog.current.md; then
             cp /tmp/changelog.pre.md CHANGELOG.md
             CHANGELOG_ROLLBACK_NEEDED=true
