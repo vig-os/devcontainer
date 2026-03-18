@@ -117,7 +117,8 @@ jobs:
         env:
           VERSION: ${{ steps.vars.outputs.version }}
         run: |
-          git fetch origin "release/$VERSION" || {
+          set -euo pipefail
+          uv run retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin "release/$VERSION" || {
             echo "ERROR: Release branch not found: release/$VERSION"
             echo "Did you run: just prepare-release $VERSION"
             exit 1
@@ -333,7 +334,7 @@ jobs:
           RELEASE_BRANCH="release/$VERSION"
 
           # Find PR from release branch to main
-          PR_JSON=$(gh pr list \
+          PR_JSON=$(uv run retry --retries 3 --backoff 5 --max-backoff 30 -- gh pr list \
             --head "$RELEASE_BRANCH" \
             --base main \
             --json number,isDraft,reviewDecision,statusCheckRollup \
@@ -575,7 +576,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "Triggering sync-issues workflow..."
-          gh workflow run sync-issues.yml \
+          uv run retry --retries 2 --backoff 5 --max-backoff 20 -- gh workflow run sync-issues.yml \
             -f "target-branch=release/$VERSION"
           echo "✓ sync-issues workflow triggered"
 
@@ -630,7 +631,7 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          git fetch origin "release/$VERSION"
+          uv run retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin "release/$VERSION"
           git reset --hard "origin/release/$VERSION"
           echo "✓ Synced with remote release branch"
 
@@ -660,7 +661,8 @@ jobs:
           $CHANGELOG_CONTENT
           EOF
 
-          gh pr edit "$PR_NUMBER" --body-file /tmp/release-pr-body.md
+          uv run retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh pr edit "$PR_NUMBER" --body-file /tmp/release-pr-body.md
           echo "✓ Refreshed PR #$PR_NUMBER body from finalized CHANGELOG.md"
 
       - name: Output finalize SHA
@@ -674,7 +676,8 @@ jobs:
           if [ "$RELEASE_KIND" = "final" ]; then
             FINALIZE_SHA=$(git rev-parse HEAD)
           else
-            FINALIZE_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/$VERSION" --jq '.object.sha')
+            FINALIZE_SHA=$(uv run retry --retries 3 --backoff 5 --max-backoff 30 -- \
+              gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/$VERSION" --jq '.object.sha')
           fi
           echo "finalize_sha=$FINALIZE_SHA" >> $GITHUB_OUTPUT
           echo "Release kind: $RELEASE_KIND — SHA: $FINALIZE_SHA"
@@ -801,7 +804,14 @@ jobs:
             fi
           fi
 
-          git push origin "$PUBLISH_VERSION"
+          if ! uv run retry --retries 3 --backoff 5 --max-backoff 30 -- git push origin "$PUBLISH_VERSION"; then
+            if git ls-remote --tags --refs origin "$PUBLISH_VERSION" | grep -q "refs/tags/$PUBLISH_VERSION$"; then
+              echo "Tag already present on origin after push attempt: $PUBLISH_VERSION"
+            else
+              echo "ERROR: Failed to push tag $PUBLISH_VERSION"
+              exit 1
+            fi
+          fi
           echo "✓ Tag pushed: $PUBLISH_VERSION"
 
       - name: Generate final release notes from CHANGELOG
@@ -865,22 +875,8 @@ jobs:
             IMAGE_TAG="$REPO:$PUBLISH_VERSION-$arch"
             docker tag "$SOURCE_IMAGE_TAG" "$IMAGE_TAG"
             echo "Pushing $arch image: $IMAGE_TAG"
-
-            RETRIES=3
-            for i in $(seq 1 $RETRIES); do
-              if docker push "$IMAGE_TAG"; then
-                echo "✓ Pushed: $IMAGE_TAG"
-                break
-              else
-                if [ $i -lt $RETRIES ]; then
-                  echo "Push failed, retrying ($i/$RETRIES)..."
-                  sleep 3
-                else
-                  echo "ERROR: Failed to push after $RETRIES attempts"
-                  exit 1
-                fi
-              fi
-            done
+            uv run retry --retries 3 --backoff 3 --max-backoff 3 -- docker push "$IMAGE_TAG"
+            echo "✓ Pushed: $IMAGE_TAG"
           done
 
       - name: Create multi-arch manifest
@@ -902,45 +898,20 @@ jobs:
           done
 
           echo "Creating version manifest: $REPO:$PUBLISH_VERSION"
-          RETRIES=3
-          for i in $(seq 1 $RETRIES); do
-            if docker buildx imagetools create \
+          uv run retry --retries 3 --backoff 3 --max-backoff 3 -- \
+            docker buildx imagetools create \
               --tag "$REPO:$PUBLISH_VERSION" \
-              "${ARCH_IMAGES[@]}"; then
-              echo "✓ Created version manifest: $REPO:$PUBLISH_VERSION"
-              break
-            else
-              if [ $i -lt $RETRIES ]; then
-                echo "Manifest creation failed, retrying ($i/$RETRIES)..."
-                sleep 3
-              else
-                echo "ERROR: Failed to create version manifest"
-                exit 1
-              fi
-            fi
-          done
+              "${ARCH_IMAGES[@]}"
+          echo "✓ Created version manifest: $REPO:$PUBLISH_VERSION"
 
           # Update latest manifest only for final releases building both architectures.
           if [ "$RELEASE_KIND" = "final" ] && [ ${#ARCH_ARRAY[@]} -eq 2 ]; then
             echo "Creating/updating latest manifest: $REPO:latest"
-
-            RETRIES=3
-            for i in $(seq 1 $RETRIES); do
-              if docker buildx imagetools create \
+            uv run retry --retries 3 --backoff 3 --max-backoff 3 -- \
+              docker buildx imagetools create \
                 --tag "$REPO:latest" \
-                "${ARCH_IMAGES[@]}"; then
-                echo "✓ Created/updated latest manifest: $REPO:latest"
-                break
-              else
-                if [ $i -lt $RETRIES ]; then
-                  echo "Latest manifest creation failed, retrying ($i/$RETRIES)..."
-                  sleep 3
-                else
-                  echo "ERROR: Failed to create latest manifest"
-                  exit 1
-                fi
-              fi
-            done
+                "${ARCH_IMAGES[@]}"
+            echo "✓ Created/updated latest manifest: $REPO:latest"
           else
             echo "Skipping 'latest' manifest (single architecture or limited build)"
           fi
@@ -1030,24 +1001,13 @@ jobs:
           REPO="ghcr.io/vig-os/devcontainer"
 
           # Get the digest for the multi-arch manifest
-          DIGEST=$(docker buildx imagetools inspect "$REPO:$PUBLISH_VERSION" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          DIGEST=$(uv run retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            docker buildx imagetools inspect "$REPO:$PUBLISH_VERSION" --format '{{json .Manifest.Digest}}' | tr -d '"')
           echo "Signing image: $REPO@$DIGEST"
 
           # Keyless signing using GitHub Actions OIDC identity
-          RETRIES=3
-          for i in $(seq 1 $RETRIES); do
-            if cosign sign --yes "$REPO@$DIGEST"; then
-              break
-            fi
-
-            if [ $i -lt $RETRIES ]; then
-              echo "Cosign sign failed, retrying ($i/$RETRIES)..."
-              sleep 15
-            else
-              echo "ERROR: Failed to sign image after $RETRIES attempts"
-              exit 1
-            fi
-          done
+          uv run retry --retries 3 --backoff 15 --max-backoff 15 -- \
+            cosign sign --yes "$REPO@$DIGEST"
           echo "✓ Image signed with cosign (keyless)"
 
       - name: Capture image digest for attestation
@@ -1055,8 +1015,10 @@ jobs:
         env:
           PUBLISH_VERSION: ${{ needs.validate.outputs.publish_version }}
         run: |
+          set -euo pipefail
           REPO="ghcr.io/vig-os/devcontainer"
-          DIGEST=$(docker buildx imagetools inspect "$REPO:$PUBLISH_VERSION" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          DIGEST=$(uv run retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            docker buildx imagetools inspect "$REPO:$PUBLISH_VERSION" --format '{{json .Manifest.Digest}}' | tr -d '"')
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
           echo "Image digest: $DIGEST"
 
@@ -1111,15 +1073,21 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
-          if gh release view "$PUBLISH_VERSION" >/dev/null 2>&1; then
+          if uv run retry --retries 2 --backoff 5 --max-backoff 20 -- gh release view "$PUBLISH_VERSION" >/dev/null 2>&1; then
             echo "ERROR: GitHub Release already exists for tag $PUBLISH_VERSION"
             exit 1
           fi
 
-          gh release create "$PUBLISH_VERSION" \
+          uv run retry --retries 3 --backoff 5 --max-backoff 30 -- gh release create "$PUBLISH_VERSION" \
             --title "$PUBLISH_VERSION" \
             --notes-file /tmp/github-release-notes.md \
-            --verify-tag
+            --verify-tag || {
+              if gh release view "$PUBLISH_VERSION" >/dev/null 2>&1; then
+                echo "GitHub Release already present after create attempt: $PUBLISH_VERSION"
+              else
+                exit 1
+              fi
+            }
 
           echo "✓ GitHub Release published: $PUBLISH_VERSION"
 
@@ -1186,9 +1154,8 @@ jobs:
           CORRELATION_ID: ${{ github.repository }}:${{ github.run_id }}:${{ needs.validate.outputs.publish_version }}
         run: |
           set -euo pipefail
-          RETRIES=3
-          for i in $(seq 1 $RETRIES); do
-            if gh api repos/vig-os/devcontainer-smoke-test/dispatches \
+          uv run retry --retries 3 --backoff 10 --max-backoff 10 -- \
+            gh api repos/vig-os/devcontainer-smoke-test/dispatches \
               -f event_type=smoke-test-trigger \
               -f "client_payload[tag]=$RELEASE_TAG" \
               -f "client_payload[release_kind]=$RELEASE_KIND" \
@@ -1198,18 +1165,7 @@ jobs:
               -f "client_payload[source_run_id]=$SOURCE_RUN_ID" \
               -f "client_payload[source_run_url]=$SOURCE_RUN_URL" \
               -f "client_payload[source_sha]=$SOURCE_SHA" \
-              -f "client_payload[correlation_id]=$CORRELATION_ID"; then
-              break
-            fi
-
-            if [ $i -lt $RETRIES ]; then
-              echo "Dispatch failed, retrying ($i/$RETRIES)..."
-              sleep 10
-            else
-              echo "ERROR: Failed to trigger smoke-test dispatch after $RETRIES attempts"
-              exit 1
-            fi
-          done
+              -f "client_payload[correlation_id]=$CORRELATION_ID"
           echo "✓ Triggered smoke-test dispatch for release tag: $RELEASE_TAG"
 
       - name: Summary
@@ -1286,7 +1242,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "Rolling back release branch to pre-finalization state..."
-          gh api "repos/${{ github.repository }}/git/refs/heads/release/$VERSION" \
+          uv run retry --retries 3 --backoff 5 --max-backoff 30 -- gh api "repos/${{ github.repository }}/git/refs/heads/release/$VERSION" \
             -X PATCH \
             -f sha="$PRE_SHA" \
             -F force=true
@@ -1301,9 +1257,9 @@ jobs:
         run: |
           set -euo pipefail
           TAG="$PUBLISH_VERSION"
-          if gh api "repos/${{ github.repository }}/git/refs/tags/$TAG" >/dev/null 2>&1; then
+          if uv run retry --retries 2 --backoff 5 --max-backoff 20 -- gh api "repos/${{ github.repository }}/git/refs/tags/$TAG" >/dev/null 2>&1; then
             echo "Deleting remote tag: $TAG"
-            gh api "repos/${{ github.repository }}/git/refs/tags/$TAG" -X DELETE
+            uv run retry --retries 3 --backoff 5 --max-backoff 30 -- gh api "repos/${{ github.repository }}/git/refs/tags/$TAG" -X DELETE
             echo "✓ Tag deleted"
           else
             echo "Tag does not exist on remote (not created)"

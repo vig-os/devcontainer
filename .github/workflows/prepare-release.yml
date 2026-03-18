@@ -185,7 +185,8 @@ jobs:
           GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
         run: |
           set -euo pipefail
-          PREPARE_START_SHA=$(gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
+          PREPARE_START_SHA=$(uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
           echo "prepare_start_sha=$PREPARE_START_SHA" >> "$GITHUB_OUTPUT"
           echo "✓ Captured pre-prepare dev SHA: $PREPARE_START_SHA"
 
@@ -237,9 +238,11 @@ jobs:
           RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
         run: |
           set -euo pipefail
-          DEV_SHA=$(gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
+          DEV_SHA=$(uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
           echo "Creating branch $RELEASE_BRANCH from dev at $DEV_SHA..."
-          gh api "repos/${{ github.repository }}/git/refs" \
+          uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/git/refs" \
             -f ref="refs/heads/$RELEASE_BRANCH" \
             -f sha="$DEV_SHA"
           echo "dev_sha=$DEV_SHA" >> "$GITHUB_OUTPUT"
@@ -299,7 +302,8 @@ jobs:
           $CHANGELOG_CONTENT
           "
 
-          PR_URL=$(gh pr create \
+          PR_URL=$(uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh pr create \
             --base main \
             --head "$RELEASE_BRANCH" \
             --title "chore: release $VERSION" \
@@ -335,8 +339,10 @@ jobs:
             exit 0
           fi
 
-          if gh api "repos/${{ github.repository }}/git/ref/heads/$RELEASE_BRANCH" >/dev/null 2>&1; then
-            gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/$RELEASE_BRANCH"
+          if uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/git/ref/heads/$RELEASE_BRANCH" >/dev/null 2>&1; then
+            uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+              gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/$RELEASE_BRANCH"
             BRANCH_DELETED=true
             echo "✓ Deleted partially created release branch: $RELEASE_BRANCH"
           else
@@ -344,7 +350,8 @@ jobs:
           fi
 
           if [ -n "${POST_FREEZE_DEV_SHA:-}" ]; then
-            CURRENT_DEV_SHA="$(gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')"
+            CURRENT_DEV_SHA="$(uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+              gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')"
             if [ "$CURRENT_DEV_SHA" != "$POST_FREEZE_DEV_SHA" ]; then
               echo "w dev advanced after freeze commit; skipping CHANGELOG rollback to avoid clobbering concurrent updates"
               echo "branch_deleted=$BRANCH_DELETED" >> "$GITHUB_OUTPUT"
@@ -353,8 +360,10 @@ jobs:
             fi
           fi
 
-          gh api "repos/${{ github.repository }}/contents/CHANGELOG.md?ref=$PREPARE_START_SHA" --jq '.content' | tr -d '\n' | base64 -d > /tmp/changelog.pre-prepare.md
-          gh api "repos/${{ github.repository }}/contents/CHANGELOG.md?ref=dev" --jq '.content' | tr -d '\n' | base64 -d > /tmp/changelog.current-dev.md
+          uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/contents/CHANGELOG.md?ref=$PREPARE_START_SHA" --jq '.content' | tr -d '\n' | base64 -d > /tmp/changelog.pre-prepare.md
+          uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/contents/CHANGELOG.md?ref=dev" --jq '.content' | tr -d '\n' | base64 -d > /tmp/changelog.current-dev.md
 
           if cmp -s /tmp/changelog.pre-prepare.md /tmp/changelog.current-dev.md; then
             echo "i dev CHANGELOG already matches pre-prepare state"
