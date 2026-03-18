@@ -82,6 +82,8 @@ jobs:
     name: Rollback on Failure
     needs: [core, extension, publish]
     runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/vig-os/devcontainer:${{ needs.core.outputs.image_tag }}
     timeout-minutes: 10
     if: ${{ failure() && inputs.dry-run != true }}
     permissions:
@@ -111,10 +113,10 @@ jobs:
           PRE_SHA: ${{ needs.core.outputs.pre_finalize_sha }}
         run: |
           set -euo pipefail
-          git fetch origin "release/$VERSION"
+          retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin "release/$VERSION"
           git checkout "release/$VERSION"
           if git reset --hard "$PRE_SHA" 2>/dev/null; then
-            if git push --force-with-lease origin "release/$VERSION"; then
+            if retry --retries 3 --backoff 5 --max-backoff 30 -- git push --force-with-lease origin "release/$VERSION"; then
               echo "Release branch rolled back"
             fi
           fi
@@ -125,8 +127,9 @@ jobs:
         env:
           PUBLISH_VERSION: ${{ needs.core.outputs.publish_version }}
         run: |
+          set -euo pipefail
           if git ls-remote origin "refs/tags/$PUBLISH_VERSION" | grep -q "$PUBLISH_VERSION"; then
-            git push origin ":refs/tags/$PUBLISH_VERSION" || true
+            retry --retries 3 --backoff 5 --max-backoff 30 -- git push origin ":refs/tags/$PUBLISH_VERSION" || true
           fi
 
       - name: Create failure issue
@@ -138,7 +141,7 @@ jobs:
         run: |
           set -euo pipefail
           WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          gh issue create \
+          retry --retries 3 --backoff 5 --max-backoff 30 -- gh issue create \
             --title "Release $VERSION failed — automatic rollback" \
             --label "bug" \
             --body "Release $VERSION failed during the automated release workflow.

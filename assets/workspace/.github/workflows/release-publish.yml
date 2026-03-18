@@ -52,9 +52,29 @@ permissions:
   contents: read
 
 jobs:
+  resolve-image:
+    name: Resolve image tag
+    runs-on: ubuntu-22.04
+    timeout-minutes: 2
+    outputs:
+      image-tag: ${{ steps.resolve.outputs.image-tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          sparse-checkout: .vig-os
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve container image
+        id: resolve
+        uses: ./.github/actions/resolve-image
+
   publish:
     name: Publish Release
+    needs: [resolve-image]
     runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 10
     permissions:
       contents: write
@@ -113,7 +133,26 @@ jobs:
         run: |
           set -euo pipefail
           git tag -a "$PUBLISH_VERSION" -m "Release $PUBLISH_VERSION"
-          git push origin "$PUBLISH_VERSION"
+          if ! retry --retries 3 --backoff 5 --max-backoff 30 -- git push origin "$PUBLISH_VERSION"; then
+            if retry --retries 3 --backoff 5 --max-backoff 30 -- git ls-remote --tags --refs origin "$PUBLISH_VERSION" | grep -q "refs/tags/$PUBLISH_VERSION$"; then
+              LOCAL_TAG_TARGET_SHA=$(git rev-parse "$PUBLISH_VERSION^{}")
+              REMOTE_TAG_TARGET_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- git ls-remote --tags origin "refs/tags/$PUBLISH_VERSION^{}" | awk '{print $1}')
+              if [ -z "$REMOTE_TAG_TARGET_SHA" ]; then
+                echo "ERROR: Remote tag exists but target SHA could not be resolved: $PUBLISH_VERSION"
+                exit 1
+              fi
+              if [ "$REMOTE_TAG_TARGET_SHA" != "$LOCAL_TAG_TARGET_SHA" ]; then
+                echo "ERROR: Remote tag target SHA mismatch for $PUBLISH_VERSION"
+                echo "Local tag target:  $LOCAL_TAG_TARGET_SHA"
+                echo "Remote tag target: $REMOTE_TAG_TARGET_SHA"
+                exit 1
+              fi
+              echo "Tag already present on origin with matching target SHA: $PUBLISH_VERSION"
+            else
+              echo "ERROR: Failed to push tag $PUBLISH_VERSION"
+              exit 1
+            fi
+          fi
 
       - name: Extract release notes from CHANGELOG
         env:
@@ -136,14 +175,18 @@ jobs:
           GH_TOKEN: ${{ steps.auth.outputs.token }}
         run: |
           set -euo pipefail
+          if retry --retries 2 --backoff 5 --max-backoff 20 -- gh release view "$PUBLISH_VERSION" >/dev/null 2>&1; then
+            echo "ERROR: GitHub Release already exists for tag $PUBLISH_VERSION"
+            exit 1
+          fi
           if [ "$RELEASE_KIND" = "candidate" ]; then
-            gh release create "$PUBLISH_VERSION" \
+            retry --retries 3 --backoff 5 --max-backoff 30 -- gh release create "$PUBLISH_VERSION" \
               --title "$PUBLISH_VERSION" \
               --notes-file /tmp/release-notes.md \
               --verify-tag \
               --prerelease
           else
-            gh release create "$PUBLISH_VERSION" \
+            retry --retries 3 --backoff 5 --max-backoff 30 -- gh release create "$PUBLISH_VERSION" \
               --title "$PUBLISH_VERSION" \
               --notes-file /tmp/release-notes.md \
               --verify-tag
