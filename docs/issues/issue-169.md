@@ -2,7 +2,7 @@
 type: issue
 state: closed
 created: 2026-02-24T07:13:32Z
-updated: 2026-03-13T21:58:35Z
+updated: 2026-03-17T10:19:50Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/169
@@ -13,7 +13,7 @@ milestone: 0.3
 projects: none
 parent: none
 children: 170, 171, 172, 173, 197, 161, 122, 264
-synced: 2026-03-14T04:16:11.145Z
+synced: 2026-03-18T04:29:45.889Z
 ---
 
 # [Issue 169]: [[FEATURE] Smoke-test repository to validate shipped CI/CD workflows](https://github.com/vig-os/devcontainer/issues/169)
@@ -124,7 +124,7 @@ Added
 - [x] Smoke-test repo exists with a deployed workspace from the current template
 - [x] Bare-runner CI (`ci.yml`) runs successfully against the deployed workspace
 - [x] RC publishing works: release workflow can publish `X.Y.Z-rc1` to GHCR
-- [ ] Smoke-test repo is triggered via `repository_dispatch` on RC publish
+- [x] Smoke-test repo is triggered via `repository_dispatch` on RC publish
 - [ ] Container CI (`ci-container.yml`) runs successfully using the RC image via `container:` directive
 - [ ] TDD compliance (see .cursor/rules/tdd.mdc)
 ---
