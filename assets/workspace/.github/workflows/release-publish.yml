@@ -134,9 +134,9 @@ jobs:
           set -euo pipefail
           git tag -a "$PUBLISH_VERSION" -m "Release $PUBLISH_VERSION"
           if ! retry --retries 3 --backoff 5 --max-backoff 30 -- git push origin "$PUBLISH_VERSION"; then
-            if git ls-remote --tags --refs origin "$PUBLISH_VERSION" | grep -q "refs/tags/$PUBLISH_VERSION$"; then
+            if retry --retries 3 --backoff 5 --max-backoff 30 -- git ls-remote --tags --refs origin "$PUBLISH_VERSION" | grep -q "refs/tags/$PUBLISH_VERSION$"; then
               LOCAL_TAG_TARGET_SHA=$(git rev-parse "$PUBLISH_VERSION^{}")
-              REMOTE_TAG_TARGET_SHA=$(git ls-remote --tags origin "refs/tags/$PUBLISH_VERSION^{}" | awk '{print $1}')
+              REMOTE_TAG_TARGET_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- git ls-remote --tags origin "refs/tags/$PUBLISH_VERSION^{}" | awk '{print $1}')
               if [ -z "$REMOTE_TAG_TARGET_SHA" ]; then
                 echo "ERROR: Remote tag exists but target SHA could not be resolved: $PUBLISH_VERSION"
                 exit 1
