@@ -316,8 +316,7 @@ jobs:
             EXPECTED_PRERELEASE=false
           fi
 
-          EXISTING_RELEASE=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" 2>/dev/null || true)
-          if [ -n "$EXISTING_RELEASE" ]; then
+          if EXISTING_RELEASE=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" 2>/dev/null); then
             EXISTING_PRERELEASE=$(echo "$EXISTING_RELEASE" | jq -r '.prerelease')
             if [ "$EXISTING_PRERELEASE" != "$EXPECTED_PRERELEASE" ]; then
               echo "ERROR: Existing release '$TAG' prerelease=$EXISTING_PRERELEASE (expected $EXPECTED_PRERELEASE)"
@@ -328,19 +327,23 @@ jobs:
               --title "$TAG" \
               --notes-file /tmp/smoke-test-release-notes.md
             echo "Release '$TAG' already exists with expected prerelease value."
+          else
+            if [ "$EXPECTED_PRERELEASE" = "true" ]; then
+              gh release create "$TAG" \
+                --title "$TAG" \
+                --notes-file /tmp/smoke-test-release-notes.md \
+                --prerelease
+            else
+              gh release create "$TAG" \
+                --title "$TAG" \
+                --notes-file /tmp/smoke-test-release-notes.md
+            fi
+            echo "Created release '$TAG' with prerelease=$EXPECTED_PRERELEASE."
             exit 0
           fi
 
-          if [ "$EXPECTED_PRERELEASE" = "true" ]; then
-            gh release create "$TAG" \
-              --title "$TAG" \
-              --notes-file /tmp/smoke-test-release-notes.md \
-              --prerelease
-          else
-            gh release create "$TAG" \
-              --title "$TAG" \
-              --notes-file /tmp/smoke-test-release-notes.md
-          fi
+          echo "Updated existing release '$TAG' with expected prerelease value."
+          exit 0
 
       - name: Summary
         env:
