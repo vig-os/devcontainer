@@ -70,6 +70,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smoke-test dispatch deploy now repairs workspace ownership before changelog copy** ([#352](https://github.com/vig-os/devcontainer/issues/352))
   - Add a write probe and conditional `sudo chown -R` in `assets/smoke-test/.github/workflows/repository-dispatch.yml` after installer execution
   - Prevent `Permission denied` failures when copying `.devcontainer/CHANGELOG.md` to repository root in GitHub-hosted runner jobs
+- **Smoke-test release lookup no longer treats missing tags as existing releases** ([#355](https://github.com/vig-os/devcontainer/issues/355))
+  - Change `assets/smoke-test/.github/workflows/repository-dispatch.yml` to branch on `gh api` exit status when querying `releases/tags/<tag>`
+  - Ensure missing release tags follow the create path instead of failing with `prerelease=null` mismatch
 
 ### Security
 
