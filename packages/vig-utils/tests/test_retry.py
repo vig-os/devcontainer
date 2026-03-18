@@ -132,3 +132,24 @@ def test_retry_cli_module_invocation_succeeds() -> None:
         cwd=REPO_ROOT,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_retry_handles_command_execution_oserror(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    sleep_calls: list[int] = []
+
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        raise FileNotFoundError(2, "No such file or directory", "missing-cmd")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(retry.time, "sleep", sleep_calls.append)
+
+    rc = retry.retry_command(
+        ["missing-cmd", "--flag"], retries=3, backoff=1, max_backoff=5
+    )
+    captured = capsys.readouterr()
+
+    assert rc == 127
+    assert sleep_calls == []
+    assert "retry: failed to execute command: missing-cmd --flag" in captured.err

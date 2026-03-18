@@ -17,6 +17,14 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+def _execution_error_exit_code(error: OSError) -> int:
+    if isinstance(error, FileNotFoundError):
+        return 127
+    if isinstance(error, PermissionError):
+        return 126
+    return 1
+
+
 def _parse_positive_int(value: str, option_name: str) -> int:
     if not value.isdigit() or int(value) <= 0:
         raise ValueError(f"retry: {option_name} must be a positive integer")
@@ -70,15 +78,23 @@ def retry_command(
     max_backoff: int,
 ) -> int:
     """Run command with bounded exponential retry."""
+    command_display = " ".join(command)
     exit_code = 0
     for attempt in range(1, retries + 1):
-        result = subprocess.run(
-            command,
-            stdin=sys.stdin,
-            stdout=sys.stdout,
-            stderr=sys.stderr,
-            check=False,
-        )
+        try:
+            result = subprocess.run(
+                command,
+                stdin=sys.stdin,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+                check=False,
+            )
+        except OSError as error:
+            print(
+                f"retry: failed to execute command: {command_display} ({error})",
+                file=sys.stderr,
+            )
+            return _execution_error_exit_code(error)
         if result.returncode == 0:
             return 0
         exit_code = result.returncode
