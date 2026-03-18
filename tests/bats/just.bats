@@ -76,12 +76,12 @@ setup() {
 }
 
 @test "smoke-test dispatch generates minimal changelog for prepare-release freeze" {
-    run bash -lc "grep -Fq -- 'cat > CHANGELOG.md <<CHLOG' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- '## Unreleased' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- '- Deploy devcontainer \\${TAG}' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    run bash -lc 'grep -Fq -- "cat > \"CHANGELOG.md\" <<CHLOG" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "## Unreleased" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "- Deploy devcontainer \${TAG}" assets/smoke-test/.github/workflows/repository-dispatch.yml'
     assert_success
 }
 
 @test "smoke-test dispatch waits for deploy PR merge before release orchestration" {
-    run bash -lc "grep -Fq -- 'wait-deploy-merge:' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'gh pr view \"\\${PR_URL}\" --json state --jq' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    run bash -lc 'grep -Fq -- "wait-deploy-merge:" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "gh pr view \"\${PR_URL}\" --json state --jq" assets/smoke-test/.github/workflows/repository-dispatch.yml'
     assert_success
 }
 
@@ -111,7 +111,7 @@ setup() {
 }
 
 @test "smoke-test dispatch notifies upstream on orchestration failure" {
-    run bash -lc "grep -Fq -- 'notify-failure:' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'gh issue create --repo vig-os/devcontainer' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    run bash -lc "grep -Fq -- 'notify-failure:' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'gh issue create \\' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- '--repo vig-os/devcontainer' assets/smoke-test/.github/workflows/repository-dispatch.yml"
     assert_success
 }
 
