@@ -36,9 +36,29 @@ permissions:
   contents: read
 
 jobs:
+  resolve-image:
+    name: Resolve image tag
+    runs-on: ubuntu-22.04
+    timeout-minutes: 2
+    outputs:
+      image-tag: ${{ steps.resolve.outputs.image-tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          sparse-checkout: .vig-os
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve container image
+        id: resolve
+        uses: ./.github/actions/resolve-image
+
   check:
     name: Check if dev is up to date
+    needs: [resolve-image]
     runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 5
     outputs:
       up_to_date: ${{ steps.check.outputs.up_to_date }}
@@ -49,16 +69,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up environment
-        uses: ./.github/actions/setup-env
-        with:
-          sync-dependencies: 'true'
-
       - name: Check if dev is up to date with main
         id: check
         run: |
           set -euo pipefail
-          uv run retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin main dev
+          retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin main dev
           if ! git show-ref --verify --quiet refs/remotes/origin/main; then
             echo "Error: remote branch 'origin/main' not found after fetch."
             exit 1
@@ -78,9 +93,11 @@ jobs:
 
   sync:
     name: Merge main into dev via PR
-    needs: check
+    needs: [resolve-image, check]
     if: needs.check.outputs.up_to_date != 'true'
     runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 10
     env:
       SYNC_BRANCH: chore/sync-main-to-dev-${{ github.run_number }}-${{ github.run_attempt }}
@@ -104,16 +121,11 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.commit-app-token.outputs.token }}
 
-      - name: Set up environment
-        uses: ./.github/actions/setup-env
-        with:
-          sync-dependencies: 'true'
-
       - name: Re-check if dev is still behind main
         id: recheck
         run: |
           set -euo pipefail
-          uv run retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin main dev
+          retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin main dev
           BEHIND=$(git rev-list --count origin/main ^origin/dev)
           if [ "${BEHIND}" = "0" ]; then
             echo "up_to_date=true" >> "$GITHUB_OUTPUT"
@@ -138,7 +150,7 @@ jobs:
           GH_TOKEN: ${{ steps.release-app-token.outputs.token }}
         run: |
           set -euo pipefail
-          OPEN=$(uv run retry --retries 3 --backoff 5 --max-backoff 30 -- \
+          OPEN=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
             gh pr list --base dev --state open --limit 200 \
             --json headRefName \
             --jq '[.[] | select(.headRefName | startswith("chore/sync-main-to-dev-"))] | length')
@@ -153,15 +165,15 @@ jobs:
           GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
         run: |
           set -euo pipefail
-          REFS=$(uv run retry --retries 3 --backoff 5 --max-backoff 30 -- \
+          REFS=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
             gh api --paginate "repos/${{ github.repository }}/git/matching-refs/heads/chore/sync-main-to-dev-" \
             --jq '.[].ref' | sed 's|refs/heads/||') || true
           for branch in ${REFS}; do
-            HAS_PR=$(GH_TOKEN="${{ steps.release-app-token.outputs.token }}" uv run retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            HAS_PR=$(GH_TOKEN="${{ steps.release-app-token.outputs.token }}" retry --retries 3 --backoff 5 --max-backoff 30 -- \
               gh pr list --base dev --head "${branch}" \
               --state open --json number --jq 'length')
             if [ "${HAS_PR}" = "0" ]; then
-              uv run retry --retries 3 --backoff 5 --max-backoff 30 -- \
+              retry --retries 3 --backoff 5 --max-backoff 30 -- \
                 gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/${branch}" 2>/dev/null || true
               echo "Deleted stale sync branch: ${branch}"
             fi
@@ -172,7 +184,7 @@ jobs:
         id: merge-check
         run: |
           set -euo pipefail
-          uv run retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin main
+          retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin main
           if git merge --no-commit --no-ff origin/main 2>/dev/null; then
             echo "conflict=false" >> "$GITHUB_OUTPUT"
           else
@@ -187,11 +199,11 @@ jobs:
         run: |
           set -euo pipefail
           MAIN_SHA=$(git rev-parse origin/main)
-          uv run retry --retries 3 --backoff 5 --max-backoff 30 -- \
+          retry --retries 3 --backoff 5 --max-backoff 30 -- \
             gh api "repos/${{ github.repository }}/git/refs" \
             -f ref="refs/heads/${SYNC_BRANCH}" \
             -f sha="${MAIN_SHA}" || {
-              if uv run retry --retries 2 --backoff 5 --max-backoff 20 -- \
+              if retry --retries 2 --backoff 5 --max-backoff 20 -- \
                 gh api "repos/${{ github.repository }}/git/ref/heads/${SYNC_BRANCH}" >/dev/null 2>&1; then
                 echo "Sync branch already exists: ${SYNC_BRANCH}"
               else
@@ -233,12 +245,12 @@ jobs:
             BODY="Syncs \`dev\` with \`main\` (sync-main-to-dev workflow)."
           fi
 
-          EXISTING_PR_URL=$(uv run retry --retries 3 --backoff 5 --max-backoff 30 -- \
+          EXISTING_PR_URL=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
             gh pr list --base dev --head "${SYNC_BRANCH}" --state open --json url --jq '.[0].url // empty')
           if [ -n "${EXISTING_PR_URL}" ]; then
             PR_URL="${EXISTING_PR_URL}"
           else
-            PR_URL=$(uv run retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            PR_URL=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
               gh pr create --base dev --head "${SYNC_BRANCH}" \
                 --title "${TITLE}" --body "${BODY}")
           fi
@@ -247,7 +259,7 @@ jobs:
 
           if [ "${CONFLICT}" = "true" ]; then
             gh label create "merge-conflict" --color "B60205" --force 2>/dev/null || true
-            uv run retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            retry --retries 3 --backoff 5 --max-backoff 30 -- \
               gh pr edit "${SYNC_BRANCH}" --add-label "merge-conflict" || \
               echo "Warning: failed to add merge-conflict label."
           fi
@@ -261,6 +273,6 @@ jobs:
           PR_URL: ${{ steps.create-pr.outputs.pr_url }}
         run: |
           set -euo pipefail
-          uv run retry --retries 2 --backoff 5 --max-backoff 20 -- \
+          retry --retries 2 --backoff 5 --max-backoff 20 -- \
             gh pr merge "${PR_URL}" --auto --merge || \
             echo "Warning: could not enable auto-merge (may require branch protection settings)"
