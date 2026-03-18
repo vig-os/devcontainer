@@ -73,6 +73,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smoke-test release lookup no longer treats missing tags as existing releases** ([#355](https://github.com/vig-os/devcontainer/issues/355))
   - Change `assets/smoke-test/.github/workflows/repository-dispatch.yml` to branch on `gh api` exit status when querying `releases/tags/<tag>`
   - Ensure missing release tags follow the create path instead of failing with `prerelease=null` mismatch
+- **Bounded retry added for network-dependent setup and prepare-release calls** ([#357](https://github.com/vig-os/devcontainer/issues/357))
+  - Replace shell-based retry helper with pure Python `retry` CLI in `vig-utils` (`packages/vig-utils/src/vig_utils/retry.py`)
+  - Update this repository CI workflows to call `uv run retry` after `setup-env` dependency sync
+  - Update downstream workflow templates to call `retry` directly in devcontainer jobs and remove `source` lines
+  - Ensure downstream containerized jobs resolve image tags from `.vig-os` instead of hardcoded `latest`
+  - Bundle idempotency guards for branch/PR/tag/release creation paths to keep retried network calls safe on reruns
+  - Remove synced `retry.sh` artifacts and BATS retry tests in favor of `vig-utils` pytest coverage
 
 ### Security
 
