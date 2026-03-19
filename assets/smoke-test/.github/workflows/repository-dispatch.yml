@@ -198,8 +198,31 @@ jobs:
             sleep 5
           done
 
+          # Docker-based install can leave bind-mounted files owned by root.
+          # Repair ownership only when required by local writability/readability probes.
+          NEEDS_CHOWN=false
+          if [ ! -r ".devcontainer/CHANGELOG.md" ]; then
+            NEEDS_CHOWN=true
+          fi
+          if [ -e "CHANGELOG.md" ] && [ ! -w "CHANGELOG.md" ]; then
+            NEEDS_CHOWN=true
+          fi
+
+          if [ "${NEEDS_CHOWN}" = "true" ]; then
+            OWNER_UID_GID="$(id -u):$(id -g)"
+            if command -v sudo >/dev/null 2>&1; then
+              sudo chown -R "${OWNER_UID_GID}" .
+            else
+              chown -R "${OWNER_UID_GID}" .
+            fi
+          fi
+
           if [ ! -f ".devcontainer/CHANGELOG.md" ]; then
             echo "ERROR: expected .devcontainer/CHANGELOG.md after install"
+            exit 1
+          fi
+          if [ ! -r ".devcontainer/CHANGELOG.md" ]; then
+            echo "ERROR: .devcontainer/CHANGELOG.md is not readable after ownership repair"
             exit 1
           fi
           cat > "CHANGELOG.md" <<CHLOG
