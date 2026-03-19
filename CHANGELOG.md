@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Downstream release helper recipes via GitHub justfile import** ([#373](https://github.com/vig-os/devcontainer/issues/373))
+  - Move `prepare-release`, `finalize-release`, `publish-candidate`, `reset-changelog`, and `pull` into `justfile.gh` so downstream workspace templates expose them by default
+  - Keep root recipe availability through `import 'justfile.gh'` while consolidating release helper ownership in the GitHub-focused recipe file
+
 ### Deprecated
 
 ### Removed
