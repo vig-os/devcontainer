@@ -85,8 +85,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Bundle idempotency guards for branch/PR/tag/release creation paths to keep retried network calls safe on reruns
   - Remove synced `retry.sh` artifacts and BATS retry tests in favor of `vig-utils` pytest coverage
 - **Release workflow no longer fails when retry tooling is unavailable** ([#365](https://github.com/vig-os/devcontainer/issues/365))
-  - Provision `uv` and synced dependencies before `uv run retry` calls in validate, finalize, and publish release jobs
-  - Replace `uv run retry` in no-checkout smoke-test and rollback jobs with inline shell retry helpers to keep rollback paths reliable
+  - Extend `.github/actions/setup-env/action.yml` with a reusable `retry` shell function exported via `BASH_ENV` as the retry single source of truth
+  - Add `setup-env` input support for uv-only usage by allowing Python setup to be disabled when jobs only need retry tooling
+  - Switch release workflow retry calls from `uv run retry` to shared `retry` and remove duplicated inline retry implementations
 
 ### Security
 
