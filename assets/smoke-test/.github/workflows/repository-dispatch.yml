@@ -346,6 +346,8 @@ jobs:
     name: Cleanup stale release branch and PR
     runs-on: ubuntu-22.04
     timeout-minutes: 5
+    env:
+      GH_REPO: ${{ github.repository }}
     needs: [validate, wait-deploy-merge]
     steps:
       - name: Generate release app token for PR/branch cleanup
@@ -385,6 +387,8 @@ jobs:
     name: Trigger and wait for prepare-release workflow
     runs-on: ubuntu-22.04
     timeout-minutes: 25
+    env:
+      GH_REPO: ${{ github.repository }}
     needs: [validate, cleanup-release]
     outputs:
       before_run_id: ${{ steps.capture_prepare_before.outputs.before_run_id }}
@@ -454,6 +458,8 @@ jobs:
     name: Sync changelog and prepare release PR
     runs-on: ubuntu-22.04
     timeout-minutes: 35
+    env:
+      GH_REPO: ${{ github.repository }}
     needs: [validate, trigger-prepare-release]
     outputs:
       release_pr: ${{ steps.locate_release_pr.outputs.release_pr }}
@@ -574,6 +580,8 @@ jobs:
     name: Trigger and wait for release workflow
     runs-on: ubuntu-22.04
     timeout-minutes: 35
+    env:
+      GH_REPO: ${{ github.repository }}
     needs: [validate, ready-release-pr]
     outputs:
       before_run_id: ${{ steps.capture_release_before.outputs.before_run_id }}
