@@ -2045,8 +2045,11 @@ class TestJustRecipes:
         assert 'gh workflow run release.yml --ref "$REF"' in content
         assert "release-kind=final" in content
         assert "release-kind=candidate" in content
-        assert "prepare-changelog reset CHANGELOG.md" in content
-        assert "uv run prepare-changelog reset CHANGELOG.md" not in content
+        assert "uv run prepare-changelog reset CHANGELOG.md" in content
+        assert (
+            "\nreset-changelog:\n    prepare-changelog reset CHANGELOG.md"
+            not in content
+        )
         assert 'pull version="latest" repo="":' in content
         assert (
             'RESOLVED_REPO="${repo:-${TEST_REGISTRY:-ghcr.io/vig-os/devcontainer}}"'
