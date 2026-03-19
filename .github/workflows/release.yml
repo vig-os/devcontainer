@@ -1250,6 +1250,7 @@ jobs:
     timeout-minutes: 10
     if: ${{ always() && (needs.validate.result == 'failure' || needs.finalize.result == 'failure' || needs.build-and-test.result == 'failure' || needs.publish.result == 'failure') }}
     permissions:
+      contents: read        # required by actions/checkout in rollback job
       issues: write          # create failure issue
       # Branch rollback and tag deletion use the RELEASE_APP token (not GITHUB_TOKEN),
       # which has Contents read/write configured on the GitHub App.
@@ -1261,6 +1262,9 @@ jobs:
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Set up environment
         uses: ./.github/actions/setup-env
