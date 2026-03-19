@@ -1985,7 +1985,7 @@ class TestJustRecipes:
             f"command: {' '.join(just_cmd)}"
         )
 
-    def test_just_pytest(self, devcontainer_up):
+    def test_just_test_recipe(self, devcontainer_up):
         """Test the just test command."""
         workspace_path = str(devcontainer_up.resolve())
 
@@ -2015,6 +2015,45 @@ class TestJustRecipes:
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}\n"
             f"command: {' '.join(just_cmd)}"
+        )
+
+    def test_template_justfile_gh_includes_release_recipes(self):
+        """Test that template justfile.gh exposes release helper recipes."""
+        project_root = Path(__file__).resolve().parents[1]
+        justfile_gh = project_root / "assets/workspace/.devcontainer/justfile.gh"
+        content = justfile_gh.read_text()
+
+        for recipe_name in [
+            "prepare-release",
+            "finalize-release",
+            "publish-candidate",
+            "reset-changelog",
+            "pull",
+        ]:
+            assert re.search(rf"(?m)^{recipe_name}(?:\s+.*)?:$", content), (
+                f"{recipe_name} recipe definition should exist in .devcontainer/justfile.gh"
+            )
+
+    def test_template_release_helpers_dispatch_expected_workflows(self):
+        """Test release helper dispatch defaults in template justfile.gh."""
+        project_root = Path(__file__).resolve().parents[1]
+        justfile_gh = project_root / "assets/workspace/.devcontainer/justfile.gh"
+        content = justfile_gh.read_text()
+
+        assert 'gh workflow run prepare-release.yml --ref "$REF"' in content
+        assert 'REF="dev"' in content
+        assert 'gh workflow run release.yml --ref "$REF"' in content
+        assert "release-kind=final" in content
+        assert "release-kind=candidate" in content
+        assert "uv run prepare-changelog reset CHANGELOG.md" in content
+        assert (
+            "\nreset-changelog:\n    prepare-changelog reset CHANGELOG.md"
+            not in content
+        )
+        assert 'pull version="latest" repo="":' in content
+        assert (
+            'RESOLVED_REPO="${repo:-${TEST_REGISTRY:-ghcr.io/vig-os/devcontainer}}"'
+            in (content)
         )
 
 
