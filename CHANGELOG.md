@@ -91,6 +91,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Upstream sync workflows no longer depend on pre-published GHCR image tags** ([#367](https://github.com/vig-os/devcontainer/issues/367))
   - Remove upstream `.vig-os` files at repository root and `assets/smoke-test/` to eliminate downstream-only configuration from upstream CI
   - Refactor `.github/workflows/sync-issues.yml` and `.github/workflows/sync-main-to-dev.yml` to run natively on runners via `./.github/actions/setup-env` instead of `resolve-image` + `container`
+- **Release test-image setup now recovers from uv sync crashes** ([#370](https://github.com/vig-os/devcontainer/issues/370))
+  - Harden `.github/actions/setup-env/action.yml` to retry `uv sync --frozen --all-extras` once after clearing uv cache and removing stale `.venv`
+  - Prevent repeat release test failures when `setup-env` is executed multiple times in the same job
 
 ### Security
 
