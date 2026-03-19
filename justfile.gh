@@ -2,9 +2,6 @@
 # GITHUB CLI RECIPES - Issue, PR, and Repository Management
 # ===============================================================================
 
-# Allow TEST_REGISTRY to override REPO for testing (e.g., localhost:5000/test/)
-gh_repo := env("TEST_REGISTRY", "ghcr.io/vig-os/devcontainer")
-
 # -------------------------------------------------------------------------------
 # ALIASES
 # -------------------------------------------------------------------------------
@@ -93,11 +90,12 @@ reset-changelog:
 
 # Pull image from registry (default: latest)
 [group('release')]
-pull version="latest":
+pull version="latest" repo="":
     #!/usr/bin/env bash
-    echo "Pulling image {{ gh_repo }}:{{ version }}..."
+    RESOLVED_REPO="${repo:-${TEST_REGISTRY:-ghcr.io/vig-os/devcontainer}}"
+    echo "Pulling image ${RESOLVED_REPO}:{{ version }}..."
     TLS_FLAG=""
     if [ "${REGISTRY_TEST:-}" = "1" ]; then
         TLS_FLAG="--tls-verify=false"
     fi
-    podman pull $TLS_FLAG "{{ gh_repo }}:{{ version }}" || echo "[!]  Failed to pull {{ gh_repo }}:{{ version }}"
+    podman pull $TLS_FLAG "${RESOLVED_REPO}:{{ version }}" || echo "[!]  Failed to pull ${RESOLVED_REPO}:{{ version }}"
