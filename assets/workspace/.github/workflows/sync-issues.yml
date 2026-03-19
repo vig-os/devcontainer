@@ -2,6 +2,8 @@
 # Uses:
 # - sync-issues action from this public repository (vig-os/sync-issues-action)
 # - commit-action from the public repository (vig-os/commit-action)
+# NOTE: This workspace workflow is intentionally decoupled from upstream
+# `.github/workflows/sync-issues.yml` and maintained separately.
 
 name: Sync Issues and PRs
 

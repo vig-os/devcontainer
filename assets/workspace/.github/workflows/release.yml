@@ -45,7 +45,6 @@ jobs:
       dry_run: ${{ inputs.dry-run }}
       git_user_name: ${{ inputs.git-user-name }}
       git_user_email: ${{ inputs.git-user-email }}
-      contract_version: "1"
     secrets: inherit
 
   extension:
@@ -59,7 +58,6 @@ jobs:
       release_date: ${{ needs.core.outputs.release_date }}
       release_kind: ${{ needs.core.outputs.release_kind }}
       publish_version: ${{ needs.core.outputs.publish_version }}
-      contract_version: "1"
     secrets: inherit
 
   publish:
@@ -75,7 +73,6 @@ jobs:
       release_kind: ${{ needs.core.outputs.release_kind }}
       git_user_name: ${{ inputs.git-user-name }}
       git_user_email: ${{ inputs.git-user-email }}
-      contract_version: "1"
     secrets: inherit
 
   rollback:

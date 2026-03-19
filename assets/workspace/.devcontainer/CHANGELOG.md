@@ -88,6 +88,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Extend `.github/actions/setup-env/action.yml` with a reusable `retry` shell function exported via `BASH_ENV` as the retry single source of truth
   - Add `setup-env` input support for uv-only usage by allowing Python setup to be disabled when jobs only need retry tooling
   - Switch release workflow retry calls from `uv run retry` to shared `retry` and remove duplicated inline retry implementations
+- **Upstream sync workflows no longer depend on pre-published GHCR image tags** ([#367](https://github.com/vig-os/devcontainer/issues/367))
+  - Remove upstream `.vig-os` files at repository root and `assets/smoke-test/` to eliminate downstream-only configuration from upstream CI
+  - Refactor `.github/workflows/sync-issues.yml` and `.github/workflows/sync-main-to-dev.yml` to run natively on runners via `./.github/actions/setup-env` instead of `resolve-image` + `container`
 
 ### Security
 

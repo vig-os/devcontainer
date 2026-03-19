@@ -16,6 +16,9 @@
 # - COMMIT_APP_* for git/ref operations (least-privilege commit identity)
 # - RELEASE_APP_* for PR/label operations that require pull-request scopes
 #
+# NOTE: This workspace workflow is intentionally decoupled from upstream
+# `.github/workflows/sync-main-to-dev.yml` and maintained separately.
+#
 # With the new CHANGELOG flow, dev already has ## Unreleased (created during
 # prepare-release), so no CHANGELOG reset is needed here.
 #
