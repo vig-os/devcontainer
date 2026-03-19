@@ -33,10 +33,6 @@ on:  # yamllint disable-line rule:truthy
         required: false
         default: "41898282+github-actions[bot]@users.noreply.github.com"
         type: string
-      contract_version:
-        description: "Release workflow contract version"
-        required: true
-        type: string
     secrets:
       token:
         required: false
@@ -83,11 +79,6 @@ jobs:
       release_url: ${{ steps.out.outputs.release_url }}
 
     steps:
-      - name: Validate contract version
-        uses: ./.github/actions/validate-contract
-        with:
-          contract_version: ${{ inputs.contract_version }}
-
       - name: Resolve auth token
         id: auth
         env:

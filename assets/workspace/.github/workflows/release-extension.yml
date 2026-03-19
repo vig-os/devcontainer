@@ -23,21 +23,12 @@ on:  # yamllint disable-line rule:truthy
         description: "Version tag that will be published (X.Y.Z or X.Y.Z-rcN)"
         required: true
         type: string
-      contract_version:
-        description: "Release workflow contract version"
-        required: true
-        type: string
 
 jobs:
   extension:
     name: Extension Hook (Default No-op)
     runs-on: ubuntu-22.04
     steps:
-      - name: Validate contract version
-        uses: ./.github/actions/validate-contract
-        with:
-          contract_version: ${{ inputs.contract_version }}
-
       - name: Default extension summary
         env:
           VERSION: ${{ inputs.version }}

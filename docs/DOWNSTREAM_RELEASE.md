@@ -1,6 +1,6 @@
 # Downstream Release Workflows
 
-This document describes the downstream release workflow contract shipped in `assets/workspace/.github/workflows/`.
+This document describes the downstream release workflows shipped in `assets/workspace/.github/workflows/`.
 
 ## Overview
 
@@ -25,19 +25,15 @@ On failure, the orchestrator runs a single consolidated rollback that resets the
 
 Candidate mode keeps release branch content unchanged (no CHANGELOG date finalization). Final mode performs changelog finalization before publish.
 
-## Workflow Contract
+## Workflow Interface
 
-Current contract version: `"1"`.
-
-The following workflows require `contract_version: "1"`:
+The orchestrator `release.yml` passes release context directly to the called reusable workflows:
 
 - `.github/workflows/release-core.yml`
 - `.github/workflows/release-extension.yml`
 - `.github/workflows/release-publish.yml`
 
-Contract validation is performed by the shared composite action `.github/actions/validate-contract`. The expected version is defined once in that action's default input. When bumping the contract version, update the action default and the `contract_version` values in `release.yml`.
-
-If `contract_version` does not match, the workflow fails with an actionable error.
+There is no separate contract-version handshake; compatibility is defined by the `workflow_call` input schema in each workflow file.
 
 ## Input Naming Convention
 
@@ -87,10 +83,6 @@ on:
       publish_version:
         required: true
         type: string
-      contract_version:
-        required: true
-        type: string
-
 jobs:
   ghcr-publish:
     name: Publish Container Image
@@ -99,11 +91,6 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Validate contract version
-        uses: ./.github/actions/validate-contract
-        with:
-          contract_version: ${{ inputs.contract_version }}
-
       - name: Checkout finalized commit
         uses: actions/checkout@v4
         with:
@@ -130,7 +117,7 @@ jobs:
 
 1. Upgrade downstream devcontainer version (which redeploys `assets/workspace` templates).
 2. Keep project-owned `release-extension.yml` (preserved on force upgrades).
-3. Ensure orchestrator and called workflows use the expected `contract_version`.
+3. Ensure project-owned `release-extension.yml` matches the current `workflow_call` inputs used by `release.yml`.
 4. Run `prepare-release` / `release` in `--dry-run` mode to validate integration.
 
 ## Pinning and Drift
