@@ -105,6 +105,17 @@ CVE-2025-61730
 Expiration: 2026-04-15
 CVE-2025-15558
 
+# CVE-2026-33186: gRPC-Go authorization bypass via missing leading slash in :path
+# Risk Assessment: LOW (devcontainer context)
+# - CRITICAL severity in google.golang.org/grpc v1.79.2 embedded in gh v2.88.1
+# - Upstream gh latest release still ships grpc v1.79.2 in go.mod
+# - Fix is available in grpc v1.79.3 and requires upstream gh release/rebuild
+# - gh is used as a client to GitHub APIs in trusted workflows in this image
+# - Temporary exception to keep blocking policy for other HIGH/CRITICAL findings
+# - Tracking: https://github.com/vig-os/devcontainer/issues/361
+Expiration: 2026-05-15
+CVE-2026-33186
+
 # CVE-2026-31812: quinn-proto unauthenticated remote DoS via QUIC transport parameter panic
 # Risk Assessment: LOW (devcontainer context)
 # - HIGH severity in quinn-proto v0.11.12 embedded in uv/uvx Rust binaries
