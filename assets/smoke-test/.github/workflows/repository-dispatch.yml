@@ -182,8 +182,21 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
           set -euo pipefail
-          curl -sSf "https://raw.githubusercontent.com/vig-os/devcontainer/${TAG}/install.sh" \
-            | bash -s -- --version "${TAG}" --smoke-test --force --docker .
+          INSTALL_URL="https://raw.githubusercontent.com/vig-os/devcontainer/${TAG}/install.sh"
+          ATTEMPT=1
+          MAX_ATTEMPTS=3
+          until [ "${ATTEMPT}" -gt "${MAX_ATTEMPTS}" ]; do
+            if curl -sSf "${INSTALL_URL}" | bash -s -- --version "${TAG}" --smoke-test --force --docker .; then
+              break
+            fi
+            if [ "${ATTEMPT}" -eq "${MAX_ATTEMPTS}" ]; then
+              echo "ERROR: failed to download/install after ${MAX_ATTEMPTS} attempts: ${INSTALL_URL}"
+              exit 1
+            fi
+            echo "Install attempt ${ATTEMPT}/${MAX_ATTEMPTS} failed; retrying in 5s..."
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep 5
+          done
 
           if [ ! -f ".devcontainer/CHANGELOG.md" ]; then
             echo "ERROR: expected .devcontainer/CHANGELOG.md after install"
@@ -270,6 +283,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 35
     needs: deploy
+    permissions:
+      pull-requests: read
     steps:
       - name: Poll deploy PR merge status
         env:
@@ -437,9 +452,21 @@ jobs:
           BASE_VERSION: ${{ needs.validate.outputs.base_version }}
         run: |
           set -euo pipefail
-          curl -sSf \
-            "https://raw.githubusercontent.com/vig-os/devcontainer/${TAG}/CHANGELOG.md" \
-            -o /tmp/upstream-changelog.md
+          CHANGELOG_URL="https://raw.githubusercontent.com/vig-os/devcontainer/${TAG}/CHANGELOG.md"
+          ATTEMPT=1
+          MAX_ATTEMPTS=3
+          until [ "${ATTEMPT}" -gt "${MAX_ATTEMPTS}" ]; do
+            if curl -sSf "${CHANGELOG_URL}" -o /tmp/upstream-changelog.md; then
+              break
+            fi
+            if [ "${ATTEMPT}" -eq "${MAX_ATTEMPTS}" ]; then
+              echo "ERROR: failed to download upstream changelog after ${MAX_ATTEMPTS} attempts: ${CHANGELOG_URL}"
+              exit 1
+            fi
+            echo "Changelog download attempt ${ATTEMPT}/${MAX_ATTEMPTS} failed; retrying in 5s..."
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep 5
+          done
 
           FILE_SHA="$(gh api \
             "repos/${GITHUB_REPOSITORY}/contents/CHANGELOG.md?ref=release/${BASE_VERSION}" \
@@ -505,8 +532,11 @@ jobs:
 
             MERGE_STATE="$(gh pr view "${PR_NUMBER}" --json mergeStateStatus --jq '.mergeStateStatus' 2>/dev/null || echo unknown)"
             if [ "${MERGE_STATE}" = "CLEAN" ] && [ "${AUTO_MERGE_SET}" = "false" ]; then
-              gh pr merge "${PR_NUMBER}" --auto --merge
-              AUTO_MERGE_SET=true
+              if gh pr merge "${PR_NUMBER}" --auto --merge; then
+                AUTO_MERGE_SET=true
+              else
+                echo "Warning: could not enable auto-merge yet; will retry"
+              fi
             fi
 
             sleep "${INTERVAL}"

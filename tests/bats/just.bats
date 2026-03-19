@@ -85,6 +85,11 @@ setup() {
     assert_success
 }
 
+@test "smoke-test dispatch grants PR read permission for deploy-merge polling" {
+    run bash -lc 'grep -Fq -- "wait-deploy-merge:" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "pull-requests: read" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+    assert_success
+}
+
 @test "smoke-test dispatch removes publish-release job" {
     run bash -lc "! grep -Fq -- 'publish-release:' assets/smoke-test/.github/workflows/repository-dispatch.yml"
     assert_success
@@ -107,6 +112,11 @@ setup() {
 
 @test "smoke-test dispatch readies release PR and syncs upstream changelog" {
     run bash -lc "grep -Fq -- 'gh pr ready' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'gh pr review' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'raw.githubusercontent.com/vig-os/devcontainer' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'contents/CHANGELOG.md' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    assert_success
+}
+
+@test "smoke-test dispatch tolerates transient auto-merge enable failures" {
+    run bash -lc 'grep -Fq -- "could not enable auto-merge yet; will retry" assets/smoke-test/.github/workflows/repository-dispatch.yml'
     assert_success
 }
 
