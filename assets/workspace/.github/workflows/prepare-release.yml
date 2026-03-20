@@ -150,6 +150,9 @@ jobs:
       env:
         UV_PROJECT_ENVIRONMENT: /root/assets/workspace/.venv
     timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
     if: ${{ inputs.dry-run != true }}
     permissions:
       contents: write

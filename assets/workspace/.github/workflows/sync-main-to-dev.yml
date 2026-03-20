@@ -65,6 +65,9 @@ jobs:
     container:
       image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
     outputs:
       up_to_date: ${{ steps.check.outputs.up_to_date }}
 
@@ -73,6 +76,9 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           fetch-depth: 0
+
+      - name: Fix git safe.directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Check if dev is up to date with main
         id: check
@@ -104,6 +110,9 @@ jobs:
     container:
       image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
     env:
       SYNC_BRANCH: chore/sync-main-to-dev-${{ github.run_number }}-${{ github.run_attempt }}
     permissions:
@@ -125,6 +134,9 @@ jobs:
           ref: dev
           fetch-depth: 0
           token: ${{ steps.commit-app-token.outputs.token }}
+
+      - name: Fix git safe.directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Re-check if dev is still behind main
         id: recheck

@@ -5,7 +5,7 @@ name: Repository Dispatch Listener
 # - Deploy the requested tag into the smoke-test repo.
 # - Always create a `chore/deploy-<tag>` branch and PR to `dev`.
 # - Create signed deploy commits via `vig-os/commit-action`.
-# - CI (`ci.yml` + `ci-container.yml`) triggers on the deploy PR.
+# - CI (`ci.yml`) triggers on the deploy PR.
 #
 # Dispatch payload:
 # - Preferred:   client_payload.tag
@@ -414,7 +414,7 @@ jobs:
           # Canonical cross-repo dispatch contract lives in docs/CROSS_REPO_RELEASE_GATE.md.
           REQUIRED_WORKFLOWS=(prepare-release.yml release.yml)
           for workflow_file in "${REQUIRED_WORKFLOWS[@]}"; do
-            if WORKFLOW_CHECK_OUTPUT="$(gh workflow view "${workflow_file}" --ref "${WORKFLOW_REF}" 2>&1)"; then
+            if WORKFLOW_CHECK_OUTPUT="$(gh workflow view "${workflow_file}" --ref "${WORKFLOW_REF}" --yaml 2>&1 >/dev/null)"; then
               echo "Workflow available on ${WORKFLOW_REF}: ${workflow_file}"
             else
               if printf '%s' "${WORKFLOW_CHECK_OUTPUT}" | grep -Eqi "404|not found"; then

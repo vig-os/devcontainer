@@ -74,6 +74,9 @@ jobs:
     container:
       image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
     permissions:
       contents: write
     outputs:
@@ -111,6 +114,9 @@ jobs:
           ref: ${{ inputs.finalize_sha }}
           fetch-depth: 0
           token: ${{ steps.auth.outputs.token }}
+
+      - name: Fix git safe.directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Configure git
         env:

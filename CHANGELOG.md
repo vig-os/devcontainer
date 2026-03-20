@@ -109,6 +109,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smoke-test release orchestration now validates workflow contract before dispatch** ([#389](https://github.com/vig-os/devcontainer/issues/389))
   - Add a preflight check that verifies `prepare-release.yml` and `release.yml` are resolvable on dispatch ref `dev` before downstream orchestration starts
   - Dispatch and polling now use explicit ref/branch context (`--ref dev` / `--branch dev`) to avoid default-branch workflow registry drift and `404 workflow not found` failures
+- **Smoke-test preflight now uses gh CLI ref-compatible workflow validation** ([#392](https://github.com/vig-os/devcontainer/issues/392))
+  - Update `assets/smoke-test/.github/workflows/repository-dispatch.yml` preflight checks to call `gh workflow view` with `--yaml` when `--ref` is set
+  - Prevent false preflight failures caused by newer GitHub CLI argument validation before `prepare-release` dispatch
+- **Downstream release workflow templates hardened for smoke-test orchestration** ([#394](https://github.com/vig-os/devcontainer/issues/394))
+  - Add missing `git config --global --add safe.directory "$GITHUB_WORKSPACE"` in containerized release and sync jobs that run git after checkout
+  - Decouple `release.yml` rollback container startup from `needs.core.outputs.image_tag` by resolving the image in a dedicated `resolve-image` job
+  - Add explicit release caller/reusable workflow permissions for `actions` and `pull-requests` operations, and update dispatch header comments to reference only current CI workflows
+- **Workspace containerized workflows now pin bash for run steps** ([#395](https://github.com/vig-os/devcontainer/issues/395))
+  - Set `defaults.run.shell: bash` in containerized workspace release and prepare jobs so `set -euo pipefail` scripts do not execute under POSIX `sh`
+  - Prevent downstream smoke-test failures caused by `set: Illegal option -o pipefail` in container jobs
 
 ### Security
 
