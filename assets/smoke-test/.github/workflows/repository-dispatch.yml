@@ -420,9 +420,6 @@ jobs:
               if printf '%s' "${WORKFLOW_CHECK_OUTPUT}" | grep -Eqi "404|not found"; then
                 echo "ERROR: required workflow '${workflow_file}' is not resolvable on ref '${WORKFLOW_REF}'"
                 echo "Dispatch contract drift detected; aborting before orchestration dispatch."
-              elif printf '%s' "${WORKFLOW_CHECK_OUTPUT}" | grep -Eqi -- "--yaml required|--yaml"; then
-                echo "ERROR: workflow preflight invocation invalid for current gh CLI (missing required --yaml with --ref)"
-                echo "Update preflight command to include --yaml when using --ref."
               else
                 echo "ERROR: failed to validate workflow '${workflow_file}' on ref '${WORKFLOW_REF}'"
                 echo "Validation failed due to a non-contract error (auth/permission/API/network)."
