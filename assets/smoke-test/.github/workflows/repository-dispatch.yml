@@ -389,6 +389,7 @@ jobs:
     timeout-minutes: 25
     env:
       GH_REPO: ${{ github.repository }}
+      WORKFLOW_REF: dev
     needs: [validate, cleanup-release]
     outputs:
       before_run_id: ${{ steps.capture_prepare_before.outputs.before_run_id }}
@@ -402,6 +403,23 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
 
+      - name: Preflight check required release workflows on dispatch ref
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+        run: |
+          set -euo pipefail
+          # Canonical cross-repo dispatch contract lives in docs/CROSS_REPO_RELEASE_GATE.md.
+          REQUIRED_WORKFLOWS="prepare-release.yml release.yml"
+          for workflow_file in ${REQUIRED_WORKFLOWS}; do
+            if gh workflow view "${workflow_file}" --ref "${WORKFLOW_REF}" >/dev/null 2>&1; then
+              echo "Workflow available on ${WORKFLOW_REF}: ${workflow_file}"
+            else
+              echo "ERROR: required workflow '${workflow_file}' is not resolvable on ref '${WORKFLOW_REF}'"
+              echo "Dispatch contract drift detected; aborting before orchestration dispatch."
+              exit 1
+            fi
+          done
+
       - name: Capture latest prepare-release run id
         id: capture_prepare_before
         env:
@@ -409,7 +427,7 @@ jobs:
         run: |
           set -euo pipefail
           BEFORE_RUN_ID="$(
-            gh run list --workflow prepare-release.yml --limit 1 --json databaseId --jq '.[0].databaseId // 0' 2>/dev/null || echo 0
+            gh run list --workflow prepare-release.yml --branch "${WORKFLOW_REF}" --limit 1 --json databaseId --jq '.[0].databaseId // 0' 2>/dev/null || echo 0
           )"
           echo "before_run_id=${BEFORE_RUN_ID}" >> "${GITHUB_OUTPUT}"
 
@@ -419,7 +437,7 @@ jobs:
           BASE_VERSION: ${{ needs.validate.outputs.base_version }}
         run: |
           set -euo pipefail
-          gh workflow run prepare-release.yml -f version="${BASE_VERSION}"
+          gh workflow run prepare-release.yml --ref "${WORKFLOW_REF}" -f version="${BASE_VERSION}"
 
       - name: Wait for prepare-release completion
         env:
@@ -432,7 +450,7 @@ jobs:
           ELAPSED=0
 
           while [ "${ELAPSED}" -lt "${TIMEOUT}" ]; do
-            RUN_ID="$(gh run list --workflow prepare-release.yml --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true)"
+            RUN_ID="$(gh run list --workflow prepare-release.yml --branch "${WORKFLOW_REF}" --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true)"
             if [ -n "${RUN_ID}" ] && [ "${RUN_ID}" -gt "${BEFORE_RUN_ID}" ]; then
               STATUS="$(gh run view "${RUN_ID}" --json status --jq '.status' 2>/dev/null || echo unknown)"
               if [ "${STATUS}" = "completed" ]; then
@@ -582,6 +600,7 @@ jobs:
     timeout-minutes: 35
     env:
       GH_REPO: ${{ github.repository }}
+      WORKFLOW_REF: dev
     needs: [validate, ready-release-pr]
     outputs:
       before_run_id: ${{ steps.capture_release_before.outputs.before_run_id }}
@@ -602,7 +621,7 @@ jobs:
         run: |
           set -euo pipefail
           BEFORE_RUN_ID="$(
-            gh run list --workflow release.yml --limit 1 --json databaseId --jq '.[0].databaseId // 0' 2>/dev/null || echo 0
+            gh run list --workflow release.yml --branch "${WORKFLOW_REF}" --limit 1 --json databaseId --jq '.[0].databaseId // 0' 2>/dev/null || echo 0
           )"
           echo "before_run_id=${BEFORE_RUN_ID}" >> "${GITHUB_OUTPUT}"
 
@@ -614,6 +633,7 @@ jobs:
         run: |
           set -euo pipefail
           gh workflow run release.yml \
+            --ref "${WORKFLOW_REF}" \
             -f version="${BASE_VERSION}" \
             -f release-kind="${RELEASE_KIND}"
 
@@ -628,7 +648,7 @@ jobs:
           ELAPSED=0
 
           while [ "${ELAPSED}" -lt "${TIMEOUT}" ]; do
-            RUN_ID="$(gh run list --workflow release.yml --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true)"
+            RUN_ID="$(gh run list --workflow release.yml --branch "${WORKFLOW_REF}" --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true)"
             if [ -n "${RUN_ID}" ] && [ "${RUN_ID}" -gt "${BEFORE_RUN_ID}" ]; then
               STATUS="$(gh run view "${RUN_ID}" --json status --jq '.status' 2>/dev/null || echo unknown)"
               if [ "${STATUS}" = "completed" ]; then

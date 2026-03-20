@@ -101,17 +101,22 @@ setup() {
 }
 
 @test "smoke-test dispatch triggers downstream prepare and release workflows" {
-    run bash -lc "grep -Fq -- 'cleanup-release:' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'gh workflow run prepare-release.yml' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'gh workflow run release.yml' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    run bash -lc "grep -Fq -- 'cleanup-release:' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'gh workflow run prepare-release.yml --ref \"\${WORKFLOW_REF}\"' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'gh workflow run release.yml \\' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- '--ref \"\${WORKFLOW_REF}\" \\' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    assert_success
+}
+
+@test "smoke-test dispatch preflight validates required workflow contract" {
+    run bash -lc "grep -Fq -- 'Preflight check required release workflows on dispatch ref' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'REQUIRED_WORKFLOWS=\"prepare-release.yml release.yml\"' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'gh workflow view \"\${workflow_file}\" --ref \"\${WORKFLOW_REF}\"' assets/smoke-test/.github/workflows/repository-dispatch.yml"
     assert_success
 }
 
 @test "smoke-test dispatch wait logic tracks prepare-release run after dispatch" {
-    run bash -lc 'grep -Fq -- "Capture latest prepare-release run id" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "BEFORE_RUN_ID: \${{ steps.capture_prepare_before.outputs.before_run_id }}" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "[ \"\${RUN_ID}\" -gt \"\${BEFORE_RUN_ID}\" ]" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+    run bash -lc 'grep -Fq -- "Capture latest prepare-release run id" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "gh run list --workflow prepare-release.yml --branch \"\${WORKFLOW_REF}\"" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "BEFORE_RUN_ID: \${{ steps.capture_prepare_before.outputs.before_run_id }}" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "[ \"\${RUN_ID}\" -gt \"\${BEFORE_RUN_ID}\" ]" assets/smoke-test/.github/workflows/repository-dispatch.yml'
     assert_success
 }
 
 @test "smoke-test dispatch wait logic tracks release run after dispatch" {
-    run bash -lc 'grep -Fq -- "Capture latest release run id" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "BEFORE_RUN_ID: \${{ steps.capture_release_before.outputs.before_run_id }}" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "[ \"\${RUN_ID}\" -gt \"\${BEFORE_RUN_ID}\" ]" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+    run bash -lc 'grep -Fq -- "Capture latest release run id" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "gh run list --workflow release.yml --branch \"\${WORKFLOW_REF}\"" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "BEFORE_RUN_ID: \${{ steps.capture_release_before.outputs.before_run_id }}" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "[ \"\${RUN_ID}\" -gt \"\${BEFORE_RUN_ID}\" ]" assets/smoke-test/.github/workflows/repository-dispatch.yml'
     assert_success
 }
 
