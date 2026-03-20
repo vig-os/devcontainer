@@ -103,6 +103,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Workspace resolve-image jobs now checkout local action metadata** ([#380](https://github.com/vig-os/devcontainer/issues/380))
   - Update `sparse-checkout` in workspace `resolve-image` jobs to include `.github/actions/resolve-image` in addition to `.vig-os`
   - Prevent CI failures in downstream deploy PRs where local composite actions were missing from sparse checkout
+- **Smoke-test dispatch gh jobs now set explicit repo context** ([#386](https://github.com/vig-os/devcontainer/issues/386))
+  - Add job-level `GH_REPO: ${{ github.repository }}` to `cleanup-release`, `trigger-prepare-release`, `ready-release-pr`, and `trigger-release` in `assets/smoke-test/.github/workflows/repository-dispatch.yml`
+  - Prevent `gh` CLI failures (`fatal: not a git repository`) in runner jobs that do not perform `actions/checkout`
 
 ### Security
 
