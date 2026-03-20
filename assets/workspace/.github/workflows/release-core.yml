@@ -93,6 +93,9 @@ jobs:
     container:
       image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
     outputs:
       version: ${{ steps.vars.outputs.version }}
       pr_number: ${{ steps.pr.outputs.pr_number }}
@@ -313,6 +316,9 @@ jobs:
       env:
         UV_PROJECT_ENVIRONMENT: /root/assets/workspace/.venv
     timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
     if: ${{ inputs.dry_run != true }}
     outputs:
       finalize_sha: ${{ steps.finalize.outputs.finalize_sha }}
@@ -453,6 +459,9 @@ jobs:
       env:
         UV_PROJECT_ENVIRONMENT: /root/assets/workspace/.venv
     timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
     if: ${{ inputs.dry_run != true }}
 
     steps:

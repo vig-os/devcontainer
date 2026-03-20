@@ -65,6 +65,9 @@ jobs:
     container:
       image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
     outputs:
       up_to_date: ${{ steps.check.outputs.up_to_date }}
 
@@ -107,6 +110,9 @@ jobs:
     container:
       image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
     env:
       SYNC_BRANCH: chore/sync-main-to-dev-${{ github.run_number }}-${{ github.run_attempt }}
     permissions:

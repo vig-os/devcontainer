@@ -107,6 +107,9 @@ jobs:
     container:
       image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
     if: ${{ failure() && inputs.dry-run != true }}
     permissions:
       contents: write
