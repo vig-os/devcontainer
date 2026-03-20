@@ -9,8 +9,9 @@ name: Repository Dispatch Listener
 #
 # Dispatch payload:
 # - Preferred:   client_payload.tag
-# - Optional:    client_payload.event_type, client_payload.source_repo,
-#                client_payload.source_workflow, client_payload.source_run_id,
+# - Optional:    client_payload.event_type, client_payload.release_kind,
+#                client_payload.source_repo, client_payload.source_workflow,
+#                client_payload.source_run_id,
 #                client_payload.source_run_url, client_payload.source_sha,
 #                client_payload.correlation_id
 #
