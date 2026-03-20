@@ -1231,7 +1231,14 @@ class TestDevContainerUserConf:
             (
                 "set -e && "
                 "cd /workspace/test_project && "
-                "printf '[core]\\n\\teditor = does-not-exist-editor\\n' > .devcontainer/.conf/.gitconfig && "
+                "orig_conf=.devcontainer/.conf/.gitconfig && "
+                "bak_conf=.devcontainer/.conf/.gitconfig.test-bak && "
+                '[ -f "$orig_conf" ] && cp "$orig_conf" "$bak_conf" || true && '
+                "export HOME=/tmp/setup-git-conf-home && "
+                'rm -rf "$HOME" && mkdir -p "$HOME" && '
+                'cleanup(){ rm -rf "$HOME"; if [ -f "$bak_conf" ]; then mv "$bak_conf" "$orig_conf"; else rm -f "$orig_conf"; fi; } && '
+                "trap cleanup EXIT && "
+                "printf '[core]\\n\\teditor = missing-editor-command-zzzz-12345\\n' > \"$orig_conf\" && "
                 ".devcontainer/scripts/setup-git-conf.sh >/tmp/setup-git-conf.log 2>&1 && "
                 "git config --global --get core.editor"
             ),
