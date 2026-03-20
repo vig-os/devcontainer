@@ -414,12 +414,15 @@ jobs:
           # Canonical cross-repo dispatch contract lives in docs/CROSS_REPO_RELEASE_GATE.md.
           REQUIRED_WORKFLOWS=(prepare-release.yml release.yml)
           for workflow_file in "${REQUIRED_WORKFLOWS[@]}"; do
-            if WORKFLOW_CHECK_OUTPUT="$(gh workflow view "${workflow_file}" --ref "${WORKFLOW_REF}" 2>&1)"; then
+            if WORKFLOW_CHECK_OUTPUT="$(gh workflow view "${workflow_file}" --ref "${WORKFLOW_REF}" --yaml 2>&1 >/dev/null)"; then
               echo "Workflow available on ${WORKFLOW_REF}: ${workflow_file}"
             else
               if printf '%s' "${WORKFLOW_CHECK_OUTPUT}" | grep -Eqi "404|not found"; then
                 echo "ERROR: required workflow '${workflow_file}' is not resolvable on ref '${WORKFLOW_REF}'"
                 echo "Dispatch contract drift detected; aborting before orchestration dispatch."
+              elif printf '%s' "${WORKFLOW_CHECK_OUTPUT}" | grep -Eqi -- "--yaml required|--yaml"; then
+                echo "ERROR: workflow preflight invocation invalid for current gh CLI (missing required --yaml with --ref)"
+                echo "Update preflight command to include --yaml when using --ref."
               else
                 echo "ERROR: failed to validate workflow '${workflow_file}' on ref '${WORKFLOW_REF}'"
                 echo "Validation failed due to a non-contract error (auth/permission/API/network)."
