@@ -34,6 +34,17 @@ Payload contract:
   - `client_payload[source_sha]`
   - `client_payload[correlation_id]`
 
+Workflow dispatch contract:
+
+- Required downstream workflow IDs/files:
+  - `prepare-release.yml`
+  - `release.yml`
+- Required dispatch ref:
+  - `dev`
+- Dispatch and wait operations must use the same ref context to avoid default-branch drift:
+  - dispatch via `gh workflow run <workflow> --ref dev ...`
+  - run discovery via `gh run list --workflow <workflow> --branch dev ...`
+
 ### Receiver Responsibilities
 
 The receiver workflow (`assets/smoke-test/.github/workflows/repository-dispatch.yml`) performs:
@@ -44,6 +55,7 @@ The receiver workflow (`assets/smoke-test/.github/workflows/repository-dispatch.
    - candidate tag -> GitHub pre-release
    - final tag -> GitHub release
 4. idempotency checks when a release object already exists
+5. preflight validation that required downstream workflow IDs are resolvable on the dispatch ref before orchestration starts
 
 ### Gate Checks in the Orchestrator
 
@@ -92,6 +104,7 @@ Common failure patterns:
 - downstream release type mismatch (`prerelease` flag differs from expected)
 - malformed/insufficient dispatch payload
 - downstream workflow failure prior to release artifact publication
+- workflow contract drift (required workflow ID missing on expected dispatch ref), which must fail fast in preflight
 
 ## Operational Verification
 

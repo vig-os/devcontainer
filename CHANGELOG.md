@@ -106,6 +106,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smoke-test dispatch gh jobs now set explicit repo context** ([#386](https://github.com/vig-os/devcontainer/issues/386))
   - Add job-level `GH_REPO: ${{ github.repository }}` to `cleanup-release`, `trigger-prepare-release`, `ready-release-pr`, and `trigger-release` in `assets/smoke-test/.github/workflows/repository-dispatch.yml`
   - Prevent `gh` CLI failures (`fatal: not a git repository`) in runner jobs that do not perform `actions/checkout`
+- **Smoke-test release orchestration now validates workflow contract before dispatch** ([#389](https://github.com/vig-os/devcontainer/issues/389))
+  - Add a preflight check that verifies `prepare-release.yml` and `release.yml` are resolvable on dispatch ref `dev` before downstream orchestration starts
+  - Dispatch and polling now use explicit ref/branch context (`--ref dev` / `--branch dev`) to avoid default-branch workflow registry drift and `404 workflow not found` failures
 
 ### Security
 
