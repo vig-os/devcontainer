@@ -102,7 +102,7 @@ jobs:
         if: always()
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           echo "Attempting to delete old cache to prevent save collisions..."
           # Wait a moment to ensure any previous cache saves have completed

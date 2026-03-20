@@ -127,6 +127,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Update `assets/workspace/.github/workflows/prepare-release.yml`, `release-core.yml`, `release-publish.yml`, `release.yml`, and `sync-issues.yml` to remove `github.token` fallback from protected write operations
   - Route protected branch/ref writes through Commit App tokens and release orchestration/issue operations through Release App tokens
   - Document downstream token requirements in `docs/DOWNSTREAM_RELEASE.md` and `docs/CROSS_REPO_RELEASE_GATE.md`
+  - Use `github.token` specifically for Actions cache deletion in `sync-issues.yml` because that API path requires explicit `actions: write` job token scope
+  - Use Commit App credentials for rollback checkout in `release.yml` so rollback branch/tag writes can still bypass protected refs
 
 ### Security
 
