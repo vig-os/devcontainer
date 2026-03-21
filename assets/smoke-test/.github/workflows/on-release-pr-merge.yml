@@ -55,11 +55,14 @@ jobs:
             exit 1
           fi
 
-          RELEASE_KIND="candidate"
+          RELEASE_KIND=""
           if jq -e '.pull_request.labels[]? | select(.name=="release-kind:final")' "${GITHUB_EVENT_PATH}" >/dev/null; then
             RELEASE_KIND="final"
           elif jq -e '.pull_request.labels[]? | select(.name=="release-kind:candidate")' "${GITHUB_EVENT_PATH}" >/dev/null; then
             RELEASE_KIND="candidate"
+          else
+            echo "ERROR: missing required release-kind label (expected 'release-kind:final' or 'release-kind:candidate')"
+            exit 1
           fi
 
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"

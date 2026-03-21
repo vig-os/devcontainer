@@ -74,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smoke-test dispatch no longer fails on release PR self-approval** ([#402](https://github.com/vig-os/devcontainer/issues/402))
   - Remove bot self-approval from `repository-dispatch.yml` and replace with release-kind labeling plus auto-merge enablement
   - Remove in-job polling for release PR merge and downstream release execution from phase 1 orchestration
+  - Phase 2 (`on-release-pr-merge.yml`) fails validation unless the merged release PR has `release-kind:final` or `release-kind:candidate`
 - **Sync-main-to-dev PRs now trigger CI reliably in downstream repos** ([#398](https://github.com/vig-os/devcontainer/issues/398))
   - Replace API-based sync branch creation with `git push` in `assets/workspace/.github/workflows/sync-main-to-dev.yml` so PR-related CI checks are emitted
 
