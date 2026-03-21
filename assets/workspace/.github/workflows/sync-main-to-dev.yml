@@ -9,8 +9,10 @@
 #   sync  - clean up stale sync branches
 #         - trial merge to detect conflicts
 #         - create chore/sync-main-to-dev-<run>-<attempt> branch via git push
-#         - open PR (auto-merge enabled, or labelled "merge-conflict" with
-#           resolution instructions when conflicts exist)
+#         - open PR, then workflow_dispatch CI on sync branch (before auto-merge;
+#           runs for conflict PRs too)
+#         - enable auto-merge when clean, or label "merge-conflict" with
+#           resolution instructions when conflicts exist
 #
 # Auth: Two GitHub App tokens:
 # - COMMIT_APP_* for git/ref operations (least-privilege commit identity)
@@ -272,6 +274,16 @@ jobs:
               echo "Warning: failed to add merge-conflict label."
           fi
 
+      - name: Trigger CI on sync branch
+        if: steps.create-pr.outputs.pr_url != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh workflow run ci.yml --ref "${SYNC_BRANCH}"
+          echo "Dispatched CI workflow on ${SYNC_BRANCH}"
+
       - name: Enable auto-merge
         if: >-
           steps.create-pr.outputs.pr_url != ''
@@ -284,15 +296,3 @@ jobs:
           retry --retries 2 --backoff 5 --max-backoff 20 -- \
             gh pr merge "${PR_URL}" --auto --merge || \
             echo "Warning: could not enable auto-merge (may require branch protection settings)"
-
-      - name: Trigger CI on sync branch
-        if: >-
-          steps.create-pr.outputs.pr_url != ''
-          && steps.merge-check.outputs.conflict != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          retry --retries 3 --backoff 5 --max-backoff 30 -- \
-            gh workflow run ci.yml --ref "${SYNC_BRANCH}"
-          echo "Dispatched CI workflow on ${SYNC_BRANCH}"

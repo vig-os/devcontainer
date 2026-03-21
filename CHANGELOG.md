@@ -80,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sync-main-to-dev PRs dispatch CI after opening the sync PR** ([#405](https://github.com/vig-os/devcontainer/issues/405))
   - GitHub App push and PR creation do not start workflows that listen on `pull_request` / `push`; the sync job now calls `workflow_dispatch` on `ci.yml` with `GITHUB_TOKEN` on the sync branch
   - Grant `actions: write` on the sync job in `.github/workflows/sync-main-to-dev.yml` and `assets/workspace/.github/workflows/sync-main-to-dev.yml`
+  - Dispatch runs before auto-merge and whenever a sync PR is opened, including merge-conflict PRs
 
 - **Release finalization now commits generated docs and refreshes PR content** ([#300](https://github.com/vig-os/devcontainer/issues/300))
   - Final release automation regenerates docs before committing so pre-commit `generate-docs` does not fail CI with tracked file diffs
