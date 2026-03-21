@@ -60,11 +60,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Handle smoke-test dispatch failures with a targeted issue while avoiding destructive rollback after publish artifacts are already released
 - **Redesigned smoke-test dispatch release orchestration** ([#358](https://github.com/vig-os/devcontainer/issues/358))
   - Replace premature `publish-release` behavior with full downstream orchestration: deploy-to-dev merge gate, `prepare-release.yml`, release PR readiness/approval, and `release.yml` dispatch polling
-  - Add release-branch CHANGELOG sync so smoke-test `main` ends with the same `CHANGELOG.md` content as `vig-os/devcontainer` at the dispatched tag
   - Add upstream failure issue reporting with job-phase results and cleanup guidance when dispatch orchestration fails
 - **Smoke-test release orchestration now runs as two phases** ([#402](https://github.com/vig-os/devcontainer/issues/402))
   - Keep `repository-dispatch.yml` focused on deploy/prepare/release-PR readiness and move release dispatch to a dedicated merged-PR workflow (`on-release-pr-merge.yml`)
   - Add release-kind labeling and auto-merge enablement for release PRs, and keep upstream failure notifications in both phases
+  - Remove release-branch upstream `CHANGELOG.md` sync from `repository-dispatch.yml` (previously added in [#358](https://github.com/vig-os/devcontainer/issues/358))
 
 ### Fixed
 
