@@ -76,7 +76,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Remove in-job polling for release PR merge and downstream release execution from phase 1 orchestration
   - Phase 2 (`on-release-pr-merge.yml`) fails validation unless the merged release PR has `release-kind:final` or `release-kind:candidate`
 - **Sync-main-to-dev PRs now trigger CI reliably in downstream repos** ([#398](https://github.com/vig-os/devcontainer/issues/398))
-  - Replace API-based sync branch creation with `git push` in `assets/workspace/.github/workflows/sync-main-to-dev.yml` so PR-related CI checks are emitted
+  - Replace API-based sync branch creation with `git push` in `assets/workspace/.github/workflows/sync-main-to-dev.yml`
+- **Sync-main-to-dev PRs dispatch CI after opening the sync PR** ([#405](https://github.com/vig-os/devcontainer/issues/405))
+  - GitHub App push and PR creation do not start workflows that listen on `pull_request` / `push`; the sync job now calls `workflow_dispatch` on `ci.yml` with `GITHUB_TOKEN` on the sync branch
+  - Grant `actions: write` on the sync job in `.github/workflows/sync-main-to-dev.yml` and `assets/workspace/.github/workflows/sync-main-to-dev.yml`
 
 - **Release finalization now commits generated docs and refreshes PR content** ([#300](https://github.com/vig-os/devcontainer/issues/300))
   - Final release automation regenerates docs before committing so pre-commit `generate-docs` does not fail CI with tracked file diffs

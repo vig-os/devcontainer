@@ -116,6 +116,7 @@ jobs:
     env:
       SYNC_BRANCH: chore/sync-main-to-dev-${{ github.run_number }}-${{ github.run_attempt }}
     permissions:
+      actions: write
       contents: write
       pull-requests: write
       issues: write
@@ -283,3 +284,15 @@ jobs:
           retry --retries 2 --backoff 5 --max-backoff 20 -- \
             gh pr merge "${PR_URL}" --auto --merge || \
             echo "Warning: could not enable auto-merge (may require branch protection settings)"
+
+      - name: Trigger CI on sync branch
+        if: >-
+          steps.create-pr.outputs.pr_url != ''
+          && steps.merge-check.outputs.conflict != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh workflow run ci.yml --ref "${SYNC_BRANCH}"
+          echo "Dispatched CI workflow on ${SYNC_BRANCH}"
