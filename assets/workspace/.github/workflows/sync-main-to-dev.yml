@@ -9,9 +9,7 @@
 #   sync  - clean up stale sync branches
 #         - trial merge to detect conflicts
 #         - create chore/sync-main-to-dev-<run>-<attempt> branch via git push
-#         - open PR, then workflow_dispatch CI on sync branch (before auto-merge;
-#           runs for conflict PRs too)
-#         - enable auto-merge when clean, or label "merge-conflict" with
+#         - open PR; enable auto-merge when clean, or label "merge-conflict" with
 #           resolution instructions when conflicts exist
 #
 # Auth: Two GitHub App tokens:
@@ -118,7 +116,6 @@ jobs:
     env:
       SYNC_BRANCH: chore/sync-main-to-dev-${{ github.run_number }}-${{ github.run_attempt }}
     permissions:
-      actions: write
       contents: write
       pull-requests: write
       issues: write
@@ -273,16 +270,6 @@ jobs:
               gh pr edit "${SYNC_BRANCH}" --add-label "merge-conflict" || \
               echo "Warning: failed to add merge-conflict label."
           fi
-
-      - name: Trigger CI on sync branch
-        if: steps.create-pr.outputs.pr_url != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          retry --retries 3 --backoff 5 --max-backoff 30 -- \
-            gh workflow run ci.yml --ref "${SYNC_BRANCH}"
-          echo "Dispatched CI workflow on ${SYNC_BRANCH}"
 
       - name: Enable auto-merge
         if: >-
