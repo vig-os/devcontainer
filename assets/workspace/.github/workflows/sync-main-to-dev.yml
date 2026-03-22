@@ -7,7 +7,7 @@
 # Pipeline:
 #   check - (early exit if dev already contains all main commits)
 #   sync  - clean up stale sync branches
-#         - trial merge to detect conflicts
+#         - merge-tree (in-memory) merge to detect conflicts
 #         - create chore/sync-main-to-dev-<run>-<attempt> branch via git push
 #         - open PR; enable auto-merge when clean, or label "merge-conflict" with
 #           resolution instructions when conflicts exist
@@ -201,13 +201,22 @@ jobs:
         id: merge-check
         run: |
           set -euo pipefail
-          retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin main
-          if git merge --no-commit --no-ff origin/main 2>/dev/null; then
+          retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin main dev
+          if merge_out="$(git merge-tree --write-tree origin/dev origin/main 2>&1)"; then
             echo "conflict=false" >> "$GITHUB_OUTPUT"
+            echo "Merge-tree check: no conflicts between origin/dev and origin/main."
           else
-            echo "conflict=true" >> "$GITHUB_OUTPUT"
+            merge_rc=$?
+            if [ "${merge_rc}" -eq 1 ]; then
+              echo "conflict=true" >> "$GITHUB_OUTPUT"
+              echo "::warning::Merge conflicts detected between origin/dev and origin/main."
+              echo "${merge_out}"
+            else
+              echo "::error::git merge-tree failed with exit code ${merge_rc}"
+              echo "${merge_out}"
+              exit "${merge_rc}"
+            fi
           fi
-          git merge --abort 2>/dev/null || true
 
       - name: Create sync branch from main
         if: steps.existing-pr.outputs.count == '0' && steps.recheck.outputs.up_to_date != 'true'

@@ -80,6 +80,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sync-main-to-dev no longer dispatches CI via workflow_dispatch** ([#405](https://github.com/vig-os/devcontainer/issues/405))
   - `workflow_dispatch` runs are omitted from the PR status check rollup, so they do not satisfy branch protection on the sync PR
   - Remove the post-PR `gh workflow run ci.yml` step and drop `actions: write` from the sync job in `.github/workflows/sync-main-to-dev.yml` and `assets/workspace/.github/workflows/sync-main-to-dev.yml`
+- **Sync-main-to-dev conflict detection uses merge-tree** ([#410](https://github.com/vig-os/devcontainer/issues/410))
+  - Replace working-tree trial merge with `git merge-tree --write-tree` so clean merges are not mislabeled as conflicts
+  - Enable auto-merge when dev merges cleanly with main; print merge-tree output on conflicts; fail the step on unexpected errors
 
 - **Release finalization now commits generated docs and refreshes PR content** ([#300](https://github.com/vig-os/devcontainer/issues/300))
   - Final release automation regenerates docs before committing so pre-commit `generate-docs` does not fail CI with tracked file diffs
