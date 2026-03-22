@@ -9,8 +9,8 @@
 #   sync  - clean up stale sync branches
 #         - trial merge to detect conflicts
 #         - create chore/sync-main-to-dev-<run>-<attempt> branch via API
-#         - open PR (auto-merge enabled, or labelled "merge-conflict" with
-#           resolution instructions when conflicts exist)
+#         - open PR; enable auto-merge when clean, or label "merge-conflict" with
+#           resolution instructions when conflicts exist
 #
 # Auth: Two GitHub App tokens:
 # - COMMIT_APP_* for git/ref operations (least-privilege commit identity)
