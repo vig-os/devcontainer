@@ -552,8 +552,6 @@ jobs:
     env:
       GH_REPO: ${{ github.repository }}
     needs: [validate, ready-release-pr]
-    outputs:
-      before_run_id: ${{ steps.capture_release_before.outputs.before_run_id }}
     steps:
       - name: Generate release app token for release workflow dispatch
         id: generate_release_token
@@ -624,6 +622,8 @@ jobs:
     name: Enable auto-merge and wait for release PR merge
     runs-on: ubuntu-22.04
     timeout-minutes: 35
+    env:
+      GH_REPO: ${{ github.repository }}
     needs: [ready-release-pr, trigger-release]
     steps:
       - name: Generate release app token for PR merge
