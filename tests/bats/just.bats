@@ -75,8 +75,8 @@ setup() {
     assert_success
 }
 
-@test "smoke-test dispatch normalizes workspace changelog for prepare-release freeze" {
-    run bash -lc 'grep -Fq -- "expected CHANGELOG.md after install (workspace scaffold)" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "FIRST_CHANGELOG_SECTION" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "## Unreleased" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+@test "smoke-test dispatch validates workspace changelog exists after install" {
+    run bash -lc 'grep -Fq -- "expected CHANGELOG.md after install (workspace scaffold)" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "CHANGELOG.md is not readable after ownership repair" assets/smoke-test/.github/workflows/repository-dispatch.yml'
     assert_success
 }
 
