@@ -162,19 +162,6 @@ jobs:
       - name: Fix git safe.directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Validate image accessibility
-        env:
-          IMAGE_TAG: ${{ needs.resolve-image.outputs.image-tag }}
-        run: |
-          set -euo pipefail
-          IMAGE="ghcr.io/vig-os/devcontainer:${IMAGE_TAG}"
-          echo "Validating image availability: $IMAGE"
-          if ! retry --retries 3 --backoff 5 --max-backoff 30 -- docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
-            echo "ERROR: Cannot access image manifest: $IMAGE"
-            echo "Check whether the tag exists and whether this workflow has access to GHCR."
-            exit 1
-          fi
-
       - name: Record pre-finalization SHA
         id: pre_sha
         run: |
