@@ -176,8 +176,49 @@ def reset_unreleased(filepath="CHANGELOG.md"):
 
 
 def unprepare_changelog(filepath="CHANGELOG.md"):
-    """Rename top version section to ## Unreleased (implemented in next commit)."""
-    raise NotImplementedError
+    """
+    Rename the first top-level version section to ## Unreleased (inverse of prepare).
+
+    Used when the workspace CHANGELOG was replaced by a scaffold but the canonical
+    entries live under ``## [X.Y.Z] - …`` (e.g. copied from ``.devcontainer/CHANGELOG.md``).
+
+    - If the first ``## `` heading is already ``## Unreleased``, no-op.
+    - If it matches ``## [MAJOR.MINOR.PATCH] - …`` (semver + suffix), replace with
+      ``## Unreleased``.
+    - Otherwise raises ValueError.
+
+    Args:
+        filepath: Path to CHANGELOG.md
+
+    Returns:
+        True if the file was modified, False if already ``## Unreleased``.
+    """
+    path = Path(filepath)
+    if not path.exists():
+        raise FileNotFoundError(f"CHANGELOG not found: {filepath}")
+
+    content = path.read_text()
+    match = re.search(r"^## .+$", content, re.MULTILINE)
+    if not match:
+        raise ValueError("No top-level ## heading found in CHANGELOG")
+
+    line = match.group(0).rstrip("\r\n")
+    if line == "## Unreleased":
+        return False
+
+    # Match ## [X.Y.Z] - TBD or ## [X.Y.Z] - YYYY-MM-DD (same semver rule as prepare)
+    version_heading = re.compile(
+        r"^## \[(\d+\.\d+\.\d+)\] - .+$",
+    )
+    if not version_heading.match(line):
+        raise ValueError(
+            f"Unexpected first CHANGELOG section heading: {line!r} "
+            "(expected ## Unreleased or ## [semver] - …)"
+        )
+
+    new_content = content[: match.start()] + "## Unreleased" + content[match.end() :]
+    path.write_text(new_content)
+    return True
 
 
 def prepare_changelog(version, filepath="CHANGELOG.md"):
