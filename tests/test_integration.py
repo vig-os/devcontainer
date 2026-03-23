@@ -908,13 +908,15 @@ class TestSmokeRepo:
         root_content = root_changelog.read_text(encoding="utf-8")
         devcontainer_content = devcontainer_changelog.read_text(encoding="utf-8")
 
-        # Root changelog is workspace-owned; .devcontainer changelog is the canonical
-        # upstream release history synced from the template manifest.
-        assert "## Unreleased" in root_content, (
-            "Root changelog should expose workspace Unreleased section"
+        # Root changelog is a copy of .devcontainer/CHANGELOG.md with the top semver
+        # heading renamed via prepare-changelog unprepare; older release sections stay.
+        first_h2 = re.search(r"^## .+$", root_content, re.MULTILINE)
+        assert first_h2 is not None, "Root changelog should have a top-level ## heading"
+        assert first_h2.group(0).rstrip("\r\n") == "## Unreleased", (
+            "Root changelog top section should be ## Unreleased after smoke-test unprepare"
         )
-        assert "## [" not in root_content, (
-            "Root changelog should remain a workspace stub without versioned releases"
+        assert re.search(r"^## \[\d+\.\d+\.\d+\]", root_content, re.MULTILINE), (
+            "Root changelog should retain semver release sections below Unreleased"
         )
         assert re.search(
             r"^## \[\d+\.\d+\.\d+\]", devcontainer_content, re.MULTILINE

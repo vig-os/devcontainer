@@ -25,7 +25,7 @@ uv run check-action-pins --help
 |---|---|---|
 | `validate-commit-msg` | Python | Enforce commit message standard |
 | `check-action-pins` | Python | Ensure GitHub Actions are SHA pinned |
-| `prepare-changelog` | Python | Validate/prepare/finalize/reset changelog |
+| `prepare-changelog` | Python | Validate/prepare/finalize/reset/unprepare changelog |
 | `gh-issues` | Python | Rich issue/PR dashboard via `gh` |
 | `prepare-commit-msg-strip-trailers` | Python | Remove blocked trailers from commit messages |
 | `check-agent-identity` | Python | Block commits from agent fingerprints in author identity |
@@ -87,6 +87,7 @@ prepare-changelog validate [FILE]
 prepare-changelog prepare <VERSION> [FILE]
 prepare-changelog finalize <VERSION> <YYYY-MM-DD> [FILE]
 prepare-changelog reset [FILE]
+prepare-changelog unprepare [FILE]
 ```
 
 Examples:
@@ -96,6 +97,7 @@ prepare-changelog validate
 prepare-changelog prepare 0.3.0
 prepare-changelog finalize 0.3.0 2026-03-04
 prepare-changelog reset
+prepare-changelog unprepare
 ```
 
 ### `gh-issues`
