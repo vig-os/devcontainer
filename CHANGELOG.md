@@ -162,6 +162,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Stop overwriting `CHANGELOG.md` with a minimal stub in `assets/smoke-test/.github/workflows/repository-dispatch.yml`
   - Require the workspace `CHANGELOG.md` from `init-workspace` so downstream `prepare-release` validation matches shipped layout
   - When the first changelog section is `## [X.Y.Z] - …` (TBD or a release date), remap that top version header to `## Unreleased` so downstream `prepare-release` can run
+- **Smoke-test dispatch release validate no longer runs docker inside devcontainer** ([#421](https://github.com/vig-os/devcontainer/issues/421))
+  - Remove redundant `docker manifest inspect` step from `release-core.yml` validate job (container image is already proof of accessibility; `resolve-image` validates on the runner)
+  - Set `GH_REPO` for rollback `gh issue create` in workspace `release.yml` when git checkout is skipped
 
 ### Security
 

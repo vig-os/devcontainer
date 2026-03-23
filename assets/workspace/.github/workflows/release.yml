@@ -194,6 +194,7 @@ jobs:
           VERSION: ${{ needs.core.outputs.version }}
           PR_NUMBER: ${{ needs.core.outputs.pr_number }}
           GH_TOKEN: ${{ steps.release_app_token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
