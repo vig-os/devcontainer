@@ -211,6 +211,9 @@ jobs:
           if [ -e "CHANGELOG.md" ] && [ ! -w "CHANGELOG.md" ]; then
             NEEDS_CHOWN=true
           fi
+          if [ -e "CHANGELOG.md" ] && [ ! -r "CHANGELOG.md" ]; then
+            NEEDS_CHOWN=true
+          fi
 
           if [ "${NEEDS_CHOWN}" = "true" ]; then
             OWNER_UID_GID="$(id -u):$(id -g)"
@@ -247,7 +250,7 @@ jobs:
             echo "ERROR: CHANGELOG.md first section is neither ## Unreleased nor ## [version] - <date>: ${FIRST_CHANGELOG_SECTION:-<empty>}"
             exit 1
           fi
-          sed -i '/^### Changed$/a\- Deploy devcontainer '"${TAG}" CHANGELOG.md
+          sed -i '0,/^### Changed$/s/^### Changed$/### Changed\n- Deploy devcontainer '"${TAG}"'/' CHANGELOG.md
 
       - name: Prepare deploy branch and metadata
         id: prepare_branch
