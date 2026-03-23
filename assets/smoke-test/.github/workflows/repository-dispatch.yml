@@ -240,16 +240,6 @@ jobs:
             echo "ERROR: CHANGELOG.md is not readable after ownership repair"
             exit 1
           fi
-          FIRST_CHANGELOG_SECTION="$(awk '/^## / { print; exit }' CHANGELOG.md)"
-          if [ "${FIRST_CHANGELOG_SECTION}" = "## Unreleased" ]; then
-            :
-          elif printf '%s\n' "${FIRST_CHANGELOG_SECTION}" | grep -Eq '^## \[[^]]+\] - '; then
-            echo "Remapping top ## [version] - <date> to ## Unreleased for prepare-release"
-            sed -i '0,/^## \[[^]]*\] - /s/^## \[[^]]*\] - .*/## Unreleased/' CHANGELOG.md
-          else
-            echo "ERROR: CHANGELOG.md first section is neither ## Unreleased nor ## [version] - <date>: ${FIRST_CHANGELOG_SECTION:-<empty>}"
-            exit 1
-          fi
 
       - name: Prepare deploy branch and metadata
         id: prepare_branch
