@@ -250,7 +250,6 @@ jobs:
             echo "ERROR: CHANGELOG.md first section is neither ## Unreleased nor ## [version] - <date>: ${FIRST_CHANGELOG_SECTION:-<empty>}"
             exit 1
           fi
-          sed -i '0,/^### Changed$/s/^### Changed$/### Changed\n- Deploy devcontainer '"${TAG}"'/' CHANGELOG.md
 
       - name: Prepare deploy branch and metadata
         id: prepare_branch
