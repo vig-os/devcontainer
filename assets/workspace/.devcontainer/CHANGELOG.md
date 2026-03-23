@@ -147,6 +147,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **setup-env retries uv install on transient GitHub Releases download failures** ([#407](https://github.com/vig-os/devcontainer/issues/407))
   - Add `continue-on-error` plus a delayed second attempt for `astral-sh/setup-uv` in `.github/actions/setup-env/action.yml`
   - Reduce flaky release publish failures when GitHub CDN returns transient HTTP errors for uv release assets
+- **Smoke-test deploy keeps workspace scaffold as root CHANGELOG** ([#403](https://github.com/vig-os/devcontainer/issues/403))
+  - Stop overwriting `CHANGELOG.md` with a minimal stub in `assets/smoke-test/.github/workflows/repository-dispatch.yml`
+  - Require the workspace `CHANGELOG.md` from `init-workspace` so downstream `prepare-release` validation matches shipped layout
+  - When the first changelog section is `## [X.Y.Z] - …` (TBD or a release date), remap that top version header to `## Unreleased` so downstream `prepare-release` can run
 
 ### Security
 

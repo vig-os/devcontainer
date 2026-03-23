@@ -211,6 +211,9 @@ jobs:
           if [ -e "CHANGELOG.md" ] && [ ! -w "CHANGELOG.md" ]; then
             NEEDS_CHOWN=true
           fi
+          if [ -e "CHANGELOG.md" ] && [ ! -r "CHANGELOG.md" ]; then
+            NEEDS_CHOWN=true
+          fi
 
           if [ "${NEEDS_CHOWN}" = "true" ]; then
             OWNER_UID_GID="$(id -u):$(id -g)"
@@ -229,15 +232,24 @@ jobs:
             echo "ERROR: .devcontainer/CHANGELOG.md is not readable after ownership repair"
             exit 1
           fi
-          cat > "CHANGELOG.md" <<CHLOG
-          # Changelog
-
-          ## Unreleased
-
-          ### Changed
-
-          - Deploy devcontainer ${TAG}
-          CHLOG
+          if [ ! -f "CHANGELOG.md" ]; then
+            echo "ERROR: expected CHANGELOG.md after install (workspace scaffold)"
+            exit 1
+          fi
+          if [ ! -r "CHANGELOG.md" ]; then
+            echo "ERROR: CHANGELOG.md is not readable after ownership repair"
+            exit 1
+          fi
+          FIRST_CHANGELOG_SECTION="$(awk '/^## / { print; exit }' CHANGELOG.md)"
+          if [ "${FIRST_CHANGELOG_SECTION}" = "## Unreleased" ]; then
+            :
+          elif printf '%s\n' "${FIRST_CHANGELOG_SECTION}" | grep -Eq '^## \[[^]]+\] - '; then
+            echo "Remapping top ## [version] - <date> to ## Unreleased for prepare-release"
+            sed -i '0,/^## \[[^]]*\] - /s/^## \[[^]]*\] - .*/## Unreleased/' CHANGELOG.md
+          else
+            echo "ERROR: CHANGELOG.md first section is neither ## Unreleased nor ## [version] - <date>: ${FIRST_CHANGELOG_SECTION:-<empty>}"
+            exit 1
+          fi
 
       - name: Prepare deploy branch and metadata
         id: prepare_branch
