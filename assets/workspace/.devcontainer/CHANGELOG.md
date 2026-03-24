@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Add project-owned `release-extension.yml` stub and preserve it during `init-workspace.sh --force` upgrades
   - Add `validate-contract` composite action for single-source contract version validation
   - Add downstream release contract documentation and GHCR extension example in `docs/DOWNSTREAM_RELEASE.md`
+- **`jq` in devcontainer image** ([#425](https://github.com/vig-os/devcontainer/issues/425))
+  - Install the `jq` CLI in the GHCR image so containerized workflows (e.g. `release-core` validate / downstream Release Core) can pipe JSON through `jq`
 
 ### Changed
 
