@@ -26,7 +26,7 @@ EXPECTED_VERSIONS = {
     "ruff": "0.15.",  # Minor version check (installed via uv pip)
     "bandit": "1.9.",  # Minor version check (installed via uv pip)
     "pip_licenses": "5.",  # Major version check (installed via uv pip)
-    "just": "1.47.",  # Minor version check (manually installed from latest release)
+    "just": "1.48.",  # Minor version check (manually installed from latest release)
     "hadolint": "2.14.",  # Minor version check (manually installed from pinned release)
     "taplo": "0.10.",  # Minor version check (manually installed from latest release)
     "cargo-binstall": "1.17.",  # Minor version check (installed from latest release),

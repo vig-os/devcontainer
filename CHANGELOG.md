@@ -167,6 +167,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Set `GH_REPO` for rollback `gh issue create` in workspace `release.yml` when git checkout is skipped
 - **Container image tests expect current uv minor line** ([#423](https://github.com/vig-os/devcontainer/issues/423))
   - Update `tests/test_image.py` `EXPECTED_VERSIONS["uv"]` to match uv 0.11.x from the latest release install path in the image build
+- **Container image tests expect current just minor line** ([#423](https://github.com/vig-os/devcontainer/issues/423))
+  - Update `tests/test_image.py` `EXPECTED_VERSIONS["just"]` to match just 1.48.x from the latest release install path in the image build
 
 ### Security
 
