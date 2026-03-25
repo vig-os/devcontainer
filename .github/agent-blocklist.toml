@@ -1,5 +1,5 @@
 # Canonical blocklist for AI agent identity fingerprints.
-# Referenced by: validate-commit-msg, pre-commit hooks, pr-title-check CI.
+# Referenced by: validate-commit-msg, pre-commit hooks.
 # Refs: #163
 
 [patterns]
