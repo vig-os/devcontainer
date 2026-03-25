@@ -80,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **PR Title Check GitHub Actions workflow** ([#444](https://github.com/vig-os/devcontainer/issues/444))
   - Remove `.github/workflows/pr-title-check.yml`; commit message rules remain enforced via local hooks and `validate-commit-msg`
+  - Remove `--subject-only` from `validate-commit-msg` (it existed only for PR title CI)
 
 ### Fixed
 

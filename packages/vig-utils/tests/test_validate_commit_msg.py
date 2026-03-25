@@ -212,7 +212,7 @@ class TestChoreRefsExemption:
             assert valid is False, f"Type {ctype} should require Refs but passed"
             assert "Refs" in err
 
-    def test_chore_subject_only_with_blank_line(self):
+    def test_chore_minimal_with_blank_line_only(self):
         """Minimal chore commit: subject + blank line only."""
         msg = "chore: update dependencies\n\n"
         valid, err = validate_commit_message(msg)
@@ -1098,12 +1098,6 @@ class TestAgentFingerprints:
         assert valid is True
         assert err is None
 
-    def test_subject_only_still_checks_agent_fingerprints(self):
-        """Subject-only mode still rejects Co-authored-by in subject (edge case)."""
-        msg = "feat: add feature\n\nCo-authored-by: Claude <x@y.com>"
-        valid, err = validate_commit_message(msg, subject_only=True)
-        assert valid is False
-
     def test_rejects_made_with_cursor_link(self):
         """Reject 'Made with [Cursor](https://cursor.com)' branding in body."""
         msg = "feat: add feature\n\nMade with [Cursor](https://cursor.com)\n\nRefs: #163\n"
@@ -1128,98 +1122,3 @@ class TestAgentFingerprints:
         valid, err = validate_commit_message(msg, blocked_patterns=blocklist)
         assert valid is False
         assert "openai" in err.lower() or "blocked" in err.lower()
-
-
-class TestSubjectOnly:
-    """Test subject_only mode for PR title validation."""
-
-    def test_subject_only_valid_feat(self):
-        valid, err = validate_commit_message("feat: add new feature", subject_only=True)
-        assert valid is True
-        assert err is None
-
-    def test_subject_only_valid_with_scope(self):
-        valid, err = validate_commit_message(
-            "fix(api): correct endpoint", subject_only=True
-        )
-        assert valid is True
-        assert err is None
-
-    def test_subject_only_valid_breaking(self):
-        valid, err = validate_commit_message(
-            "feat!: breaking change", subject_only=True
-        )
-        assert valid is True
-        assert err is None
-
-    def test_subject_only_valid_scope_and_breaking(self):
-        valid, err = validate_commit_message(
-            "feat(cli)!: remove flag", subject_only=True
-        )
-        assert valid is True
-        assert err is None
-
-    def test_subject_only_rejects_invalid_type(self):
-        valid, err = validate_commit_message("invalid: bad type", subject_only=True)
-        assert valid is False
-        assert "Unknown commit type" in err
-
-    def test_subject_only_rejects_missing_description(self):
-        valid, err = validate_commit_message("feat:", subject_only=True)
-        assert valid is False
-
-    def test_subject_only_rejects_empty(self):
-        valid, err = validate_commit_message("", subject_only=True)
-        assert valid is False
-
-    def test_subject_only_ignores_body_and_refs(self):
-        """Subject-only mode validates only the first line, ignoring body/Refs."""
-        valid, err = validate_commit_message(
-            "feat: add feature\n\nSome body\n\nRefs: #1\n", subject_only=True
-        )
-        assert valid is True
-        assert err is None
-
-    def test_subject_only_does_not_require_refs(self):
-        """Subject-only mode never requires a Refs line, even for non-chore types."""
-        valid, err = validate_commit_message("feat: add feature", subject_only=True)
-        assert valid is True
-
-    def test_subject_only_validates_scopes_when_configured(self):
-        valid, err = validate_commit_message(
-            "feat(unknown): add feature",
-            subject_only=True,
-            approved_scopes=frozenset({"api", "cli"}),
-        )
-        assert valid is False
-        assert "Unknown scope" in err
-
-    def test_main_subject_only_flag(self, tmp_path):
-        """Test main() with --subject-only flag."""
-        msg_file = tmp_path / "msg"
-        msg_file.write_text("feat: add feature")
-        orig_argv = sys.argv
-        try:
-            sys.argv = [
-                "validate_commit_msg.py",
-                str(msg_file),
-                "--subject-only",
-            ]
-            assert main() == 0
-        finally:
-            sys.argv = orig_argv
-
-    def test_main_subject_only_rejects_invalid(self, tmp_path):
-        """Test main() with --subject-only rejects invalid type."""
-        msg_file = tmp_path / "msg"
-        msg_file.write_text("invalid: bad type")
-        orig_argv = sys.argv
-        try:
-            sys.argv = [
-                "validate_commit_msg.py",
-                str(msg_file),
-                "--subject-only",
-            ]
-            assert main() == 1
-        finally:
-            sys.argv = orig_argv

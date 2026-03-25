@@ -7,7 +7,7 @@ and exits 0 if the message complies, non-zero with an error on stderr otherwise.
 See docs/COMMIT_MESSAGE_STANDARD.md for the full standard.
 
 Usage:
-    validate-commit-msg <path-to-commit-message-file> [--types TYPE,TYPE,...] [--scopes SCOPE,SCOPE,...] [--refs-optional-types TYPE,TYPE,...] [--require-scope] [--subject-only]
+    validate-commit-msg <path-to-commit-message-file> [--types TYPE,TYPE,...] [--scopes SCOPE,SCOPE,...] [--refs-optional-types TYPE,TYPE,...] [--require-scope]
 
 Examples:
     validate-commit-msg .git/COMMIT_EDITMSG
@@ -108,7 +108,6 @@ def validate_commit_message(
     approved_scopes: frozenset[str] | None = None,
     refs_optional_types: frozenset[str] | None = None,
     require_scope: bool = False,
-    subject_only: bool = False,
     blocked_patterns: dict | None = None,
 ) -> tuple[bool, str | None]:
     """Validate a commit message string.
@@ -119,8 +118,6 @@ def validate_commit_message(
         approved_scopes: Set of allowed scopes. If None or empty, scopes are not enforced.
         refs_optional_types: Set of commit types where Refs line is optional. Defaults to DEFAULT_REFS_OPTIONAL_TYPES.
         require_scope: If True, at least one scope is mandatory. Defaults to False.
-        subject_only: If True, validate only the subject line (type, scope, description).
-            Skips blank-line, body, and Refs validation. Useful for PR title checks.
         blocked_patterns: Blocklist dict from agent_blocklist.load_blocklist(). If None, uses hardcoded fallback.
 
     Returns:
@@ -205,11 +202,8 @@ def validate_commit_message(
                 f"Allowed scopes: {', '.join(sorted(approved_scopes))}",
             )
 
-    if subject_only:
-        return True, None
-
     # Require at least one blank line between subject and body/Refs
-    # For types with optional Refs, a subject-only message is valid
+    # For types with optional Refs, subject + blank line only is valid
     if len(lines) < 2:
         if type_part in refs_optional_types:
             return True, None
@@ -297,11 +291,6 @@ def main() -> int:
         help="Require at least one scope in the commit message (default: false)",
     )
     parser.add_argument(
-        "--subject-only",
-        action="store_true",
-        help="Validate only the subject line (skip body and Refs). Useful for PR title validation.",
-    )
-    parser.add_argument(
         "--blocked-patterns",
         type=Path,
         default=None,
@@ -347,7 +336,6 @@ def main() -> int:
         approved_scopes=approved_scopes,
         refs_optional_types=refs_optional_types,
         require_scope=args.require_scope,
-        subject_only=args.subject_only,
         blocked_patterns=blocked_patterns,
     )
     if valid:

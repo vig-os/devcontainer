@@ -50,7 +50,6 @@ validate-commit-msg <message-file> \
   [--scopes SCOPE,...] \
   [--refs-optional-types TYPE,...] \
   [--require-scope] \
-  [--subject-only] \
   [--blocked-patterns PATH]
 ```
 
@@ -59,7 +58,6 @@ Examples:
 ```bash
 validate-commit-msg .git/COMMIT_EDITMSG
 validate-commit-msg .git/COMMIT_EDITMSG --scopes setup,ci,vigutils --require-scope
-validate-commit-msg .git/COMMIT_EDITMSG --subject-only
 ```
 
 ### `check-action-pins`
