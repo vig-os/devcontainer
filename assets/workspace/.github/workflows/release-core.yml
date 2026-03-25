@@ -195,7 +195,7 @@ jobs:
           if [ "$RELEASE_KIND" = "candidate" ]; then
             if [ -n "${INPUT_RC_NUMBER}" ]; then
               if ! printf '%s' "${INPUT_RC_NUMBER}" | grep -qE '^[0-9]+$'; then
-                echo "ERROR: rc_number must be a non-negative integer (got '${INPUT_RC_NUMBER}')"
+                echo "ERROR: rc_number must be a positive integer (got '${INPUT_RC_NUMBER}')"
                 exit 1
               fi
               if [ "${INPUT_RC_NUMBER}" -lt 1 ]; then

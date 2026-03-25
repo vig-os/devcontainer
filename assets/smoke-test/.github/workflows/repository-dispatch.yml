@@ -19,7 +19,7 @@ name: Repository Dispatch Listener
 # vig-os/devcontainer-smoke-test and promotion through PRs until merged to main.
 #
 # If this repo (or a fork) orchestrates workspace release.yml for candidates,
-# pass workflow_dispatch input rc-number=<N> where N is validate.outputs.rc_number
+# pass workflow_dispatch input rc-number=<N> where N is needs.validate.outputs.rc_number
 # so downstream candidate tags match the upstream dispatch tag (cross-repo gate).
 
 on:  # yamllint disable-line rule:truthy
