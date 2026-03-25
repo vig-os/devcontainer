@@ -202,8 +202,9 @@ def validate_commit_message(
                 f"Allowed scopes: {', '.join(sorted(approved_scopes))}",
             )
 
-    # Require at least one blank line between subject and body/Refs
-    # For types with optional Refs, subject + blank line only is valid
+    # Require at least one blank line between subject and body/Refs.
+    # Content is rstrip()'d before splitlines(), so trailing newlines do not count as a
+    # second line. For refs-optional types, a lone subject line is valid (no Refs/body).
     if len(lines) < 2:
         if type_part in refs_optional_types:
             return True, None

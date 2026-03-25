@@ -212,8 +212,8 @@ class TestChoreRefsExemption:
             assert valid is False, f"Type {ctype} should require Refs but passed"
             assert "Refs" in err
 
-    def test_chore_minimal_with_blank_line_only(self):
-        """Minimal chore commit: subject + blank line only."""
+    def test_chore_minimal_subject_only(self):
+        """Minimal chore commit: subject line only (trailing newlines are stripped)."""
         msg = "chore: update dependencies\n\n"
         valid, err = validate_commit_message(msg)
         assert valid is True
