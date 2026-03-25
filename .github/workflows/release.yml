@@ -378,9 +378,9 @@ jobs:
           elif [ "$REVIEW_DECISION" = "null" ] || [ -z "$REVIEW_DECISION" ]; then
             # Bot approval fallback when gh pr list leaves reviewDecision empty (#438)
             APPROVED_COUNT=$(retry --retries 3 --backoff 5 --max-backoff 30 -- gh api \
-              --paginate \
+              --paginate --slurp \
               "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
-              --jq '[.[] | select(.state == "APPROVED")] | length')
+              | jq 'add | map(select(.state == "APPROVED")) | length')
             if [ "$APPROVED_COUNT" -eq 0 ]; then
               echo "ERROR: PR #$PR_NUMBER does not have approvals (reviewDecision: $REVIEW_DECISION, approved reviews: 0)"
               exit 1
