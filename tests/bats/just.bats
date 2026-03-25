@@ -169,3 +169,8 @@ setup() {
     run bash -lc "grep -Fq -- 'base_version=' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'rc_number=' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'steps.extract.outputs.base_version' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'steps.extract.outputs.rc_number' assets/smoke-test/.github/workflows/repository-dispatch.yml"
     assert_success
 }
+
+@test "workspace release workflows accept rc-number for pinned candidate RC" {
+    run bash -lc "grep -Fq -- 'rc-number:' assets/workspace/.github/workflows/release.yml && grep -Fq -- 'rc_number:' assets/workspace/.github/workflows/release.yml && grep -Fq -- 'rc_number:' assets/workspace/.github/workflows/release-core.yml"
+    assert_success
+}
