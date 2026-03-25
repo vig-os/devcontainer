@@ -164,3 +164,8 @@ setup() {
     run bash -lc "awk '/^  core:/{flag=1} /^  extension:/{flag=0} flag {print}' assets/workspace/.github/workflows/release.yml | grep -Fq -- 'actions: write' && awk '/^  core:/{flag=1} /^  extension:/{flag=0} flag {print}' assets/workspace/.github/workflows/release.yml | grep -Fq -- 'pull-requests: read' && awk '/^  publish:/{flag=1} /^  rollback:/{flag=0} flag {print}' assets/workspace/.github/workflows/release.yml | grep -Fq -- 'contents: write' && awk '/^  validate:/{flag=1} /^  finalize:/{flag=0} flag {print}' assets/workspace/.github/workflows/release-core.yml | grep -Fq -- 'pull-requests: read' && awk '/^  finalize:/{flag=1} /^  test:/{flag=0} flag {print}' assets/workspace/.github/workflows/release-core.yml | grep -Fq -- 'actions: write'"
     assert_success
 }
+
+@test "smoke-test dispatch exposes base_version and rc_number for cross-repo RC alignment" {
+    run bash -lc "grep -Fq -- 'base_version=' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'rc_number=' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'steps.extract.outputs.base_version' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'steps.extract.outputs.rc_number' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    assert_success
+}
