@@ -261,8 +261,12 @@ jobs:
             echo "ERROR: PR #$PR_NUMBER is still in draft"
             exit 1
           fi
-          if [ "$REVIEW_DECISION" != "APPROVED" ]; then
+          if [ "$REVIEW_DECISION" = "APPROVED" ]; then
+            echo "PR #$PR_NUMBER is approved"
+          elif [ "$REVIEW_DECISION" = "null" ] || [ -z "$REVIEW_DECISION" ]; then
+            # Bot approval fallback when gh pr list leaves reviewDecision empty (#438)
             APPROVED_COUNT=$(retry --retries 3 --backoff 5 --max-backoff 30 -- gh api \
+              --paginate \
               "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
               --jq '[.[] | select(.state == "APPROVED")] | length')
             if [ "$APPROVED_COUNT" -eq 0 ]; then
@@ -270,6 +274,9 @@ jobs:
               exit 1
             fi
             echo "reviewDecision='$REVIEW_DECISION' but $APPROVED_COUNT approved review(s) found"
+          else
+            echo "ERROR: PR #$PR_NUMBER is not approved (status: $REVIEW_DECISION)"
+            exit 1
           fi
 
           STATUS_ROLLUP=$(echo "$PR_JSON" | jq -r '.[0].statusCheckRollup // []')

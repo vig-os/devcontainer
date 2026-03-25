@@ -62,6 +62,9 @@ jobs:
     name: Validate Release
     runs-on: ubuntu-22.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       version: ${{ steps.vars.outputs.version }}
       pr_number: ${{ steps.pr.outputs.pr_number }}
@@ -370,8 +373,12 @@ jobs:
             exit 1
           fi
 
-          if [ "$REVIEW_DECISION" != "APPROVED" ]; then
+          if [ "$REVIEW_DECISION" = "APPROVED" ]; then
+            echo "PR #$PR_NUMBER is approved"
+          elif [ "$REVIEW_DECISION" = "null" ] || [ -z "$REVIEW_DECISION" ]; then
+            # Bot approval fallback when gh pr list leaves reviewDecision empty (#438)
             APPROVED_COUNT=$(retry --retries 3 --backoff 5 --max-backoff 30 -- gh api \
+              --paginate \
               "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
               --jq '[.[] | select(.state == "APPROVED")] | length')
             if [ "$APPROVED_COUNT" -eq 0 ]; then
@@ -379,6 +386,9 @@ jobs:
               exit 1
             fi
             echo "reviewDecision='$REVIEW_DECISION' but $APPROVED_COUNT approved review(s) found"
+          else
+            echo "ERROR: PR #$PR_NUMBER does not have approvals (status: $REVIEW_DECISION)"
+            exit 1
           fi
 
           # Check CI status
