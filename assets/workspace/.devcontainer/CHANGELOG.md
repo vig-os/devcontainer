@@ -76,6 +76,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Retries 3 times with backoff before giving up
   - Build succeeds without cursor-agent when Cursor's CDN is unavailable
 
+### Removed
+
+- **PR Title Check GitHub Actions workflow** ([#444](https://github.com/vig-os/devcontainer/issues/444))
+  - Remove `.github/workflows/pr-title-check.yml`; commit message rules remain enforced via local hooks and `validate-commit-msg`
+  - Remove `--subject-only` from `validate-commit-msg` (it existed only for PR title CI)
+
 ### Fixed
 
 - **Smoke-test deploy restores workspace CHANGELOG for prepare-release** ([#417](https://github.com/vig-os/devcontainer/issues/417))
