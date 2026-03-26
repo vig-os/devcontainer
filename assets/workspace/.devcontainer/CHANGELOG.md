@@ -203,6 +203,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release validate fails early when GitHub Release already exists** ([#443](https://github.com/vig-os/devcontainer/issues/443))
   - Validate job in `.github/workflows/release.yml` queries `GET /repos/.../releases/tags/<PUBLISH_VERSION>` with retries and classifies errors like the downstream RC gate; only a documented not-found response is treated as “no release,” and ambiguous API failures fail closed before build/sign/publish
   - Publish job uses the same existence checks before and after `gh release create` instead of `gh release view` with discarded stderr
+- **Release tag resolution and GitHub Release view retries** ([#446](https://github.com/vig-os/devcontainer/issues/446))
+  - Fall back to plain `refs/tags/<tag>` when the peeled ref is empty (lightweight remote tags) in `.github/workflows/release.yml`, `release-core.yml`, and `release-publish.yml`
+  - Use one retried `gh release view` in workspace `release-publish.yml` so draft/prerelease skip paths parse JSON from the same successful response
 
 ### Security
 

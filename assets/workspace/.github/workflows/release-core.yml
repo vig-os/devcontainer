@@ -494,17 +494,20 @@ jobs:
           set -euo pipefail
           REMOTE_LINE=$(git ls-remote origin "refs/tags/${PUBLISH_VERSION}^{}" || true)
           if [ -z "$REMOTE_LINE" ]; then
+            REMOTE_LINE=$(git ls-remote origin "refs/tags/${PUBLISH_VERSION}" || true)
+          fi
+          if [ -z "$REMOTE_LINE" ]; then
             echo "tag_already_exists=false" >> "$GITHUB_OUTPUT"
             echo "No remote tag ${PUBLISH_VERSION} yet"
             exit 0
           fi
-          REMOTE_PEEL=$(printf '%s\n' "$REMOTE_LINE" | awk '{print $1}')
-          if [ -z "$REMOTE_PEEL" ]; then
+          REMOTE_TARGET_SHA=$(printf '%s\n' "$REMOTE_LINE" | awk '{print $1}')
+          if [ -z "$REMOTE_TARGET_SHA" ]; then
             echo "tag_already_exists=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if [ "$REMOTE_PEEL" != "$FINALIZE_SHA" ]; then
-            echo "ERROR: Tag $PUBLISH_VERSION exists but peeled commit is $REMOTE_PEEL; expected $FINALIZE_SHA (finalize SHA)"
+          if [ "$REMOTE_TARGET_SHA" != "$FINALIZE_SHA" ]; then
+            echo "ERROR: Tag $PUBLISH_VERSION exists but target commit is $REMOTE_TARGET_SHA; expected $FINALIZE_SHA (finalize SHA)"
             exit 1
           fi
           echo "tag_already_exists=true" >> "$GITHUB_OUTPUT"

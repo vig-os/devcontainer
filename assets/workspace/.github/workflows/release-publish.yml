@@ -150,6 +150,9 @@ jobs:
               LOCAL_TAG_TARGET_SHA=$(git rev-parse "$PUBLISH_VERSION^{}")
               REMOTE_TAG_TARGET_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- git ls-remote --tags origin "refs/tags/$PUBLISH_VERSION^{}" | awk '{print $1}')
               if [ -z "$REMOTE_TAG_TARGET_SHA" ]; then
+                REMOTE_TAG_TARGET_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- git ls-remote --tags origin "refs/tags/$PUBLISH_VERSION" | awk '{print $1}')
+              fi
+              if [ -z "$REMOTE_TAG_TARGET_SHA" ]; then
                 echo "ERROR: Remote tag exists but target SHA could not be resolved: $PUBLISH_VERSION"
                 exit 1
               fi
@@ -187,8 +190,7 @@ jobs:
           GH_TOKEN: ${{ steps.auth.outputs.token }}
         run: |
           set -euo pipefail
-          if retry --retries 2 --backoff 5 --max-backoff 20 -- gh release view "$PUBLISH_VERSION" --json isDraft,isPrerelease >/dev/null 2>&1; then
-            RELEASE_JSON=$(gh release view "$PUBLISH_VERSION" --json isDraft,isPrerelease)
+          if RELEASE_JSON=$(retry --retries 2 --backoff 5 --max-backoff 20 -- gh release view "$PUBLISH_VERSION" --json isDraft,isPrerelease 2>/dev/null); then
             IS_DRAFT=$(printf '%s' "$RELEASE_JSON" | jq -r '.isDraft')
             if [ "$IS_DRAFT" = "true" ]; then
               echo "Draft GitHub Release already exists for $PUBLISH_VERSION; skipping create (retry path)."
