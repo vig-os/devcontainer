@@ -94,17 +94,17 @@ class TestFormatCiStatus:
             "number": 1,
             "statusCheckRollup": [
                 {
-                    "name": "Validate PR Title",
+                    "name": "Status Gate",
                     "conclusion": "FAILURE",
                     "completedAt": "2026-02-24T12:52:49Z",
                 },
                 {
-                    "name": "Validate PR Title",
+                    "name": "Status Gate",
                     "conclusion": "FAILURE",
                     "completedAt": "2026-02-24T12:53:39Z",
                 },
                 {
-                    "name": "Validate PR Title",
+                    "name": "Status Gate",
                     "conclusion": "SUCCESS",
                     "completedAt": "2026-02-24T12:53:52Z",
                 },

@@ -54,7 +54,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           ref: dev
           fetch-depth: 0
@@ -156,20 +156,20 @@ jobs:
     steps:
       - name: Generate Commit App Token
         id: commit-app-token
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
         with:
           app-id: ${{ secrets.COMMIT_APP_ID }}
           private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
 
       - name: Generate Release App Token
         id: release-app-token
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
       - name: Checkout dev branch
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           ref: dev
           fetch-depth: 0
@@ -185,7 +185,8 @@ jobs:
           GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
         run: |
           set -euo pipefail
-          PREPARE_START_SHA=$(gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
+          PREPARE_START_SHA=$(uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
           echo "prepare_start_sha=$PREPARE_START_SHA" >> "$GITHUB_OUTPUT"
           echo "✓ Captured pre-prepare dev SHA: $PREPARE_START_SHA"
 
@@ -197,6 +198,12 @@ jobs:
           echo "Preparing CHANGELOG for version $VERSION..."
           uv run prepare-changelog prepare "$VERSION" CHANGELOG.md
           echo "✓ CHANGELOG prepared (Unreleased → [${VERSION}] - TBD + fresh Unreleased)"
+
+      - name: Sync workspace manifest after changelog prepare
+        run: |
+          set -euo pipefail
+          uv run python scripts/sync_manifest.py sync assets/workspace/
+          echo "✓ Synced workspace manifest after changelog prepare"
 
       - name: Extract CHANGELOG content for PR body
         id: changelog
@@ -212,17 +219,18 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Commit prepared CHANGELOG to dev via API
-        uses: vig-os/commit-action@c0024cbad0e501764127cccab732c6cd465b4646  # v0.1.5
+        uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
         env:
           GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           TARGET_BRANCH: refs/heads/dev
+          MAX_ATTEMPTS: "3"
           COMMIT_MESSAGE: |-
             chore: freeze changelog for release ${{ needs.validate.outputs.version }}
 
             Move Unreleased content to [${{ needs.validate.outputs.version }}] - TBD
             and create fresh empty Unreleased section for continued development.
-          FILE_PATHS: CHANGELOG.md
+          FILE_PATHS: CHANGELOG.md assets/workspace/.devcontainer/CHANGELOG.md
 
       - name: Create release branch from dev
         id: create-branch
@@ -231,9 +239,11 @@ jobs:
           RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
         run: |
           set -euo pipefail
-          DEV_SHA=$(gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
+          DEV_SHA=$(uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
           echo "Creating branch $RELEASE_BRANCH from dev at $DEV_SHA..."
-          gh api "repos/${{ github.repository }}/git/refs" \
+          uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/git/refs" \
             -f ref="refs/heads/$RELEASE_BRANCH" \
             -f sha="$DEV_SHA"
           echo "dev_sha=$DEV_SHA" >> "$GITHUB_OUTPUT"
@@ -255,18 +265,25 @@ jobs:
           "
           echo "✓ Stripped empty Unreleased section from CHANGELOG"
 
+      - name: Sync workspace manifest after release changelog strip
+        run: |
+          set -euo pipefail
+          uv run python scripts/sync_manifest.py sync assets/workspace/
+          echo "✓ Synced workspace manifest after release changelog strip"
+
       - name: Commit stripped CHANGELOG to release branch via API
-        uses: vig-os/commit-action@c0024cbad0e501764127cccab732c6cd465b4646  # v0.1.5
+        uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
         env:
           GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           TARGET_BRANCH: refs/heads/${{ needs.validate.outputs.release_branch }}
+          MAX_ATTEMPTS: "3"
           COMMIT_MESSAGE: |-
             chore: prepare release ${{ needs.validate.outputs.version }}
 
             Strip empty Unreleased section from release branch.
             Release date TBD (set during finalization).
-          FILE_PATHS: CHANGELOG.md
+          FILE_PATHS: CHANGELOG.md assets/workspace/.devcontainer/CHANGELOG.md
 
       - name: Create draft PR to main
         id: pr
@@ -278,29 +295,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          PR_BODY="## Release $VERSION
+          PR_BODY="# Release $VERSION
 
           This PR prepares release $VERSION for merge to main.
 
-          ### Release Content
-
           $CHANGELOG_CONTENT
-
-          ### Testing Checklist
-          - [ ] All tests pass (\`just test\`)
-          - [ ] Manual testing complete
-          - [ ] No critical bugs found
-          - [ ] Ready for release
-
-          ### When Ready to Release
-          - Publish candidate: \`just publish-candidate $VERSION\`
-          - Publish final release: \`just finalize-release $VERSION\`
-
-          ### Related
-          - Release automation: #48, #172
           "
 
-          PR_URL=$(gh pr create \
+          PR_URL=$(uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh pr create \
             --base main \
             --head "$RELEASE_BRANCH" \
             --title "chore: release $VERSION" \
@@ -336,8 +339,10 @@ jobs:
             exit 0
           fi
 
-          if gh api "repos/${{ github.repository }}/git/ref/heads/$RELEASE_BRANCH" >/dev/null 2>&1; then
-            gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/$RELEASE_BRANCH"
+          if uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/git/ref/heads/$RELEASE_BRANCH" >/dev/null 2>&1; then
+            uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+              gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/$RELEASE_BRANCH"
             BRANCH_DELETED=true
             echo "✓ Deleted partially created release branch: $RELEASE_BRANCH"
           else
@@ -345,7 +350,8 @@ jobs:
           fi
 
           if [ -n "${POST_FREEZE_DEV_SHA:-}" ]; then
-            CURRENT_DEV_SHA="$(gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')"
+            CURRENT_DEV_SHA="$(uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+              gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')"
             if [ "$CURRENT_DEV_SHA" != "$POST_FREEZE_DEV_SHA" ]; then
               echo "w dev advanced after freeze commit; skipping CHANGELOG rollback to avoid clobbering concurrent updates"
               echo "branch_deleted=$BRANCH_DELETED" >> "$GITHUB_OUTPUT"
@@ -354,13 +360,16 @@ jobs:
             fi
           fi
 
-          gh api "repos/${{ github.repository }}/contents/CHANGELOG.md?ref=$PREPARE_START_SHA" --jq '.content' | tr -d '\n' | base64 -d > /tmp/changelog.pre-prepare.md
-          gh api "repos/${{ github.repository }}/contents/CHANGELOG.md?ref=dev" --jq '.content' | tr -d '\n' | base64 -d > /tmp/changelog.current-dev.md
+          uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/contents/CHANGELOG.md?ref=$PREPARE_START_SHA" --jq '.content' | tr -d '\n' | base64 -d > /tmp/changelog.pre-prepare.md
+          uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+            gh api "repos/${{ github.repository }}/contents/CHANGELOG.md?ref=dev" --jq '.content' | tr -d '\n' | base64 -d > /tmp/changelog.current-dev.md
 
           if cmp -s /tmp/changelog.pre-prepare.md /tmp/changelog.current-dev.md; then
             echo "i dev CHANGELOG already matches pre-prepare state"
           else
             cp /tmp/changelog.pre-prepare.md CHANGELOG.md
+            uv run python scripts/sync_manifest.py sync assets/workspace/
             CHANGELOG_ROLLBACK_NEEDED=true
             echo "✓ Prepared CHANGELOG rollback content for dev"
           fi
@@ -370,16 +379,17 @@ jobs:
 
       - name: Commit CHANGELOG rollback to dev via API
         if: ${{ failure() && steps.rollback-prepare.outputs.changelog_rollback_needed == 'true' }}
-        uses: vig-os/commit-action@c0024cbad0e501764127cccab732c6cd465b4646  # v0.1.5
+        uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
         env:
           GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           TARGET_BRANCH: refs/heads/dev
+          MAX_ATTEMPTS: "3"
           COMMIT_MESSAGE: |-
             chore: rollback failed prepare-release ${{ needs.validate.outputs.version }}
 
             Restore CHANGELOG.md on dev to pre-prepare state after prepare-release failed.
-          FILE_PATHS: CHANGELOG.md
+          FILE_PATHS: CHANGELOG.md assets/workspace/.devcontainer/CHANGELOG.md
 
       - name: Rollback summary
         if: ${{ failure() }}

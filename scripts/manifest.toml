@@ -33,6 +33,10 @@ src = ".pymarkdown"
 src = ".pymarkdown.config.md"
 
 [[entries]]
+src = "CHANGELOG.md"
+dest = ".devcontainer/CHANGELOG.md"
+
+[[entries]]
 src = ".hadolint.yaml"
 
 [[entries]]
@@ -62,12 +66,6 @@ transforms = [
 
 [[entries]]
 src = ".github/workflows/scorecard.yml"
-
-[[entries]]
-src = ".github/workflows/sync-issues.yml"
-
-[[entries]]
-src = ".github/workflows/sync-main-to-dev.yml"
 
 [[entries]]
 src = ".github/workflows/codeql.yml"

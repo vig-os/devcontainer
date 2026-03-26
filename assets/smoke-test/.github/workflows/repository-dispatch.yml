@@ -5,22 +5,37 @@ name: Repository Dispatch Listener
 # - Deploy the requested tag into the smoke-test repo.
 # - Always create a `chore/deploy-<tag>` branch and PR to `dev`.
 # - Create signed deploy commits via `vig-os/commit-action`.
-# - CI (ci.yml + ci-container.yml) triggers on the deploy PR.
+# - CI (`ci.yml`) triggers on the deploy PR.
 #
 # Dispatch payload:
 # - Preferred:   client_payload.tag
-# - Optional:    client_payload.event_type, client_payload.source_repo
+# - Optional:    client_payload.event_type, client_payload.release_kind,
+#                client_payload.source_repo, client_payload.source_workflow,
+#                client_payload.source_run_id,
+#                client_payload.source_run_url, client_payload.source_sha,
+#                client_payload.correlation_id
 #
 # NOTE: Changes to this template may require manual redeploy to
 # vig-os/devcontainer-smoke-test and promotion through PRs until merged to main.
+#
+# If this repo (or a fork) orchestrates workspace release.yml for candidates,
+# pass workflow_dispatch input rc-number=<N> where N is needs.validate.outputs.rc_number
+# so downstream candidate tags match the upstream dispatch tag (cross-repo gate).
 
 on:  # yamllint disable-line rule:truthy
   repository_dispatch:
     types:
       - smoke-test-trigger
 
+concurrency:
+  group: smoke-test-dispatch-${{ github.event.client_payload.tag || github.run_id }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
+
+env:
+  WORKFLOW_REF: dev
 
 jobs:
   validate:
@@ -29,6 +44,15 @@ jobs:
     timeout-minutes: 5
     outputs:
       tag: ${{ steps.extract.outputs.tag }}
+      base_version: ${{ steps.extract.outputs.base_version }}
+      rc_number: ${{ steps.extract.outputs.rc_number }}
+      release_kind: ${{ steps.extract.outputs.release_kind }}
+      source_repo: ${{ steps.extract.outputs.source_repo }}
+      source_workflow: ${{ steps.extract.outputs.source_workflow }}
+      source_run_id: ${{ steps.extract.outputs.source_run_id }}
+      source_run_url: ${{ steps.extract.outputs.source_run_url }}
+      source_sha: ${{ steps.extract.outputs.source_sha }}
+      correlation_id: ${{ steps.extract.outputs.correlation_id }}
     steps:
       - name: Extract and validate tag
         id: extract
@@ -36,13 +60,26 @@ jobs:
           EVENT_ACTION: ${{ github.event.action }}
           EVENT_TYPE: ${{ github.event.client_payload.event_type || '' }}
           TAG: ${{ github.event.client_payload.tag || '' }}
+          RELEASE_KIND: ${{ github.event.client_payload.release_kind || '' }}
           SOURCE_REPO: ${{ github.event.client_payload.source_repo || '' }}
+          SOURCE_WORKFLOW: ${{ github.event.client_payload.source_workflow || '' }}
+          SOURCE_RUN_ID: ${{ github.event.client_payload.source_run_id || '' }}
+          SOURCE_RUN_URL: ${{ github.event.client_payload.source_run_url || '' }}
+          SOURCE_SHA: ${{ github.event.client_payload.source_sha || '' }}
+          CORRELATION_ID: ${{ github.event.client_payload.correlation_id || '' }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
         run: |
           echo "repository_dispatch received"
           echo "action=${EVENT_ACTION}"
           echo "event_type=${EVENT_TYPE}"
           echo "tag=${TAG}"
+          echo "release_kind=${RELEASE_KIND}"
           echo "source_repo=${SOURCE_REPO}"
+          echo "source_workflow=${SOURCE_WORKFLOW}"
+          echo "source_run_id=${SOURCE_RUN_ID}"
+          echo "source_run_url=${SOURCE_RUN_URL}"
+          echo "source_sha=${SOURCE_SHA}"
+          echo "correlation_id=${CORRELATION_ID}"
 
           if [ -z "${TAG}" ]; then
             echo "ERROR: tag is required in github.event.client_payload"
@@ -54,7 +91,51 @@ jobs:
             exit 1
           fi
 
+          EFFECTIVE_RELEASE_KIND="${RELEASE_KIND}"
+          if [ -z "${EFFECTIVE_RELEASE_KIND}" ]; then
+            if printf '%s' "${TAG}" | grep -Eq -- '-rc[0-9]+$'; then
+              EFFECTIVE_RELEASE_KIND="candidate"
+            else
+              EFFECTIVE_RELEASE_KIND="final"
+            fi
+          fi
+
+          if [ "${EFFECTIVE_RELEASE_KIND}" != "candidate" ] && [ "${EFFECTIVE_RELEASE_KIND}" != "final" ]; then
+            echo "ERROR: release_kind must be candidate or final (got '${EFFECTIVE_RELEASE_KIND}')"
+            exit 1
+          fi
+
+          if [ "${EFFECTIVE_RELEASE_KIND}" = "candidate" ] && ! printf '%s' "${TAG}" | grep -Eq -- '-rc[0-9]+$'; then
+            echo "ERROR: candidate release_kind requires RC tag format (expected X.Y.Z-rcN, got '${TAG}')"
+            exit 1
+          fi
+
+          if [ "${EFFECTIVE_RELEASE_KIND}" = "final" ] && printf '%s' "${TAG}" | grep -Eq -- '-rc[0-9]+$'; then
+            echo "ERROR: final release_kind requires final tag format (expected X.Y.Z, got '${TAG}')"
+            exit 1
+          fi
+
+          BASE_VERSION="$(printf '%s' "${TAG}" | sed 's/-rc[0-9]*$//')"
+          RC_NUMBER=""
+          if printf '%s' "${TAG}" | grep -Eq -- '-rc[0-9]+$'; then
+            RC_NUMBER="$(printf '%s' "${TAG}" | sed 's/^.*-rc//')"
+          fi
+
+          EFFECTIVE_SOURCE_RUN_URL="${SOURCE_RUN_URL}"
+          if [ -z "${EFFECTIVE_SOURCE_RUN_URL}" ] && [ -n "${SOURCE_REPO}" ] && [ -n "${SOURCE_RUN_ID}" ]; then
+            EFFECTIVE_SOURCE_RUN_URL="${GITHUB_SERVER_URL}/${SOURCE_REPO}/actions/runs/${SOURCE_RUN_ID}"
+          fi
+
           echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "base_version=${BASE_VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "rc_number=${RC_NUMBER}" >> "${GITHUB_OUTPUT}"
+          echo "release_kind=${EFFECTIVE_RELEASE_KIND}" >> "${GITHUB_OUTPUT}"
+          echo "source_repo=${SOURCE_REPO}" >> "${GITHUB_OUTPUT}"
+          echo "source_workflow=${SOURCE_WORKFLOW}" >> "${GITHUB_OUTPUT}"
+          echo "source_run_id=${SOURCE_RUN_ID}" >> "${GITHUB_OUTPUT}"
+          echo "source_run_url=${EFFECTIVE_SOURCE_RUN_URL}" >> "${GITHUB_OUTPUT}"
+          echo "source_sha=${SOURCE_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "correlation_id=${CORRELATION_ID}" >> "${GITHUB_OUTPUT}"
 
   deploy:
     name: Deploy tag and open PR to dev
@@ -66,7 +147,7 @@ jobs:
     steps:
       - name: Generate release app token for PR/issue operations
         id: generate_release_token
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -75,7 +156,7 @@ jobs:
 
       - name: Generate commit app token for signed commits
         id: generate_commit_token
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
         with:
           app-id: ${{ secrets.COMMIT_APP_ID }}
           private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
@@ -115,8 +196,61 @@ jobs:
         env:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
-          curl -sSf "https://raw.githubusercontent.com/vig-os/devcontainer/${TAG}/install.sh" \
-            | bash -s -- --version "${TAG}" --smoke-test --force --docker .
+          set -euo pipefail
+          INSTALL_URL="https://raw.githubusercontent.com/vig-os/devcontainer/${TAG}/install.sh"
+          ATTEMPT=1
+          MAX_ATTEMPTS=3
+          until [ "${ATTEMPT}" -gt "${MAX_ATTEMPTS}" ]; do
+            if curl -sSf "${INSTALL_URL}" | bash -s -- --version "${TAG}" --smoke-test --force --docker .; then
+              break
+            fi
+            if [ "${ATTEMPT}" -eq "${MAX_ATTEMPTS}" ]; then
+              echo "ERROR: failed to download/install after ${MAX_ATTEMPTS} attempts: ${INSTALL_URL}"
+              exit 1
+            fi
+            echo "Install attempt ${ATTEMPT}/${MAX_ATTEMPTS} failed; retrying in 5s..."
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep 5
+          done
+
+          # Docker-based install can leave bind-mounted files owned by root.
+          # Repair ownership only when required by local writability/readability probes.
+          NEEDS_CHOWN=false
+          if [ ! -r ".devcontainer/CHANGELOG.md" ]; then
+            NEEDS_CHOWN=true
+          fi
+          if [ -e "CHANGELOG.md" ] && [ ! -w "CHANGELOG.md" ]; then
+            NEEDS_CHOWN=true
+          fi
+          if [ -e "CHANGELOG.md" ] && [ ! -r "CHANGELOG.md" ]; then
+            NEEDS_CHOWN=true
+          fi
+
+          if [ "${NEEDS_CHOWN}" = "true" ]; then
+            OWNER_UID_GID="$(id -u):$(id -g)"
+            if command -v sudo >/dev/null 2>&1; then
+              sudo chown -R "${OWNER_UID_GID}" .
+            else
+              chown -R "${OWNER_UID_GID}" .
+            fi
+          fi
+
+          if [ ! -f ".devcontainer/CHANGELOG.md" ]; then
+            echo "ERROR: expected .devcontainer/CHANGELOG.md after install"
+            exit 1
+          fi
+          if [ ! -r ".devcontainer/CHANGELOG.md" ]; then
+            echo "ERROR: .devcontainer/CHANGELOG.md is not readable after ownership repair"
+            exit 1
+          fi
+          if [ ! -f "CHANGELOG.md" ]; then
+            echo "ERROR: expected CHANGELOG.md after install (workspace scaffold)"
+            exit 1
+          fi
+          if [ ! -r "CHANGELOG.md" ]; then
+            echo "ERROR: CHANGELOG.md is not readable after ownership repair"
+            exit 1
+          fi
 
       - name: Prepare deploy branch and metadata
         id: prepare_branch
@@ -140,11 +274,12 @@ jobs:
           fi
 
       - name: Commit and push deploy changes via signed commit-action
-        uses: vig-os/commit-action@c0024cbad0e501764127cccab732c6cd465b4646  # v0.1.5
+        uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
         env:
           GH_TOKEN: ${{ steps.generate_commit_token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           TARGET_BRANCH: refs/heads/${{ steps.prepare_branch.outputs.branch_name }}
+          MAX_ATTEMPTS: "3"
           ALLOW_EMPTY: "true"
           COMMIT_MESSAGE: |-
             chore: deploy ${{ needs.validate.outputs.tag }}
@@ -184,13 +319,438 @@ jobs:
           gh pr merge "${PR_URL}" --auto --merge || \
             echo "Warning: could not enable auto-merge"
 
+  wait-deploy-merge:
+    name: Wait for deploy PR merge
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    needs: deploy
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Poll deploy PR merge status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ needs.deploy.outputs.pr_url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PR_URL}" ]; then
+            echo "ERROR: missing deploy PR URL"
+            exit 1
+          fi
+
+          TIMEOUT=1800
+          INTERVAL=30
+          ELAPSED=0
+
+          while [ "${ELAPSED}" -lt "${TIMEOUT}" ]; do
+            STATE="$(gh pr view "${PR_URL}" --json state --jq '.state' 2>/dev/null || echo unknown)"
+            if [ "${STATE}" = "MERGED" ]; then
+              echo "Deploy PR merged: ${PR_URL}"
+              exit 0
+            fi
+            if [ "${STATE}" = "CLOSED" ]; then
+              echo "ERROR: deploy PR closed without merge: ${PR_URL}"
+              exit 1
+            fi
+            sleep "${INTERVAL}"
+            ELAPSED=$((ELAPSED + INTERVAL))
+            echo "Waiting for deploy PR merge... (${ELAPSED}s/${TIMEOUT}s)"
+          done
+
+          echo "ERROR: timed out waiting for deploy PR merge"
+          exit 1
+
+  cleanup-release:
+    name: Cleanup stale release branch and PR
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    env:
+      GH_REPO: ${{ github.repository }}
+    needs: [validate, wait-deploy-merge]
+    steps:
+      - name: Generate release app token for PR/branch cleanup
+        id: generate_release_token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Close stale release PR and delete stale release branch
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+          BASE_VERSION: ${{ needs.validate.outputs.base_version }}
+        run: |
+          set -euo pipefail
+          RELEASE_BRANCH="release/${BASE_VERSION}"
+
+          if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${RELEASE_BRANCH}" >/dev/null 2>&1; then
+            echo "No stale release branch found: ${RELEASE_BRANCH}"
+            exit 0
+          fi
+
+          mapfile -t RELEASE_PRS < <(
+            gh pr list --head "${RELEASE_BRANCH}" --state open --json number --jq '.[].number'
+          )
+          for pr_number in "${RELEASE_PRS[@]}"; do
+            echo "Closing stale release PR #${pr_number}"
+            gh pr close "${pr_number}"
+          done
+
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${RELEASE_BRANCH}"
+          echo "Deleted stale release branch: ${RELEASE_BRANCH}"
+
+  trigger-prepare-release:
+    name: Trigger and wait for prepare-release workflow
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      GH_REPO: ${{ github.repository }}
+    needs: [validate, cleanup-release]
+    outputs:
+      before_run_id: ${{ steps.capture_prepare_before.outputs.before_run_id }}
+    steps:
+      - name: Generate release app token for workflow dispatch
+        id: generate_release_token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Preflight check required release workflows on dispatch ref
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+        run: |
+          set -euo pipefail
+          # Canonical cross-repo dispatch contract lives in docs/CROSS_REPO_RELEASE_GATE.md.
+          REQUIRED_WORKFLOWS=(prepare-release.yml release.yml)
+          for workflow_file in "${REQUIRED_WORKFLOWS[@]}"; do
+            if WORKFLOW_CHECK_OUTPUT="$(gh workflow view "${workflow_file}" --ref "${WORKFLOW_REF}" --yaml 2>&1 >/dev/null)"; then
+              echo "Workflow available on ${WORKFLOW_REF}: ${workflow_file}"
+            else
+              if printf '%s' "${WORKFLOW_CHECK_OUTPUT}" | grep -Eqi "404|not found"; then
+                echo "ERROR: required workflow '${workflow_file}' is not resolvable on ref '${WORKFLOW_REF}'"
+                echo "Dispatch contract drift detected; aborting before orchestration dispatch."
+              else
+                echo "ERROR: failed to validate workflow '${workflow_file}' on ref '${WORKFLOW_REF}'"
+                echo "Validation failed due to a non-contract error (auth/permission/API/network)."
+              fi
+              echo "${WORKFLOW_CHECK_OUTPUT}"
+              exit 1
+            fi
+          done
+
+      - name: Capture latest prepare-release run id
+        id: capture_prepare_before
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+        run: |
+          set -euo pipefail
+          BEFORE_RUN_ID="$(
+            gh run list --workflow prepare-release.yml --branch "${WORKFLOW_REF}" --limit 1 --json databaseId --jq '.[0].databaseId // 0' 2>/dev/null || echo 0
+          )"
+          echo "before_run_id=${BEFORE_RUN_ID}" >> "${GITHUB_OUTPUT}"
+
+      - name: Trigger prepare-release
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+          BASE_VERSION: ${{ needs.validate.outputs.base_version }}
+        run: |
+          set -euo pipefail
+          gh workflow run prepare-release.yml --ref "${WORKFLOW_REF}" -f version="${BASE_VERSION}"
+
+      - name: Wait for prepare-release completion
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+          BEFORE_RUN_ID: ${{ steps.capture_prepare_before.outputs.before_run_id }}
+        run: |
+          set -euo pipefail
+          TIMEOUT=1200
+          INTERVAL=30
+          ELAPSED=0
+
+          while [ "${ELAPSED}" -lt "${TIMEOUT}" ]; do
+            RUN_ID="$(gh run list --workflow prepare-release.yml --branch "${WORKFLOW_REF}" --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true)"
+            if [ -n "${RUN_ID}" ] && [ "${RUN_ID}" -gt "${BEFORE_RUN_ID}" ]; then
+              STATUS="$(gh run view "${RUN_ID}" --json status --jq '.status' 2>/dev/null || echo unknown)"
+              if [ "${STATUS}" = "completed" ]; then
+                CONCLUSION="$(gh run view "${RUN_ID}" --json conclusion --jq '.conclusion' 2>/dev/null || echo unknown)"
+                if [ "${CONCLUSION}" != "success" ]; then
+                  echo "ERROR: prepare-release workflow concluded with '${CONCLUSION}'"
+                  exit 1
+                fi
+                echo "prepare-release workflow completed successfully"
+                exit 0
+              fi
+            fi
+
+            sleep "${INTERVAL}"
+            ELAPSED=$((ELAPSED + INTERVAL))
+            echo "Waiting for prepare-release workflow... (${ELAPSED}s/${TIMEOUT}s)"
+          done
+
+          echo "ERROR: timed out waiting for prepare-release workflow completion"
+          exit 1
+
+  ready-release-pr:
+    name: Prepare release PR
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_REPO: ${{ github.repository }}
+    needs: [validate, trigger-prepare-release]
+    outputs:
+      release_pr: ${{ steps.locate_release_pr.outputs.release_pr }}
+      release_pr_url: ${{ steps.locate_release_pr.outputs.release_pr_url }}
+    steps:
+      - name: Generate release app token for PR operations
+        id: generate_release_token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Locate release PR
+        id: locate_release_pr
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+          BASE_VERSION: ${{ needs.validate.outputs.base_version }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER="$(gh pr list --base main --head "release/${BASE_VERSION}" --state open --json number --jq '.[0].number // empty')"
+          if [ -z "${PR_NUMBER}" ]; then
+            echo "ERROR: could not find release PR for release/${BASE_VERSION}"
+            exit 1
+          fi
+          PR_URL="$(gh pr view "${PR_NUMBER}" --json url --jq '.url')"
+          echo "release_pr=${PR_NUMBER}" >> "${GITHUB_OUTPUT}"
+          echo "release_pr_url=${PR_URL}" >> "${GITHUB_OUTPUT}"
+
+      - name: Mark release PR ready
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+          PR_NUMBER: ${{ steps.locate_release_pr.outputs.release_pr }}
+        run: |
+          set -euo pipefail
+          IS_DRAFT="$(gh pr view "${PR_NUMBER}" --json isDraft --jq '.isDraft')"
+          if [ "${IS_DRAFT}" = "true" ]; then
+            gh pr ready "${PR_NUMBER}"
+          fi
+
+      - name: Label release PR with release kind
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+          PR_NUMBER: ${{ steps.locate_release_pr.outputs.release_pr }}
+          RELEASE_KIND: ${{ needs.validate.outputs.release_kind }}
+        run: |
+          set -euo pipefail
+          LABEL="release-kind:${RELEASE_KIND}"
+          gh label create "${LABEL}" --color "5319E7" \
+            --description "Automated release kind label for dispatch orchestration" \
+            --force >/dev/null 2>&1 || true
+          gh pr edit "${PR_NUMBER}" --remove-label "release-kind:candidate" >/dev/null 2>&1 || true
+          gh pr edit "${PR_NUMBER}" --remove-label "release-kind:final" >/dev/null 2>&1 || true
+          gh pr edit "${PR_NUMBER}" --add-label "${LABEL}"
+
+      - name: Approve release PR for automated dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.locate_release_pr.outputs.release_pr }}
+        run: |
+          set -euo pipefail
+          gh pr review "${PR_NUMBER}" --approve \
+            --body "Automated approval by smoke-test dispatch orchestration." || {
+            echo "::error::Auto-approve failed. If you see a permissions error, enable repository (or organization) setting 'Allow GitHub Actions to create and approve pull requests'. See this PR description for context."
+            exit 1
+          }
+
+  trigger-release:
+    name: Trigger and wait for release workflow
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    env:
+      GH_REPO: ${{ github.repository }}
+    needs: [validate, ready-release-pr]
+    steps:
+      - name: Generate release app token for release workflow dispatch
+        id: generate_release_token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Capture latest release run id
+        id: capture_release_before
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+        run: |
+          set -euo pipefail
+          BEFORE_RUN_ID="$(
+            gh run list --workflow release.yml --branch "${WORKFLOW_REF}" --limit 1 --json databaseId --jq '.[0].databaseId // 0' 2>/dev/null || echo 0
+          )"
+          echo "before_run_id=${BEFORE_RUN_ID}" >> "${GITHUB_OUTPUT}"
+
+      - name: Trigger release workflow
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+          BASE_VERSION: ${{ needs.validate.outputs.base_version }}
+          RC_NUMBER: ${{ needs.validate.outputs.rc_number }}
+          RELEASE_KIND: ${{ needs.validate.outputs.release_kind }}
+        run: |
+          set -euo pipefail
+          EXTRA=()
+          if [ "${RELEASE_KIND}" = "candidate" ] && [ -n "${RC_NUMBER}" ]; then
+            EXTRA=( -f "rc-number=${RC_NUMBER}" )
+          fi
+          gh workflow run release.yml \
+            --ref "${WORKFLOW_REF}" \
+            -f version="${BASE_VERSION}" \
+            -f release-kind="${RELEASE_KIND}" \
+            "${EXTRA[@]}"
+
+      - name: Wait for release workflow completion
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+          BEFORE_RUN_ID: ${{ steps.capture_release_before.outputs.before_run_id }}
+        run: |
+          set -euo pipefail
+          TIMEOUT=1800
+          INTERVAL=30
+          ELAPSED=0
+
+          while [ "${ELAPSED}" -lt "${TIMEOUT}" ]; do
+            RUN_ID="$(gh run list --workflow release.yml --branch "${WORKFLOW_REF}" --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true)"
+            if [ -n "${RUN_ID}" ] && [ "${RUN_ID}" -gt "${BEFORE_RUN_ID}" ]; then
+              STATUS="$(gh run view "${RUN_ID}" --json status --jq '.status' 2>/dev/null || echo unknown)"
+              if [ "${STATUS}" = "completed" ]; then
+                CONCLUSION="$(gh run view "${RUN_ID}" --json conclusion --jq '.conclusion' 2>/dev/null || echo unknown)"
+                if [ "${CONCLUSION}" != "success" ]; then
+                  echo "ERROR: release workflow concluded with '${CONCLUSION}'"
+                  exit 1
+                fi
+                echo "release workflow completed successfully"
+                exit 0
+              fi
+            fi
+
+            sleep "${INTERVAL}"
+            ELAPSED=$((ELAPSED + INTERVAL))
+            echo "Waiting for release workflow... (${ELAPSED}s/${TIMEOUT}s)"
+          done
+
+          echo "ERROR: timed out waiting for release workflow completion"
+          exit 1
+
+  merge-release-pr:
+    name: Enable auto-merge and wait for release PR merge
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    env:
+      GH_REPO: ${{ github.repository }}
+    needs: [ready-release-pr, trigger-release]
+    steps:
+      - name: Generate release app token for PR merge
+        id: generate_release_token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Enable release PR auto-merge
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+          PR_NUMBER: ${{ needs.ready-release-pr.outputs.release_pr }}
+        run: |
+          set -euo pipefail
+          gh pr merge "${PR_NUMBER}" --auto --merge || \
+            echo "Warning: could not enable auto-merge yet"
+
+      - name: Poll release PR merge status
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+          PR_URL: ${{ needs.ready-release-pr.outputs.release_pr_url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PR_URL}" ]; then
+            echo "ERROR: missing release PR URL"
+            exit 1
+          fi
+
+          TIMEOUT=1800
+          INTERVAL=30
+          ELAPSED=0
+
+          while [ "${ELAPSED}" -lt "${TIMEOUT}" ]; do
+            STATE="$(gh pr view "${PR_URL}" --json state --jq '.state' 2>/dev/null || echo unknown)"
+            if [ "${STATE}" = "MERGED" ]; then
+              echo "Release PR merged: ${PR_URL}"
+              exit 0
+            fi
+            if [ "${STATE}" = "CLOSED" ]; then
+              echo "ERROR: release PR closed without merge: ${PR_URL}"
+              exit 1
+            fi
+            sleep "${INTERVAL}"
+            ELAPSED=$((ELAPSED + INTERVAL))
+            echo "Waiting for release PR merge... (${ELAPSED}s/${TIMEOUT}s)"
+          done
+
+          echo "ERROR: timed out waiting for release PR merge"
+          exit 1
+
   summary:
     name: Dispatch summary
     runs-on: ubuntu-22.04
     timeout-minutes: 5
-    needs: [validate, deploy]
+    needs:
+      - validate
+      - deploy
+      - wait-deploy-merge
+      - cleanup-release
+      - trigger-prepare-release
+      - ready-release-pr
+      - trigger-release
+      - merge-release-pr
     if: always()
     steps:
+      - name: Write source context summary
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+          BASE_VERSION: ${{ needs.validate.outputs.base_version }}
+          RC_NUMBER: ${{ needs.validate.outputs.rc_number }}
+          SOURCE_REPO: ${{ needs.validate.outputs.source_repo }}
+          SOURCE_WORKFLOW: ${{ needs.validate.outputs.source_workflow }}
+          SOURCE_RUN_ID: ${{ needs.validate.outputs.source_run_id }}
+          SOURCE_RUN_URL: ${{ needs.validate.outputs.source_run_url }}
+          SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+          CORRELATION_ID: ${{ needs.validate.outputs.correlation_id }}
+        run: |
+          {
+            echo "## Source Dispatch Context"
+            echo ""
+            echo "- Tag: ${TAG:-n/a}"
+            echo "- Base version: ${BASE_VERSION:-n/a}"
+            echo "- RC number (suffix): ${RC_NUMBER:-n/a}"
+            echo "- Source Repo: ${SOURCE_REPO:-n/a}"
+            echo "- Source Workflow: ${SOURCE_WORKFLOW:-n/a}"
+            echo "- Source Run ID: ${SOURCE_RUN_ID:-n/a}"
+            echo "- Source Run URL: ${SOURCE_RUN_URL:-n/a}"
+            echo "- Source SHA: ${SOURCE_SHA:-n/a}"
+            echo "- Correlation ID: ${CORRELATION_ID:-n/a}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Check orchestration results
         run: |
           echo "Repository Dispatch Results Summary"
@@ -198,7 +758,14 @@ jobs:
           echo ""
           echo "Validate:     ${{ needs.validate.result }}"
           echo "Deploy:       ${{ needs.deploy.result }}"
+          echo "Wait deploy:  ${{ needs.wait-deploy-merge.result }}"
+          echo "Cleanup:      ${{ needs.cleanup-release.result }}"
+          echo "Prepare:      ${{ needs.trigger-prepare-release.result }}"
+          echo "Release PR:   ${{ needs.ready-release-pr.result }}"
+          echo "Release run:  ${{ needs.trigger-release.result }}"
+          echo "Release merge: ${{ needs.merge-release-pr.result }}"
           echo "Deploy PR:    ${{ needs.deploy.outputs.pr_url }}"
+          echo "Release PR:   ${{ needs.ready-release-pr.outputs.release_pr_url }}"
           echo ""
 
           FAILED=false
@@ -213,6 +780,36 @@ jobs:
             FAILED=true
           fi
 
+          if [ "${{ needs.wait-deploy-merge.result }}" != "success" ]; then
+            echo "ERROR: Wait-for-deploy-merge job failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.cleanup-release.result }}" != "success" ]; then
+            echo "ERROR: Cleanup release job failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.trigger-prepare-release.result }}" != "success" ]; then
+            echo "ERROR: Prepare-release orchestration job failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.ready-release-pr.result }}" != "success" ]; then
+            echo "ERROR: Release PR readiness job failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.trigger-release.result }}" != "success" ]; then
+            echo "ERROR: Trigger-release job failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.merge-release-pr.result }}" != "success" ]; then
+            echo "ERROR: Merge-release-pr job failed"
+            FAILED=true
+          fi
+
           if [ "${FAILED}" = "true" ]; then
             echo ""
             echo "Dispatch orchestration failed"
@@ -221,3 +818,89 @@ jobs:
 
           echo ""
           echo "Dispatch orchestration passed"
+
+  notify-failure:
+    name: Notify upstream on smoke-test dispatch failure
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    if: failure()
+    needs:
+      - validate
+      - deploy
+      - wait-deploy-merge
+      - cleanup-release
+      - trigger-prepare-release
+      - ready-release-pr
+      - trigger-release
+      - merge-release-pr
+      - summary
+    steps:
+      - name: Generate release app token for upstream issue creation
+        id: generate_release_token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: vig-os
+          repositories: devcontainer
+
+      - name: Create upstream failure issue
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          RELEASE_KIND: ${{ needs.validate.outputs.release_kind }}
+          SOURCE_REPO: ${{ needs.validate.outputs.source_repo }}
+          SOURCE_WORKFLOW: ${{ needs.validate.outputs.source_workflow }}
+          SOURCE_RUN_ID: ${{ needs.validate.outputs.source_run_id }}
+          SOURCE_RUN_URL: ${{ needs.validate.outputs.source_run_url }}
+          SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+          CORRELATION_ID: ${{ needs.validate.outputs.correlation_id }}
+          DEPLOY_PR_URL: ${{ needs.deploy.outputs.pr_url }}
+          RELEASE_PR_URL: ${{ needs.ready-release-pr.outputs.release_pr_url }}
+        run: |
+          set -euo pipefail
+          WORKFLOW_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          ISSUE_BODY="$(
+            cat <<EOF
+          Smoke-test dispatch failed while orchestrating downstream release validation.
+
+          ## Dispatch metadata
+          - tag: \`${TAG:-unknown}\`
+          - release_kind: \`${RELEASE_KIND:-unknown}\`
+          - source_repo: \`${SOURCE_REPO:-unknown}\`
+          - source_workflow: \`${SOURCE_WORKFLOW:-unknown}\`
+          - source_run_id: \`${SOURCE_RUN_ID:-unknown}\`
+          - source_run_url: ${SOURCE_RUN_URL:-n/a}
+          - source_sha: \`${SOURCE_SHA:-unknown}\`
+          - correlation_id: \`${CORRELATION_ID:-unknown}\`
+
+          ## Workflow context
+          - downstream workflow run: ${WORKFLOW_URL}
+          - deploy PR: ${DEPLOY_PR_URL:-not created}
+          - release PR: ${RELEASE_PR_URL:-not created}
+
+          ## Job results
+          - validate: \`${{ needs.validate.result }}\`
+          - deploy: \`${{ needs.deploy.result }}\`
+          - wait-deploy-merge: \`${{ needs.wait-deploy-merge.result }}\`
+          - cleanup-release: \`${{ needs.cleanup-release.result }}\`
+          - trigger-prepare-release: \`${{ needs.trigger-prepare-release.result }}\`
+          - ready-release-pr: \`${{ needs.ready-release-pr.result }}\`
+          - trigger-release: \`${{ needs.trigger-release.result }}\`
+          - merge-release-pr: \`${{ needs.merge-release-pr.result }}\`
+          - summary: \`${{ needs.summary.result }}\`
+
+          ## Manual cleanup guidance
+          - Inspect deploy/release PRs and workflow logs before retrying.
+          - If needed, close stale release PRs and delete stale \`release/<version>\` branch.
+          - Do not rewrite or delete **published** GitHub Releases (or their linked tags when **immutable releases** are enabled) to retry the same version; bare git tags without a published release are not locked by that feature unless a tag ruleset applies.
+          - After fixing the root cause upstream, publish a **new** RC tag (or a new final attempt only after branch/tag state matches your release policy), then rely on a fresh dispatch.
+          EOF
+          )"
+
+          gh issue create \
+            --repo vig-os/devcontainer \
+            --title "Smoke-test dispatch failed for ${TAG:-unknown}" \
+            --label bug \
+            --body "${ISSUE_BODY}"

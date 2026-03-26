@@ -105,3 +105,18 @@ branch:
 # [group('app')]
 # migrate:
 #     just sidecar postgres migrate
+#
+# # Prepare release branch (manual workflow dispatch helper)
+# [group('release')]
+# prepare-release version:
+#     gh workflow run prepare-release.yml --ref dev -f "version={{ version }}"
+#
+# # Finalize and publish release (manual workflow dispatch helper)
+# [group('release')]
+# finalize-release version:
+#     gh workflow run release.yml --ref release/{{ version }} -f "version={{ version }}" -f "release-kind=final" -f "dry-run=false"
+#
+# # Publish candidate release (manual workflow dispatch helper)
+# [group('release')]
+# publish-candidate version:
+#     gh workflow run release.yml --ref release/{{ version }} -f "version={{ version }}" -f "release-kind=candidate" -f "dry-run=false"

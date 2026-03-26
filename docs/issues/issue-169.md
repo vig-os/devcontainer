@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-24T07:13:32Z
-updated: 2026-03-12T11:44:41Z
+updated: 2026-03-13T21:58:35Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/169
-comments: 1
+comments: 2
 labels: feature, area:ci, area:testing, effort:large, semver:minor
 assignees: none
 milestone: 0.3
 projects: none
 parent: none
 children: 170, 171, 172, 173, 197, 161, 122, 264
-synced: 2026-03-12T12:05:21.429Z
+synced: 2026-03-14T04:16:11.145Z
 ---
 
 # [Issue 169]: [[FEATURE] Smoke-test repository to validate shipped CI/CD workflows](https://github.com/vig-os/devcontainer/issues/169)
@@ -123,7 +123,7 @@ Added
 
 - [x] Smoke-test repo exists with a deployed workspace from the current template
 - [x] Bare-runner CI (`ci.yml`) runs successfully against the deployed workspace
-- [ ] RC publishing works: release workflow can publish `X.Y.Z-rc1` to GHCR
+- [x] RC publishing works: release workflow can publish `X.Y.Z-rc1` to GHCR
 - [ ] Smoke-test repo is triggered via `repository_dispatch` on RC publish
 - [ ] Container CI (`ci-container.yml`) runs successfully using the RC image via `container:` directive
 - [ ] TDD compliance (see .cursor/rules/tdd.mdc)
@@ -156,34 +156,34 @@ Full end-to-end release-candidate cycle to validate the remaining acceptance cri
 
 ### Phase 1: Prepare Release
 
-- [ ] **Trigger the prepare-release workflow**
+- [x] **Trigger the prepare-release workflow**
   ```bash
   just prepare-release 0.3.0
   ```
 
-- [ ] **Workflow completes successfully** -- monitor in [Actions](https://github.com/vig-os/devcontainer/actions/workflows/prepare-release.yml)
+- [x] **Workflow completes successfully** -- [here](https://github.com/vig-os/devcontainer/actions/runs/23001136891)
 
 #### Verification checklist
 
-- [ ] `release/0.3.0` branch appears in [branches](https://github.com/vig-os/devcontainer/branches)
-- [ ] Draft PR from `release/0.3.0` to `main` appears in [Pull Requests](https://github.com/vig-os/devcontainer/pulls)
-- [ ] Release branch CHANGELOG has `## [0.3.0] - TBD` (no `## Unreleased`)
-- [ ] `dev` CHANGELOG has empty `## Unreleased` above `## [0.3.0] - TBD`
+- [x] `release/0.3.0` branch appears in [branches](https://github.com/vig-os/devcontainer/branches)
+- [x] Draft PR from `release/0.3.0` to `main` appears in [Pull Requests](https://github.com/vig-os/devcontainer/pulls)
+- [x] Release branch CHANGELOG has `## [0.3.0] - TBD` (no `## Unreleased`)
+- [x] `dev` CHANGELOG has empty `## Unreleased` above `## [0.3.0] - TBD`
 
 ---
 
 ### Phase 2: Review & Test Release Branch
 
-- [ ] **CI passes on release PR** -- check PR's "Checks" tab
+- [x] **CI passes on release PR** -- [here](https://github.com/vig-os/devcontainer/actions/runs/23006247353)
   ```bash
   gh run list --branch release/0.3.0 --workflow ci.yml --limit 1
   ```
-- [ ] **Review CHANGELOG** -- verify all 0.3 changes are documented with correct issue refs
-- [ ] **Mark PR as ready for review** -- click "Ready for review" in the PR UI, or:
+- [x] **Review CHANGELOG** -- verify all 0.3 changes are documented with correct issue refs
+- [x] **Mark PR as ready for review** -- click "Ready for review" in the PR UI, or:
   ```bash
   gh pr ready <PR_NUMBER>
   ```
-- [ ] **Get PR approval** -- add a reviewer in the PR sidebar
+- [x] **Get PR approval** -- add a reviewer in the PR sidebar
 
 > **Fixing issues:** All fixes go through bugfix PRs targeting `release/0.3.0` (branch is write-protected).
 
@@ -193,19 +193,19 @@ Full end-to-end release-candidate cycle to validate the remaining acceptance cri
 
 #### 3a. Dry run (recommended)
 
-- [ ] **Run candidate publish in dry-run mode**
+- [x] **Run candidate publish in dry-run mode**
   ```bash
-  just publish-candidate 0.3.0 -f "dry-run=true"
+  just publish-candidate 0.3.0 release/0.3.0 -f "dry-run=true"
   ```
-- [ ] **Validate job passes** -- confirms all prerequisites without making changes
+- [x] **Validate job passes** -- [here](https://github.com/vig-os/devcontainer/actions/runs/23009885833)
 
 #### 3b. Publish the RC
 
-- [ ] **Trigger the actual candidate publish**
+- [x] **Trigger the actual candidate publish**
   ```bash
   just publish-candidate 0.3.0
   ```
-- [ ] **Monitor in [Actions > Release](https://github.com/vig-os/devcontainer/actions/workflows/release.yml)** -- all 5 jobs should complete:
+- [x] **Validate results**: [all 5 jobs completed](https://github.com/vig-os/devcontainer/actions/runs/23016037898):
 
   | Job | Expected outcome |
   |-----|-----------------|
@@ -217,18 +217,18 @@ Full end-to-end release-candidate cycle to validate the remaining acceptance cri
 
 #### 3c. Verify RC image on GHCR :white_check_mark: Acceptance criterion 1
 
-- [ ] **Tag `0.3.0-rc1` exists** -- check [tags](https://github.com/vig-os/devcontainer/tags)
-- [ ] **Image is pullable**
+- [x] **Tag `0.3.0-rc1` exists** -- check [tags](https://github.com/vig-os/devcontainer/tags)
+- [x] **Image is pullable**
   ```bash
   docker pull ghcr.io/vig-os/devcontainer:0.3.0-rc1
   ```
-- [ ] **Multi-arch manifest** -- inspect on [GHCR package page](https://github.com/vig-os/devcontainer/pkgs/container/devcontainer) or:
+- [x] **Multi-arch manifest** -- inspect on [GHCR package page](https://github.com/vig-os/devcontainer/pkgs/container/devcontainer) or:
   ```bash
   docker buildx imagetools inspect ghcr.io/vig-os/devcontainer:0.3.0-rc1
   ```
   Expect both `linux/amd64` and `linux/arm64` platforms.
-- [ ] **No `latest` tag updated** (candidate mode should not touch `latest`)
-- [ ] **Cosign signature verifies** (optional)
+- [x] **No `latest` tag updated** (candidate mode should not touch `latest`)
+- [x] **Cosign signature verifies** (optional)
   ```bash
   cosign verify \
     --certificate-identity-regexp='https://github.com/vig-os/devcontainer/' \
@@ -242,39 +242,40 @@ Full end-to-end release-candidate cycle to validate the remaining acceptance cri
 
 #### 4a. Dispatch fired :white_check_mark: Acceptance criterion 2
 
-- [ ] **New dispatch run appears** in [smoke-test Actions > Repository Dispatch](https://github.com/vig-os/devcontainer-smoke-test/actions/workflows/repository-dispatch.yml)
+- [x] **New dispatch run appears** in [smoke-test Actions > Repository Dispatch](https://github.com/vig-os/devcontainer-smoke-test/actions/workflows/repository-dispatch.yml)
   ```bash
   gh run list --repo vig-os/devcontainer-smoke-test --workflow repository-dispatch.yml --limit 3
   ```
-  > If no run appears, check the devcontainer release workflow's publish job logs for the "Trigger smoke-test repository dispatch" step. Look for token generation warnings.
-
-- [ ] **Dispatch `validate` job passes** -- tag `0.3.0-rc1` matches `^[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?$`
-- [ ] **Dispatch `deploy` job passes** -- runs installer with `--version 0.3.0-rc1`, creates branch `chore/deploy-0.3.0-rc1`, opens PR to `dev`
+> **Several bugs encountered**: required upstream fixes in [commit-action](https://github.com/vig-os/commit-action/releases/tag/v0.1.5) and new Release Candidates [0.3.0-rc2](https://github.com/vig-os/devcontainer/releases/tag/0.3.0-rc2) and [0.3.0-rc3](https://github.com/vig-os/devcontainer/releases/tag/0.3.0-rc3)
+- [x] **Dispatch `validate` job passes** -- tag `0.3.0-rc3` matches `^[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?$`
+- [x] **Dispatch `deploy` job passes** -- runs installer with `--version 0.3.0-rc3`, creates branch `chore/deploy-0.3.0-rc3`, opens PR to `dev`
 
 #### 4b. Bare-runner CI passes
 
-- [ ] **CI triggered on deploy PR** -- check [smoke-test PRs](https://github.com/vig-os/devcontainer-smoke-test/pulls), then the PR's Checks tab
+- [x] **CI triggered on deploy PR** -- check [smoke-test PRs](https://github.com/vig-os/devcontainer-smoke-test/pulls), then the PR's Checks tab. Successful run: [23056631299](https://github.com/vig-os/devcontainer-smoke-test/actions/runs/23056631299)
   ```bash
-  gh pr checks <PR_NUMBER> --repo vig-os/devcontainer-smoke-test
+  gh pr checks 23056631299 --repo vig-os/devcontainer-smoke-test
   ```
-- [ ] Lint & Format: pre-commit hooks pass
-- [ ] Tests: pytest passes with coverage
-- [ ] Security Scan: bandit + safety pass
-- [ ] CI Summary: green
+- [x] Lint & Format: pre-commit hooks pass
+- [x] Tests: pytest passes with coverage
+- [x] Security Scan: bandit + safety pass
+- [x] CI Summary: green
 
 #### 4c. Container CI passes with RC image :white_check_mark: Acceptance criterion 3
 
 This is the **critical test** -- the one that previously failed with `does-not-exist-tag`.
 
-- [ ] **`ci-container.yml` triggered** on the deploy PR
-- [ ] **"Initialize containers" succeeds** -- runner pulls `ghcr.io/vig-os/devcontainer:0.3.0-rc1` and starts the container
-- [ ] Lint & Format (container): pre-commit hooks pass inside the devcontainer image
-- [ ] Tests (container): pytest passes inside the devcontainer image
-- [ ] CI Summary (container): green
+Successful run: [23056631295](https://github.com/vig-os/devcontainer-smoke-test/actions/runs/23056631295)
+
+- [x] **`ci-container.yml` triggered** on the deploy PR
+- [x] **"Initialize containers" succeeds** -- runner pulls `ghcr.io/vig-os/devcontainer:0.3.0-rc3` and starts the container
+- [x] Lint & Format (container): pre-commit hooks pass inside the devcontainer image
+- [x] Tests (container): pytest passes inside the devcontainer image
+- [x] CI Summary (container): green
 
 ```bash
 gh run list --repo vig-os/devcontainer-smoke-test --workflow ci-container.yml --limit 1
-gh run view <RUN_ID> --repo vig-os/devcontainer-smoke-test
+gh run view 23056631295 --repo vig-os/devcontainer-smoke-test
 ```
 
 ---
@@ -297,12 +298,12 @@ gh run view <RUN_ID> --repo vig-os/devcontainer-smoke-test
    gh pr create --base release/0.3.0 --head bugfix/N-fix-description
    ```
 
-3. **Re-publish candidate** (auto-increments to `0.3.0-rc2`):
+3. **Re-publish candidate** (auto-increments to `0.3.0-rc2` and `0.3.0-rc3` ):
    ```bash
    just publish-candidate 0.3.0
    ```
 
-4. Repeat Phase 4 for the new RC.
+4. Repeat Phase 4 for the new RCs.
 
 </details>
 
@@ -312,22 +313,22 @@ gh run view <RUN_ID> --repo vig-os/devcontainer-smoke-test
 
 > Only proceed when **both** smoke-test workflows (bare-runner + container) are green.
 
-- [ ] **Trigger final release**
+- [x] **Trigger final release**
   ```bash
   just finalize-release 0.3.0
   ```
-- [ ] **Workflow completes** -- monitor in [Actions > Release](https://github.com/vig-os/devcontainer/actions/workflows/release.yml)
+- [x] **Workflow completes** -- successful run [23058092503](https://github.com/vig-os/devcontainer/actions/runs/23058092503)
 
 #### Verification checklist
 
-- [ ] CHANGELOG date set (`[0.3.0] - TBD` replaced with `[0.3.0] - YYYY-MM-DD`)
-- [ ] sync-issues triggered and completed
-- [ ] Both architectures build and test successfully
-- [ ] Tag `0.3.0` created -- check [tags](https://github.com/vig-os/devcontainer/tags)
-- [ ] Image published as `ghcr.io/vig-os/devcontainer:0.3.0`
-- [ ] `latest` tag updated to `0.3.0`
-- [ ] Cosign signature + SBOM + provenance attached
-- [ ] Verify images:
+- [x] CHANGELOG date set (`[0.3.0] - TBD` replaced with `[0.3.0] - YYYY-MM-DD`)
+- [ ] sync-issues triggered and completed -> failed because version in `main` is outdated
+- [x] Both architectures build and test successfully
+- [x] Tag `0.3.0` created -- check [tags](https://github.com/vig-os/devcontainer/tags)
+- [x] Image published as `ghcr.io/vig-os/devcontainer:0.3.0`
+- [x] `latest` tag updated to `0.3.0`
+- [x] Cosign signature + SBOM + provenance attached
+- [x] Verify images:
   ```bash
   docker pull ghcr.io/vig-os/devcontainer:0.3.0
   docker pull ghcr.io/vig-os/devcontainer:latest
@@ -338,13 +339,13 @@ gh run view <RUN_ID> --repo vig-os/devcontainer-smoke-test
 
 ### Phase 7: Post-Release
 
-- [ ] **Merge release PR to main** -- click "Merge pull request" in the PR UI, or:
+- [x] **Merge release PR to main** -- click "Merge pull request" in the PR UI, or:
   ```bash
   gh pr merge <PR_NUMBER> --merge
   ```
-- [ ] **sync-main-to-dev fires** -- check [Actions > sync-main-to-dev](https://github.com/vig-os/devcontainer/actions/workflows/sync-main-to-dev.yml)
-- [ ] **Dev is updated** -- sync PR auto-merges if conflict-free
-- [ ] **Final state** -- both tags exist:
+- [x] **sync-main-to-dev fires** -- check [Actions > sync-main-to-dev](https://github.com/vig-os/devcontainer/actions/workflows/sync-main-to-dev.yml)
+- [x] **Dev is updated** -- sync PR auto-merges if conflict-free
+- [x] **Final state** -- both tags exist:
   ```bash
   git fetch --all --tags
   git tag | grep 0.3.0
@@ -373,4 +374,12 @@ gh run view <RUN_ID> --repo vig-os/devcontainer-smoke-test
 | Release workflow fails mid-run | Automatic rollback resets branch + deletes tag + creates issue |
 | RC tag collision from concurrent run | Tag push step detects collision; re-run to infer next RC number |
 
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on March 13, 2026 at 09:58 PM_
+
+Closed with [Release 0.3.0](https://github.com/vig-os/devcontainer/pull/270)
 

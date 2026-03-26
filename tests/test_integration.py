@@ -892,6 +892,36 @@ class TestSmokeRepo:
             "repository-dispatch.yml should not be deployed without --smoke-test"
         )
 
+    def test_smoke_workspace_changelog_available_in_devcontainer_and_root(
+        self, initialized_smoke_workspace
+    ):
+        """Smoke template should ship root and devcontainer changelogs with distinct roles."""
+        root_changelog = initialized_smoke_workspace / "CHANGELOG.md"
+        devcontainer_changelog = (
+            initialized_smoke_workspace / ".devcontainer" / "CHANGELOG.md"
+        )
+
+        assert root_changelog.exists(), "Root CHANGELOG.md not found in smoke workspace"
+        assert devcontainer_changelog.exists(), (
+            ".devcontainer/CHANGELOG.md not found in smoke workspace"
+        )
+        root_content = root_changelog.read_text(encoding="utf-8")
+        devcontainer_content = devcontainer_changelog.read_text(encoding="utf-8")
+
+        # Root changelog is a copy of .devcontainer/CHANGELOG.md with the top semver
+        # heading renamed via prepare-changelog unprepare; older release sections stay.
+        first_h2 = re.search(r"^## .+$", root_content, re.MULTILINE)
+        assert first_h2 is not None, "Root changelog should have a top-level ## heading"
+        assert first_h2.group(0).rstrip("\r\n") == "## Unreleased", (
+            "Root changelog top section should be ## Unreleased after smoke-test unprepare"
+        )
+        assert re.search(r"^## \[\d+\.\d+\.\d+\]", root_content, re.MULTILINE), (
+            "Root changelog should retain semver release sections below Unreleased"
+        )
+        assert re.search(
+            r"^## \[\d+\.\d+\.\d+\]", devcontainer_content, re.MULTILINE
+        ), ".devcontainer changelog should include semver release history"
+
 
 class TestDevContainerGit:
     """Test that git configuration files are set up."""

@@ -4,12 +4,12 @@
 # 1. Validate: Check all prerequisites (PR status, CI passed, CHANGELOG ready)
 # 2. Finalize: For final releases only, set release date in CHANGELOG
 # 3. Build & Test: Build and test images for all architectures
-# 4. Publish: Create tag and publish images only if all tests pass
-# 5. Rollback (on failure): Revert changes and create issue
+# 4. Publish: Create tag, publish images, and create draft final GitHub Release
+# 5. Rollback (on failure): Reset release branch, create issue (tags are not deleted—forward-fix policy; GitHub immutability applies only after a published release locks the tag when that setting is enabled)
 #
 # Release kinds:
 #   candidate: Publishes X.Y.Z-rcN. No CHANGELOG changes, no sync-issues.
-#   final:     Publishes X.Y.Z. Sets release date in CHANGELOG, triggers sync-issues.
+#   final:     Publishes X.Y.Z. Sets release date in CHANGELOG, triggers sync-issues, creates draft GitHub Release.
 #
 # Design: Everything happens in one workflow dispatch before creating the tag.
 # This ensures no broken releases are tagged.
@@ -62,6 +62,9 @@ jobs:
     name: Validate Release
     runs-on: ubuntu-22.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       version: ${{ steps.vars.outputs.version }}
       pr_number: ${{ steps.pr.outputs.pr_number }}
@@ -72,12 +75,19 @@ jobs:
       publish_version: ${{ steps.publish_meta.outputs.publish_version }}
       next_rc: ${{ steps.publish_meta.outputs.next_rc }}
       pre_finalize_sha: ${{ steps.pre_sha.outputs.pre_finalize_sha }}
+      latest_rc: ${{ steps.latest_rc.outputs.latest_rc }}
       matrix: ${{ steps.matrix.outputs.matrix }}
       architectures: ${{ steps.matrix.outputs.architectures }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Set up environment
+        uses: ./.github/actions/setup-env
+        with:
+          install-python: 'false'
+          install-just: 'false'
 
       - name: Validate and prepare variables
         id: vars
@@ -116,7 +126,8 @@ jobs:
         env:
           VERSION: ${{ steps.vars.outputs.version }}
         run: |
-          git fetch origin "release/$VERSION" || {
+          set -euo pipefail
+          retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin "release/$VERSION" || {
             echo "ERROR: Release branch not found: release/$VERSION"
             echo "Did you run: just prepare-release $VERSION"
             exit 1
@@ -148,13 +159,20 @@ jobs:
               while IFS= read -r tag; do
                 [ -z "$tag" ] && continue
 
-                if ! echo "$tag" | grep -qE "^${VERSION}-rc[0-9]+$"; then
+                rc_prefix="${VERSION}-rc"
+                if [[ "$tag" != "$rc_prefix"* ]]; then
                   echo "ERROR: Malformed candidate tag detected: $tag"
                   echo "Expected format: ${VERSION}-rcN"
                   exit 1
                 fi
 
-                rc_num="${tag##*-rc}"
+                rc_num="${tag#"$rc_prefix"}"
+                if ! printf '%s' "$rc_num" | grep -qE '^[0-9]+$'; then
+                  echo "ERROR: Malformed candidate tag detected: $tag"
+                  echo "Expected format: ${VERSION}-rcN"
+                  exit 1
+                fi
+
                 if [ "$rc_num" -gt "$MAX_RC" ]; then
                   MAX_RC="$rc_num"
                 fi
@@ -173,6 +191,124 @@ jobs:
           echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
           echo "Publish version: $PUBLISH_VERSION"
 
+      - name: Find latest RC tag
+        if: steps.vars.outputs.release_kind == 'final'
+        id: latest_rc
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG_PATTERN="${VERSION}-rc*"
+          EXISTING_TAGS=$(git ls-remote --tags --refs origin "$TAG_PATTERN" \
+            | awk '{print $2}' | sed 's#refs/tags/##')
+
+          if [ -z "$EXISTING_TAGS" ]; then
+            echo "ERROR: No RC tags found for version $VERSION"
+            echo "Publish at least one candidate before finalizing: just publish-candidate $VERSION"
+            exit 1
+          fi
+
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+
+            rc_prefix="${VERSION}-rc"
+            if [[ "$tag" != "$rc_prefix"* ]]; then
+              echo "ERROR: Malformed candidate tag detected: $tag"
+              echo "Expected format: ${VERSION}-rcN"
+              exit 1
+            fi
+
+            rc_num="${tag#"$rc_prefix"}"
+            if ! printf '%s' "$rc_num" | grep -qE '^[0-9]+$'; then
+              echo "ERROR: Malformed candidate tag detected: $tag"
+              echo "Expected format: ${VERSION}-rcN"
+              exit 1
+            fi
+          done <<< "$EXISTING_TAGS"
+
+          LATEST_RC=$(echo "$EXISTING_TAGS" | sort -V | tail -1)
+          echo "latest_rc=$LATEST_RC" >> "$GITHUB_OUTPUT"
+          echo "Latest RC: $LATEST_RC"
+
+      - name: Generate cross-repo token for downstream gate
+        if: steps.vars.outputs.release_kind == 'final'
+        id: smoke-check-token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: vig-os
+          repositories: devcontainer-smoke-test
+
+      - name: Verify downstream pre-release for latest RC
+        if: steps.vars.outputs.release_kind == 'final'
+        env:
+          GH_TOKEN: ${{ steps.smoke-check-token.outputs.token }}
+          LATEST_RC: ${{ steps.latest_rc.outputs.latest_rc }}
+          VERSION: ${{ steps.vars.outputs.version }}
+        run: |
+          set -euo pipefail
+          echo "Checking downstream pre-release for $LATEST_RC..."
+
+          RELEASE_JSON=""
+          LAST_ERROR=""
+          RETRIES=5
+          for i in $(seq 1 "$RETRIES"); do
+            API_OUTPUT=""
+            if API_OUTPUT=$(gh api "repos/vig-os/devcontainer-smoke-test/releases/tags/$LATEST_RC" 2>&1); then
+              RELEASE_JSON="$API_OUTPUT"
+              break
+            fi
+
+            LAST_ERROR="$API_OUTPUT"
+            if printf '%s' "$API_OUTPUT" | grep -Eqi "401|403|forbidden|bad credentials|authentication|authorization|insufficient scopes"; then
+              echo "ERROR: Non-retryable authentication/authorization failure while querying downstream release API for $LATEST_RC"
+              echo "$API_OUTPUT"
+              exit 1
+            fi
+
+            if printf '%s' "$API_OUTPUT" | grep -Eqi "404|not found|429|5[0-9]{2}|timed out|timeout|temporary|connection reset|connection refused|network|tls"; then
+              if [ "$i" -lt "$RETRIES" ]; then
+                BACKOFF=$((i * 5))
+                echo "Downstream release lookup failed transiently, retrying in ${BACKOFF}s ($i/$RETRIES)..."
+                sleep "$BACKOFF"
+              fi
+              continue
+            fi
+
+            echo "ERROR: Failed querying downstream release API for $LATEST_RC"
+            echo "$API_OUTPUT"
+            exit 1
+          done
+
+          if [ -z "$RELEASE_JSON" ]; then
+            echo "ERROR: No downstream release found for RC tag $LATEST_RC"
+            if [ -n "$LAST_ERROR" ]; then
+              echo "Last API error:"
+              echo "$LAST_ERROR"
+            fi
+            echo ""
+            echo "The final release requires a successful smoke-test pre-release."
+            echo "Steps to resolve:"
+            echo "  1. Verify the candidate dispatch succeeded:"
+            echo "     gh -R vig-os/devcontainer-smoke-test run list --limit 5"
+            echo "  2. If no dispatch ran, re-publish the candidate:"
+            echo "     just publish-candidate $VERSION"
+            echo "  3. Wait for the downstream pre-release to appear, then retry."
+            exit 1
+          fi
+
+          TAG_NAME=$(echo "$RELEASE_JSON" | jq -r '.tag_name')
+          IS_PRERELEASE=$(echo "$RELEASE_JSON" | jq -r '.prerelease')
+
+          if [ "$IS_PRERELEASE" != "true" ]; then
+            echo "ERROR: Downstream release for $LATEST_RC exists but is not a pre-release"
+            echo "Expected prerelease=true for RC gate enforcement"
+            exit 1
+          fi
+
+          echo "✓ Downstream release verified: $TAG_NAME"
+
       - name: Verify CHANGELOG has TBD entry
         env:
           VERSION: ${{ steps.vars.outputs.version }}
@@ -182,14 +318,65 @@ jobs:
             exit 1
           fi
 
-      - name: Verify tag does not exist
+      - name: Verify GitHub Release does not block publish
         env:
           PUBLISH_VERSION: ${{ steps.publish_meta.outputs.publish_version }}
+          RELEASE_KIND: ${{ steps.vars.outputs.release_kind }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if git tag -l | grep -q "^${PUBLISH_VERSION}$"; then
-            echo "ERROR: Tag $PUBLISH_VERSION already exists"
+          set -euo pipefail
+          # Same error-classification pattern as "Verify downstream pre-release for latest RC" above.
+          RETRIES=5
+          LAST_ERROR=""
+          for i in $(seq 1 "$RETRIES"); do
+            API_OUTPUT=""
+            if API_OUTPUT=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${PUBLISH_VERSION}" 2>&1); then
+              if [ "$RELEASE_KIND" = "final" ]; then
+                IS_DRAFT=$(printf '%s' "$API_OUTPUT" | jq -r '.draft')
+                if [ "$IS_DRAFT" = "true" ]; then
+                  echo "Draft GitHub Release already exists for $PUBLISH_VERSION; publish job may retry release creation."
+                  exit 0
+                fi
+                echo "ERROR: Published (non-draft) GitHub Release already exists for $PUBLISH_VERSION"
+                echo "Immutable releases cannot be replaced; use a patch version if a new release is required."
+                exit 1
+              fi
+              echo "ERROR: GitHub Release already exists for $PUBLISH_VERSION"
+              exit 1
+            fi
+
+            LAST_ERROR="$API_OUTPUT"
+            if printf '%s' "$API_OUTPUT" | grep -Eqi "401|403|forbidden|bad credentials|authentication|authorization|insufficient scopes"; then
+              echo "ERROR: Non-retryable authentication/authorization failure while checking for existing GitHub Release for $PUBLISH_VERSION"
+              echo "$API_OUTPUT"
+              exit 1
+            fi
+
+            if printf '%s' "$API_OUTPUT" | grep -Eqi "not found|HTTP 404"; then
+              echo "No existing GitHub Release for $PUBLISH_VERSION (API reports not found)."
+              exit 0
+            fi
+
+            if printf '%s' "$API_OUTPUT" | grep -Eqi "429|5[0-9]{2}|timed out|timeout|temporary|connection reset|connection refused|network|tls"; then
+              if [ "$i" -lt "$RETRIES" ]; then
+                BACKOFF=$((i * 5))
+                echo "Release existence check failed transiently, retrying in ${BACKOFF}s ($i/$RETRIES)..."
+                sleep "$BACKOFF"
+              fi
+              continue
+            fi
+
+            echo "ERROR: Unexpected response while checking for existing GitHub Release for $PUBLISH_VERSION"
+            echo "$API_OUTPUT"
             exit 1
+          done
+
+          echo "ERROR: Unable to determine whether a GitHub Release exists for $PUBLISH_VERSION after $RETRIES attempts (fail closed)."
+          if [ -n "$LAST_ERROR" ]; then
+            echo "Last API error:"
+            echo "$LAST_ERROR"
           fi
+          exit 1
 
       - name: Set up GitHub CLI
         run: |
@@ -207,7 +394,7 @@ jobs:
           RELEASE_BRANCH="release/$VERSION"
 
           # Find PR from release branch to main
-          PR_JSON=$(gh pr list \
+          PR_JSON=$(retry --retries 3 --backoff 5 --max-backoff 30 -- gh pr list \
             --head "$RELEASE_BRANCH" \
             --base main \
             --json number,isDraft,reviewDecision,statusCheckRollup \
@@ -237,7 +424,20 @@ jobs:
             exit 1
           fi
 
-          if [ "$REVIEW_DECISION" != "APPROVED" ]; then
+          if [ "$REVIEW_DECISION" = "APPROVED" ]; then
+            echo "PR #$PR_NUMBER is approved"
+          elif [ "$REVIEW_DECISION" = "null" ] || [ -z "$REVIEW_DECISION" ]; then
+            # Bot approval fallback when gh pr list leaves reviewDecision empty (#438)
+            APPROVED_COUNT=$(retry --retries 3 --backoff 5 --max-backoff 30 -- gh api \
+              --paginate --slurp \
+              "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
+              | jq 'add | map(select(.state == "APPROVED")) | length')
+            if [ "$APPROVED_COUNT" -eq 0 ]; then
+              echo "ERROR: PR #$PR_NUMBER does not have approvals (reviewDecision: $REVIEW_DECISION, approved reviews: 0)"
+              exit 1
+            fi
+            echo "reviewDecision='$REVIEW_DECISION' but $APPROVED_COUNT approved review(s) found"
+          else
             echo "ERROR: PR #$PR_NUMBER does not have approvals (status: $REVIEW_DECISION)"
             exit 1
           fi
@@ -318,6 +518,7 @@ jobs:
           RELEASE_KIND: ${{ steps.vars.outputs.release_kind }}
           PUBLISH_VERSION: ${{ steps.publish_meta.outputs.publish_version }}
           NEXT_RC: ${{ steps.publish_meta.outputs.next_rc }}
+          LATEST_RC: ${{ steps.latest_rc.outputs.latest_rc }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           RELEASE_DATE: ${{ steps.vars.outputs.release_date }}
           ARCHITECTURES: ${{ steps.matrix.outputs.architectures }}
@@ -331,6 +532,9 @@ jobs:
           echo "  Publish Tag: $PUBLISH_VERSION"
           if [ -n "$NEXT_RC" ]; then
             echo "  Next RC Number: $NEXT_RC"
+          fi
+          if [ "$RELEASE_KIND" = "final" ]; then
+            echo "  Latest RC Gate: $LATEST_RC"
           fi
           echo "  Release Branch: release/$VERSION"
           echo "  PR: #$PR_NUMBER"
@@ -349,27 +553,28 @@ jobs:
       actions: write     # trigger sync-issues workflow
     outputs:
       finalize_sha: ${{ steps.finalize.outputs.finalize_sha }}
+      tag_already_exists: ${{ steps.tag_state.outputs.tag_already_exists }}
 
     steps:
       - name: Generate GitHub App Token
         id: app-token
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
       - name: Checkout release branch
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           ref: release/${{ needs.validate.outputs.version }}
           token: ${{ steps.app-token.outputs.token }}
           persist-credentials: true
 
       - name: Set up environment
-        if: needs.validate.outputs.release_kind == 'final'
         uses: ./.github/actions/setup-env
         with:
           sync-dependencies: 'true'
+          install-just: 'false'
 
       - name: Set release date in CHANGELOG
         if: needs.validate.outputs.release_kind == 'final'
@@ -381,20 +586,62 @@ jobs:
           uv run prepare-changelog finalize "$VERSION" "$RELEASE_DATE"
           echo "✓ Release date set in CHANGELOG.md"
 
+      - name: Regenerate docs for finalized release
+        if: needs.validate.outputs.release_kind == 'final'
+        run: |
+          set -euo pipefail
+          uv run python docs/generate.py
+          echo "✓ Regenerated docs from finalized CHANGELOG.md"
+
+      - name: Sync workspace manifest for finalized release
+        if: needs.validate.outputs.release_kind == 'final'
+        run: |
+          set -euo pipefail
+          uv run python scripts/sync_manifest.py sync assets/workspace/
+          echo "✓ Synced workspace manifest after changelog finalization"
+
+      - name: Collect finalization files
+        if: needs.validate.outputs.release_kind == 'final'
+        id: finalize-files
+        run: |
+          set -euo pipefail
+
+          CHANGED_FILES="$(git diff --name-only)"
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "ERROR: Finalization produced no tracked file changes."
+            echo "Expected CHANGELOG.md and possibly generated docs to change."
+            exit 1
+          fi
+
+          FILE_PATHS="$(echo "$CHANGED_FILES" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+          echo "file_paths=$FILE_PATHS" >> "$GITHUB_OUTPUT"
+          echo "Finalization files: $FILE_PATHS"
+
+          for expected_doc in README.md CONTRIBUTE.md TESTING.md docs/SKILL_PIPELINE.md; do
+            if git diff --quiet -- "$expected_doc"; then
+              continue
+            fi
+            if ! printf '%s\n' "$CHANGED_FILES" | grep -Fxq -- "$expected_doc"; then
+              echo "ERROR: Expected modified doc '$expected_doc' missing from commit file list."
+              exit 1
+            fi
+          done
+
       - name: Commit finalization changes via API
         if: needs.validate.outputs.release_kind == 'final'
-        uses: vig-os/commit-action@c0024cbad0e501764127cccab732c6cd465b4646  # v0.1.5
+        uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           TARGET_BRANCH: refs/heads/release/${{ needs.validate.outputs.version }}
+          MAX_ATTEMPTS: "3"
           COMMIT_MESSAGE: |-
             chore: finalize release ${{ needs.validate.outputs.version }}
 
-            Set release date to ${{ needs.validate.outputs.release_date }} in CHANGELOG.md
+            Set release date to ${{ needs.validate.outputs.release_date }} and regenerate release docs.
 
             Refs: #${{ needs.validate.outputs.pr_number }}
-          FILE_PATHS: CHANGELOG.md
+          FILE_PATHS: ${{ steps.finalize-files.outputs.file_paths }}
 
       - name: Trigger sync-issues workflow
         if: needs.validate.outputs.release_kind == 'final'
@@ -404,7 +651,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "Triggering sync-issues workflow..."
-          gh workflow run sync-issues.yml \
+          retry --retries 2 --backoff 5 --max-backoff 20 -- gh workflow run sync-issues.yml \
             -f "target-branch=release/$VERSION"
           echo "✓ sync-issues workflow triggered"
 
@@ -459,9 +706,37 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          git fetch origin "release/$VERSION"
+          retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin "release/$VERSION"
           git reset --hard "origin/release/$VERSION"
           echo "✓ Synced with remote release branch"
+
+      - name: Refresh release PR body from finalized changelog
+        if: needs.validate.outputs.release_kind == 'final'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_DATE: ${{ needs.validate.outputs.release_date }}
+          PR_NUMBER: ${{ needs.validate.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          CHANGELOG_CONTENT=$(sed -n "/## \[$VERSION\]/,/^## \[/p" CHANGELOG.md | sed '$d')
+
+          if [ -z "$CHANGELOG_CONTENT" ]; then
+            echo "ERROR: Could not extract release section for version $VERSION from CHANGELOG.md"
+            exit 1
+          fi
+
+          cat > /tmp/release-pr-body.md <<EOF
+          # [Release $VERSION](https://github.com/${GITHUB_REPOSITORY}/releases/tag/$VERSION) - $RELEASE_DATE
+
+          This PR prepares release $VERSION for merge to main.
+
+          $CHANGELOG_CONTENT
+          EOF
+
+          retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh pr edit "$PR_NUMBER" --body-file /tmp/release-pr-body.md
+          echo "✓ Refreshed PR #$PR_NUMBER body from finalized CHANGELOG.md"
 
       - name: Output finalize SHA
         id: finalize
@@ -474,10 +749,39 @@ jobs:
           if [ "$RELEASE_KIND" = "final" ]; then
             FINALIZE_SHA=$(git rev-parse HEAD)
           else
-            FINALIZE_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/$VERSION" --jq '.object.sha')
+            FINALIZE_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
+              gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/$VERSION" --jq '.object.sha')
           fi
           echo "finalize_sha=$FINALIZE_SHA" >> $GITHUB_OUTPUT
           echo "Release kind: $RELEASE_KIND — SHA: $FINALIZE_SHA"
+
+      - name: Check if publish tag already exists at finalize SHA
+        id: tag_state
+        env:
+          PUBLISH_VERSION: ${{ needs.validate.outputs.publish_version }}
+          FINALIZE_SHA: ${{ steps.finalize.outputs.finalize_sha }}
+        run: |
+          set -euo pipefail
+          REMOTE_LINE=$(git ls-remote origin "refs/tags/${PUBLISH_VERSION}^{}" || true)
+          if [ -z "$REMOTE_LINE" ]; then
+            REMOTE_LINE=$(git ls-remote origin "refs/tags/${PUBLISH_VERSION}" || true)
+          fi
+          if [ -z "$REMOTE_LINE" ]; then
+            echo "tag_already_exists=false" >> "$GITHUB_OUTPUT"
+            echo "No remote tag ${PUBLISH_VERSION} yet"
+            exit 0
+          fi
+          REMOTE_TARGET_SHA=$(printf '%s\n' "$REMOTE_LINE" | awk '{print $1}')
+          if [ -z "$REMOTE_TARGET_SHA" ]; then
+            echo "tag_already_exists=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$REMOTE_TARGET_SHA" != "$FINALIZE_SHA" ]; then
+            echo "ERROR: Tag $PUBLISH_VERSION exists but target commit is $REMOTE_TARGET_SHA; expected $FINALIZE_SHA (finalize SHA)"
+            exit 1
+          fi
+          echo "tag_already_exists=true" >> "$GITHUB_OUTPUT"
+          echo "Remote tag $PUBLISH_VERSION already points to finalize SHA; publish will skip tag create/push"
 
   build-and-test:
     name: Build and Test (${{ matrix.arch }})
@@ -490,7 +794,7 @@ jobs:
 
     steps:
       - name: Checkout release commit
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           ref: ${{ needs.finalize.outputs.finalize_sha }}
 
@@ -533,7 +837,7 @@ jobs:
           trivyignores: '.trivyignore'
 
       - name: Upload tested image
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7.0.0
         with:
           name: container-image-${{ needs.validate.outputs.publish_version }}-${{ matrix.arch }}
           path: /tmp/image.tar
@@ -554,21 +858,28 @@ jobs:
       packages: write       # push images to GHCR
       id-token: write       # keyless cosign signing via OIDC
       attestations: write   # build provenance attestations
+      artifact-metadata: write  # persist attestation storage records
 
     steps:
       - name: Generate GitHub App Token
         id: app-token
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
       - name: Checkout release commit
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           ref: ${{ needs.finalize.outputs.finalize_sha }}
           token: ${{ steps.app-token.outputs.token }}
           persist-credentials: true
+
+      - name: Set up environment
+        uses: ./.github/actions/setup-env
+        with:
+          install-python: 'false'
+          install-just: 'false'
 
       - name: Configure git
         env:
@@ -579,6 +890,7 @@ jobs:
           git config user.email "$GIT_USER_EMAIL"
 
       - name: Create annotated tag
+        if: ${{ needs.finalize.outputs.tag_already_exists != 'true' }}
         env:
           PUBLISH_VERSION: ${{ needs.validate.outputs.publish_version }}
         run: |
@@ -587,34 +899,75 @@ jobs:
           echo "✓ Tag created: $PUBLISH_VERSION"
 
       - name: Push tag
+        if: ${{ needs.finalize.outputs.tag_already_exists != 'true' }}
         env:
           PUBLISH_VERSION: ${{ needs.validate.outputs.publish_version }}
           RELEASE_KIND: ${{ needs.validate.outputs.release_kind }}
         run: |
           set -euo pipefail
           if [ "$RELEASE_KIND" = "candidate" ]; then
-            if git ls-remote --tags --refs origin "$PUBLISH_VERSION" | grep -q "refs/tags/$PUBLISH_VERSION$"; then
+            if retry --retries 3 --backoff 5 --max-backoff 30 -- git ls-remote --tags --refs origin "$PUBLISH_VERSION" | grep -q "refs/tags/$PUBLISH_VERSION$"; then
               echo "ERROR: Candidate tag '$PUBLISH_VERSION' already exists on origin"
               echo "Another candidate publish likely completed concurrently; re-run workflow to infer next RC."
               exit 1
             fi
           fi
 
-          git push origin "$PUBLISH_VERSION"
+          if ! retry --retries 3 --backoff 5 --max-backoff 30 -- git push origin "$PUBLISH_VERSION"; then
+            if retry --retries 3 --backoff 5 --max-backoff 30 -- git ls-remote --tags --refs origin "$PUBLISH_VERSION" | grep -q "refs/tags/$PUBLISH_VERSION$"; then
+              LOCAL_TAG_TARGET_SHA=$(git rev-parse "$PUBLISH_VERSION^{}")
+              REMOTE_TAG_TARGET_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- git ls-remote --tags origin "refs/tags/$PUBLISH_VERSION^{}" | awk '{print $1}')
+              if [ -z "$REMOTE_TAG_TARGET_SHA" ]; then
+                REMOTE_TAG_TARGET_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- git ls-remote --tags origin "refs/tags/$PUBLISH_VERSION" | awk '{print $1}')
+              fi
+              if [ -z "$REMOTE_TAG_TARGET_SHA" ]; then
+                echo "ERROR: Remote tag exists but target SHA could not be resolved: $PUBLISH_VERSION"
+                exit 1
+              fi
+              if [ "$REMOTE_TAG_TARGET_SHA" != "$LOCAL_TAG_TARGET_SHA" ]; then
+                echo "ERROR: Remote tag target SHA mismatch for $PUBLISH_VERSION"
+                echo "Local tag target:  $LOCAL_TAG_TARGET_SHA"
+                echo "Remote tag target: $REMOTE_TAG_TARGET_SHA"
+                exit 1
+              fi
+              echo "Tag already present on origin with matching target SHA: $PUBLISH_VERSION"
+            else
+              echo "ERROR: Failed to push tag $PUBLISH_VERSION"
+              exit 1
+            fi
+          fi
           echo "✓ Tag pushed: $PUBLISH_VERSION"
 
+      - name: Generate final release notes from CHANGELOG
+        if: needs.validate.outputs.release_kind == 'final'
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          awk -v version="$VERSION" '
+            index($0, "## [" version "] - ") == 1 {found=1; next}
+            /^## \[/ && found {found=0}
+            found {print}
+          ' CHANGELOG.md > /tmp/github-release-notes.md
+
+          if [ ! -s /tmp/github-release-notes.md ]; then
+            echo "ERROR: Failed to generate GitHub Release notes for $VERSION from CHANGELOG.md"
+            echo "Expected section heading: ## [$VERSION] - YYYY-MM-DD"
+            exit 1
+          fi
+
       - name: Install cosign
-        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad  # v4
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22  # v4
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2  # v4.0.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ github.token }}
 
       - name: Download image artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           path: /tmp/images
           pattern: container-image-${{ needs.validate.outputs.publish_version }}-*
@@ -646,22 +999,8 @@ jobs:
             IMAGE_TAG="$REPO:$PUBLISH_VERSION-$arch"
             docker tag "$SOURCE_IMAGE_TAG" "$IMAGE_TAG"
             echo "Pushing $arch image: $IMAGE_TAG"
-
-            RETRIES=3
-            for i in $(seq 1 $RETRIES); do
-              if docker push "$IMAGE_TAG"; then
-                echo "✓ Pushed: $IMAGE_TAG"
-                break
-              else
-                if [ $i -lt $RETRIES ]; then
-                  echo "Push failed, retrying ($i/$RETRIES)..."
-                  sleep 3
-                else
-                  echo "ERROR: Failed to push after $RETRIES attempts"
-                  exit 1
-                fi
-              fi
-            done
+            retry --retries 3 --backoff 3 --max-backoff 3 -- docker push "$IMAGE_TAG"
+            echo "✓ Pushed: $IMAGE_TAG"
           done
 
       - name: Create multi-arch manifest
@@ -683,45 +1022,20 @@ jobs:
           done
 
           echo "Creating version manifest: $REPO:$PUBLISH_VERSION"
-          RETRIES=3
-          for i in $(seq 1 $RETRIES); do
-            if docker buildx imagetools create \
+          retry --retries 3 --backoff 3 --max-backoff 3 -- \
+            docker buildx imagetools create \
               --tag "$REPO:$PUBLISH_VERSION" \
-              "${ARCH_IMAGES[@]}"; then
-              echo "✓ Created version manifest: $REPO:$PUBLISH_VERSION"
-              break
-            else
-              if [ $i -lt $RETRIES ]; then
-                echo "Manifest creation failed, retrying ($i/$RETRIES)..."
-                sleep 3
-              else
-                echo "ERROR: Failed to create version manifest"
-                exit 1
-              fi
-            fi
-          done
+              "${ARCH_IMAGES[@]}"
+          echo "✓ Created version manifest: $REPO:$PUBLISH_VERSION"
 
           # Update latest manifest only for final releases building both architectures.
           if [ "$RELEASE_KIND" = "final" ] && [ ${#ARCH_ARRAY[@]} -eq 2 ]; then
             echo "Creating/updating latest manifest: $REPO:latest"
-
-            RETRIES=3
-            for i in $(seq 1 $RETRIES); do
-              if docker buildx imagetools create \
+            retry --retries 3 --backoff 3 --max-backoff 3 -- \
+              docker buildx imagetools create \
                 --tag "$REPO:latest" \
-                "${ARCH_IMAGES[@]}"; then
-                echo "✓ Created/updated latest manifest: $REPO:latest"
-                break
-              else
-                if [ $i -lt $RETRIES ]; then
-                  echo "Latest manifest creation failed, retrying ($i/$RETRIES)..."
-                  sleep 3
-                else
-                  echo "ERROR: Failed to create latest manifest"
-                  exit 1
-                fi
-              fi
-            done
+                "${ARCH_IMAGES[@]}"
+            echo "✓ Created/updated latest manifest: $REPO:latest"
           else
             echo "Skipping 'latest' manifest (single architecture or limited build)"
           fi
@@ -773,8 +1087,23 @@ jobs:
             done
           fi
 
-      - name: Generate SBOM
-        uses: anchore/sbom-action@28d71544de8eaf1b958d335707167c5f783590ad  # v0.22.2
+      - name: Generate SBOM (attempt 1)
+        id: sbom_generate
+        continue-on-error: true
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610  # v0.24.0
+        with:
+          image: ghcr.io/vig-os/devcontainer:${{ needs.validate.outputs.publish_version }}
+          artifact-name: sbom-${{ needs.validate.outputs.publish_version }}.spdx.json
+          output-file: /tmp/sbom.spdx.json
+          format: spdx-json
+
+      - name: Wait before retrying SBOM generation
+        if: steps.sbom_generate.outcome == 'failure'
+        run: sleep 15
+
+      - name: Generate SBOM (retry)
+        if: steps.sbom_generate.outcome == 'failure'
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610  # v0.24.0
         with:
           image: ghcr.io/vig-os/devcontainer:${{ needs.validate.outputs.publish_version }}
           artifact-name: sbom-${{ needs.validate.outputs.publish_version }}.spdx.json
@@ -782,7 +1111,7 @@ jobs:
           format: spdx-json
 
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7.0.0
         with:
           name: sbom-${{ needs.validate.outputs.publish_version }}
           path: /tmp/sbom.spdx.json
@@ -796,11 +1125,13 @@ jobs:
           REPO="ghcr.io/vig-os/devcontainer"
 
           # Get the digest for the multi-arch manifest
-          DIGEST=$(docker buildx imagetools inspect "$REPO:$PUBLISH_VERSION" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          DIGEST=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            docker buildx imagetools inspect "$REPO:$PUBLISH_VERSION" --format '{{json .Manifest.Digest}}' | tr -d '"')
           echo "Signing image: $REPO@$DIGEST"
 
           # Keyless signing using GitHub Actions OIDC identity
-          cosign sign --yes "$REPO@$DIGEST"
+          retry --retries 3 --backoff 15 --max-backoff 15 -- \
+            cosign sign --yes "$REPO@$DIGEST"
           echo "✓ Image signed with cosign (keyless)"
 
       - name: Capture image digest for attestation
@@ -808,25 +1139,171 @@ jobs:
         env:
           PUBLISH_VERSION: ${{ needs.validate.outputs.publish_version }}
         run: |
+          set -euo pipefail
           REPO="ghcr.io/vig-os/devcontainer"
-          DIGEST=$(docker buildx imagetools inspect "$REPO:$PUBLISH_VERSION" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          DIGEST=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            docker buildx imagetools inspect "$REPO:$PUBLISH_VERSION" --format '{{json .Manifest.Digest}}' | tr -d '"')
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
           echo "Image digest: $DIGEST"
 
-      - name: Attest build provenance
-        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3
+      - name: Attest build provenance (attempt 1)
+        id: attest_provenance
+        continue-on-error: true
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32  # v4.1.0
         with:
           subject-name: ghcr.io/vig-os/devcontainer
           subject-digest: ${{ steps.digest.outputs.digest }}
           push-to-registry: true
 
-      - name: Attest SBOM
-        uses: actions/attest-sbom@4651f806c01d8637787e274ac3bdf724ef169f34  # v3
+      - name: Wait before retrying build provenance attestation
+        if: steps.attest_provenance.outcome == 'failure'
+        run: sleep 30
+
+      - name: Attest build provenance (retry)
+        if: steps.attest_provenance.outcome == 'failure'
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32  # v4.1.0
+        with:
+          subject-name: ghcr.io/vig-os/devcontainer
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest SBOM (attempt 1)
+        id: attest_sbom
+        continue-on-error: true
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26  # v4.1.0
         with:
           subject-name: ghcr.io/vig-os/devcontainer
           subject-digest: ${{ steps.digest.outputs.digest }}
           sbom-path: /tmp/sbom.spdx.json
           push-to-registry: true
+
+      - name: Wait before retrying SBOM attestation
+        if: steps.attest_sbom.outcome == 'failure'
+        run: sleep 30
+
+      - name: Attest SBOM (retry)
+        if: steps.attest_sbom.outcome == 'failure'
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26  # v4.1.0
+        with:
+          subject-name: ghcr.io/vig-os/devcontainer
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          sbom-path: /tmp/sbom.spdx.json
+          push-to-registry: true
+
+      - name: Publish final GitHub Release
+        if: needs.validate.outputs.release_kind == 'final'
+        env:
+          PUBLISH_VERSION: ${{ needs.validate.outputs.publish_version }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          # Draft first: human publishes from the UI when ready (GitHub immutable-releases best practice).
+          RETRIES=5
+          LAST_ERROR=""
+          for i in $(seq 1 "$RETRIES"); do
+            API_OUTPUT=""
+            if API_OUTPUT=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${PUBLISH_VERSION}" 2>&1); then
+              IS_DRAFT=$(printf '%s' "$API_OUTPUT" | jq -r '.draft')
+              if [ "$IS_DRAFT" = "true" ]; then
+                echo "✓ Draft GitHub Release already exists for $PUBLISH_VERSION; skipping create (retry path)."
+                echo "Review and publish from: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases"
+                exit 0
+              fi
+              echo "ERROR: Published (non-draft) GitHub Release already exists for tag $PUBLISH_VERSION"
+              exit 1
+            fi
+
+            LAST_ERROR="$API_OUTPUT"
+            if printf '%s' "$API_OUTPUT" | grep -Eqi "401|403|forbidden|bad credentials|authentication|authorization|insufficient scopes"; then
+              echo "ERROR: Non-retryable authentication/authorization failure while checking for existing GitHub Release for $PUBLISH_VERSION"
+              echo "$API_OUTPUT"
+              exit 1
+            fi
+
+            if printf '%s' "$API_OUTPUT" | grep -Eqi "not found|HTTP 404"; then
+              break
+            fi
+
+            if printf '%s' "$API_OUTPUT" | grep -Eqi "429|5[0-9]{2}|timed out|timeout|temporary|connection reset|connection refused|network|tls"; then
+              if [ "$i" -lt "$RETRIES" ]; then
+                BACKOFF=$((i * 5))
+                echo "Release existence check failed transiently, retrying in ${BACKOFF}s ($i/$RETRIES)..."
+                sleep "$BACKOFF"
+              fi
+              continue
+            fi
+
+            echo "ERROR: Unexpected response while checking for existing GitHub Release for $PUBLISH_VERSION"
+            echo "$API_OUTPUT"
+            exit 1
+          done
+
+          if ! printf '%s' "$LAST_ERROR" | grep -Eqi "not found|HTTP 404"; then
+            echo "ERROR: Unable to determine whether a GitHub Release exists for $PUBLISH_VERSION after $RETRIES attempts (fail closed)."
+            if [ -n "$LAST_ERROR" ]; then
+              echo "Last API error:"
+              echo "$LAST_ERROR"
+            fi
+            exit 1
+          fi
+
+          retry --retries 3 --backoff 5 --max-backoff 30 -- gh release create "$PUBLISH_VERSION" \
+            --title "$PUBLISH_VERSION" \
+            --notes-file /tmp/github-release-notes.md \
+            --verify-tag \
+            --draft || {
+              RELEASE_PRESENT=0
+              IS_DRAFT_RETRY=0
+              rb_retries=5
+              rb_last=""
+              for j in $(seq 1 "$rb_retries"); do
+                rb_out=""
+                if rb_out=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${PUBLISH_VERSION}" 2>&1); then
+                  RELEASE_PRESENT=1
+                  IS_DRAFT_RETRY=$(printf '%s' "$rb_out" | jq -r '.draft')
+                  break
+                fi
+                rb_last="$rb_out"
+                if printf '%s' "$rb_out" | grep -Eqi "401|403|forbidden|bad credentials|authentication|authorization|insufficient scopes"; then
+                  echo "ERROR: Non-retryable authentication/authorization failure while verifying GitHub Release after create for $PUBLISH_VERSION"
+                  echo "$rb_out"
+                  exit 1
+                fi
+                if printf '%s' "$rb_out" | grep -Eqi "not found|HTTP 404"; then
+                  RELEASE_PRESENT=0
+                  break
+                fi
+                if printf '%s' "$rb_out" | grep -Eqi "429|5[0-9]{2}|timed out|timeout|temporary|connection reset|connection refused|network|tls"; then
+                  if [ "$j" -lt "$rb_retries" ]; then
+                    rb_backoff=$((j * 5))
+                    echo "Post-create release check failed transiently, retrying in ${rb_backoff}s ($j/$rb_retries)..."
+                    sleep "$rb_backoff"
+                  fi
+                  continue
+                fi
+                echo "ERROR: Unexpected response while verifying GitHub Release after create for $PUBLISH_VERSION"
+                echo "$rb_out"
+                exit 1
+              done
+              if [ "$RELEASE_PRESENT" -eq 1 ]; then
+                if [ "$IS_DRAFT_RETRY" = "true" ]; then
+                  echo "✓ Draft GitHub Release present after create attempt: $PUBLISH_VERSION"
+                else
+                  echo "ERROR: Published (non-draft) GitHub Release appeared for $PUBLISH_VERSION during create fallback — expected draft."
+                  exit 1
+                fi
+              else
+                if [ "$j" -eq "$rb_retries" ] && ! printf '%s' "$rb_last" | grep -Eqi "not found|HTTP 404"; then
+                  echo "ERROR: Unable to verify GitHub Release state for $PUBLISH_VERSION after create failure (fail closed)."
+                  echo "$rb_last"
+                  exit 1
+                fi
+                exit 1
+              fi
+            }
+
+          echo "✓ Draft GitHub Release created: $PUBLISH_VERSION"
+          echo "Review and publish from: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases (publishing locks the linked tag and assets when immutable releases are enabled)"
 
       - name: Summary
         env:
@@ -852,60 +1329,147 @@ jobs:
           echo ""
           echo "Next steps:"
           if [ "$RELEASE_KIND" = "candidate" ]; then
-            echo "  1. Verify smoke-test repo dispatch run status before final release"
-            echo "  2. If smoke tests pass, run: just finalize-release $BASE_VERSION"
+            echo "  1. Smoke-test dispatch runs in the smoke-test job."
+            echo "  2. If downstream pre-release passes, run: just finalize-release $BASE_VERSION"
           else
-            echo "  1. Merge release PR to main (triggers sync-main-to-dev workflow automatically)"
+            echo "  1. Smoke-test dispatch runs in the smoke-test job."
+            echo "  2. Review the draft GitHub Release and publish it from the Releases UI (publishing applies immutable-release lock-in for the tag and assets when that setting is enabled)."
+            echo "  3. Merge release PR to main (triggers sync-main-to-dev workflow automatically)"
           fi
 
+  smoke-test:
+    name: Smoke-Test Dispatch
+    needs: [validate, finalize, publish]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    if: ${{ github.event.inputs.dry-run != 'true' }}
+    permissions:
+      contents: read
+      issues: write
+    steps:
       - name: Generate smoke-test dispatch token
-        if: needs.validate.outputs.release_kind == 'candidate'
         id: smoke-app-token
-        continue-on-error: true
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: vig-os
           repositories: devcontainer-smoke-test
 
+      # Local actions from ./.github/actions/* require repository checkout in this job workspace.
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Set up environment
+        uses: ./.github/actions/setup-env
+        with:
+          install-python: 'false'
+          install-just: 'false'
+
       - name: Trigger smoke-test repository dispatch
-        if: needs.validate.outputs.release_kind == 'candidate' && steps.smoke-app-token.outcome == 'success'
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ steps.smoke-app-token.outputs.token }}
-          RC_TAG: ${{ needs.validate.outputs.publish_version }}
+          RELEASE_TAG: ${{ needs.validate.outputs.publish_version }}
+          RELEASE_KIND: ${{ needs.validate.outputs.release_kind }}
+          SOURCE_REPO: ${{ github.repository }}
+          SOURCE_WORKFLOW: ${{ github.workflow }}
+          SOURCE_RUN_ID: ${{ github.run_id }}
+          SOURCE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SOURCE_SHA: ${{ needs.finalize.outputs.finalize_sha }}
+          CORRELATION_ID: ${{ github.repository }}:${{ github.run_id }}:${{ needs.validate.outputs.publish_version }}
         run: |
           set -euo pipefail
-          gh api repos/vig-os/devcontainer-smoke-test/dispatches \
-            -f event_type=smoke-test-trigger \
-            -f "client_payload[tag]=$RC_TAG"
-          echo "✓ Triggered smoke-test dispatch for RC tag: $RC_TAG"
+          retry --retries 3 --backoff 10 --max-backoff 10 -- \
+            gh api repos/vig-os/devcontainer-smoke-test/dispatches \
+              -f event_type=smoke-test-trigger \
+              -f "client_payload[tag]=$RELEASE_TAG" \
+              -f "client_payload[release_kind]=$RELEASE_KIND" \
+              -f "client_payload[event_type]=smoke-test-trigger" \
+              -f "client_payload[source_repo]=$SOURCE_REPO" \
+              -f "client_payload[source_workflow]=$SOURCE_WORKFLOW" \
+              -f "client_payload[source_run_id]=$SOURCE_RUN_ID" \
+              -f "client_payload[source_run_url]=$SOURCE_RUN_URL" \
+              -f "client_payload[source_sha]=$SOURCE_SHA" \
+              -f "client_payload[correlation_id]=$CORRELATION_ID"
+          echo "✓ Triggered smoke-test dispatch for release tag: $RELEASE_TAG"
 
-      - name: Warn if smoke-test dispatch token generation failed
-        if: needs.validate.outputs.release_kind == 'candidate' && steps.smoke-app-token.outcome != 'success'
+      - name: Summary
+        env:
+          RELEASE_TAG: ${{ needs.validate.outputs.publish_version }}
+          RELEASE_KIND: ${{ needs.validate.outputs.release_kind }}
         run: |
-          echo "WARNING: Could not generate cross-repo token for smoke-test dispatch."
-          echo "Install RELEASE_APP on vig-os/devcontainer-smoke-test with contents:read permission."
+          echo "✓ Triggered smoke-test dispatch for release tag: $RELEASE_TAG"
+          echo "Downstream validation is asynchronous; verify in devcontainer-smoke-test."
+          if [ "$RELEASE_KIND" = "final" ]; then
+            echo "Final: review the draft GitHub Release in this repo and publish it from the Releases UI when validation is complete."
+          fi
+
+      - name: Create issue for smoke dispatch failure
+        if: ${{ failure() }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8.0.0
+        with:
+          script: |
+            const publishVersion = '${{ needs.validate.outputs.publish_version }}';
+            const releaseKind = '${{ needs.validate.outputs.release_kind }}';
+            const workflowUrl = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            const title = `Release ${publishVersion} smoke dispatch failed`;
+            const body = `
+            Release ${publishVersion} (${releaseKind}) failed while triggering downstream smoke-test dispatch.
+
+            **Workflow Run:** [View logs](${workflowUrl})
+            **Failed Job:** smoke-test
+
+            **Important:**
+            - Upstream publish already completed before this dispatch step.
+            - Published artifacts (GHCR images, tag, signatures, attestations, and draft or published GitHub Release if applicable) are intentionally left intact.
+            - No branch reset or tag deletion is performed for dispatch-only failures.
+
+            **Next Steps:**
+            1. Review smoke-test dispatch logs in this workflow run.
+            2. Validate token/repository_dispatch permissions for \`vig-os/devcontainer-smoke-test\`.
+            3. Re-trigger dispatch after fixing the root cause.
+            `;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['bug', 'area:ci']
+            });
+
+            core.info(`Created issue: ${title}`);
 
   rollback:
     name: Rollback on Failure
+    # Rollback is intentionally scoped to pre-publish/publish failures.
+    # Dispatch-only smoke-test failures happen after publish; automation does not delete tags or reset branches (forward-fix policy).
     needs: [validate, finalize, build-and-test, publish]
     runs-on: ubuntu-22.04
     timeout-minutes: 10
-    if: failure()
+    if: ${{ always() && (needs.validate.result == 'failure' || needs.finalize.result == 'failure' || needs.build-and-test.result == 'failure' || needs.publish.result == 'failure') }}
     permissions:
+      contents: read        # required by actions/checkout in rollback job
       issues: write          # create failure issue
-      # Branch rollback and tag deletion use the RELEASE_APP token (not GITHUB_TOKEN),
+      # Branch rollback uses the RELEASE_APP token (not GITHUB_TOKEN),
       # which has Contents read/write configured on the GitHub App.
 
     steps:
       - name: Generate GitHub App Token
         id: app-token
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf  # v2
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Set up environment
+        uses: ./.github/actions/setup-env
+        with:
+          install-python: 'false'
+          install-just: 'false'
 
       - name: Rollback release branch
         id: rollback-branch
@@ -917,31 +1481,14 @@ jobs:
         run: |
           set -euo pipefail
           echo "Rolling back release branch to pre-finalization state..."
-          gh api "repos/${{ github.repository }}/git/refs/heads/release/$VERSION" \
+          retry --retries 3 --backoff 5 --max-backoff 30 -- gh api "repos/${{ github.repository }}/git/refs/heads/release/$VERSION" \
             -X PATCH \
             -f sha="$PRE_SHA" \
             -F force=true
           echo "✓ Release branch rolled back to $PRE_SHA"
 
-      - name: Delete tag if created
-        id: rollback-tag
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PUBLISH_VERSION: ${{ needs.validate.outputs.publish_version }}
-        run: |
-          set -euo pipefail
-          TAG="$PUBLISH_VERSION"
-          if gh api "repos/${{ github.repository }}/git/refs/tags/$TAG" >/dev/null 2>&1; then
-            echo "Deleting remote tag: $TAG"
-            gh api "repos/${{ github.repository }}/git/refs/tags/$TAG" -X DELETE
-            echo "✓ Tag deleted"
-          else
-            echo "Tag does not exist on remote (not created)"
-          fi
-
       - name: Create failure issue
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b  # v7
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8.0.0
         with:
           script: |
             const publishVersion = '${{ needs.validate.outputs.publish_version }}';
@@ -955,7 +1502,6 @@ jobs:
             if ('${{ needs.publish.result }}' !== 'success') failedJobs.push('publish');
 
             const rollbackBranch = '${{ steps.rollback-branch.outcome }}';
-            const rollbackTag = '${{ steps.rollback-tag.outcome }}';
 
             const title = `Release ${publishVersion} failed -- automatic rollback`;
             const body = `
@@ -969,21 +1515,24 @@ jobs:
 
             **Rollback Results:**
             - Branch rollback: ${rollbackBranch}
-            - Tag deletion: ${rollbackTag}
+
+            **Tag status (forward-fix policy):**
+            - Release tags are **not** deleted by automation (workflow choice; not the same as GitHub immutable-release lock-in).
+            - If the tag was pushed before the failure, it remains on the remote; use a new release candidate to validate fixes, then re-run the final release when ready.
 
             **Actions Taken:**
-            - Release branch rolled back to pre-finalization state
-            - Release tag deleted (if created)
+            - Release branch reset to pre-finalization state (best-effort)
             - This issue created for investigation
 
             **Manual Cleanup May Be Needed:**
             - If images were pushed to GHCR before the failure, they are **not** automatically deleted. Check \`ghcr.io/vig-os/devcontainer:${publishVersion}-*\` and remove any orphaned images manually.
+            - If a **draft** GitHub Release exists for this tag, edit or manage it from the Releases UI (**publishing** locks the linked tag and assets when **immutable releases** are enabled).
 
             **Next Steps:**
             1. Review the workflow logs to identify the root cause
             2. Check rollback results above; fix any partial rollback manually
             3. Fix the issue on the release branch
-            4. Re-run the workflow when ready
+            4. Publish a new release candidate to validate the fix; re-run the final workflow when ready
 
             For details, check the workflow run linked above.
             `;
@@ -1003,8 +1552,8 @@ jobs:
           echo "✗ Release workflow failed"
           echo ""
           echo "Automatic rollback completed:"
-          echo "  - Release branch reset to pre-finalization state"
-          echo "  - Release tag deleted (if created)"
+          echo "  - Release branch reset to pre-finalization state (best-effort)"
+          echo "  - Tags were not deleted (forward-fix policy)"
           echo "  - GitHub issue created for investigation"
           echo ""
           echo "Check the workflow logs and issue for details"
