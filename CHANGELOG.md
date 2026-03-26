@@ -79,6 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Final releases create a **draft** GitHub Release for human review before publishing; rollback no longer deletes remote tags
   - Release workflows skip redundant tag push when the tag already matches the finalized commit; workspace `release-core` / `release-publish` and smoke-test failure guidance updated accordingly
   - Document tag rulesets, immutable releases, and recovery in `docs/RELEASE_CYCLE.md`, `docs/DOWNSTREAM_RELEASE.md`, and `docs/CROSS_REPO_RELEASE_GATE.md`
+- **Container image tests expect current GitHub CLI minor line**
+  - Update `tests/test_image.py` `EXPECTED_VERSIONS["gh"]` to `2.89.` to match the CLI shipped in the image
 
 ### Removed
 
@@ -206,6 +208,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release tag resolution and GitHub Release view retries** ([#446](https://github.com/vig-os/devcontainer/issues/446))
   - Fall back to plain `refs/tags/<tag>` when the peeled ref is empty (lightweight remote tags) in `.github/workflows/release.yml`, `release-core.yml`, and `release-publish.yml`
   - Use one retried `gh release view` in workspace `release-publish.yml` so draft/prerelease skip paths parse JSON from the same successful response
+- **Workspace release publish `tag_already_exists` input coercion** ([#451](https://github.com/vig-os/devcontainer/issues/451))
+  - Pass a boolean into `release-publish.yml` via `needs.core.outputs.tag_already_exists == 'true'` so `workflow_call` does not reject string `"true"`/`"false"` job outputs
 
 ### Security
 

@@ -104,7 +104,7 @@ jobs:
       release_kind: ${{ needs.core.outputs.release_kind }}
       git_user_name: ${{ inputs.git-user-name }}
       git_user_email: ${{ inputs.git-user-email }}
-      tag_already_exists: ${{ needs.core.outputs.tag_already_exists }}
+      tag_already_exists: ${{ needs.core.outputs.tag_already_exists == 'true' }}
     secrets: inherit
 
   rollback:
