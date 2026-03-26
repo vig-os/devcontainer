@@ -79,6 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Final releases create a **draft** GitHub Release for human review before publishing; rollback no longer deletes remote tags
   - Release workflows skip redundant tag push when the tag already matches the finalized commit; workspace `release-core` / `release-publish` and smoke-test failure guidance updated accordingly
   - Document tag rulesets, immutable releases, and recovery in `docs/RELEASE_CYCLE.md`, `docs/DOWNSTREAM_RELEASE.md`, and `docs/CROSS_REPO_RELEASE_GATE.md`
+- **Container image tests expect current GitHub CLI minor line**
+  - Update `tests/test_image.py` `EXPECTED_VERSIONS["gh"]` to `2.89.` to match the CLI shipped in the image
 
 ### Removed
 
