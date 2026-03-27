@@ -2083,7 +2083,6 @@ class TestJustRecipes:
             "promote-release",
             "publish-candidate",
             "reset-changelog",
-            "pull",
         ]:
             assert re.search(rf"(?m)^{recipe_name}(?:\s+.*)?:$", content), (
                 f"{recipe_name} recipe definition should exist in .devcontainer/justfile.gh"
@@ -2101,16 +2100,13 @@ class TestJustRecipes:
         assert 'gh workflow run promote-release.yml --ref "$REF"' in content
         assert "release-kind=final" in content
         assert "release-kind=candidate" in content
-        assert "uv run prepare-changelog reset CHANGELOG.md" in content
-        assert (
-            "\nreset-changelog:\n    prepare-changelog reset CHANGELOG.md"
-            not in content
-        )
-        assert 'pull version="latest" repo="":' in content
-        assert (
-            'RESOLVED_REPO="${repo:-${TEST_REGISTRY:-ghcr.io/vig-os/devcontainer}}"'
-            in (content)
-        )
+        assert "create-release={{ create-release }}" in content
+        assert "\nreset-changelog:\n    prepare-changelog reset CHANGELOG.md" in content
+        assert "uv run prepare-changelog" not in content
+        assert "build/test images" not in content
+        assert "GHCR :latest" not in content
+        assert 'pull version="latest"' not in content
+        assert "ghcr.io/vig-os/devcontainer" not in content
 
 
 class TestDockerComposeProjectOverrides:
