@@ -61,7 +61,8 @@ cmd_install() {
             echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg arch=$arch] https://deb.nodesource.com/node_22.x nodistro main" \
                 | tee /etc/apt/sources.list.d/nodesource.list >/dev/null
             # Update all repos with clock-skew tolerance (nodesource nodejs depends on system python3)
-            apt-get -o Acquire::Check-Valid-Until=false update -qq 2>/dev/null
+            # apt returns 100 if any repo has clock issues — ignore since the repos we need still update
+            apt-get -o Acquire::Check-Valid-Until=false update -qq 2>/dev/null || true
             apt-get install -y nodejs
         fi
 
