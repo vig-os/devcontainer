@@ -198,10 +198,10 @@ test version="dev":
 #   5. just finalize-release X.Y.Z   - Triggers release.yml (final) that:
 #      - Validates PR status and all prerequisites
 #      - Sets release date in CHANGELOG, syncs PR docs
-#      - Builds and tests container images; creates vX.Y.Z tag; pushes versioned GHCR images
+#      - Builds and tests container images; creates X.Y.Z tag; pushes versioned GHCR images
 #      - Creates draft GitHub Release; dispatches smoke-test (not :latest yet)
 #      - On failure: automatic rollback and issue creation
-#   6. Wait for devcontainer-smoke-test to publish its final release for vX.Y.Z
+#   6. Wait for devcontainer-smoke-test to publish its final release for X.Y.Z
 #   7. just promote-release X.Y.Z    - Triggers promote-release.yml that:
 #      - Updates GHCR :latest, publishes the draft GitHub Release, merges release PR to main
 #      - Merging to main triggers sync-main-to-dev.yml (PR main -> dev, auto-merge if clean)
