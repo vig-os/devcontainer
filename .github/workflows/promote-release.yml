@@ -6,6 +6,10 @@
 # 1. validate: GHCR X.Y.Z + cosign, draft release on this repo, downstream final release
 # 2. promote: GHCR :latest manifest, publish (undraft) GitHub Release
 # 3. merge: merge release/X.Y.Z PR to main (triggers sync-main-to-dev)
+# 4. cleanup (best-effort): delete GHCR RC + orphaned sha256-only package versions for this
+#    base version; delete matching git RC tags that have no GitHub Release. Uses RELEASE_APP
+#    with org Packages read/write (not GITHUB_TOKEN for GHCR deletes); see docs/RELEASE_CYCLE.md
+#    heading "Registry and cleanup tokens (upstream)". Does not fail the workflow on error.
 
 name: Promote Release
 
@@ -470,3 +474,125 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
         run: |
           echo "✓ Release $VERSION promoted; PR #$PR_NUMBER merged to main (sync-main-to-dev may run next)"
+
+  cleanup:
+    name: Cleanup RC artifacts
+    needs: [validate, promote, merge]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    if: ${{ needs.merge.result == 'success' }}
+    continue-on-error: true
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Set up environment
+        uses: ./.github/actions/setup-env
+        with:
+          install-python: 'false'
+          install-just: 'false'
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Prune GHCR RC and orphaned sha256 package versions
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          PKG_PATH="/orgs/vig-os/packages/container/devcontainer/versions"
+
+          is_rc_for_base() {
+            local tag="$1" base="$2"
+            local prefix="${base}-rc" rc_suffix
+            [[ "$tag" == "$prefix"* ]] || return 1
+            rc_suffix="${tag#"$prefix"}"
+            [[ "$rc_suffix" =~ ^[0-9]+$ ]] && return 0
+            [[ "$rc_suffix" =~ ^[0-9]+-(amd64|arm64)$ ]] && return 0
+            return 1
+          }
+
+          all_tags_sha256_prefixed() {
+            local -a tags=("$@")
+            [ "${#tags[@]}" -gt 0 ] || return 1
+            local t
+            for t in "${tags[@]}"; do
+              [[ "$t" == sha256-* ]] || return 1
+            done
+            return 0
+          }
+
+          TMP=$(mktemp)
+          trap 'rm -f "$TMP"' EXIT
+
+          retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh api --paginate "$PKG_PATH" > "$TMP"
+
+          RC_IDS=()
+          SHA256_IDS=()
+          while IFS= read -r row; do
+            [ -z "$row" ] && continue
+            vid=$(printf '%s' "$row" | jq -r '.id')
+            mapfile -t tags < <(printf '%s' "$row" | jq -r '(.metadata.container.tags // [])[]?')
+            rc_hit=false
+            for t in "${tags[@]}"; do
+              if is_rc_for_base "$t" "$VERSION"; then
+                rc_hit=true
+                break
+              fi
+            done
+            if [ "$rc_hit" = true ]; then
+              RC_IDS+=("$vid")
+              echo "GHCR version $vid (RC for $VERSION): ${tags[*]}"
+            elif all_tags_sha256_prefixed "${tags[@]}"; then
+              SHA256_IDS+=("$vid")
+              echo "GHCR version $vid (sha256-only): ${tags[*]}"
+            fi
+          done < <(jq -s 'add // []' "$TMP" | jq -c '.[]')
+
+          mapfile -t DEL_IDS < <(printf '%s\n' "${RC_IDS[@]}" "${SHA256_IDS[@]}" | sort -u)
+          for vid in "${DEL_IDS[@]}"; do
+            [ -z "$vid" ] && continue
+            echo "Deleting GHCR package version id=$vid"
+            retry --retries 3 --backoff 5 --max-backoff 30 -- \
+              gh api -X DELETE "$PKG_PATH/$vid" || echo "WARN: delete failed for id=$vid"
+          done
+
+          echo "✓ GHCR prune pass complete for base version $VERSION"
+
+      - name: Delete git RC tags without GitHub Release
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAGS=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            git ls-remote --tags --refs "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${VERSION}-rc*" \
+            | awk '{print $2}' | sed 's#refs/tags/##' || true)
+          if [ -z "$TAGS" ]; then
+            echo "No remote RC tags matching ${VERSION}-rc*"
+            exit 0
+          fi
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            if retry --retries 2 --backoff 3 --max-backoff 10 -- \
+              gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" >/dev/null 2>&1; then
+              echo "Skipping tag $tag (GitHub Release exists)"
+              continue
+            fi
+            echo "Deleting remote tag $tag (no GitHub Release)"
+            retry --retries 3 --backoff 5 --max-backoff 30 -- \
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${tag}" \
+              || echo "WARN: failed to delete tag $tag"
+          done <<< "$TAGS"
+          echo "✓ Git RC tag cleanup complete for $VERSION"
