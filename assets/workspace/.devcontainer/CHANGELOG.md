@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **prepare-release tolerates GitHub API ref propagation and reliable CHANGELOG rollback** ([#453](https://github.com/vig-os/devcontainer/issues/453))
   - Poll until the new release branch ref resolves before `commit-action` commits to it
   - Fetch dev `CHANGELOG.md` by resolved commit SHA during rollback so Contents API staleness does not skip the rollback commit
+- **sync-main-to-dev sync job no longer depends on dev's setup-env** ([#459](https://github.com/vig-os/devcontainer/issues/459))
+  - Inline the same `retry` shell helper used by `setup-env` so the job works when `main`'s workflow expects helpers not yet on `dev`
 
 ### Security
 
