@@ -659,7 +659,7 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          if grep -q "## \[$VERSION\] - TBD" CHANGELOG.md; then
+          if grep -Fq "## [${VERSION}] - TBD" CHANGELOG.md; then
             echo "ERROR: CHANGELOG.md still contains TBD for $VERSION after finalize commit"
             exit 1
           fi
@@ -674,7 +674,11 @@ jobs:
           PR_NUMBER: ${{ needs.validate.outputs.pr_number }}
         run: |
           set -euo pipefail
-          CHANGELOG_CONTENT=$(sed -n "/## \[$VERSION\]/,/^## \[/p" CHANGELOG.md | sed '$d')
+          CHANGELOG_CONTENT=$(awk -v hdr="## [${VERSION}]" '
+            index($0, hdr) == 1 { p = 1; print; next }
+            p && /^## \[/ { exit }
+            p { print }
+          ' CHANGELOG.md)
 
           if [ -z "$CHANGELOG_CONTENT" ]; then
             echo "ERROR: Could not extract release section for version $VERSION from CHANGELOG.md"
@@ -738,51 +742,54 @@ jobs:
           echo "tag_already_exists=true" >> "$GITHUB_OUTPUT"
           echo "Remote tag $PUBLISH_VERSION already points to finalize SHA; publish will skip tag create/push"
 
-      - name: Trigger sync-issues workflow
+      - name: Trigger sync-issues workflow and wait
         if: needs.validate.outputs.release_kind == 'final'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
+          TIMEOUT=120
+          INTERVAL=10
+          ELAPSED=0
+
+          declare -A before_map=()
+          while read -r id; do
+            [ -z "$id" ] && continue
+            before_map[$id]=1
+          done < <(gh run list --workflow sync-issues.yml --json databaseId --jq -r '.[].databaseId')
+
           echo "Triggering sync-issues workflow..."
           retry --retries 2 --backoff 5 --max-backoff 20 -- gh workflow run sync-issues.yml \
             -f "target-branch=release/$VERSION"
           echo "✓ sync-issues workflow triggered"
 
-      - name: Wait for sync-issues completion
-        if: needs.validate.outputs.release_kind == 'final'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          TIMEOUT=120
-          ELAPSED=0
-          INTERVAL=10
+          RUN_ID=""
+          sleep 3
+          ELAPSED=3
 
-          sleep 5
-          ELAPSED=5
+          while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
+            if [ -z "$RUN_ID" ]; then
+              while read -r id; do
+                [ -z "$id" ] && continue
+                [ -n "${before_map[$id]+x}" ] && continue
+                RUN_ID=$id
+                echo "Resolved sync-issues run id: $RUN_ID"
+                break
+              done < <(gh run list --workflow sync-issues.yml --json databaseId --jq -r '.[].databaseId')
+            fi
 
-          while [ $ELAPSED -lt $TIMEOUT ]; do
-            RUN_STATUS=$(gh run list \
-              --workflow sync-issues.yml \
-              --limit 1 \
-              --json status,conclusion \
-              --jq '.[0].status' 2>/dev/null || echo "unknown")
-
-            if [ "$RUN_STATUS" = "completed" ]; then
-              RUN_CONCLUSION=$(gh run list \
-                --workflow sync-issues.yml \
-                --limit 1 \
-                --json conclusion \
-                --jq '.[0].conclusion' 2>/dev/null || echo "unknown")
-
-              if [ "$RUN_CONCLUSION" = "success" ]; then
-                echo "✓ sync-issues workflow completed successfully"
-              else
-                echo "⚠ sync-issues workflow completed with status: $RUN_CONCLUSION"
+            if [ -n "$RUN_ID" ]; then
+              RUN_STATUS=$(gh run view "$RUN_ID" --json status --jq -r '.status' 2>/dev/null || echo "unknown")
+              if [ "$RUN_STATUS" = "completed" ]; then
+                RUN_CONCLUSION=$(gh run view "$RUN_ID" --json conclusion --jq -r '.conclusion' 2>/dev/null || echo "unknown")
+                if [ "$RUN_CONCLUSION" = "success" ]; then
+                  echo "✓ sync-issues workflow completed successfully"
+                else
+                  echo "⚠ sync-issues workflow completed with status: $RUN_CONCLUSION"
+                fi
+                break
               fi
-              break
             fi
 
             sleep "$INTERVAL"
@@ -790,7 +797,7 @@ jobs:
             echo "Waiting for sync-issues... (${ELAPSED}s / ${TIMEOUT}s)"
           done
 
-          if [ $ELAPSED -ge $TIMEOUT ]; then
+          if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
             echo "⚠ Timed out waiting for sync-issues workflow"
             echo "The release may continue, but PR documentation may not be synced"
           fi
