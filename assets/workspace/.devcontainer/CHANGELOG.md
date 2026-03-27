@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Downstream release helper recipes via GitHub justfile import** ([#373](https://github.com/vig-os/devcontainer/issues/373))
   - Move `prepare-release`, `finalize-release`, `publish-candidate`, `reset-changelog`, and `pull` into `justfile.gh` so downstream workspace templates expose them by default
   - Keep root recipe availability through `import 'justfile.gh'` while consolidating release helper ownership in the GitHub-focused recipe file
+- **Split final release into publish and promote phases** ([#456](https://github.com/vig-os/devcontainer/issues/456))
+  - Final `release.yml` publishes versioned GHCR tags and a draft GitHub Release but no longer updates `:latest`
+  - New `promote-release.yml` runs after downstream smoke-test publishes its final release: updates `:latest`, publishes the draft release, merges the release PR to `main`
+  - Add `just promote-release` in `justfile.gh` (and workspace template copy)
 
 ### Deprecated
 
