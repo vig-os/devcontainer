@@ -1,8 +1,8 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-03-24T15:08:59Z
-updated: 2026-03-24T15:31:30Z
+updated: 2026-03-25T06:49:19Z
 author: vig-os-release-app[bot]
 author_url: https://github.com/vig-os-release-app[bot]
 url: https://github.com/vig-os/devcontainer/issues/430
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-03-25T04:26:16.906Z
+synced: 2026-03-25T17:01:36.673Z
 ---
 
 # [Issue 430]: [Smoke-test dispatch failed for 0.3.1-rc17](https://github.com/vig-os/devcontainer/issues/430)

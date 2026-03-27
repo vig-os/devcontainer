@@ -27,9 +27,10 @@ on:  # yamllint disable-line rule:truthy
         required: false
         default: "41898282+github-actions[bot]@users.noreply.github.com"
         type: string
-      contract_version:
-        description: "Release workflow contract version"
-        required: true
+      rc_number:
+        description: "Candidate RC index (e.g. 21 for X.Y.Z-rc21). Omit to auto-increment from existing tags."
+        required: false
+        default: ""
         type: string
     secrets:
       token:
@@ -56,6 +57,9 @@ on:  # yamllint disable-line rule:truthy
       finalize_sha:
         description: "Release branch SHA after finalization"
         value: ${{ jobs.finalize.outputs.finalize_sha }}
+      tag_already_exists:
+        description: "Remote publish tag already exists at finalize SHA (retry path)"
+        value: ${{ jobs.finalize.outputs.tag_already_exists }}
       image_tag:
         description: "Resolved devcontainer image tag"
         value: ${{ jobs.validate.outputs.image_tag }}
@@ -68,10 +72,38 @@ permissions:
   contents: read
 
 jobs:
+  resolve-image:
+    name: Resolve image tag
+    runs-on: ubuntu-22.04
+    timeout-minutes: 2
+    outputs:
+      image-tag: ${{ steps.resolve.outputs.image-tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          sparse-checkout: |
+            .vig-os
+            .github/actions/resolve-image
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve container image
+        id: resolve
+        uses: ./.github/actions/resolve-image
+
   validate:
     name: Validate Release Core
+    needs: [resolve-image]
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: read
+    container:
+      image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
     outputs:
       version: ${{ steps.vars.outputs.version }}
       pr_number: ${{ steps.pr.outputs.pr_number }}
@@ -79,19 +111,21 @@ jobs:
       pre_finalize_sha: ${{ steps.pre_sha.outputs.pre_finalize_sha }}
       release_kind: ${{ steps.vars.outputs.release_kind }}
       publish_version: ${{ steps.publish_meta.outputs.publish_version }}
-      image_tag: ${{ steps.resolve_image.outputs.image_tag }}
+      image_tag: ${{ needs.resolve-image.outputs.image-tag }}
 
     steps:
-      - name: Validate contract version
-        uses: ./.github/actions/validate-contract
+      - name: Generate release app token
+        id: release_app_token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
         with:
-          contract_version: ${{ inputs.contract_version }}
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
       - name: Resolve auth token
         id: auth
         env:
           PROVIDED_TOKEN: ${{ secrets.token }}
-          FALLBACK_TOKEN: ${{ github.token }}
+          FALLBACK_TOKEN: ${{ steps.release_app_token.outputs.token }}
         run: |
           set -euo pipefail
           if [ -n "${PROVIDED_TOKEN:-}" ]; then
@@ -133,31 +167,8 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.auth.outputs.token }}
 
-      - name: Resolve container image tag
-        id: resolve_image
-        run: |
-          set -euo pipefail
-          TAG=""
-          if [ -f ".vig-os" ]; then
-            TAG=$(awk -F= '/^DEVCONTAINER_VERSION=/{gsub(/^[ \t"]+|[ \t"]+$/, "", $2); print $2; exit}' .vig-os || true)
-          fi
-          if [ -z "${TAG:-}" ]; then
-            TAG="latest"
-          fi
-          echo "image_tag=$TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Validate image accessibility
-        env:
-          IMAGE_TAG: ${{ steps.resolve_image.outputs.image_tag }}
-        run: |
-          set -euo pipefail
-          IMAGE="ghcr.io/vig-os/devcontainer:${IMAGE_TAG}"
-          echo "Validating image availability: $IMAGE"
-          if ! docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
-            echo "ERROR: Cannot access image manifest: $IMAGE"
-            echo "Check whether the tag exists and whether this workflow has access to GHCR."
-            exit 1
-          fi
+      - name: Fix git safe.directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Record pre-finalization SHA
         id: pre_sha
@@ -180,54 +191,58 @@ jobs:
         env:
           VERSION: ${{ steps.vars.outputs.version }}
           RELEASE_KIND: ${{ steps.vars.outputs.release_kind }}
+          INPUT_RC_NUMBER: ${{ inputs.rc_number }}
         run: |
           set -euo pipefail
           NEXT_RC=""
           if [ "$RELEASE_KIND" = "candidate" ]; then
-            TAG_PATTERN="${VERSION}-rc*"
-            EXISTING_TAGS=$(git ls-remote --tags --refs origin "$TAG_PATTERN" | awk '{print $2}' | sed 's#refs/tags/##')
+            if [ -n "${INPUT_RC_NUMBER}" ]; then
+              if ! printf '%s' "${INPUT_RC_NUMBER}" | grep -qE '^[0-9]+$'; then
+                echo "ERROR: rc_number must be a positive integer (got '${INPUT_RC_NUMBER}')"
+                exit 1
+              fi
+              if [ "${INPUT_RC_NUMBER}" -lt 1 ]; then
+                echo "ERROR: rc_number must be >= 1 (got '${INPUT_RC_NUMBER}')"
+                exit 1
+              fi
+              NEXT_RC="${INPUT_RC_NUMBER}"
+              PUBLISH_VERSION="${VERSION}-rc${NEXT_RC}"
+              echo "Using explicit rc_number=$NEXT_RC -> publish_version=$PUBLISH_VERSION"
+            else
+              TAG_PATTERN="${VERSION}-rc*"
+              EXISTING_TAGS=$(git ls-remote --tags --refs origin "$TAG_PATTERN" | awk '{print $2}' | sed 's#refs/tags/##')
 
-            MAX_RC=0
-            if [ -n "$EXISTING_TAGS" ]; then
-              while IFS= read -r tag; do
-                [ -z "$tag" ] && continue
-                if [ "${tag#${VERSION}-rc}" = "$tag" ]; then
-                  echo "ERROR: Malformed candidate tag detected: $tag"
-                  echo "Expected format: ${VERSION}-rcN"
-                  exit 1
-                fi
-                rc_num="${tag#${VERSION}-rc}"
-                if ! echo "$rc_num" | grep -qE '^[0-9]+$'; then
-                  echo "ERROR: Malformed candidate tag detected: $tag"
-                  echo "Expected format: ${VERSION}-rcN"
-                  exit 1
-                fi
-                if [ "$rc_num" -gt "$MAX_RC" ]; then
-                  MAX_RC="$rc_num"
-                fi
-              done <<< "$EXISTING_TAGS"
+              MAX_RC=0
+              if [ -n "$EXISTING_TAGS" ]; then
+                while IFS= read -r tag; do
+                  [ -z "$tag" ] && continue
+                  if [ "${tag#${VERSION}-rc}" = "$tag" ]; then
+                    echo "ERROR: Malformed candidate tag detected: $tag"
+                    echo "Expected format: ${VERSION}-rcN"
+                    exit 1
+                  fi
+                  rc_num="${tag#${VERSION}-rc}"
+                  if ! echo "$rc_num" | grep -qE '^[0-9]+$'; then
+                    echo "ERROR: Malformed candidate tag detected: $tag"
+                    echo "Expected format: ${VERSION}-rcN"
+                    exit 1
+                  fi
+                  if [ "$rc_num" -gt "$MAX_RC" ]; then
+                    MAX_RC="$rc_num"
+                  fi
+                done <<< "$EXISTING_TAGS"
+              fi
+
+              NEXT_RC=$((MAX_RC + 1))
+              PUBLISH_VERSION="${VERSION}-rc${NEXT_RC}"
             fi
-
-            NEXT_RC=$((MAX_RC + 1))
-            PUBLISH_VERSION="${VERSION}-rc${NEXT_RC}"
           else
             PUBLISH_VERSION="$VERSION"
           fi
           echo "publish_version=$PUBLISH_VERSION" >> "$GITHUB_OUTPUT"
           echo "next_rc=$NEXT_RC" >> "$GITHUB_OUTPUT"
 
-      - name: Verify publish tag does not exist
-        env:
-          PUBLISH_VERSION: ${{ steps.publish_meta.outputs.publish_version }}
-        run: |
-          if git ls-remote --exit-code --tags --refs origin "refs/tags/$PUBLISH_VERSION" > /dev/null 2>&1; then
-            echo "ERROR: Tag $PUBLISH_VERSION already exists"
-            exit 1
-          fi
-          if git rev-parse -q --verify "refs/tags/$PUBLISH_VERSION" > /dev/null; then
-            echo "ERROR: Local tag $PUBLISH_VERSION already exists"
-            exit 1
-          fi
+      # Remote tag vs finalize SHA is validated in the finalize job (tag_state) after finalize_sha is known.
 
       - name: Find and verify PR
         id: pr
@@ -237,7 +252,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          PR_JSON=$(gh pr list \
+          PR_JSON=$(retry --retries 3 --backoff 5 --max-backoff 30 -- gh pr list \
             --head "release/$VERSION" \
             --base main \
             --json number,isDraft,reviewDecision,statusCheckRollup \
@@ -258,7 +273,20 @@ jobs:
             echo "ERROR: PR #$PR_NUMBER is still in draft"
             exit 1
           fi
-          if [ "$REVIEW_DECISION" != "APPROVED" ]; then
+          if [ "$REVIEW_DECISION" = "APPROVED" ]; then
+            echo "PR #$PR_NUMBER is approved"
+          elif [ "$REVIEW_DECISION" = "null" ] || [ -z "$REVIEW_DECISION" ]; then
+            # Bot approval fallback when gh pr list leaves reviewDecision empty (#438)
+            APPROVED_COUNT=$(retry --retries 3 --backoff 5 --max-backoff 30 -- gh api \
+              --paginate --slurp \
+              "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
+              | jq 'add | map(select(.state == "APPROVED")) | length')
+            if [ "$APPROVED_COUNT" -eq 0 ]; then
+              echo "ERROR: PR #$PR_NUMBER is not approved (reviewDecision: $REVIEW_DECISION, approved reviews: 0)"
+              exit 1
+            fi
+            echo "reviewDecision='$REVIEW_DECISION' but $APPROVED_COUNT approved review(s) found"
+          else
             echo "ERROR: PR #$PR_NUMBER is not approved (status: $REVIEW_DECISION)"
             exit 1
           fi
@@ -279,7 +307,7 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           RELEASE_DATE: ${{ steps.vars.outputs.release_date }}
           DRY_RUN: ${{ inputs.dry_run }}
-          IMAGE_TAG: ${{ steps.resolve_image.outputs.image_tag }}
+          IMAGE_TAG: ${{ needs.resolve-image.outputs.image-tag }}
         run: |
           echo "Validation passed"
           echo ""
@@ -299,23 +327,42 @@ jobs:
     name: Finalize Release Core
     needs: validate
     runs-on: ubuntu-22.04
+    permissions:
+      actions: write
+      contents: write
     container:
       image: ghcr.io/vig-os/devcontainer:${{ needs.validate.outputs.image_tag }}
       env:
         UV_PROJECT_ENVIRONMENT: /root/assets/workspace/.venv
     timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
     if: ${{ inputs.dry_run != true }}
-    permissions:
-      contents: write
     outputs:
       finalize_sha: ${{ steps.finalize.outputs.finalize_sha }}
+      tag_already_exists: ${{ steps.tag_state.outputs.tag_already_exists }}
 
     steps:
+      - name: Generate commit app token
+        id: commit_app_token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
+        with:
+          app-id: ${{ secrets.COMMIT_APP_ID }}
+          private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
+
+      - name: Generate release app token
+        id: release_app_token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - name: Resolve auth token
         id: auth
         env:
           PROVIDED_TOKEN: ${{ secrets.token }}
-          FALLBACK_TOKEN: ${{ github.token }}
+          FALLBACK_TOKEN: ${{ steps.release_app_token.outputs.token }}
         run: |
           set -euo pipefail
           if [ -n "${PROVIDED_TOKEN:-}" ]; then
@@ -345,11 +392,12 @@ jobs:
 
       - name: Commit and push finalization changes via API
         if: ${{ inputs.release_kind == 'final' }}
-        uses: vig-os/commit-action@c0024cbad0e501764127cccab732c6cd465b4646  # v0.1.5
+        uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
         env:
-          GH_TOKEN: ${{ steps.auth.outputs.token }}
+          GH_TOKEN: ${{ steps.commit_app_token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           TARGET_BRANCH: refs/heads/release/${{ needs.validate.outputs.version }}
+          MAX_ATTEMPTS: "3"
           COMMIT_MESSAGE: |-
             chore: finalize release ${{ needs.validate.outputs.version }}
 
@@ -365,7 +413,8 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          gh workflow run sync-issues.yml -f "target-branch=release/$VERSION"
+          retry --retries 2 --backoff 5 --max-backoff 20 -- \
+            gh workflow run sync-issues.yml -f "target-branch=release/$VERSION"
 
       - name: Wait for sync-issues completion
         if: ${{ inputs.release_kind == 'final' }}
@@ -417,7 +466,7 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          git fetch origin "release/$VERSION"
+          retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin "release/$VERSION"
           git reset --hard "origin/release/$VERSION"
 
       - name: Output finalize SHA
@@ -431,9 +480,38 @@ jobs:
           if [ "$RELEASE_KIND" = "final" ]; then
             FINALIZE_SHA=$(git rev-parse HEAD)
           else
-            FINALIZE_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/$VERSION" --jq '.object.sha')
+            FINALIZE_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
+              gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/$VERSION" --jq '.object.sha')
           fi
           echo "finalize_sha=$FINALIZE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Check if publish tag already exists at finalize SHA
+        id: tag_state
+        env:
+          PUBLISH_VERSION: ${{ needs.validate.outputs.publish_version }}
+          FINALIZE_SHA: ${{ steps.finalize.outputs.finalize_sha }}
+        run: |
+          set -euo pipefail
+          REMOTE_LINE=$(git ls-remote origin "refs/tags/${PUBLISH_VERSION}^{}" || true)
+          if [ -z "$REMOTE_LINE" ]; then
+            REMOTE_LINE=$(git ls-remote origin "refs/tags/${PUBLISH_VERSION}" || true)
+          fi
+          if [ -z "$REMOTE_LINE" ]; then
+            echo "tag_already_exists=false" >> "$GITHUB_OUTPUT"
+            echo "No remote tag ${PUBLISH_VERSION} yet"
+            exit 0
+          fi
+          REMOTE_TARGET_SHA=$(printf '%s\n' "$REMOTE_LINE" | awk '{print $1}')
+          if [ -z "$REMOTE_TARGET_SHA" ]; then
+            echo "tag_already_exists=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$REMOTE_TARGET_SHA" != "$FINALIZE_SHA" ]; then
+            echo "ERROR: Tag $PUBLISH_VERSION exists but target commit is $REMOTE_TARGET_SHA; expected $FINALIZE_SHA (finalize SHA)"
+            exit 1
+          fi
+          echo "tag_already_exists=true" >> "$GITHUB_OUTPUT"
+          echo "Remote tag $PUBLISH_VERSION already points to finalize SHA; publish will skip tag create/push"
 
   test:
     name: Test Finalized Release
@@ -444,14 +522,24 @@ jobs:
       env:
         UV_PROJECT_ENVIRONMENT: /root/assets/workspace/.venv
     timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
     if: ${{ inputs.dry_run != true }}
 
     steps:
+      - name: Generate release app token
+        id: release_app_token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - name: Resolve auth token
         id: auth
         env:
           PROVIDED_TOKEN: ${{ secrets.token }}
-          FALLBACK_TOKEN: ${{ github.token }}
+          FALLBACK_TOKEN: ${{ steps.release_app_token.outputs.token }}
         run: |
           set -euo pipefail
           if [ -n "${PROVIDED_TOKEN:-}" ]; then

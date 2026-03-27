@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-03-25T18:36:48Z
-updated: 2026-03-25T18:36:48Z
+updated: 2026-03-26T10:39:36Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/446
 comments: 0
 labels: chore, area:ci
-assignees: none
+assignees: c-vigo
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-03-26T04:38:23.001Z
+synced: 2026-03-26T17:53:31.585Z
 ---
 
 # [Issue 446]: [[CHORE] Enforce immutable git tags and GitHub releases; align rollback workflows](https://github.com/vig-os/devcontainer/issues/446)
