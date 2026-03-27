@@ -58,6 +58,8 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      GH_REPO: ${{ github.repository }}
 
     steps:
       - name: Generate release app token
@@ -216,6 +218,8 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      GH_REPO: ${{ github.repository }}
 
     steps:
       - name: Generate release app token
@@ -254,6 +258,8 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      GH_REPO: ${{ github.repository }}
 
     steps:
       - name: Generate release app token
