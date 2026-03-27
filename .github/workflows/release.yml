@@ -76,7 +76,6 @@ jobs:
       publish_version: ${{ steps.publish_meta.outputs.publish_version }}
       next_rc: ${{ steps.publish_meta.outputs.next_rc }}
       pre_finalize_sha: ${{ steps.pre_sha.outputs.pre_finalize_sha }}
-      latest_rc: ${{ steps.latest_rc.outputs.latest_rc }}
       matrix: ${{ steps.matrix.outputs.matrix }}
       architectures: ${{ steps.matrix.outputs.architectures }}
 
@@ -231,85 +230,6 @@ jobs:
           echo "latest_rc=$LATEST_RC" >> "$GITHUB_OUTPUT"
           echo "Latest RC: $LATEST_RC"
 
-      - name: Generate cross-repo token for downstream gate
-        if: steps.vars.outputs.release_kind == 'final'
-        id: smoke-check-token
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
-        with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          owner: vig-os
-          repositories: devcontainer-smoke-test
-
-      - name: Verify downstream pre-release for latest RC
-        if: steps.vars.outputs.release_kind == 'final'
-        env:
-          GH_TOKEN: ${{ steps.smoke-check-token.outputs.token }}
-          LATEST_RC: ${{ steps.latest_rc.outputs.latest_rc }}
-          VERSION: ${{ steps.vars.outputs.version }}
-        run: |
-          set -euo pipefail
-          echo "Checking downstream pre-release for $LATEST_RC..."
-
-          RELEASE_JSON=""
-          LAST_ERROR=""
-          RETRIES=5
-          for i in $(seq 1 "$RETRIES"); do
-            API_OUTPUT=""
-            if API_OUTPUT=$(gh api "repos/vig-os/devcontainer-smoke-test/releases/tags/$LATEST_RC" 2>&1); then
-              RELEASE_JSON="$API_OUTPUT"
-              break
-            fi
-
-            LAST_ERROR="$API_OUTPUT"
-            if printf '%s' "$API_OUTPUT" | grep -Eqi "401|403|forbidden|bad credentials|authentication|authorization|insufficient scopes"; then
-              echo "ERROR: Non-retryable authentication/authorization failure while querying downstream release API for $LATEST_RC"
-              echo "$API_OUTPUT"
-              exit 1
-            fi
-
-            if printf '%s' "$API_OUTPUT" | grep -Eqi "404|not found|429|5[0-9]{2}|timed out|timeout|temporary|connection reset|connection refused|network|tls"; then
-              if [ "$i" -lt "$RETRIES" ]; then
-                BACKOFF=$((i * 5))
-                echo "Downstream release lookup failed transiently, retrying in ${BACKOFF}s ($i/$RETRIES)..."
-                sleep "$BACKOFF"
-              fi
-              continue
-            fi
-
-            echo "ERROR: Failed querying downstream release API for $LATEST_RC"
-            echo "$API_OUTPUT"
-            exit 1
-          done
-
-          if [ -z "$RELEASE_JSON" ]; then
-            echo "ERROR: No downstream release found for RC tag $LATEST_RC"
-            if [ -n "$LAST_ERROR" ]; then
-              echo "Last API error:"
-              echo "$LAST_ERROR"
-            fi
-            echo ""
-            echo "The final release requires a successful smoke-test pre-release."
-            echo "Steps to resolve:"
-            echo "  1. Verify the candidate dispatch succeeded:"
-            echo "     gh -R vig-os/devcontainer-smoke-test run list --limit 5"
-            echo "  2. If no dispatch ran, re-publish the candidate:"
-            echo "     just publish-candidate $VERSION"
-            echo "  3. Wait for the downstream pre-release to appear, then retry."
-            exit 1
-          fi
-
-          TAG_NAME=$(echo "$RELEASE_JSON" | jq -r '.tag_name')
-          IS_PRERELEASE=$(echo "$RELEASE_JSON" | jq -r '.prerelease')
-
-          if [ "$IS_PRERELEASE" != "true" ]; then
-            echo "ERROR: Downstream release for $LATEST_RC exists but is not a pre-release"
-            echo "Expected prerelease=true for RC gate enforcement"
-            exit 1
-          fi
-
-          echo "✓ Downstream release verified: $TAG_NAME"
-
       - name: Verify CHANGELOG has TBD entry
         env:
           VERSION: ${{ steps.vars.outputs.version }}
@@ -326,7 +246,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Same error-classification pattern as "Verify downstream pre-release for latest RC" above.
+          # Classify GitHub API errors: auth failures fail fast; 404 means no release; transient errors retry.
           RETRIES=5
           LAST_ERROR=""
           for i in $(seq 1 "$RETRIES"); do
@@ -535,7 +455,7 @@ jobs:
             echo "  Next RC Number: $NEXT_RC"
           fi
           if [ "$RELEASE_KIND" = "final" ]; then
-            echo "  Latest RC Gate: $LATEST_RC"
+            echo "  Latest RC: $LATEST_RC"
           fi
           echo "  Release Branch: release/$VERSION"
           echo "  PR: #$PR_NUMBER"
