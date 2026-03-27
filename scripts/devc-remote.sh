@@ -268,7 +268,13 @@ detect_editor_cli() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 inject_tailscale_key() {
-    # Skip if no OAuth credentials
+    # Resolve credentials: env var → macOS keychain → skip
+    if [[ -z "${TS_CLIENT_ID:-}" ]]; then
+        TS_CLIENT_ID=$(security find-generic-password -a tailscale-oauth -s TS_CLIENT_ID -w 2>/dev/null || true)
+    fi
+    if [[ -z "${TS_CLIENT_SECRET:-}" ]]; then
+        TS_CLIENT_SECRET=$(security find-generic-password -a tailscale-oauth -s TS_CLIENT_SECRET -w 2>/dev/null || true)
+    fi
     if [[ -z "${TS_CLIENT_ID:-}" || -z "${TS_CLIENT_SECRET:-}" ]]; then
         return 0
     fi
