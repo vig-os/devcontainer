@@ -676,10 +676,11 @@ remote_compose_up() {
     health=$(echo "$ps_output" | grep -o '"Health":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
 
     # Capture container ID before compose up (to detect recreate)
+    # Filter out compose provider banner lines (>>>>)
     local id_before=""
     if [[ "$state" == "running" ]]; then
         # shellcheck disable=SC2029
-        id_before=$(ssh "$SSH_HOST" "cd $devc_dir && $compose_full ps -q 2>/dev/null" || true)
+        id_before=$(ssh "$SSH_HOST" "cd $devc_dir && $compose_full ps -q 2>/dev/null" | grep -v '^>' | head -1 || true)
     fi
 
     log_info "Starting devcontainer on $SSH_HOST..."
@@ -698,7 +699,7 @@ remote_compose_up() {
         # Was running — check if compose recreated it (different container ID)
         local id_after
         # shellcheck disable=SC2029
-        id_after=$(ssh "$SSH_HOST" "cd $devc_dir && $compose_full ps -q 2>/dev/null" || true)
+        id_after=$(ssh "$SSH_HOST" "cd $devc_dir && $compose_full ps -q 2>/dev/null" | grep -v '^>' | head -1 || true)
         if [[ "$id_before" != "$id_after" ]]; then
             log_info "Container was recreated (config changed)"
             CONTAINER_FRESH=1
