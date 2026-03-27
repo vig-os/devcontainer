@@ -4,15 +4,16 @@
 # 1. Validate: Check all prerequisites (PR status, CI passed, CHANGELOG ready)
 # 2. Finalize: For final releases only, set release date in CHANGELOG
 # 3. Build & Test: Build and test images for all architectures
-# 4. Publish: Create tag, publish images, and create draft final GitHub Release
-# 5. Rollback (on failure): Reset release branch, create issue (tags are not deleted—forward-fix policy; GitHub immutability applies only after a published release locks the tag when that setting is enabled)
+# 4. Publish: Create tag, publish versioned images to GHCR, sign/attest, create draft final GitHub Release (final only)
+# 5. Smoke-test: Dispatch downstream validation
+# 6. Rollback (on failure): Reset release branch, create issue (tags are not deleted—forward-fix policy; GitHub immutability applies only after a published release locks the tag when that setting is enabled)
 #
 # Release kinds:
 #   candidate: Publishes X.Y.Z-rcN. No CHANGELOG changes, no sync-issues.
 #   final:     Publishes X.Y.Z. Sets release date in CHANGELOG, triggers sync-issues, creates draft GitHub Release.
+#              GHCR :latest and publishing that draft release run in promote-release.yml after verification (see just promote-release).
 #
-# Design: Everything happens in one workflow dispatch before creating the tag.
-# This ensures no broken releases are tagged.
+# Design: Tag and versioned artifacts are created in this workflow; final promotion to :latest is a separate human-gated step.
 
 name: Release
 
@@ -643,63 +644,6 @@ jobs:
             Refs: #${{ needs.validate.outputs.pr_number }}
           FILE_PATHS: ${{ steps.finalize-files.outputs.file_paths }}
 
-      - name: Trigger sync-issues workflow
-        if: needs.validate.outputs.release_kind == 'final'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.validate.outputs.version }}
-        run: |
-          set -euo pipefail
-          echo "Triggering sync-issues workflow..."
-          retry --retries 2 --backoff 5 --max-backoff 20 -- gh workflow run sync-issues.yml \
-            -f "target-branch=release/$VERSION"
-          echo "✓ sync-issues workflow triggered"
-
-      - name: Wait for sync-issues completion
-        if: needs.validate.outputs.release_kind == 'final'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          TIMEOUT=120
-          ELAPSED=0
-          INTERVAL=10
-
-          sleep 5
-          ELAPSED=5
-
-          while [ $ELAPSED -lt $TIMEOUT ]; do
-            RUN_STATUS=$(gh run list \
-              --workflow sync-issues.yml \
-              --limit 1 \
-              --json status,conclusion \
-              --jq '.[0].status' 2>/dev/null || echo "unknown")
-
-            if [ "$RUN_STATUS" = "completed" ]; then
-              RUN_CONCLUSION=$(gh run list \
-                --workflow sync-issues.yml \
-                --limit 1 \
-                --json conclusion \
-                --jq '.[0].conclusion' 2>/dev/null || echo "unknown")
-
-              if [ "$RUN_CONCLUSION" = "success" ]; then
-                echo "✓ sync-issues workflow completed successfully"
-              else
-                echo "⚠ sync-issues workflow completed with status: $RUN_CONCLUSION"
-              fi
-              break
-            fi
-
-            sleep "$INTERVAL"
-            ELAPSED=$((ELAPSED + INTERVAL))
-            echo "Waiting for sync-issues... (${ELAPSED}s / ${TIMEOUT}s)"
-          done
-
-          if [ $ELAPSED -ge $TIMEOUT ]; then
-            echo "⚠ Timed out waiting for sync-issues workflow"
-            echo "The release may continue, but PR documentation may not be synced"
-          fi
-
       - name: Pull remote changes
         if: needs.validate.outputs.release_kind == 'final'
         env:
@@ -710,6 +654,18 @@ jobs:
           git reset --hard "origin/release/$VERSION"
           echo "✓ Synced with remote release branch"
 
+      - name: Verify CHANGELOG finalized (no TBD)
+        if: needs.validate.outputs.release_kind == 'final'
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          if grep -Fq "## [${VERSION}] - TBD" CHANGELOG.md; then
+            echo "ERROR: CHANGELOG.md still contains TBD for $VERSION after finalize commit"
+            exit 1
+          fi
+          echo "✓ CHANGELOG.md has finalized date for $VERSION"
+
       - name: Refresh release PR body from finalized changelog
         if: needs.validate.outputs.release_kind == 'final'
         env:
@@ -719,7 +675,11 @@ jobs:
           PR_NUMBER: ${{ needs.validate.outputs.pr_number }}
         run: |
           set -euo pipefail
-          CHANGELOG_CONTENT=$(sed -n "/## \[$VERSION\]/,/^## \[/p" CHANGELOG.md | sed '$d')
+          CHANGELOG_CONTENT=$(awk -v hdr="## [${VERSION}]" '
+            index($0, hdr) == 1 { p = 1; print; next }
+            p && /^## \[/ { exit }
+            p { print }
+          ' CHANGELOG.md)
 
           if [ -z "$CHANGELOG_CONTENT" ]; then
             echo "ERROR: Could not extract release section for version $VERSION from CHANGELOG.md"
@@ -782,6 +742,66 @@ jobs:
           fi
           echo "tag_already_exists=true" >> "$GITHUB_OUTPUT"
           echo "Remote tag $PUBLISH_VERSION already points to finalize SHA; publish will skip tag create/push"
+
+      - name: Trigger sync-issues workflow and wait
+        if: needs.validate.outputs.release_kind == 'final'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          TIMEOUT=120
+          INTERVAL=10
+          ELAPSED=0
+
+          declare -A before_map=()
+          while read -r id; do
+            [ -z "$id" ] && continue
+            before_map[$id]=1
+          done < <(gh run list --workflow sync-issues.yml --json databaseId --jq -r '.[].databaseId')
+
+          echo "Triggering sync-issues workflow..."
+          retry --retries 2 --backoff 5 --max-backoff 20 -- gh workflow run sync-issues.yml \
+            -f "target-branch=release/$VERSION"
+          echo "✓ sync-issues workflow triggered"
+
+          RUN_ID=""
+          sleep 3
+          ELAPSED=3
+
+          while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
+            if [ -z "$RUN_ID" ]; then
+              while read -r id; do
+                [ -z "$id" ] && continue
+                [ -n "${before_map[$id]+x}" ] && continue
+                RUN_ID=$id
+                echo "Resolved sync-issues run id: $RUN_ID"
+                break
+              done < <(gh run list --workflow sync-issues.yml --json databaseId --jq -r '.[].databaseId')
+            fi
+
+            if [ -n "$RUN_ID" ]; then
+              RUN_STATUS=$(gh run view "$RUN_ID" --json status --jq -r '.status' 2>/dev/null || echo "unknown")
+              if [ "$RUN_STATUS" = "completed" ]; then
+                RUN_CONCLUSION=$(gh run view "$RUN_ID" --json conclusion --jq -r '.conclusion' 2>/dev/null || echo "unknown")
+                if [ "$RUN_CONCLUSION" = "success" ]; then
+                  echo "✓ sync-issues workflow completed successfully"
+                else
+                  echo "⚠ sync-issues workflow completed with status: $RUN_CONCLUSION"
+                fi
+                break
+              fi
+            fi
+
+            sleep "$INTERVAL"
+            ELAPSED=$((ELAPSED + INTERVAL))
+            echo "Waiting for sync-issues... (${ELAPSED}s / ${TIMEOUT}s)"
+          done
+
+          if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
+            echo "⚠ Timed out waiting for sync-issues workflow"
+            echo "The release may continue, but PR documentation may not be synced"
+          fi
 
   build-and-test:
     name: Build and Test (${{ matrix.arch }})
@@ -1006,7 +1026,6 @@ jobs:
       - name: Create multi-arch manifest
         env:
           PUBLISH_VERSION: ${{ needs.validate.outputs.publish_version }}
-          RELEASE_KIND: ${{ needs.validate.outputs.release_kind }}
           ARCHS: ${{ needs.validate.outputs.architectures }}
         run: |
           set -euo pipefail
@@ -1028,22 +1047,9 @@ jobs:
               "${ARCH_IMAGES[@]}"
           echo "✓ Created version manifest: $REPO:$PUBLISH_VERSION"
 
-          # Update latest manifest only for final releases building both architectures.
-          if [ "$RELEASE_KIND" = "final" ] && [ ${#ARCH_ARRAY[@]} -eq 2 ]; then
-            echo "Creating/updating latest manifest: $REPO:latest"
-            retry --retries 3 --backoff 3 --max-backoff 3 -- \
-              docker buildx imagetools create \
-                --tag "$REPO:latest" \
-                "${ARCH_IMAGES[@]}"
-            echo "✓ Created/updated latest manifest: $REPO:latest"
-          else
-            echo "Skipping 'latest' manifest (single architecture or limited build)"
-          fi
-
       - name: Verify manifests
         env:
           PUBLISH_VERSION: ${{ needs.validate.outputs.publish_version }}
-          RELEASE_KIND: ${{ needs.validate.outputs.release_kind }}
           ARCHS: ${{ needs.validate.outputs.architectures }}
         run: |
           set -euo pipefail
@@ -1067,25 +1073,6 @@ jobs:
               fi
             fi
           done
-
-          if [ "$RELEASE_KIND" = "final" ] && [ ${#ARCH_ARRAY[@]} -eq 2 ]; then
-            echo "Verifying latest manifest: $REPO:latest"
-            RETRIES=5
-            for i in $(seq 1 $RETRIES); do
-              if docker buildx imagetools inspect "$REPO:latest" >/dev/null 2>&1; then
-                echo "✓ Latest manifest verified"
-                break
-              else
-                if [ $i -lt $RETRIES ]; then
-                  echo "Verification failed, retrying ($i/$RETRIES)..."
-                  sleep 5
-                else
-                  echo "ERROR: Latest manifest verification failed"
-                  exit 1
-                fi
-              fi
-            done
-          fi
 
       - name: Generate SBOM (attempt 1)
         id: sbom_generate
@@ -1197,7 +1184,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
-          # Draft first: human publishes from the UI when ready (GitHub immutable-releases best practice).
+          # Draft first; promote-release.yml publishes (undrafts) after downstream verification (GitHub immutable-releases best practice).
           RETRIES=5
           LAST_ERROR=""
           for i in $(seq 1 "$RETRIES"); do
@@ -1206,7 +1193,7 @@ jobs:
               IS_DRAFT=$(printf '%s' "$API_OUTPUT" | jq -r '.draft')
               if [ "$IS_DRAFT" = "true" ]; then
                 echo "✓ Draft GitHub Release already exists for $PUBLISH_VERSION; skipping create (retry path)."
-                echo "Review and publish from: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases"
+                echo "Publish via promote workflow when ready: just promote-release $PUBLISH_VERSION"
                 exit 0
               fi
               echo "ERROR: Published (non-draft) GitHub Release already exists for tag $PUBLISH_VERSION"
@@ -1303,7 +1290,7 @@ jobs:
             }
 
           echo "✓ Draft GitHub Release created: $PUBLISH_VERSION"
-          echo "Review and publish from: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases (publishing locks the linked tag and assets when immutable releases are enabled)"
+          echo "After smoke-test passes downstream, run: just promote-release $PUBLISH_VERSION (publishing locks the linked tag and assets when immutable releases are enabled)"
 
       - name: Summary
         env:
@@ -1320,7 +1307,7 @@ jobs:
           echo "  Images:"
           echo "    - ghcr.io/vig-os/devcontainer:$PUBLISH_VERSION"
           if [ "$RELEASE_KIND" = "final" ]; then
-            echo "    - ghcr.io/vig-os/devcontainer:latest"
+            echo "    - ghcr.io/vig-os/devcontainer:latest (after just promote-release $BASE_VERSION)"
           fi
           echo "  Security:"
           echo "    - Cosign signature attached"
@@ -1332,9 +1319,8 @@ jobs:
             echo "  1. Smoke-test dispatch runs in the smoke-test job."
             echo "  2. If downstream pre-release passes, run: just finalize-release $BASE_VERSION"
           else
-            echo "  1. Smoke-test dispatch runs in the smoke-test job."
-            echo "  2. Review the draft GitHub Release and publish it from the Releases UI (publishing applies immutable-release lock-in for the tag and assets when that setting is enabled)."
-            echo "  3. Merge release PR to main (triggers sync-main-to-dev workflow automatically)"
+            echo "  1. Smoke-test dispatch runs in the smoke-test job; wait for downstream final release on devcontainer-smoke-test."
+            echo "  2. Run: just promote-release $BASE_VERSION — updates :latest, publishes the draft GitHub Release, merges the release PR to main."
           fi
 
   smoke-test:
@@ -1401,7 +1387,7 @@ jobs:
           echo "✓ Triggered smoke-test dispatch for release tag: $RELEASE_TAG"
           echo "Downstream validation is asynchronous; verify in devcontainer-smoke-test."
           if [ "$RELEASE_KIND" = "final" ]; then
-            echo "Final: review the draft GitHub Release in this repo and publish it from the Releases UI when validation is complete."
+            echo "Final: when downstream smoke-test has published its release for this tag, run: just promote-release $RELEASE_TAG"
           fi
 
       - name: Create issue for smoke dispatch failure
