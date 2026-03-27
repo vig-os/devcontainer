@@ -141,7 +141,7 @@ jobs:
           REPO="ghcr.io/vig-os/devcontainer"
           retry --retries 3 --backoff 10 --max-backoff 30 -- \
             cosign verify "$REPO:$VERSION" \
-              --certificate-identity-regexp='https://github.com/vig-os/devcontainer/' \
+              --certificate-identity-regexp='https://github.com/vig-os/devcontainer/.github/workflows/release.yml@refs/heads/release/' \
               --certificate-oidc-issuer='https://token.actions.githubusercontent.com'
           echo "✓ Cosign verification passed for $REPO:$VERSION"
 
