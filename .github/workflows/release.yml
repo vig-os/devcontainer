@@ -643,63 +643,6 @@ jobs:
             Refs: #${{ needs.validate.outputs.pr_number }}
           FILE_PATHS: ${{ steps.finalize-files.outputs.file_paths }}
 
-      - name: Trigger sync-issues workflow
-        if: needs.validate.outputs.release_kind == 'final'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.validate.outputs.version }}
-        run: |
-          set -euo pipefail
-          echo "Triggering sync-issues workflow..."
-          retry --retries 2 --backoff 5 --max-backoff 20 -- gh workflow run sync-issues.yml \
-            -f "target-branch=release/$VERSION"
-          echo "✓ sync-issues workflow triggered"
-
-      - name: Wait for sync-issues completion
-        if: needs.validate.outputs.release_kind == 'final'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          TIMEOUT=120
-          ELAPSED=0
-          INTERVAL=10
-
-          sleep 5
-          ELAPSED=5
-
-          while [ $ELAPSED -lt $TIMEOUT ]; do
-            RUN_STATUS=$(gh run list \
-              --workflow sync-issues.yml \
-              --limit 1 \
-              --json status,conclusion \
-              --jq '.[0].status' 2>/dev/null || echo "unknown")
-
-            if [ "$RUN_STATUS" = "completed" ]; then
-              RUN_CONCLUSION=$(gh run list \
-                --workflow sync-issues.yml \
-                --limit 1 \
-                --json conclusion \
-                --jq '.[0].conclusion' 2>/dev/null || echo "unknown")
-
-              if [ "$RUN_CONCLUSION" = "success" ]; then
-                echo "✓ sync-issues workflow completed successfully"
-              else
-                echo "⚠ sync-issues workflow completed with status: $RUN_CONCLUSION"
-              fi
-              break
-            fi
-
-            sleep "$INTERVAL"
-            ELAPSED=$((ELAPSED + INTERVAL))
-            echo "Waiting for sync-issues... (${ELAPSED}s / ${TIMEOUT}s)"
-          done
-
-          if [ $ELAPSED -ge $TIMEOUT ]; then
-            echo "⚠ Timed out waiting for sync-issues workflow"
-            echo "The release may continue, but PR documentation may not be synced"
-          fi
-
       - name: Pull remote changes
         if: needs.validate.outputs.release_kind == 'final'
         env:
@@ -709,6 +652,18 @@ jobs:
           retry --retries 3 --backoff 3 --max-backoff 20 -- git fetch origin "release/$VERSION"
           git reset --hard "origin/release/$VERSION"
           echo "✓ Synced with remote release branch"
+
+      - name: Verify CHANGELOG finalized (no TBD)
+        if: needs.validate.outputs.release_kind == 'final'
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          if grep -q "## \[$VERSION\] - TBD" CHANGELOG.md; then
+            echo "ERROR: CHANGELOG.md still contains TBD for $VERSION after finalize commit"
+            exit 1
+          fi
+          echo "✓ CHANGELOG.md has finalized date for $VERSION"
 
       - name: Refresh release PR body from finalized changelog
         if: needs.validate.outputs.release_kind == 'final'
@@ -782,6 +737,63 @@ jobs:
           fi
           echo "tag_already_exists=true" >> "$GITHUB_OUTPUT"
           echo "Remote tag $PUBLISH_VERSION already points to finalize SHA; publish will skip tag create/push"
+
+      - name: Trigger sync-issues workflow
+        if: needs.validate.outputs.release_kind == 'final'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          echo "Triggering sync-issues workflow..."
+          retry --retries 2 --backoff 5 --max-backoff 20 -- gh workflow run sync-issues.yml \
+            -f "target-branch=release/$VERSION"
+          echo "✓ sync-issues workflow triggered"
+
+      - name: Wait for sync-issues completion
+        if: needs.validate.outputs.release_kind == 'final'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TIMEOUT=120
+          ELAPSED=0
+          INTERVAL=10
+
+          sleep 5
+          ELAPSED=5
+
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            RUN_STATUS=$(gh run list \
+              --workflow sync-issues.yml \
+              --limit 1 \
+              --json status,conclusion \
+              --jq '.[0].status' 2>/dev/null || echo "unknown")
+
+            if [ "$RUN_STATUS" = "completed" ]; then
+              RUN_CONCLUSION=$(gh run list \
+                --workflow sync-issues.yml \
+                --limit 1 \
+                --json conclusion \
+                --jq '.[0].conclusion' 2>/dev/null || echo "unknown")
+
+              if [ "$RUN_CONCLUSION" = "success" ]; then
+                echo "✓ sync-issues workflow completed successfully"
+              else
+                echo "⚠ sync-issues workflow completed with status: $RUN_CONCLUSION"
+              fi
+              break
+            fi
+
+            sleep "$INTERVAL"
+            ELAPSED=$((ELAPSED + INTERVAL))
+            echo "Waiting for sync-issues... (${ELAPSED}s / ${TIMEOUT}s)"
+          done
+
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            echo "⚠ Timed out waiting for sync-issues workflow"
+            echo "The release may continue, but PR documentation may not be synced"
+          fi
 
   build-and-test:
     name: Build and Test (${{ matrix.arch }})

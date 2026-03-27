@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Git commit now falls back to nano when editor config is unusable** ([#383](https://github.com/vig-os/devcontainer/issues/383))
   - `setup-git-conf.sh` now validates the effective Git editor and sets `core.editor=nano` only when the configured editor is missing or invalid in-container
   - Add integration regression coverage to ensure invalid editor settings are corrected during setup
+- **Release finalize no longer races sync-issues; CHANGELOG TBD verified after reset** ([#455](https://github.com/vig-os/devcontainer/issues/455))
+  - Run `sync-issues` after capturing finalize SHA so downstream build/publish use the finalized commit
+  - Fail finalize if `CHANGELOG.md` still contains `## [version] - TBD` after `git reset --hard`
+- **generate-docs pre-commit runs when CHANGELOG.md changes** ([#455](https://github.com/vig-os/devcontainer/issues/455))
+  - Keeps README “Latest Version” and other generated docs aligned with the changelog
 
 ### Security
 
