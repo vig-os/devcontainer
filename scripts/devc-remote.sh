@@ -952,6 +952,9 @@ DEVC_PATH="$2"
 IMAGE_TAG="$3"
 REGISTRY="$4"
 
+# Ensure ~/.local/bin is in PATH (uv, etc.)
+export PATH="$HOME/.local/bin:$PATH"
+
 # Expand ~ in DEVC_PATH
 DEVC_PATH="${DEVC_PATH/#\~/$HOME}"
 
