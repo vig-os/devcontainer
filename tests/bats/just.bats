@@ -70,7 +70,107 @@ setup() {
     assert_success
 }
 
-@test "smoke-test dispatch copies changelog from devcontainer to repo root" {
-    run bash -lc "grep -Fq -- 'cp \".devcontainer/CHANGELOG.md\" \"CHANGELOG.md\"' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+@test "smoke-test dispatch computes base version output from tag" {
+    run bash -lc "grep -Fq -- 'base_version:' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- \"sed 's/-rc[0-9]*\\$//'\" assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    assert_success
+}
+
+@test "smoke-test dispatch validates workspace changelog exists after install" {
+    run bash -lc 'grep -Fq -- "expected CHANGELOG.md after install (workspace scaffold)" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "CHANGELOG.md is not readable after ownership repair" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+    assert_success
+}
+
+@test "smoke-test dispatch repairs ownership when installer leaves root-owned files" {
+    run bash -lc 'grep -Fq -- "NEEDS_CHOWN=false" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "sudo chown -R" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "OWNER_UID_GID=\"\$(id -u):\$(id -g)\"" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+    assert_success
+}
+
+@test "smoke-test dispatch waits for deploy PR merge before release orchestration" {
+    run bash -lc 'grep -Fq -- "wait-deploy-merge:" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "gh pr view \"\${PR_URL}\" --json state --jq" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+    assert_success
+}
+
+@test "smoke-test dispatch grants PR read permission for deploy-merge polling" {
+    run bash -lc 'grep -Fq -- "wait-deploy-merge:" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "pull-requests: read" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+    assert_success
+}
+
+@test "smoke-test dispatch removes publish-release job" {
+    run bash -lc "! grep -Fq -- 'publish-release:' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    assert_success
+}
+
+@test "smoke-test dispatch triggers downstream prepare-release workflow" {
+    run bash -lc 'grep -Fq -- "cleanup-release:" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "gh workflow run prepare-release.yml" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+    assert_success
+}
+
+@test "smoke-test dispatch preflight validates required workflow contract" {
+    run bash -lc "grep -Fq -- 'Preflight check required release workflows on dispatch ref' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'REQUIRED_WORKFLOWS=(prepare-release.yml release.yml)' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'for workflow_file in \"\${REQUIRED_WORKFLOWS[@]}\"; do' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'WORKFLOW_CHECK_OUTPUT=\"\$(gh workflow view \"\${workflow_file}\" --ref \"\${WORKFLOW_REF}\" --yaml 2>&1 >/dev/null)\"' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    assert_success
+}
+
+@test "smoke-test dispatch wait logic tracks prepare-release run after dispatch" {
+    run bash -lc 'grep -Fq -- "Capture latest prepare-release run id" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "gh run list --workflow prepare-release.yml --branch \"\${WORKFLOW_REF}\"" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "BEFORE_RUN_ID: \${{ steps.capture_prepare_before.outputs.before_run_id }}" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "[ \"\${RUN_ID}\" -gt \"\${BEFORE_RUN_ID}\" ]" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+    assert_success
+}
+
+@test "smoke-test dispatch wait logic tracks release run after dispatch" {
+    run bash -lc 'grep -Fq -- "Capture latest release run id" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "gh run list --workflow release.yml --branch \"\${WORKFLOW_REF}\"" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "BEFORE_RUN_ID: \${{ steps.capture_release_before.outputs.before_run_id }}" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "[ \"\${RUN_ID}\" -gt \"\${BEFORE_RUN_ID}\" ]" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+    assert_success
+}
+
+@test "smoke-test dispatch triggers release workflow with base version and release kind" {
+    run bash -lc 'grep -Fq -- "gh workflow run release.yml \\" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "-f version=\"\${BASE_VERSION}\"" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "-f release-kind=\"\${RELEASE_KIND}\"" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "needs: [validate, ready-release-pr]" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+    assert_success
+}
+
+@test "smoke-test dispatch merges release PR after successful release workflow" {
+    run bash -lc 'grep -Fq -- "merge-release-pr:" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "Poll release PR merge status" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "Waiting for release PR merge" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "needs: [ready-release-pr, trigger-release]" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+    assert_success
+}
+
+@test "smoke-test dispatch readies release PR with release kind label" {
+    run bash -lc 'grep -Fq -- "gh pr ready" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "release-kind:candidate" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "Label release PR with release kind" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+    assert_success
+}
+
+@test "smoke-test dispatch tolerates transient auto-merge enable failures" {
+    run bash -lc 'grep -Fq -- "Warning: could not enable auto-merge yet" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+    assert_success
+}
+
+@test "smoke-test dispatch notifies upstream on orchestration failure" {
+    run bash -lc "grep -Fq -- 'notify-failure:' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'gh issue create \\' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- '--repo vig-os/devcontainer' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    assert_success
+}
+
+@test "smoke-test dispatch summary includes release-orchestration job results" {
+    run bash -lc "grep -Fq -- 'needs.wait-deploy-merge.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.cleanup-release.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.trigger-prepare-release.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.ready-release-pr.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.trigger-release.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.merge-release-pr.result' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    assert_success
+}
+
+@test "release workflow rollback resolves container image independently of core outputs" {
+    run bash -lc "grep -Fq -- 'resolve-image:' assets/workspace/.github/workflows/release.yml && grep -Fq -- 'needs: [resolve-image, core, extension, publish]' assets/workspace/.github/workflows/release.yml && grep -Fq -- 'image: ghcr.io/vig-os/devcontainer:\${{ needs.resolve-image.outputs.image-tag }}' assets/workspace/.github/workflows/release.yml"
+    assert_success
+}
+
+@test "release workflows configure safe.directory in container jobs that run git" {
+    run bash -lc "awk '/^  validate:/{flag=1} /^  finalize:/{flag=0} flag {print}' assets/workspace/.github/workflows/release-core.yml | grep -Fq -- 'name: Fix git safe.directory' && grep -Fq -- 'name: Fix git safe.directory' assets/workspace/.github/workflows/release-publish.yml && [ \"$(grep -Fc -- 'name: Fix git safe.directory' assets/workspace/.github/workflows/sync-main-to-dev.yml)\" -ge 2 ] && grep -Fq -- 'name: Fix git safe.directory' assets/workspace/.github/workflows/release.yml"
+    assert_success
+}
+
+@test "release caller and reusable workflows define explicit minimal permissions for gh operations" {
+    run bash -lc "awk '/^  core:/{flag=1} /^  extension:/{flag=0} flag {print}' assets/workspace/.github/workflows/release.yml | grep -Fq -- 'actions: write' && awk '/^  core:/{flag=1} /^  extension:/{flag=0} flag {print}' assets/workspace/.github/workflows/release.yml | grep -Fq -- 'pull-requests: read' && awk '/^  publish:/{flag=1} /^  rollback:/{flag=0} flag {print}' assets/workspace/.github/workflows/release.yml | grep -Fq -- 'contents: write' && awk '/^  validate:/{flag=1} /^  finalize:/{flag=0} flag {print}' assets/workspace/.github/workflows/release-core.yml | grep -Fq -- 'pull-requests: read' && awk '/^  finalize:/{flag=1} /^  test:/{flag=0} flag {print}' assets/workspace/.github/workflows/release-core.yml | grep -Fq -- 'actions: write'"
+    assert_success
+}
+
+@test "smoke-test dispatch exposes base_version and rc_number for cross-repo RC alignment" {
+    run bash -lc "grep -Fq -- 'base_version=' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'rc_number=' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'steps.extract.outputs.base_version' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'steps.extract.outputs.rc_number' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    assert_success
+}
+
+@test "workspace release workflows accept rc-number for pinned candidate RC" {
+    run bash -lc "grep -Fq -- 'rc-number:' assets/workspace/.github/workflows/release.yml && grep -Fq -- 'rc_number:' assets/workspace/.github/workflows/release.yml && grep -Fq -- 'rc_number:' assets/workspace/.github/workflows/release-core.yml"
     assert_success
 }

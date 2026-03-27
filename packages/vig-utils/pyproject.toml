@@ -27,6 +27,7 @@ resolve-branch = "vig_utils.resolve_branch:main"
 derive-branch-summary = "vig_utils.derive_branch_summary:main"
 check-skill-names = "vig_utils.check_skill_names:main"
 setup-labels = "vig_utils.setup_labels:main"
+retry = "vig_utils.retry:main"
 vig-utils = "vig_utils.utils:main"
 
 [tool.hatch.build.targets.wheel]

@@ -56,7 +56,8 @@ runs:
           fi
         fi
 
-        echo "tag=latest" >> "$GITHUB_OUTPUT"
+        echo "ERROR: Could not resolve DEVCONTAINER_VERSION from .vig-os and no image-tag override was provided."
+        exit 1
 
     - name: Validate image accessibility
       shell: bash

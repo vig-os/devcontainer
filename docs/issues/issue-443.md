@@ -1,8 +1,8 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-03-25T17:15:30Z
-updated: 2026-03-25T18:28:27Z
+updated: 2026-03-26T07:32:48Z
 author: github-actions[bot]
 author_url: https://github.com/github-actions[bot]
 url: https://github.com/vig-os/devcontainer/issues/443
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-03-26T04:38:23.561Z
+synced: 2026-03-26T17:53:32.306Z
 ---
 
 # [Issue 443]: [Release 0.3.1 failed -- automatic rollback](https://github.com/vig-os/devcontainer/issues/443)

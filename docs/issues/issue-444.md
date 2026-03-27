@@ -1,8 +1,8 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-03-25T17:21:28Z
-updated: 2026-03-25T19:08:24Z
+updated: 2026-03-26T07:32:03Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/444
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-03-26T04:38:23.243Z
+synced: 2026-03-26T17:53:31.912Z
 ---
 
 # [Issue 444]: [[CHORE] Remove PR Title Check workflow from CI](https://github.com/vig-os/devcontainer/issues/444)

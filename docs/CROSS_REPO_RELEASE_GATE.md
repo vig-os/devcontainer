@@ -34,6 +34,17 @@ Payload contract:
   - `client_payload[source_sha]`
   - `client_payload[correlation_id]`
 
+Workflow dispatch contract:
+
+- Required downstream workflow IDs/files:
+  - `prepare-release.yml`
+  - `release.yml`
+- Required dispatch ref:
+  - `dev`
+- Dispatch and wait operations must use the same ref context to avoid default-branch drift:
+  - dispatch via `gh workflow run <workflow> --ref dev ...`
+  - run discovery via `gh run list --workflow <workflow> --branch dev ...`
+
 ### Receiver Responsibilities
 
 The receiver workflow (`assets/smoke-test/.github/workflows/repository-dispatch.yml`) performs:
@@ -44,6 +55,9 @@ The receiver workflow (`assets/smoke-test/.github/workflows/repository-dispatch.
    - candidate tag -> GitHub pre-release
    - final tag -> GitHub release
 4. idempotency checks when a release object already exists
+5. preflight validation that required downstream workflow IDs are resolvable on the dispatch ref before orchestration starts
+
+If the validation repository also runs the shipped workspace `release.yml` workflow for a **candidate** (separate from publishing a release for the dispatched tag), pass workflow input `rc-number` set to the numeric RC suffix of `client_payload.tag` (for example `21` for `0.3.1-rc21`). That keeps the downstream candidate tag aligned with the upstream publish tag and satisfies the orchestrator’s latest-RC gate. The smoke-test template exposes this value as job output `needs.validate.outputs.rc_number`.
 
 ### Gate Checks in the Orchestrator
 
@@ -56,6 +70,8 @@ The orchestrator validates:
 - additional finalization precondition: latest RC must already exist as a downstream pre-release
 
 If any of these checks fail, the release workflow fails and rollback handling is evaluated by workflow conditions.
+
+**Immutable releases:** Where **immutable releases** are enabled, a **published** GitHub Release (including a published **pre-release**) locks its **linked** tag and assets; they cannot be rewritten via normal GitHub UI/API. Downstream and smoke-test flows should fix forward with a new RC or version rather than deleting tags or releases. See [Immutable releases, tag rulesets, and forward-fix policy](RELEASE_CYCLE.md#immutable-releases-tag-rulesets-and-forward-fix-policy) for full policy and recovery procedures (including tags without a published release and the forward-fix no-delete policy).
 
 ## Expected Output
 
@@ -92,6 +108,7 @@ Common failure patterns:
 - downstream release type mismatch (`prerelease` flag differs from expected)
 - malformed/insufficient dispatch payload
 - downstream workflow failure prior to release artifact publication
+- workflow contract drift (required workflow ID missing on expected dispatch ref), which must fail fast in preflight
 
 ## Operational Verification
 
@@ -107,3 +124,12 @@ gh -R vig-os/devcontainer-smoke-test release view <TAG>
 
 - Orchestrator logic: `.github/workflows/release.yml`
 - Validation receiver template: `assets/smoke-test/.github/workflows/repository-dispatch.yml`
+
+## Token Model for Downstream Write Paths
+
+For downstream workflow templates used by this gate, repositories must provide both Commit and Release app credentials.
+
+- Commit App token is required for protected branch writes performed by release preparation/finalization flows.
+- Release App token is required for PR/release/workflow dispatch orchestration.
+
+Using `github.token` for protected downstream write paths is not supported by this gate contract because branch rulesets may reject direct writes without app bypass.
