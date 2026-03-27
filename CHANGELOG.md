@@ -16,8 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Workspace `release.yml` adds `create-release` (`workflow_dispatch`, default `false`); `release-publish.yml` creates a draft GitHub pre-release only when set for `candidate` runs
   - Smoke-test `repository-dispatch.yml` passes `create-release=true` when triggering downstream `release.yml`
   - `just publish-candidate` forwards `create-release` in `justfile.gh` and the workspace template copy
-- **One-time GHCR/git RC prune script** ([#463](https://github.com/vig-os/devcontainer/issues/463))
-  - Add `scripts/prune-ghcr-tags.sh` (dry-run by default; `--execute` to delete) for manual cleanup of stale RC and `sha256-*`-only package versions
 
 ### Changed
 
@@ -39,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **One-time GHCR/git RC prune script** ([#463](https://github.com/vig-os/devcontainer/issues/463))
+  - Remove `scripts/prune-ghcr-tags.sh`; RC and `sha256-*` orphan cleanup remains in root `promote-release.yml`
 - **Downstream RC pre-release gate from release validate job** ([#463](https://github.com/vig-os/devcontainer/issues/463))
   - Removed dead `if: false` steps from `release.yml`; downstream final release is verified only in `promote-release.yml` before promote
 
