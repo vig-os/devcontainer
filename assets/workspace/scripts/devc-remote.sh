@@ -70,6 +70,11 @@ log_info() {
     echo -e "${BLUE}ℹ${NC}  $1"
 }
 
+# Sanitize a string for use as a DNS label (Tailscale hostnames, etc.)
+sanitize_dns_label() {
+    echo "${1//_/-}"
+}
+
 log_success() {
     echo -e "${GREEN}✓${NC}  $1"
 }
@@ -791,7 +796,7 @@ wait_for_tailscale() {
     devc_name=$(ssh "$SSH_HOST" \
         "python3 -c \"import json,sys; print(json.load(sys.stdin).get('name',''))\" \
          < ${REMOTE_PATH}/.devcontainer/devcontainer.json 2>/dev/null" || true)
-    devc_name="${devc_name:-devc}"
+    devc_name=$(sanitize_dns_label "${devc_name:-devc}")
 
     log_info "Tailscale: waiting for container to join tailnet (pattern: *${devc_name}*)..."
 
