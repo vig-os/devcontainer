@@ -58,7 +58,7 @@ finalize-release version ref="" *flags:
     #!/usr/bin/env bash
     set -euo pipefail
     # Trigger the release workflow via GitHub Actions
-    # The workflow handles: finalize CHANGELOG, build/test images, create final tag, publish
+    # The workflow handles: finalize CHANGELOG, create final tag, publish
     REF="{{ ref }}"
     if [ -z "$REF" ]; then
         REF="release/{{ version }}"
@@ -68,7 +68,7 @@ finalize-release version ref="" *flags:
     echo "✓ Release workflow triggered for version {{ version }}"
     echo "Monitor progress: gh run list --workflow release.yml"
 
-# Promote final release: GHCR :latest, publish draft GitHub Release, merge release PR (after downstream smoke-test final release)
+# Promote final release: publish draft GitHub Release, merge release PR
 [group('release')]
 promote-release version ref="" *flags:
     #!/usr/bin/env bash
@@ -84,7 +84,7 @@ promote-release version ref="" *flags:
 
 # Publish release candidate via GitHub Actions workflow
 [group('release')]
-publish-candidate version ref="" *flags:
+publish-candidate version ref="" create-release="false" *flags:
     #!/usr/bin/env bash
     set -euo pipefail
     # Trigger release workflow in candidate mode (default mode in workflow)
@@ -92,7 +92,7 @@ publish-candidate version ref="" *flags:
     if [ -z "$REF" ]; then
         REF="release/{{ version }}"
     fi
-    gh workflow run release.yml --ref "$REF" -f "version={{ version }}" -f "release-kind=candidate" {{ flags }}
+    gh workflow run release.yml --ref "$REF" -f "version={{ version }}" -f "release-kind=candidate" -f "create-release={{ create-release }}" {{ flags }}
     echo ""
     echo "✓ Candidate release workflow triggered for version {{ version }}"
     echo "Monitor progress: gh run list --workflow release.yml"
@@ -100,16 +100,4 @@ publish-candidate version ref="" *flags:
 # Reset CHANGELOG Unreleased section (after merging release to dev)
 [group('release')]
 reset-changelog:
-    uv run prepare-changelog reset CHANGELOG.md
-
-# Pull image from registry (default: latest)
-[group('release')]
-pull version="latest" repo="":
-    #!/usr/bin/env bash
-    RESOLVED_REPO="${repo:-${TEST_REGISTRY:-ghcr.io/vig-os/devcontainer}}"
-    echo "Pulling image ${RESOLVED_REPO}:{{ version }}..."
-    TLS_FLAG=""
-    if [ "${REGISTRY_TEST:-}" = "1" ]; then
-        TLS_FLAG="--tls-verify=false"
-    fi
-    podman pull $TLS_FLAG "${RESOLVED_REPO}:{{ version }}" || echo "[!]  Failed to pull ${RESOLVED_REPO}:{{ version }}"
+    prepare-changelog reset CHANGELOG.md
