@@ -1,0 +1,2 @@
+# vig-os devcontainer configuration
+DEVCONTAINER_VERSION={{IMAGE_TAG}}

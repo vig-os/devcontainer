@@ -2,17 +2,17 @@
 type: issue
 state: open
 created: 2026-02-18T01:45:43Z
-updated: 2026-02-22T09:22:29Z
+updated: 2026-03-08T10:46:57Z
 author: gerchowl
 author_url: https://github.com/gerchowl
 url: https://github.com/vig-os/devcontainer/issues/70
-comments: 2
+comments: 3
 labels: feature, priority:low, area:workspace, effort:large, semver:minor
 assignees: gerchowl
 milestone: Backlog
 projects: none
 relationship: none
-synced: 2026-02-23T04:30:08.741Z
+synced: 2026-03-09T04:23:41.703Z
 ---
 
 # [Issue 70]: [[FEATURE] Remote devcontainer orchestration via just recipe](https://github.com/vig-os/devcontainer/issues/70)
@@ -478,4 +478,82 @@ Two parallel sub-issues, then wiring on the parent branch:
 - [ ] Run manifest sync — verify: files in `assets/workspace/.devcontainer/scripts/`
 - [ ] Smoke test: `bash scripts/devc-remote.sh --help` exits 0 with usage output
 - [ ] Update CHANGELOG.md Unreleased section
+
+---
+
+# [Comment #3]() by [gerchowl]()
+
+_Posted on March 8, 2026 at 10:46 AM_
+
+## Research: Claude Code subscription auth in devcontainers
+
+### Problem
+
+The current `setup-claude.sh` / `inject_claude_auth()` approach uses `ANTHROPIC_API_KEY` (Console API key). But we want subscription-based auth (Claude Pro/Max) — no API key, just the user's existing browser login.
+
+### Key finding: OAuth token forwarding via env vars
+
+Extracted from the Claude Code binary (`strings` on v2.1.71), these env vars support OAuth token injection:
+
+| Variable | Purpose |
+|----------|---------|
+| `CLAUDE_CODE_OAUTH_TOKEN` | OAuth access token (from subscription login) |
+| `CLAUDE_CODE_OAUTH_REFRESH_TOKEN` | Refresh token for renewing expired access tokens |
+| `CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR` | Pass token via file descriptor (alternative) |
+| `ANTHROPIC_AUTH_TOKEN` | Bearer token (sent as `Authorization: Bearer` header) |
+
+### How subscription auth works locally
+
+1. `claude login` → opens browser → OAuth flow → tokens stored in **macOS Keychain** ("Claude Safe Storage" / "Claude Key")
+2. `~/.claude.json` stores `oauthAccount` metadata (account UUID, email, org UUID, billing type)
+3. All terminal sessions share the keychain-stored tokens — no per-session auth needed
+
+### `claude setup-token` subcommand
+
+Claude Code has a built-in `setup-token` command designed for headless environments:
+- Triggers browser auth on the host, produces a **long-lived token**
+- Intended for containers/CI where no browser is available
+- Token can be injected via `CLAUDE_CODE_OAUTH_TOKEN` env var
+
+### Proposed flow for devcontainers
+
+```
+Host (macOS)                           Container (Linux)
+────────────                           ─────────────────
+claude setup-token                     
+  └→ browser OAuth                     
+  └→ outputs token ──────────────────→ CLAUDE_CODE_OAUTH_TOKEN env var
+                                       claude --dangerously-skip-permissions
+                                         └→ uses token, no login needed
+```
+
+**`devc-remote.sh` integration:**
+1. Check for local OAuth token (extract from keychain or `setup-token` output)
+2. Inject `CLAUDE_CODE_OAUTH_TOKEN` into `docker-compose.local.yaml` (same pattern as Tailscale key injection)
+3. Container's `setup-claude.sh` installs Claude Code; token is already in env
+
+### Open questions
+
+- [ ] Can we extract the OAuth token from macOS Keychain programmatically? (The "Claude Key" entry is an encryption key, not the token itself — need to find where the encrypted token blob lives)
+- [ ] What is the token lifetime? Does `CLAUDE_CODE_OAUTH_REFRESH_TOKEN` auto-renew?
+- [ ] Does `claude setup-token` output the token to stdout, or store it somewhere?
+- [ ] Does `CLAUDE_CODE_OAUTH_TOKEN` work on Linux without any prior `claude login`?
+- [ ] `CLAUDE_CODE_ACCOUNT_UUID` and `CLAUDE_CODE_ORGANIZATION_UUID` — are these also needed alongside the token?
+
+### Other relevant env vars discovered
+
+For future reference, other auth-related vars from the binary:
+
+- `CLAUDE_CODE_API_KEY_HELPER_TTL_MS` — refresh interval for `apiKeyHelper` script
+- `CLAUDE_CODE_CUSTOM_OAUTH_URL` — custom OAuth endpoint
+- `CLAUDE_CODE_OAUTH_CLIENT_ID` — custom OAuth client ID  
+- `CLAUDE_CODE_OAUTH_SCOPES` — OAuth scope configuration
+- `CLAUDE_CODE_SESSION_ACCESS_TOKEN` — per-session access token
+- `CLAUDE_CODE_USER_EMAIL` — pre-set user email
+
+### Recommendation
+
+Replace `ANTHROPIC_API_KEY` injection with `CLAUDE_CODE_OAUTH_TOKEN` injection. This lets users authenticate with their existing subscription — no Console API key needed, no extra billing. The `setup-token` flow is the official Anthropic-supported path for headless auth.
+
+Next step: manually test `claude setup-token` to confirm output format, then redesign `setup-claude.sh` and `inject_claude_auth()`.
 

@@ -41,6 +41,16 @@ worktree-start issue prompt="" reviewer="":
         echo "Install: curl https://cursor.com/install -fsSL | bash"
         exit 1
     fi
+    if ! resolve-branch --help >/dev/null 2>&1; then
+        echo "[ERROR] resolve-branch command not available."
+        echo "Run workspace/bootstrap sync to install helper CLIs, then retry."
+        exit 1
+    fi
+    if ! derive-branch-summary --help >/dev/null 2>&1; then
+        echo "[ERROR] derive-branch-summary command not available."
+        echo "Run workspace/bootstrap sync to install helper CLIs, then retry."
+        exit 1
+    fi
 
     # Helper: ensure a directory is in cursor-agent's trustedDirectories
     _wt_ensure_trust() {

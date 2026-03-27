@@ -19,6 +19,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from .conftest import _build_podman_cmd, _run_noninteractive_init
+
 
 class TestHostGitSignatureSetup:
     """Test that git commit signing is properly configured on the host.
@@ -549,7 +551,7 @@ class TestDevContainerDockerCompose:
             "docker-compose.yml missing 'devcontainer' service"
         )
 
-    def test_docker_compose_yml_image(self, initialized_workspace, container_image):
+    def test_docker_compose_yml_image(self, initialized_workspace):
         """Test that docker-compose.yml has correct image reference."""
         docker_compose_yml = (
             initialized_workspace / ".devcontainer" / "docker-compose.yml"
@@ -561,17 +563,10 @@ class TestDevContainerDockerCompose:
         service = config["services"]["devcontainer"]
         assert "image" in service, "devcontainer service missing 'image' field"
 
-        # Verify the docker-compose.yml image matches the container_image fixture
-        # Normalize arch suffix if present (e.g., :X.Y or :X.Y-amd64 -> :X.Y)
-        # Only remove known architecture suffixes (-amd64, -arm64) at the very end
-        expected_image = re.sub(r"-(amd64|arm64)$", "", container_image)
+        # docker-compose now references version from .env / .vig-os
+        expected_image = "ghcr.io/vig-os/devcontainer:${DEVCONTAINER_VERSION:-latest}"
         assert service["image"] == expected_image, (
             f"Expected image to be {expected_image}, got: {service['image']}"
-        )
-
-        # {{IMAGE_TAG}} should be replaced (or at least not present)
-        assert "{{IMAGE_TAG}}" not in service["image"], (
-            f"Image tag placeholder not replaced: {service['image']}"
         )
 
     def test_docker_compose_yml_volumes(self, initialized_workspace):
@@ -683,6 +678,112 @@ class TestDevContainerDockerCompose:
         assert service["tty"] is True, f"Expected tty=True, got: {service['tty']}"
 
 
+class TestVigOsConfig:
+    """Test .vig-os configuration as version source of truth."""
+
+    def test_vig_os_exists(self, initialized_workspace):
+        """Test that .vig-os exists at workspace root."""
+        vig_os_file = initialized_workspace / ".vig-os"
+        assert vig_os_file.exists(), ".vig-os not found in workspace root"
+        assert vig_os_file.is_file(), ".vig-os is not a regular file"
+
+    def test_vig_os_contains_devcontainer_version(self, initialized_workspace):
+        """Test that .vig-os contains DEVCONTAINER_VERSION key."""
+        vig_os_file = initialized_workspace / ".vig-os"
+        content = vig_os_file.read_text(encoding="utf-8")
+        assert "DEVCONTAINER_VERSION=" in content, (
+            "DEVCONTAINER_VERSION key not found in .vig-os"
+        )
+        assert "{{IMAGE_TAG}}" not in content, (
+            "IMAGE_TAG placeholder should be replaced in .vig-os"
+        )
+
+    def test_initialize_writes_devcontainer_version_to_env(self, initialized_workspace):
+        """Test initialize.sh writes DEVCONTAINER_VERSION to .devcontainer/.env."""
+        init_script = (
+            initialized_workspace / ".devcontainer" / "scripts" / "initialize.sh"
+        )
+        env_file = initialized_workspace / ".devcontainer" / ".env"
+
+        if env_file.exists():
+            env_file.unlink()
+
+        result = subprocess.run(
+            [str(init_script)],
+            capture_output=True,
+            text=True,
+            cwd=str(initialized_workspace),
+            timeout=10,
+        )
+        assert result.returncode == 0, (
+            f"initialize.sh failed\nstdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        assert env_file.exists(), ".devcontainer/.env was not created by initialize.sh"
+
+        env_content = env_file.read_text(encoding="utf-8")
+        assert "DEVCONTAINER_VERSION=" in env_content, (
+            "initialize.sh did not write DEVCONTAINER_VERSION to .env"
+        )
+
+    def test_initialize_does_not_execute_vig_os_shell_content(
+        self, initialized_workspace
+    ):
+        """Test initialize.sh parses .vig-os as data, not executable shell."""
+        init_script = (
+            initialized_workspace / ".devcontainer" / "scripts" / "initialize.sh"
+        )
+        vig_os_file = initialized_workspace / ".vig-os"
+        env_file = initialized_workspace / ".devcontainer" / ".env"
+        marker_file = initialized_workspace / ".issue285_init_marker"
+        original_vig_os = (
+            vig_os_file.read_text(encoding="utf-8") if vig_os_file.exists() else None
+        )
+
+        try:
+            if env_file.exists():
+                env_file.unlink()
+            if marker_file.exists():
+                marker_file.unlink()
+
+            vig_os_file.write_text(
+                "\n".join(
+                    [
+                        "DEVCONTAINER_VERSION=1.2.3",
+                        f'EVIL=$(touch "{marker_file}")',
+                        "UNRELATED_KEY=ignored",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [str(init_script)],
+                capture_output=True,
+                text=True,
+                cwd=str(initialized_workspace),
+                timeout=10,
+            )
+
+            assert result.returncode == 0, (
+                f"initialize.sh failed\nstdout: {result.stdout}\nstderr: {result.stderr}"
+            )
+            assert marker_file.exists() is False, (
+                "initialize.sh executed shell content from .vig-os"
+            )
+            assert env_file.exists(), (
+                ".devcontainer/.env was not created by initialize.sh"
+            )
+            env_content = env_file.read_text(encoding="utf-8")
+            assert "DEVCONTAINER_VERSION=1.2.3" in env_content
+        finally:
+            if original_vig_os is None:
+                if vig_os_file.exists():
+                    vig_os_file.unlink()
+            else:
+                vig_os_file.write_text(original_vig_os, encoding="utf-8")
+
+
 class TestPlaceholders:
     """Test that placeholders are replaced correctly."""
 
@@ -748,6 +849,99 @@ class TestPlaceholders:
                 f"{{{{SHORT_NAME}}}} placeholder not replaced in {file}"
             )
             assert "test_project" in content, f"Short name not replaced in {file}"
+
+
+class TestSmokeRepo:
+    """Tests for smoke-test-specific asset deployment."""
+
+    def test_smoke_test_flag_deploys_assets(self, initialized_smoke_workspace):
+        """Test --smoke-test deploys specific assets."""
+        project_root = Path(__file__).resolve().parents[1]
+        smoke_test_assets_dir = project_root / "assets" / "smoke-test"
+        smoke_test_files = [
+            path for path in smoke_test_assets_dir.rglob("*") if path.is_file()
+        ]
+
+        assert smoke_test_files, "No smoke-test assets found in assets/smoke-test"
+        for source_file in smoke_test_files:
+            relative_path = source_file.relative_to(smoke_test_assets_dir)
+            deployed_path = initialized_smoke_workspace / relative_path
+            assert deployed_path.exists(), f"{relative_path} not deployed"
+
+    def test_smoke_redeploy_preserves_synced_docs_directories(
+        self, initialized_smoke_workspace, container_image
+    ):
+        """Regression: smoke re-deploy must not delete docs synced by sync-issues."""
+        docs_issues = initialized_smoke_workspace / "docs" / "issues"
+        docs_pull_requests = initialized_smoke_workspace / "docs" / "pull-requests"
+        docs_issues.mkdir(parents=True, exist_ok=True)
+        docs_pull_requests.mkdir(parents=True, exist_ok=True)
+
+        issues_sentinel = docs_issues / "keep.md"
+        prs_sentinel = docs_pull_requests / "keep.md"
+        issues_sentinel.write_text("keep issue docs", encoding="utf-8")
+        prs_sentinel.write_text("keep PR docs", encoding="utf-8")
+
+        cmd = _build_podman_cmd(
+            container_image,
+            f"{initialized_smoke_workspace}:/workspace",
+            smoke_test=True,
+        )
+        _run_noninteractive_init(cmd)
+
+        assert docs_issues.exists(), (
+            "docs/issues directory was deleted by smoke re-deploy"
+        )
+        assert docs_pull_requests.exists(), (
+            "docs/pull-requests directory was deleted by smoke re-deploy"
+        )
+        assert issues_sentinel.exists(), (
+            "docs/issues sentinel was deleted by smoke re-deploy"
+        )
+        assert prs_sentinel.exists(), (
+            "docs/pull-requests sentinel was deleted by smoke re-deploy"
+        )
+
+    def test_default_init_does_not_deploy_repository_dispatch(
+        self, initialized_workspace
+    ):
+        """Test default init does not deploy repository-dispatch workflow."""
+        dispatch_workflow = (
+            initialized_workspace / ".github" / "workflows" / "repository-dispatch.yml"
+        )
+        assert not dispatch_workflow.exists(), (
+            "repository-dispatch.yml should not be deployed without --smoke-test"
+        )
+
+    def test_smoke_workspace_changelog_available_in_devcontainer_and_root(
+        self, initialized_smoke_workspace
+    ):
+        """Smoke template should ship root and devcontainer changelogs with distinct roles."""
+        root_changelog = initialized_smoke_workspace / "CHANGELOG.md"
+        devcontainer_changelog = (
+            initialized_smoke_workspace / ".devcontainer" / "CHANGELOG.md"
+        )
+
+        assert root_changelog.exists(), "Root CHANGELOG.md not found in smoke workspace"
+        assert devcontainer_changelog.exists(), (
+            ".devcontainer/CHANGELOG.md not found in smoke workspace"
+        )
+        root_content = root_changelog.read_text(encoding="utf-8")
+        devcontainer_content = devcontainer_changelog.read_text(encoding="utf-8")
+
+        # Root changelog is a copy of .devcontainer/CHANGELOG.md with the top semver
+        # heading renamed via prepare-changelog unprepare; older release sections stay.
+        first_h2 = re.search(r"^## .+$", root_content, re.MULTILINE)
+        assert first_h2 is not None, "Root changelog should have a top-level ## heading"
+        assert first_h2.group(0).rstrip("\r\n") == "## Unreleased", (
+            "Root changelog top section should be ## Unreleased after smoke-test unprepare"
+        )
+        assert re.search(r"^## \[\d+\.\d+\.\d+\]", root_content, re.MULTILINE), (
+            "Root changelog should retain semver release sections below Unreleased"
+        )
+        assert re.search(
+            r"^## \[\d+\.\d+\.\d+\]", devcontainer_content, re.MULTILINE
+        ), ".devcontainer changelog should include semver release history"
 
 
 class TestDevContainerGit:
@@ -1281,8 +1475,11 @@ class TestDevContainerCLI:
             # Check if it's a permission denied (keys not authorized) vs connection error
             if "Permission denied" in result.stderr:
                 # Keys exist but aren't authorized - this is acceptable for testing
-                # The important thing is that SSH is configured
-                assert "github.com" in result.stderr, (
+                # Ensure this is an auth failure, not a connectivity/hostname failure.
+                assert (
+                    "Could not resolve hostname" not in result.stderr
+                    and "Name or service not known" not in result.stderr
+                ), (
                     f"SSH connection failed unexpectedly\n"
                     f"stdout: {result.stdout}\n"
                     f"stderr: {result.stderr}"
@@ -1296,7 +1493,12 @@ class TestDevContainerCLI:
                 )
         elif result.returncode == 1:
             # Success - GitHub responded (exit 1 is normal for test connections)
-            assert "Hi" in result.stdout or "github.com" in result.stderr, (
+            output = result.stdout + result.stderr
+            assert (
+                "successfully authenticated" in output
+                or "does not provide shell access" in output
+                or "Hi " in output
+            ), (
                 f"Unexpected SSH response from GitHub\n"
                 f"stdout: {result.stdout}\n"
                 f"stderr: {result.stderr}"
@@ -1547,15 +1749,11 @@ class TestDevContainerCLI:
 
         # Verify we got a successful authentication response
         output = result.stdout + result.stderr
-        assert (
-            "Logged in to github.com" in output
-            or "✓ Logged in" in output
-            or "github.com" in output
-        ), (
+        assert "Logged in to " in output or "✓ Logged in" in output, (
             f"GitHub CLI authentication status unclear\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}\n"
-            f"Expected 'Logged in to github.com' or similar in output"
+            f"Expected a successful gh auth status message in output"
         )
 
     def test_valid_branch_names_commit_succeeds(self, devcontainer_up):
@@ -1811,10 +2009,10 @@ class TestJustRecipes:
         )
 
     def test_just_pytest(self, devcontainer_up):
-        """Test the just pytest command."""
+        """Test the just test command."""
         workspace_path = str(devcontainer_up.resolve())
 
-        just_cmd = self._just_cmd(workspace_path, ["test-pytest"])
+        just_cmd = self._just_cmd(workspace_path, ["test"])
         result = subprocess.run(
             just_cmd,
             capture_output=True,
@@ -1825,7 +2023,7 @@ class TestJustRecipes:
         )
 
         assert result.returncode == 0, (
-            f"`just test-pytest` recipe failed\n"
+            f"`just test` recipe failed\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}\n"
             f"command: {' '.join(just_cmd)}"
@@ -1837,67 +2035,6 @@ class TestJustRecipes:
             and "failed" not in result.stdout
         ), (
             f"Unexpected pytest output\n"
-            f"stdout: {result.stdout}\n"
-            f"stderr: {result.stderr}\n"
-            f"command: {' '.join(just_cmd)}"
-        )
-
-
-class TestGhIssuesSmoke:
-    """Smoke test for the just gh-issues recipe (requires gh auth)."""
-
-    def test_just_gh_issues(self, devcontainer_up):
-        """Test that 'just gh-issues' runs and produces table output."""
-        workspace_path = str(devcontainer_up.resolve())
-
-        just_cmd = [
-            "devcontainer",
-            "exec",
-            "--workspace-folder",
-            workspace_path,
-            "--config",
-            f"{workspace_path}/.devcontainer/devcontainer.json",
-            "--docker-path",
-            "podman",
-            "just",
-            "gh-issues",
-        ]
-        result = subprocess.run(
-            just_cmd,
-            capture_output=True,
-            text=True,
-            cwd=workspace_path,
-            env=os.environ.copy(),
-            timeout=30,
-        )
-
-        if result.returncode == 0:
-            output = result.stdout
-            assert "Open Issues" in output or "No open issues" in output, (
-                f"Expected issues section in output\n"
-                f"stdout: {result.stdout}\n"
-                f"stderr: {result.stderr}"
-            )
-            assert "Pull Requests" in output, (
-                f"Expected pull requests section in output\n"
-                f"stdout: {result.stdout}\n"
-                f"stderr: {result.stderr}"
-            )
-            return
-
-        error_output = (result.stderr + result.stdout).lower()
-        gh_cli_errors = (
-            "not logged in" in error_output
-            or "auth login" in error_output
-            or "calledprocesserror" in error_output
-            or "gh issue list" in error_output
-        )
-        if gh_cli_errors:
-            pytest.skip(
-                "gh CLI call failed (no repo context or auth in test workspace)"
-            )
-        pytest.fail(
-            f"`just gh-issues` failed (exit {result.returncode})\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}\n"
             f"command: {' '.join(just_cmd)}"
@@ -2628,6 +2765,62 @@ class TestVersionCheckScript:
         assert "on|enable" in result.stdout
         assert "off|disable" in result.stdout
 
+    def test_reads_version_from_vig_os_config(self, version_check_script):
+        """Test that version-check reads version from .vig-os config."""
+        content = version_check_script.read_text(encoding="utf-8")
+        assert ".vig-os" in content, "version-check.sh should reference .vig-os"
+        assert "DEVCONTAINER_VERSION" in content, (
+            "version-check.sh should read DEVCONTAINER_VERSION"
+        )
+
+    def test_config_does_not_execute_vig_os_shell_content(
+        self, version_check_script, initialized_workspace
+    ):
+        """Test config command does not execute shell code from .vig-os."""
+        vig_os_file = initialized_workspace / ".vig-os"
+        marker_file = initialized_workspace / ".issue285_version_marker"
+        original_vig_os = (
+            vig_os_file.read_text(encoding="utf-8") if vig_os_file.exists() else None
+        )
+
+        try:
+            if marker_file.exists():
+                marker_file.unlink()
+
+            vig_os_file.write_text(
+                "\n".join(
+                    [
+                        "DEVCONTAINER_VERSION=1.2.3",
+                        f'EVIL=$(touch "{marker_file}")',
+                        "NOT_RELEVANT=ok",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [str(version_check_script), "config"],
+                capture_output=True,
+                text=True,
+                cwd=str(initialized_workspace),
+                timeout=10,
+            )
+
+            assert result.returncode == 0, (
+                f"version-check.sh config failed\nstdout: {result.stdout}\nstderr: {result.stderr}"
+            )
+            assert marker_file.exists() is False, (
+                "version-check.sh executed shell content from .vig-os"
+            )
+            assert "Current ver:    1.2.3" in result.stdout
+        finally:
+            if original_vig_os is None:
+                if vig_os_file.exists():
+                    vig_os_file.unlink()
+            else:
+                vig_os_file.write_text(original_vig_os, encoding="utf-8")
+
     def test_config_creation(self, version_check_script, local_dir):
         """Test that config file is created with defaults on first run."""
         config_file = local_dir / "version-check.conf"
@@ -2914,29 +3107,29 @@ class TestVersionCheckJustIntegration:
 
     def test_just_check_command_exists(self, initialized_workspace):
         """Test that 'just check' command is available."""
-        # Check if .devcontainer/justfile.base has the check recipe
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        # Check if .devcontainer/justfile.devc has the check recipe
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
             pytest.skip(
-                "justfile.base not found - workspace may be from older template"
+                "justfile.devc not found - workspace may be from older template"
             )
 
         content = justfile_base.read_text()
-        assert "check" in content, "check recipe not found in justfile.base"
+        assert "check" in content, "check recipe not found in justfile.devc"
 
     def test_just_update_command_exists(self, initialized_workspace):
         """Test that 'just update' command is available."""
-        # Check if .devcontainer/justfile.base has the update recipe
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        # Check if justfile.project has the update recipe
+        justfile_base = initialized_workspace / "justfile.project"
 
         if not justfile_base.exists():
             pytest.skip(
-                "justfile.base not found - workspace may be from older template"
+                "justfile.project not found - workspace may be from older template"
             )
 
         content = justfile_base.read_text()
-        assert "update" in content, "update recipe not found in justfile.base"
+        assert "update" in content, "update recipe not found in justfile.project"
 
     def test_just_check_calls_script(self, initialized_workspace):
         """Test that 'just check config' executes successfully."""
@@ -2948,16 +3141,16 @@ class TestVersionCheckJustIntegration:
         if not script_path.exists():
             pytest.skip("version-check.sh not found - workspace from older template")
 
-        # Check if justfile.base has check recipe
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        # Check if justfile.devc has check recipe
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found - workspace from older template")
+            pytest.skip("justfile.devc not found - workspace from older template")
 
         content = justfile_base.read_text()
         if "check" not in content:
             pytest.skip(
-                "check recipe not in justfile.base - workspace from older template"
+                "check recipe not in justfile.devc - workspace from older template"
             )
 
         # Test that check recipe can be called directly via the script
@@ -2974,10 +3167,10 @@ class TestVersionCheckJustIntegration:
 
     def test_just_check_recipe_calls_version_check_script(self, initialized_workspace):
         """Test that 'just check' recipe properly calls version-check.sh."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found - workspace from older template")
+            pytest.skip("justfile.devc not found - workspace from older template")
 
         content = justfile_base.read_text()
 
@@ -3005,27 +3198,27 @@ class TestVersionCheckJustIntegration:
 
     def test_just_check_verbose_mode(self, initialized_workspace):
         """Test that 'just check' runs in verbose mode (check subcommand)."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
         if "check" not in content:
             pytest.skip("check recipe not found")
 
-        # The recipe should call 'check' subcommand when no args provided
+        # The recipe should default to 'check' subcommand when no args provided
         # This ensures verbose output instead of silent mode
-        assert 'version-check.sh" check' in content or '"$@"' in content, (
-            "check recipe doesn't use verbose mode"
+        assert "{ 'check' }" in content or 'version-check.sh" check' in content, (
+            "check recipe doesn't default to verbose check mode"
         )
 
     def test_just_check_accepts_subcommands(self, initialized_workspace):
         """Test that 'just check' recipe accepts and passes through subcommands."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
         if "check" not in content:
@@ -3066,9 +3259,9 @@ class TestVersionCheckJustIntegration:
 
     def test_just_check_config_via_just_command(self, initialized_workspace):
         """Regression: 'just check config' resolves path correctly (issue #187)."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
         if "check" not in justfile_base.read_text():
             pytest.skip("check recipe not found")
 
@@ -3086,6 +3279,45 @@ class TestVersionCheckJustIntegration:
         assert "Could not locate .devcontainer/scripts directory" not in (
             result.stdout + result.stderr
         ), "Path resolution broken: script dir not found"
+
+    def test_justfile_devc_excludes_project_recipes(self, initialized_workspace):
+        """Test that project-focused recipes are not defined in justfile.devc."""
+        justfile_devc = initialized_workspace / ".devcontainer" / "justfile.devc"
+
+        if not justfile_devc.exists():
+            pytest.skip("justfile.devc not found")
+
+        content = justfile_devc.read_text()
+        for recipe_name in ["lint:", "format:", "precommit:", "sync:", "update:"]:
+            assert recipe_name not in content, (
+                f"{recipe_name.rstrip(':')} should not exist in justfile.devc"
+            )
+
+    def test_workspace_justfile_project_contains_project_recipes(
+        self, initialized_workspace
+    ):
+        """Test that moved project recipes are defined in justfile.project."""
+        justfile_project = initialized_workspace / "justfile.project"
+
+        if not justfile_project.exists():
+            pytest.skip("justfile.project not found")
+
+        content = justfile_project.read_text()
+        for recipe_name in ["lint:", "format:", "precommit:", "sync:", "update:"]:
+            assert recipe_name in content, (
+                f"{recipe_name.rstrip(':')} should exist in justfile.project"
+            )
+
+    def test_workspace_justfile_imports_justfile_devc(self, initialized_workspace):
+        """Test that workspace justfile imports justfile.devc."""
+        workspace_justfile = initialized_workspace / "justfile"
+
+        if not workspace_justfile.exists():
+            pytest.skip("workspace justfile not found")
+
+        content = workspace_justfile.read_text()
+        assert "import '.devcontainer/justfile.devc'" in content
+        assert "import '.devcontainer/justfile.base'" not in content
 
     def test_just_check_mute_functionality(self, initialized_workspace):
         """Test that 'just check 7d' mutes notifications."""
@@ -3387,27 +3619,27 @@ class TestDevcontainerUpgradeRecipe:
     """Test the host-side 'just devcontainer-upgrade' recipe."""
 
     def test_devcontainer_upgrade_recipe_exists(self, initialized_workspace):
-        """Test that 'just devcontainer-upgrade' recipe exists in justfile.base."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        """Test that 'just devcontainer-upgrade' recipe exists in justfile.devc."""
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
 
         # Recipe should exist
         assert "devcontainer-upgrade" in content, (
-            "devcontainer-upgrade recipe not found in justfile.base"
+            "devcontainer-upgrade recipe not found in justfile.devc"
         )
 
     def test_devcontainer_upgrade_detects_container_environment(
         self, initialized_workspace
     ):
         """Test that recipe detects when running inside container."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
 
@@ -3418,10 +3650,10 @@ class TestDevcontainerUpgradeRecipe:
 
     def test_devcontainer_upgrade_shows_error_in_container(self, initialized_workspace):
         """Test that recipe shows clear error when run inside container."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
 
@@ -3462,10 +3694,10 @@ class TestDevcontainerUpgradeRecipe:
 
     def test_devcontainer_upgrade_checks_runtime_available(self, initialized_workspace):
         """Test that recipe checks if podman/docker is available."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
 
@@ -3478,10 +3710,10 @@ class TestDevcontainerUpgradeRecipe:
 
     def test_devcontainer_upgrade_calls_install_script(self, initialized_workspace):
         """Test that recipe calls install.sh with --force flag."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
 
@@ -3494,10 +3726,10 @@ class TestDevcontainerUpgradeRecipe:
 
     def test_devcontainer_upgrade_in_info_group(self, initialized_workspace):
         """Test that devcontainer-upgrade recipe is in the 'info' group."""
-        justfile_base = initialized_workspace / ".devcontainer" / "justfile.base"
+        justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
-            pytest.skip("justfile.base not found")
+            pytest.skip("justfile.devc not found")
 
         content = justfile_base.read_text()
         lines = content.split("\n")
@@ -3580,3 +3812,28 @@ class TestVersionCheckGracefulFailure:
             # Restore file
             if backup_path.exists():
                 backup_path.rename(compose_file)
+
+    def test_missing_vig_os_silent_failure(
+        self, version_check_script, initialized_workspace
+    ):
+        """Test that missing .vig-os doesn't break silent mode."""
+        vig_os_file = initialized_workspace / ".vig-os"
+        backup_path = initialized_workspace / ".vig-os.backup"
+
+        if vig_os_file.exists():
+            vig_os_file.rename(backup_path)
+
+        try:
+            result = subprocess.run(
+                [str(version_check_script)],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            # Should succeed silently
+            assert result.returncode == 0
+            assert len(result.stderr) == 0
+        finally:
+            if backup_path.exists():
+                backup_path.rename(vig_os_file)

@@ -11,6 +11,7 @@ Single source of truth principle: All dependency information comes from requirem
 all skill metadata comes from SKILL.md frontmatter.
 """
 
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -41,8 +42,8 @@ def get_version_from_changelog() -> str:
     if changelog.exists():
         with changelog.open() as f:
             for line in f:
-                if line.startswith("## ["):
-                    # Extract version from "## [X.Y]" format
+                # Skip unreleased headings (e.g., "TBD") and use latest dated release.
+                if line.startswith("## [") and re.search(r"\d{4}-\d{2}-\d{2}", line):
                     version = line.split("[")[1].split("]")[0]
                     return version
     return "dev"
@@ -55,7 +56,9 @@ def get_release_date_from_changelog() -> str:
         with changelog.open() as f:
             for line in f:
                 if line.startswith("## ["):
-                    return line.split("]")[1].split(" - ")[1].strip()
+                    match = re.search(r"\d{4}-\d{2}-\d{2}", line)
+                    if match:
+                        return match.group()
     return datetime.now().isoformat(timespec="seconds")
 
 

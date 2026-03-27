@@ -2,10 +2,6 @@
 # vigOS Devcontainer - Just Recipes
 # Build automation for devcontainer image development
 # ===============================================================================
-# Import standard dev recipes
-
-import 'justfile.base'
-
 # ===============================================================================
 # VARIABLES
 # ===============================================================================
@@ -26,6 +22,25 @@ default:
 [group('info')]
 help:
     @just --list
+
+# ===============================================================================
+# CODE QUALITY
+# ===============================================================================
+
+# Run all linters
+[group('quality')]
+lint:
+    uv run ruff check .
+
+# Format code
+[group('quality')]
+format:
+    uv run ruff format .
+
+# Run pre-commit hooks on all files
+[group('quality')]
+precommit:
+    uv run pre-commit run --all-files
 
 # Show image information
 [group('info')]
@@ -194,35 +209,47 @@ test version="dev":
 
 # Prepare release branch for testing (step 1)
 [group('release')]
-prepare-release version *flags:
+prepare-release version ref="" *flags:
     #!/usr/bin/env bash
     set -euo pipefail
     # Trigger the prepare-release workflow via GitHub Actions
     # The workflow handles: validate inputs, create release branch, prepare CHANGELOG, create draft PR
-    gh workflow run prepare-release.yml -f "version={{ version }}" {{ flags }}
+    REF="{{ ref }}"
+    if [ -z "$REF" ]; then
+        REF="dev"
+    fi
+    gh workflow run prepare-release.yml --ref "$REF" -f "version={{ version }}" {{ flags }}
     echo ""
     echo "✓ Release preparation workflow triggered for version {{ version }}"
     echo "Monitor progress: gh run list --workflow prepare-release.yml"
 
 # Finalize and publish release via GitHub Actions workflow (step 3, after testing)
 [group('release')]
-finalize-release version *flags:
+finalize-release version ref="" *flags:
     #!/usr/bin/env bash
     set -euo pipefail
     # Trigger the release workflow via GitHub Actions
     # The workflow handles: finalize CHANGELOG, build/test images, create final tag, publish
-    gh workflow run release.yml -f "version={{ version }}" -f "release-kind=final" {{ flags }}
+    REF="{{ ref }}"
+    if [ -z "$REF" ]; then
+        REF="release/{{ version }}"
+    fi
+    gh workflow run release.yml --ref "$REF" -f "version={{ version }}" -f "release-kind=final" {{ flags }}
     echo ""
     echo "✓ Release workflow triggered for version {{ version }}"
     echo "Monitor progress: gh run list --workflow release.yml"
 
 # Publish release candidate via GitHub Actions workflow
 [group('release')]
-publish-candidate version *flags:
+publish-candidate version ref="" *flags:
     #!/usr/bin/env bash
     set -euo pipefail
     # Trigger release workflow in candidate mode (default mode in workflow)
-    gh workflow run release.yml -f "version={{ version }}" -f "release-kind=candidate" {{ flags }}
+    REF="{{ ref }}"
+    if [ -z "$REF" ]; then
+        REF="release/{{ version }}"
+    fi
+    gh workflow run release.yml --ref "$REF" -f "version={{ version }}" -f "release-kind=candidate" {{ flags }}
     echo ""
     echo "✓ Candidate release workflow triggered for version {{ version }}"
     echo "Monitor progress: gh run list --workflow release.yml"

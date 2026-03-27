@@ -1,7 +1,7 @@
 # Use Python 3.12 as base image (pinned to digest for supply chain integrity)
 # Dependabot (docker ecosystem) will propose digest updates automatically
 # Updated to bookworm (stable) for better security patch cadence
-FROM python:3.12-slim-bookworm@sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcade98e669c
+FROM python:3.12-slim-bookworm@sha256:4c50375fc4b8ea5ca06ac9485186ccb50171c99390b0e9300c2bac871cc2dc3e
 
 # Add metadata
 # By default, we build the dev version unless specified as an argument
@@ -150,8 +150,20 @@ RUN set -eux; \
 # Install cursor-agent CLI (installs to ~/.local/bin)
 ENV PATH="/root/.local/bin:${PATH}"
 RUN set -eux; \
-    curl -fsSL https://cursor.com/install | bash; \
-    agent --version;
+    INSTALLER="/tmp/cursor-install.sh"; \
+    for attempt in 1 2 3; do \
+        if curl -fsSL https://cursor.com/install -o "${INSTALLER}" \
+            && bash "${INSTALLER}" \
+            && agent --version; then \
+            rm -f "${INSTALLER}"; \
+            exit 0; \
+        fi; \
+        rm -f "${INSTALLER}"; \
+        echo "cursor-agent install attempt ${attempt} failed, retrying in 10s..."; \
+        sleep 10; \
+    done; \
+    echo "WARNING: cursor-agent install failed after 3 attempts (external CDN issue); skipping"; \
+    echo "Install manually: curl -fsSL https://cursor.com/install | bash";
 
 # Install latest cargo-binstall from release archive with minisign signature verification
 # cargo-binstall uses minisign for signing releases. Each release has an ephemeral key.

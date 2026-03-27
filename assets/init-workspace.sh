@@ -1,11 +1,12 @@
 #!/bin/bash
 # Initialize workspace by copying template files
 #
-# Usage: init-workspace [--force] [--no-prompts]
+# Usage: init-workspace [--force] [--no-prompts] [--smoke-test]
 #
 # Options:
 #   --force       Overwrite existing files (for upgrades)
 #   --no-prompts  Run non-interactively (requires SHORT_NAME env var)
+#   --smoke-test  Deploy smoke-test-specific assets
 #
 # Environment variables (used with --no-prompts):
 #   SHORT_NAME  - Project short name (required)
@@ -17,6 +18,7 @@ TEMPLATE_DIR="/root/assets/workspace"
 WORKSPACE_DIR="/workspace"
 FORCE=false
 NO_PROMPTS=false
+SMOKE_TEST=false
 
 # Files to preserve during --force upgrades (never overwrite if they exist)
 # These are user/project customization files that should survive upgrades
@@ -27,6 +29,7 @@ PRESERVE_FILES=(
     "CHANGELOG.md"
     "LICENSE"
     ".github/CODEOWNERS"
+    ".github/workflows/release-extension.yml"
     "justfile.project"
 )
 
@@ -43,13 +46,22 @@ for arg in "$@"; do
         --no-prompts)
             NO_PROMPTS=true
             ;;
+        --smoke-test)
+            SMOKE_TEST=true
+            ;;
         *)
             echo "Unknown option: $arg" >&2
-            echo "Usage: init-workspace [--force] [--no-prompts]" >&2
+            echo "Usage: init-workspace [--force] [--no-prompts] [--smoke-test]" >&2
             exit 1
             ;;
     esac
 done
+
+# Smoke mode must run unattended and allow overwriting existing content.
+if [[ "$SMOKE_TEST" == "true" ]]; then
+    NO_PROMPTS=true
+    FORCE=true
+fi
 
 # Check if running in interactive mode (only if prompts are needed)
 if [[ "$NO_PROMPTS" != "true" ]] && [[ ! -t 0 ]]; then
@@ -108,6 +120,8 @@ fi
 
 # Sanitize: replace hyphens and spaces with underscore; lowercase; remove other special chars
 SHORT_NAME=$(echo "$SHORT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[ -]/_/g' | sed 's/[^a-z0-9_]/_/g')
+SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/__*/_/g' | sed 's/^[^a-z0-9]*//; s/[^a-z0-9]*$//')
+SHORT_NAME="${SHORT_NAME:-project}"
 echo "Project short name set to: $SHORT_NAME"
 
 # Get ORG_NAME - from env var, default, or prompt
@@ -200,18 +214,43 @@ fi
 echo "Initializing workspace from template..."
 echo "Copying files from $TEMPLATE_DIR to $WORKSPACE_DIR..."
 
-# Build exclude list for preserved files that already exist
-EXCLUDE_ARGS=()
-for preserved in "${PRESERVE_FILES[@]}"; do
-    if [[ -e "$WORKSPACE_DIR/$preserved" ]]; then
-        EXCLUDE_ARGS+=("--exclude=$preserved")
-    fi
-done
-
 # Note: Excluding .venv - it is used directly from the container image
 # via UV_PROJECT_ENVIRONMENT environment variable (set in docker-compose.yml)
 # Pre-commit cache is now at /opt/pre-commit-cache (not in assets/workspace)
-rsync -av --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
+if [[ "$SMOKE_TEST" == "true" ]]; then
+    # Smoke mode: clean deploy (--delete removes stale files), then overlay smoke-test assets
+    rsync -av --delete --exclude='.git' --exclude='.venv' --exclude='docs/issues/' --exclude='docs/pull-requests/' "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
+
+    SMOKE_TEST_DIR="$SCRIPT_DIR/smoke-test"
+    if [[ -d "$SMOKE_TEST_DIR" ]]; then
+        echo "Deploying smoke-test-specific files..."
+        rsync -av "$SMOKE_TEST_DIR/" "$WORKSPACE_DIR/"
+    else
+        echo "Warning: Smoke-test directory not found at $SMOKE_TEST_DIR" >&2
+    fi
+
+    # Workspace scaffold CHANGELOG is empty; copy devcontainer changelog and
+    # rename top ## [version] - … to ## Unreleased for downstream prepare-release.
+    if [[ -f "$WORKSPACE_DIR/.devcontainer/CHANGELOG.md" ]]; then
+        echo "Syncing workspace CHANGELOG from .devcontainer/CHANGELOG.md (smoke-test)..."
+        cp "$WORKSPACE_DIR/.devcontainer/CHANGELOG.md" "$WORKSPACE_DIR/CHANGELOG.md"
+        if ! command -v prepare-changelog >/dev/null 2>&1; then
+            echo "ERROR: prepare-changelog not found (required for smoke-test CHANGELOG sync)" >&2
+            exit 1
+        fi
+        prepare-changelog unprepare "$WORKSPACE_DIR/CHANGELOG.md"
+    fi
+else
+    # Build exclude list for preserved files that already exist
+    EXCLUDE_ARGS=()
+    for preserved in "${PRESERVE_FILES[@]}"; do
+        if [[ -e "$WORKSPACE_DIR/$preserved" ]]; then
+            EXCLUDE_ARGS+=("--exclude=$preserved")
+        fi
+    done
+
+    rsync -av --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
+fi
 
 # Replace placeholders in files (using pre-built manifest from image)
 echo "Replacing placeholders in files..."

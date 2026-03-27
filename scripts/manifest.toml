@@ -33,7 +33,17 @@ src = ".pymarkdown"
 src = ".pymarkdown.config.md"
 
 [[entries]]
+src = "CHANGELOG.md"
+dest = ".devcontainer/CHANGELOG.md"
+
+[[entries]]
 src = ".hadolint.yaml"
+
+[[entries]]
+src = ".vscode/settings.json"
+transforms = [
+  { type = "Sed", pattern = "\\$\\{workspaceFolder\\}/\\.venv/bin/python3", replace = "/opt/venv/bin/python3" },
+]
 
 [[entries]]
 src = ".github/agent-blocklist.toml"
@@ -58,14 +68,7 @@ transforms = [
 src = ".github/workflows/scorecard.yml"
 
 [[entries]]
-src = ".github/workflows/sync-issues.yml"
-
-[[entries]]
 src = ".github/workflows/codeql.yml"
-
-[[entries]]
-src = "justfile.base"
-dest = ".devcontainer/justfile.base"
 
 [[entries]]
 src = "justfile.gh"
@@ -104,6 +107,8 @@ transforms = [
     "prepare-commit-msg-strip-trailers",
     "check-agent-identity",
     "validate-commit-msg",
+    "taplo-format",
+    "taplo-lint",
   ] },
   { type = "Sed", pattern = "bandit -r packages/vig-utils/src/ assets/workspace/", replace = "bandit -r src/" },
   { type = "StripTrailingBlankLines" },

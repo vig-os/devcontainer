@@ -7,6 +7,7 @@
 #
 # Label reconciliation:
 #   Run `uv run setup-labels` after repo creation to create/update labels
+#   The `setup-labels` command is provided by devcontainer bootstrap tooling.
 #   from this taxonomy. Use `--prune` to remove org-default labels that don't
 #   match the taxonomy. Use `--dry-run` to preview changes first.
 

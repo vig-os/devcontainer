@@ -20,6 +20,17 @@ You rarely need to run these manually; VS Code executes them automatically via `
 If you do re-run them, make sure to use the same working directory that VS Code would (`project/.devcontainer` on the host
 or `/workspace/<project>/.devcontainer` inside the container).
 
+## CLI helper commands
+
+Some `just` recipes call helper commands that are provided by devcontainer bootstrap tooling
+rather than repo-local scripts.
+
+- Worktree helpers: `resolve-branch`, `derive-branch-summary`
+- GitHub helper: `gh-issues`
+- Label sync helper: `setup-labels` (used as `uv run setup-labels`)
+
+If these are missing, run the devcontainer post-create/bootstrap flow to install the helper CLIs.
+
 ## Mounts and multi-root workspaces
 
 This devcontainer supports mounting additional folders/projects using Docker Compose override files.

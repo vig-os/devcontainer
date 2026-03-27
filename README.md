@@ -112,35 +112,13 @@ Available recipes:
     [build]
     build no_cache=""                          # Build local development image
     clean version="dev"                        # Remove image (default: dev)
-    clean-artifacts                            # Clean build artifacts
     clean-test-containers                      # Clean up lingering test containers
-
-    [deps]
-    sync                                       # Sync all dependencies (idempotent, fast if nothing changed)
-    update                                     # Update all dependencies
-
-    [devcontainer]
-    devc-remote *args                          # just devc-remote --repo git@github.com:org/repo.git myserver
-    down                                       # Stop and remove containers
-    logs *args                                 # Tail container logs
-    open                                       # Open Cursor/VS Code attached to the running container
-    remote-devc host *args                     # just remote-devc ksb-meatgrinder --open none
-    restart *args                              # Restart service(s)
-    shell                                      # Open bash in running devcontainer
-    status                                     # Show container status
-    up                                         # Start devcontainer + sidecars via compose
-
-    [git]
-    branch                                     # Show current branch + list recent branches
-    log                                        # Pretty one-line git log (last 20 commits)
 
     [github]
     gh-issues                                  # List open issues and PRs grouped by milestone [alias: gh-i]
 
     [info]
-    check *args                                # Examples: just check, just check config, just check off, just check 7d
     default                                    # Show available commands (default)
-    devcontainer-upgrade                       # This recipe MUST be run from a host terminal, not inside the container
     docs                                       # Generate documentation from templates
     help                                       # Show available commands
     info                                       # Show image information
@@ -167,24 +145,18 @@ Available recipes:
     precommit                                  # Run pre-commit hooks on all files
 
     [release]
-    finalize-release version *flags            # Finalize and publish release via GitHub Actions workflow (step 3, after testing)
-    prepare-release version *flags             # Prepare release branch for testing (step 1)
-    publish-candidate version *flags           # Publish release candidate via GitHub Actions workflow
+    finalize-release version ref="" *flags     # Finalize and publish release via GitHub Actions workflow (step 3, after testing)
+    prepare-release version ref="" *flags      # Prepare release branch for testing (step 1)
+    publish-candidate version ref="" *flags    # Publish release candidate via GitHub Actions workflow
     pull version="latest"                      # Pull image from registry (default: latest)
     reset-changelog                            # Reset CHANGELOG Unreleased section (after merging release to dev)
-
-    [sidecar]
-    sidecar name *args                         # Example: just sidecar postgres migrate / just sidecar redis flush
-    sidecars                                   # List available sidecar containers
 
     [test]
     test version="dev"                         # Run all test suites
     test-bats                                  # Run BATS shell script tests
-    test-cov *args                             # Run tests with coverage
     test-image version="dev"                   # Run image tests only
     test-install                               # Run install script tests only
     test-integration version="dev"             # Run integration tests only
-    test-pytest *args                          # Run tests with pytest
     test-utils                                 # Run utils tests only
     test-validate-commit-msg                   # Run validate commit msg tests only
     test-vig-utils                             # Run check action pins tests only
@@ -206,7 +178,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **Registry**: `ghcr.io/vig-os/devcontainer`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
-- **Latest Version**: [0.2.1](https://github.com/vig-os/devcontainer/releases/tag/0.2.1) - 2026-01-28
+- **Latest Version**: [0.3.0](https://github.com/vig-os/devcontainer/releases/tag/0.3.0) - 2026-03-13
 - **Image tags**: bare semver (`0.2.1`, `latest`) — git tags use `v` prefix (`v0.2.1`) but image tags do not
 
 ## Features

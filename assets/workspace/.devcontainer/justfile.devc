@@ -1,67 +1,9 @@
 # ===============================================================================
-# DEVCONTAINER BASE RECIPES - DO NOT EDIT
+# DEVCONTAINER RECIPES - DO NOT EDIT
 # Managed by vigOS devcontainer. Customizations go in root justfile.
 # ===============================================================================
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
-
-# -------------------------------------------------------------------------------
-# CODE QUALITY
-# -------------------------------------------------------------------------------
-
-# Run all linters
-[group('quality')]
-lint:
-    uv run ruff check .
-
-# Format code
-[group('quality')]
-format:
-    uv run ruff format .
-
-# Run pre-commit hooks on all files
-[group('quality')]
-precommit:
-    uv run pre-commit run --all-files
-
-# -------------------------------------------------------------------------------
-# TESTING
-# -------------------------------------------------------------------------------
-
-# Run tests with pytest
-[group('test')]
-test-pytest *args:
-    uv run pytest {{ args }}
-
-# Run tests with coverage
-[group('test')]
-test-cov *args:
-    uv run pytest --cov --cov-report=term-missing {{ args }}
-
-# -------------------------------------------------------------------------------
-# DEPENDENCIES
-# -------------------------------------------------------------------------------
-
-# Sync all dependencies (idempotent, fast if nothing changed)
-[group('deps')]
-sync:
-    @if [ -f pyproject.toml ]; then uv sync --all-extras; fi
-
-# Update all dependencies
-[group('deps')]
-update:
-    uv lock --upgrade
-    @just sync
-
-# -------------------------------------------------------------------------------
-# BUILD
-# -------------------------------------------------------------------------------
-
-# Clean build artifacts
-[group('build')]
-clean-artifacts:
-    rm -rf .pytest_cache .ruff_cache .coverage htmlcov dist build *.egg-info
-    find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # -------------------------------------------------------------------------------
 # VERSION CHECK
@@ -83,13 +25,9 @@ check *args:
         exit 1
     fi
 
-    if [[ $# -eq 0 ]]; then
-        # No args provided - run in verbose check mode
-        "$SCRIPT_DIR/version-check.sh" check
-    else
-        # Pass all arguments through to the script
-        "$SCRIPT_DIR/version-check.sh" "$@"
-    fi
+    # No args provided: default to verbose check mode.
+    # Otherwise pass all args through as provided by just.
+    "$SCRIPT_DIR/version-check.sh" {{ if args == '' { 'check' } else { args } }}
 
 # Upgrade devcontainer to latest version (host-side only)
 # This recipe MUST be run from a host terminal, not inside the container
@@ -282,24 +220,6 @@ open:
     fi
 
 # -------------------------------------------------------------------------------
-# GIT
-# -------------------------------------------------------------------------------
-
-# Pretty one-line git log (last 20 commits)
-[group('git')]
-log:
-    git log --oneline -20
-
-# Show current branch + list recent branches
-[group('git')]
-branch:
-    #!/usr/bin/env bash
-    echo "Current: $(git branch --show-current)"
-    echo ""
-    echo "Recent branches:"
-    git branch -a | head -15
-
-# -------------------------------------------------------------------------------
 # SIDECAR
 # -------------------------------------------------------------------------------
 
@@ -307,12 +227,20 @@ branch:
 [group('sidecar')]
 sidecars:
     #!/usr/bin/env bash
+    if command -v podman &>/dev/null; then
+        RUNTIME="podman"
+    elif command -v docker &>/dev/null; then
+        RUNTIME="docker"
+    else
+        echo "[ERROR] Need podman or docker"
+        exit 1
+    fi
     echo "Available sidecar containers:"
     echo ""
     # Get running sidecars (exclude devcontainer itself)
-    # Construct podman format string using printf to avoid just interpolation
+    # Construct format string using printf to avoid just interpolation
     FORMAT=$(printf '\x7b\x7b.Names\x7d\x7d')
-    RUNNING=$(podman ps --format "$FORMAT" 2>/dev/null | grep -v "^devcontainer$" || true)
+    RUNNING=$($RUNTIME ps --format "$FORMAT" 2>/dev/null | grep -v "^devcontainer$" || true)
     if [ -n "$RUNNING" ]; then
         echo "$RUNNING" | while read -r name; do
             echo "  [OK] $name (running)"
@@ -331,15 +259,23 @@ sidecars:
 [group('sidecar')]
 sidecar name *args:
     #!/usr/bin/env bash
-    # Construct podman format string using printf to avoid just interpolation
+    if command -v podman &>/dev/null; then
+        RUNTIME="podman"
+    elif command -v docker &>/dev/null; then
+        RUNTIME="docker"
+    else
+        echo "[ERROR] Need podman or docker"
+        exit 1
+    fi
+    # Construct format string using printf to avoid just interpolation
     FORMAT=$(printf '\x7b\x7b.Names\x7d\x7d')
 
     # Check if container exists (running or stopped)
-    if ! podman ps -a --format "$FORMAT" 2>/dev/null | grep -q "^{{ name }}$"; then
+    if ! $RUNTIME ps -a --format "$FORMAT" 2>/dev/null | grep -q "^{{ name }}$"; then
         echo "[ERROR] Sidecar container '{{ name }}' not found"
         echo ""
         echo "Available sidecars:"
-        RUNNING=$(podman ps --format "$FORMAT" 2>/dev/null | grep -v "^devcontainer$" || true)
+        RUNNING=$($RUNTIME ps --format "$FORMAT" 2>/dev/null | grep -v "^devcontainer$" || true)
         if [ -n "$RUNNING" ]; then
             echo "$RUNNING" | while read -r n; do
                 echo "  - $n"
@@ -354,10 +290,10 @@ sidecar name *args:
     fi
 
     # Check if container is running
-    if ! podman ps --format "$FORMAT" 2>/dev/null | grep -q "^{{ name }}$"; then
+    if ! $RUNTIME ps --format "$FORMAT" 2>/dev/null | grep -q "^{{ name }}$"; then
         echo "[!]  Sidecar container '{{ name }}' exists but is not running"
         echo "Starting container..."
-        podman start {{ name }} || {
+        $RUNTIME start {{ name }} || {
             echo "[ERROR] Failed to start container '{{ name }}'"
             exit 1
         }
@@ -366,7 +302,7 @@ sidecar name *args:
     fi
 
     # Execute the recipe in the sidecar
-    podman exec {{name}} just {{args}}
+    $RUNTIME exec {{ name }} just {{ args }}
 
 # -------------------------------------------------------------------------------
 # REMOTE DEVCONTAINER
@@ -379,7 +315,7 @@ sidecar name *args:
 #        just devc-remote --repo git@github.com:org/repo.git myserver
 [group('devcontainer')]
 devc-remote *args:
-    bash scripts/devc-remote.sh {{args}}
+    bash scripts/devc-remote.sh {{ args }}
 
 # Deploy current project to a remote host (auto-detects repo + branch)
 # Pushes unpushed commits, clones/fetches on remote, starts devcontainer
@@ -390,7 +326,7 @@ devc-remote *args:
 remote-devc host *args:
     #!/usr/bin/env bash
     set -euo pipefail
-    SCRIPT_DIR="$(cd "{{source_directory()}}/scripts" && pwd)"
+    SCRIPT_DIR="$(cd "{{ source_directory() }}/scripts" && pwd)"
     if [[ ! -f "$SCRIPT_DIR/devc-remote.sh" ]]; then
         echo "[ERROR] devc-remote.sh not found at $SCRIPT_DIR"
         exit 1
@@ -410,4 +346,4 @@ remote-devc host *args:
     if [[ -n "$branch" ]]; then
         gh_target="gh:${gh_repo}:${branch}"
     fi
-    bash "$SCRIPT_DIR/devc-remote.sh" --force "{{host}}" "$gh_target" {{args}}
+    bash "$SCRIPT_DIR/devc-remote.sh" --force "{{ host }}" "$gh_target" {{ args }}

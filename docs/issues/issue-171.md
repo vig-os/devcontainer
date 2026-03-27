@@ -1,18 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-24T10:13:19Z
-updated: 2026-02-24T10:13:19Z
+updated: 2026-03-03T20:22:50Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/171
 comments: 0
 labels: feature, area:ci, effort:medium, area:testing, semver:minor
-assignees: none
-milestone: Backlog
+assignees: c-vigo
+milestone: 0.3
 projects: none
-relationship: none
-synced: 2026-02-25T04:25:55.384Z
+parent: 169
+children: none
+synced: 2026-03-14T04:16:10.608Z
 ---
 
 # [Issue 171]: [[FEATURE] Add container-based CI workflow to smoke-test repo](https://github.com/vig-os/devcontainer/issues/171)
@@ -56,9 +57,9 @@ Added
 
 ### Acceptance Criteria
 
-- [ ] `ci-container.yml` exists in the smoke-test repo
-- [ ] CI jobs run inside the devcontainer image via `container:` directive
-- [ ] Lint and test jobs pass inside the container
-- [ ] Both bare-runner (`ci.yml`) and container (`ci-container.yml`) CI run on PRs
-- [ ] Quirks and differences vs bare-runner CI are documented
-- [ ] TDD compliance (see .cursor/rules/tdd.mdc)
+- [x] `ci-container.yml` exists in the smoke-test repo
+- [x] CI jobs run inside the devcontainer image via `container:` directive
+- [x] Lint and test jobs pass inside the container
+- [x] Both bare-runner (`ci.yml`) and container (`ci-container.yml`) CI run on PRs
+- [x] Quirks and differences vs bare-runner CI are documented
+- [x] TDD compliance (see .cursor/rules/tdd.mdc)

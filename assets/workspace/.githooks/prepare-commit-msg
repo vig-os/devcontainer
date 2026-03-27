@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # Check if we're running inside the dev container
-if [ "${IN_CONTAINER:-}" = "false" ]; then
+if [ "${IN_CONTAINER:-}" != "true" ]; then
 	# Outside dev container
 	echo "Please commit your changes within the dev container."
 	exit 1
