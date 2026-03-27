@@ -373,7 +373,10 @@ INJECT_EOF
 # ═══════════════════════════════════════════════════════════════════════════════
 
 inject_claude_auth() {
-    # Skip if no OAuth token in local environment
+    # Resolve token: env var → macOS keychain → skip
+    if [[ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
+        CLAUDE_CODE_OAUTH_TOKEN=$(security find-generic-password -s devc-remote -a CLAUDE_CODE_OAUTH_TOKEN -w 2>/dev/null || true)
+    fi
     if [[ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
         return 0
     fi
