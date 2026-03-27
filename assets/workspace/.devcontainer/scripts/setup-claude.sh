@@ -53,7 +53,12 @@ cmd_install() {
         # Ensure Node.js LTS is available (npm required for install)
         if ! command -v npm &>/dev/null; then
             echo "Claude: installing Node.js LTS..."
-            curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+            # Use nodesource repo directly; containers may have clock skew
+            # that breaks apt-get update on system repos.
+            curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - 2>/dev/null || true
+            apt-get -o Acquire::Check-Valid-Until=false update \
+                -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/nodesource.list \
+                -o Dir::Etc::sourceparts=- -qq 2>/dev/null
             apt-get install -y nodejs
         fi
 
