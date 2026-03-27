@@ -353,7 +353,7 @@ jobs:
               echo "ERROR: deploy PR closed without merge: ${PR_URL}"
               exit 1
             fi
-            CHECKS_JSON="$(gh pr checks "${PR_URL}" --json bucket 2>/dev/null || echo '[]')"
+            CHECKS_JSON="$(gh pr checks "${PR_URL}" --required --json bucket 2>/dev/null || echo '[]')"
             FAIL_COUNT="$(echo "${CHECKS_JSON}" | jq '[.[] | select(.bucket == "fail")] | length')"
             PENDING_COUNT="$(echo "${CHECKS_JSON}" | jq '[.[] | select(.bucket == "pending")] | length')"
             if [ "${FAIL_COUNT}" -gt 0 ] && [ "${PENDING_COUNT}" -eq 0 ]; then
