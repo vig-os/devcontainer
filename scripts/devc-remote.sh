@@ -675,6 +675,13 @@ remote_compose_up() {
     # shellcheck disable=SC2034
     health=$(echo "$ps_output" | grep -o '"Health":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
 
+    # Capture container ID before compose up (to detect recreate)
+    local id_before=""
+    if [[ "$state" == "running" ]]; then
+        # shellcheck disable=SC2029
+        id_before=$(ssh "$SSH_HOST" "cd $devc_dir && $compose_full ps -q 2>/dev/null" || true)
+    fi
+
     log_info "Starting devcontainer on $SSH_HOST..."
     # Always run compose up -d: it's idempotent and auto-recreates if config changed.
     # shellcheck disable=SC2029
@@ -685,10 +692,19 @@ remote_compose_up() {
     fi
     sleep 2
 
-    if [[ "$state" == "running" ]]; then
-        CONTAINER_FRESH=0  # was already running, lifecycle scripts already ran
+    if [[ "$state" != "running" ]]; then
+        CONTAINER_FRESH=1  # was not running → fresh
     else
-        CONTAINER_FRESH=1
+        # Was running — check if compose recreated it (different container ID)
+        local id_after
+        # shellcheck disable=SC2029
+        id_after=$(ssh "$SSH_HOST" "cd $devc_dir && $compose_full ps -q 2>/dev/null" || true)
+        if [[ "$id_before" != "$id_after" ]]; then
+            log_info "Container was recreated (config changed)"
+            CONTAINER_FRESH=1
+        else
+            CONTAINER_FRESH=0
+        fi
     fi
 }
 
