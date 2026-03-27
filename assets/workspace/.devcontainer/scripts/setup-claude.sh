@@ -57,7 +57,7 @@ cmd_install() {
             local arch
             arch=$(dpkg --print-architecture 2>/dev/null || echo "amd64")
             curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
-                | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg 2>/dev/null
+                | gpg --dearmor --yes -o /usr/share/keyrings/nodesource.gpg 2>/dev/null
             echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg arch=$arch] https://deb.nodesource.com/node_22.x nodistro main" \
                 | tee /etc/apt/sources.list.d/nodesource.list >/dev/null
             apt-get -o Acquire::Check-Valid-Until=false update \
