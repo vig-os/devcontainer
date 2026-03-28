@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-03-26T17:39:01Z
-updated: 2026-03-26T17:39:01Z
+updated: 2026-03-27T09:30:25Z
 author: vig-os-release-app[bot]
 author_url: https://github.com/vig-os-release-app[bot]
 url: https://github.com/vig-os/devcontainer/issues/454
-comments: 0
+comments: 1
 labels: bug
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-03-26T17:53:30.146Z
+synced: 2026-03-28T04:26:14.760Z
 ---
 
 # [Issue 454]: [Smoke-test dispatch failed for 0.3.1-rc25](https://github.com/vig-os/devcontainer/issues/454)
@@ -51,3 +51,11 @@ Smoke-test dispatch failed while orchestrating downstream release validation.
 - If needed, close stale release PRs and delete stale `release/<version>` branch.
 - Do not rewrite or delete **published** GitHub Releases (or their linked tags when **immutable releases** are enabled) to retry the same version; bare git tags without a published release are not locked by that feature unless a tag ruleset applies.
 - After fixing the root cause upstream, publish a **new** RC tag (or a new final attempt only after branch/tag state matches your release policy), then rely on a fresh dispatch.
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on March 27, 2026 at 09:30 AM_
+
+Duplicate of #453 (second attempt of [23603456323](https://github.com/vig-os/devcontainer-smoke-test/actions/runs/23603456323/attempts/2))
+

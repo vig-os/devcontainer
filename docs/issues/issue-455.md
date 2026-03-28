@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-03-26T18:38:47Z
-updated: 2026-03-26T18:38:47Z
+updated: 2026-03-27T09:18:03Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/455
 comments: 0
 labels: bug
-assignees: none
+assignees: c-vigo
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-03-27T04:38:58.294Z
+synced: 2026-03-28T04:26:14.487Z
 ---
 
 # [Issue 455]: [[BUG] Release 0.3.1 CHANGELOG date not set -- TBD persisted through publish and merge](https://github.com/vig-os/devcontainer/issues/455)
@@ -67,10 +67,26 @@ The fact that `origin/main` still has TBD after merge strongly suggests the fina
 
 - Add a post-commit verification step that fetches the finalized SHA from the API, confirms `CHANGELOG.md` contains the date, and fails the job if TBD is still present
 - Ensure `build-and-test` checks out the exact SHA from the API commit response rather than relying on `git rev-parse HEAD` after a `git reset`
-- Add an integration test: `grep -q "## \[$VERSION\] - [0-9]" CHANGELOG.md` after the finalize commit lands
+- Add an integration test: `grep -q "## [$VERSION] - [0-9]" CHANGELOG.md` after the finalize commit lands
 
 ### Changelog Category
 
 Fixed
 
 - [ ] TDD compliance (see .cursor/rules/tdd.mdc)
+
+---
+
+### Related: README "Latest Version" stale after release (pre-commit / CI)
+
+**CI failure:** [Project Checks — job 68847671680](https://github.com/vig-os/devcontainer/actions/runs/23636793174/job/68847671680?pr=458) on [PR #458](https://github.com/vig-os/devcontainer/pull/458) (`chore: sync main into dev after 0.3.1 release`).
+
+**What happened:** `README.md` (Image Details → **Latest Version**, ~lines 184–185) still listed **0.3.0** (2026-03-13) after **0.3.1** shipped. The `generate-docs` pre-commit hook regenerates `README.md` from templates and produced **0.3.1** (2026-03-26). `uv run pre-commit run --all-files` therefore failed with *pre-commit hook(s) made changes* and that README diff.
+
+**Desired outcome (pick one or combine):**
+
+1. **Automation:** Ensure the release / prepare-release path updates generated `README.md` **after** `CHANGELOG.md` is finalized, then run a full `uv run pre-commit run --all-files` (or equivalent in CI) so committed artifacts match what hooks generate.
+2. **De-scope:** Remove or relocate the **Latest Version** line if it is not worth keeping in sync by hand or by release automation.
+
+This is the same class of problem as the CHANGELOG finalize drift: release artifacts on `main` were not fully synchronized before downstream sync PRs ran the normal checks.
+
