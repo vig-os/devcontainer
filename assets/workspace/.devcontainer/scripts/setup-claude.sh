@@ -140,6 +140,12 @@ alias cl='claude'
 alias cld='claude --dangerously-skip-permissions'
 ROOT_ALIASES
 
+    # Pre-configure onboarding and theme so interactive TUI skips login screen
+    cat > "$CLAUDE_HOME/.claude/.claude.json" << 'ONBOARD'
+{"hasCompletedOnboarding": true}
+ONBOARD
+    chown "$CLAUDE_USER:$CLAUDE_USER" "$CLAUDE_HOME/.claude/.claude.json"
+
     echo "Claude: install complete. 'claude' auto-switches to non-root user when run as root."
 }
 
