@@ -98,6 +98,10 @@ cmd_install() {
 # claude-wrapper: auto-switch to claude user when running as root.
 # The real binary lives at claude-bin (same directory).
 REAL="$(dirname "$0")/claude-bin"
+# Source OAuth token from container PID 1 if not in current env (e.g. Tailscale SSH)
+if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -f /proc/1/environ ]; then
+    export CLAUDE_CODE_OAUTH_TOKEN=$(tr '\0' '\n' < /proc/1/environ 2>/dev/null | sed -n 's/^CLAUDE_CODE_OAUTH_TOKEN=//p')
+fi
 if [ "$(id -u)" = "0" ]; then
     exec runuser -w CLAUDE_CODE_OAUTH_TOKEN -u claude -- "$REAL" --dangerously-skip-permissions "$@"
 fi
