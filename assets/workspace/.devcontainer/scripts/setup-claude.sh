@@ -140,11 +140,28 @@ alias cl='claude'
 alias cld='claude --dangerously-skip-permissions'
 ROOT_ALIASES
 
-    # Pre-configure onboarding and theme so interactive TUI skips login screen
+    # Pre-configure onboarding so interactive TUI skips login screen
     cat > "$CLAUDE_HOME/.claude/.claude.json" << 'ONBOARD'
 {"hasCompletedOnboarding": true, "hasCompletedAuthFlow": true}
 ONBOARD
     chown "$CLAUDE_USER:$CLAUDE_USER" "$CLAUDE_HOME/.claude/.claude.json"
+
+    # Pre-configure settings: trust workspace, skip dangerous mode prompt
+    # devc-remote.sh sync_claude_config may overwrite with user's full settings later
+    local ws_project
+    ws_project=$(find /workspace -maxdepth 1 -mindepth 1 -type d 2>/dev/null | head -1)
+    if [[ -z "$ws_project" ]]; then
+        ws_project="/workspace"
+    fi
+    cat > "$CLAUDE_HOME/.claude/settings.json" << SETTINGS
+{
+  "permissions": {
+    "additionalDirectories": ["${ws_project}", "/workspace"]
+  },
+  "skipDangerousModePermissionPrompt": true
+}
+SETTINGS
+    chown "$CLAUDE_USER:$CLAUDE_USER" "$CLAUDE_HOME/.claude/settings.json"
 
     echo "Claude: install complete. 'claude' auto-switches to non-root user when run as root."
 }
