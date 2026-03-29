@@ -103,9 +103,9 @@ if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -f /proc/1/environ ]; then
     export CLAUDE_CODE_OAUTH_TOKEN=$(tr '\0' '\n' < /proc/1/environ 2>/dev/null | sed -n 's/^CLAUDE_CODE_OAUTH_TOKEN=//p')
 fi
 if [ "$(id -u)" = "0" ]; then
-    exec runuser --pty -w CLAUDE_CODE_OAUTH_TOKEN -u claude -- "$REAL" --dangerously-skip-permissions "$@"
+    exec runuser --pty -w CLAUDE_CODE_OAUTH_TOKEN -u claude -- "$REAL" --dangerously-skip-permissions --add-dir "$PWD" "$@"
 fi
-exec "$REAL" "$@"
+exec "$REAL" --add-dir "$PWD" "$@"
 WRAPPER
         chmod +x "$real_claude"
     fi
