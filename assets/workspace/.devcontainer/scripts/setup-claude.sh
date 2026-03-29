@@ -121,8 +121,20 @@ if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -f /proc/1/environ ]; then
 fi
 
 export PATH="/usr/local/bin:/usr/bin:/bin:/root/.cargo/bin:$PATH"
+
+# Claude toolkit aliases (mirrors local dev environment)
+alias cl='claude'
+alias cld='claude --dangerously-skip-permissions'
 BASHRC
     chown "$CLAUDE_USER:$CLAUDE_USER" "$CLAUDE_HOME/.bashrc"
+
+    # Add aliases to root's shell too (for ssh root@... sessions)
+    grep -q 'alias cl=' /root/.bashrc 2>/dev/null || cat >> /root/.bashrc << 'ROOT_ALIASES'
+
+# Claude toolkit aliases (mirrors local dev environment)
+alias cl='claude'
+alias cld='claude --dangerously-skip-permissions'
+ROOT_ALIASES
 
     echo "Claude: install complete. 'claude' auto-switches to non-root user when run as root."
 }
