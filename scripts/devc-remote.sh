@@ -441,6 +441,66 @@ INJECT_EOF
     log_success "Claude: OAuth token injected into remote compose"
 }
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# CLAUDE CODE CONFIG SYNC (copies local ~/.claude config into container)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sync_claude_config() {
+    local compose_full devc_dir
+    compose_full=$(compose_cmd_with_files)
+    devc_dir="$REMOTE_PATH/.devcontainer"
+
+    # Skip if claude user doesn't exist in container
+    # shellcheck disable=SC2029
+    if ! ssh "$SSH_HOST" "cd $devc_dir && $compose_full exec -T devcontainer id claude" &>/dev/null; then
+        return 0
+    fi
+
+    local claude_home="$HOME/.claude"
+    local synced=0
+
+    # Sync CLAUDE.md (global instructions)
+    if [[ -f "$claude_home/CLAUDE.md" ]]; then
+        # shellcheck disable=SC2029
+        ssh "$SSH_HOST" \
+            "cd $devc_dir && $compose_full exec -T devcontainer tee /home/claude/.claude/CLAUDE.md" \
+            < "$claude_home/CLAUDE.md" >/dev/null 2>&1
+        synced=1
+    fi
+
+    # Sync settings.json (permissions, env config)
+    if [[ -f "$claude_home/settings.json" ]]; then
+        # shellcheck disable=SC2029
+        ssh "$SSH_HOST" \
+            "cd $devc_dir && $compose_full exec -T devcontainer tee /home/claude/.claude/settings.json" \
+            < "$claude_home/settings.json" >/dev/null 2>&1
+        synced=1
+    fi
+
+    # Sync custom commands
+    if [[ -d "$claude_home/commands" ]]; then
+        # shellcheck disable=SC2029
+        ssh "$SSH_HOST" "cd $devc_dir && $compose_full exec -T devcontainer mkdir -p /home/claude/.claude/commands" 2>/dev/null
+        for cmd_file in "$claude_home/commands"/*.md; do
+            [[ -f "$cmd_file" ]] || continue
+            local fname
+            fname=$(basename "$cmd_file")
+            # shellcheck disable=SC2029
+            ssh "$SSH_HOST" \
+                "cd $devc_dir && $compose_full exec -T devcontainer tee /home/claude/.claude/commands/$fname" \
+                < "$cmd_file" >/dev/null 2>&1
+            synced=1
+        done
+    fi
+
+    # Fix ownership
+    if [[ "$synced" == "1" ]]; then
+        # shellcheck disable=SC2029
+        ssh "$SSH_HOST" "cd $devc_dir && $compose_full exec -T devcontainer chown -R claude:claude /home/claude/.claude" 2>/dev/null
+        log_success "Claude: config synced (CLAUDE.md, settings, commands)"
+    fi
+}
+
 check_ssh() {
     if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "$SSH_HOST" true 2>/dev/null; then
         log_error "Cannot connect to $SSH_HOST. Check your SSH config and network."
@@ -1082,6 +1142,7 @@ main() {
     remote_compose_up
 
     run_container_lifecycle
+    sync_claude_config
 
     case "$OPEN_MODE" in
         cursor|code)
