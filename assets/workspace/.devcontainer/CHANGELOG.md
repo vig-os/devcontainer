@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `ci.yml` adds a `schedule` trigger at 04:00 UTC that checks out `dev` and runs all test suites; checkout `ref` and `vcs-ref` are resolved correctly for scheduled runs
 - **Scheduled security scan pulls GHCR `:latest` instead of rebuilding** ([#461](https://github.com/vig-os/devcontainer/issues/461))
   - Runs nightly at 05:00 UTC, pulls the published image, gates on fixable HIGH/CRITICAL vulnerabilities, auto-creates a deduplicated GitHub issue on failure, and uploads SARIF under `container-image-latest`
+- **Dependabot dependency update batch** ([#474](https://github.com/vig-os/devcontainer/pull/474))
+  - Bump `github/codeql-action` from `4.34.1` to `4.35.1`
+  - Bump `sigstore/cosign-installer` from `4.1.0` to `4.1.1`
 
 ### Deprecated
 
