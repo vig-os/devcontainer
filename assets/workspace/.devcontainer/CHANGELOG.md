@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Add `just promote-release` in `justfile.gh` (and workspace template copy)
 - **Smoke-test dispatch fails fast when deploy PR checks fail** ([#381](https://github.com/vig-os/devcontainer/issues/381))
   - `wait-deploy-merge` in `assets/smoke-test/.github/workflows/repository-dispatch.yml` exits as soon as all required checks have completed with failures instead of waiting for the merge poll timeout (`gh pr checks --required`)
+- **Nightly CI schedule** ([#461](https://github.com/vig-os/devcontainer/issues/461))
+  - `ci.yml` adds a `schedule` trigger at 04:00 UTC that checks out `dev` and runs all test suites; checkout `ref` and `vcs-ref` are resolved correctly for scheduled runs
+- **Scheduled security scan pulls GHCR `:latest` instead of rebuilding** ([#461](https://github.com/vig-os/devcontainer/issues/461))
+  - Runs nightly at 05:00 UTC, pulls the published image, gates on fixable HIGH/CRITICAL vulnerabilities, auto-creates a deduplicated GitHub issue on failure, and uploads SARIF under `container-image-latest`
 
 ### Deprecated
 
@@ -59,6 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Inline the same `retry` shell helper used by `setup-env` so the job works when `main`'s workflow expects helpers not yet on `dev`
 
 ### Security
+
+- **Nightly vulnerability gate for published container image** ([#461](https://github.com/vig-os/devcontainer/issues/461))
+  - Scheduled security scan now fails on fixable HIGH/CRITICAL CVEs and auto-files a GitHub issue, replacing the previous non-blocking weekly scan
 
 ## [0.3.1](https://github.com/vig-os/devcontainer/releases/tag/0.3.1) - 2026-03-26
 
