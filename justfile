@@ -188,88 +188,24 @@ test version="dev":
 # ===============================================================================
 # RELEASE MANAGEMENT
 # ===============================================================================
-# Unified release workflow via GitHub Actions (.github/workflows/release.yml)
+# Unified release via GitHub Actions (.github/workflows/release.yml, promote-release.yml)
 #
 # Process:
 #   1. just prepare-release X.Y.Z    - Create release/X.Y.Z branch, draft PR
 #   2. Test release branch, fix bugs as needed via PRs to release branch
 #   3. Mark PR ready for review (gh pr ready PR_NUMBER)
 #   4. Get PR approval from reviewer
-#   5. just finalize-release X.Y.Z   - Triggers GitHub Actions workflow that:
+#   5. just finalize-release X.Y.Z   - Triggers release.yml (final) that:
 #      - Validates PR status and all prerequisites
 #      - Sets release date in CHANGELOG, syncs PR docs
-#      - Builds and tests container images
-#      - Creates vX.Y.Z tag
-#      - Publishes images to GHCR
+#      - Builds and tests container images; creates X.Y.Z tag; pushes versioned GHCR images
+#      - Creates draft GitHub Release; dispatches smoke-test (not :latest yet)
 #      - On failure: automatic rollback and issue creation
-#   6. Merge release PR to main       - Triggers sync-main-to-dev.yml automatically:
-#      - Opens PR to merge main into dev
-#      - Auto-merges if no conflicts
+#   6. Wait for devcontainer-smoke-test to publish its final release for X.Y.Z
+#   7. just promote-release X.Y.Z    - Triggers promote-release.yml that:
+#      - Updates GHCR :latest, publishes the draft GitHub Release, merges release PR to main
+#      - Merging to main triggers sync-main-to-dev.yml (PR main -> dev, auto-merge if clean)
 # ===============================================================================
-
-# Prepare release branch for testing (step 1)
-[group('release')]
-prepare-release version ref="" *flags:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    # Trigger the prepare-release workflow via GitHub Actions
-    # The workflow handles: validate inputs, create release branch, prepare CHANGELOG, create draft PR
-    REF="{{ ref }}"
-    if [ -z "$REF" ]; then
-        REF="dev"
-    fi
-    gh workflow run prepare-release.yml --ref "$REF" -f "version={{ version }}" {{ flags }}
-    echo ""
-    echo "✓ Release preparation workflow triggered for version {{ version }}"
-    echo "Monitor progress: gh run list --workflow prepare-release.yml"
-
-# Finalize and publish release via GitHub Actions workflow (step 3, after testing)
-[group('release')]
-finalize-release version ref="" *flags:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    # Trigger the release workflow via GitHub Actions
-    # The workflow handles: finalize CHANGELOG, build/test images, create final tag, publish
-    REF="{{ ref }}"
-    if [ -z "$REF" ]; then
-        REF="release/{{ version }}"
-    fi
-    gh workflow run release.yml --ref "$REF" -f "version={{ version }}" -f "release-kind=final" {{ flags }}
-    echo ""
-    echo "✓ Release workflow triggered for version {{ version }}"
-    echo "Monitor progress: gh run list --workflow release.yml"
-
-# Publish release candidate via GitHub Actions workflow
-[group('release')]
-publish-candidate version ref="" *flags:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    # Trigger release workflow in candidate mode (default mode in workflow)
-    REF="{{ ref }}"
-    if [ -z "$REF" ]; then
-        REF="release/{{ version }}"
-    fi
-    gh workflow run release.yml --ref "$REF" -f "version={{ version }}" -f "release-kind=candidate" {{ flags }}
-    echo ""
-    echo "✓ Candidate release workflow triggered for version {{ version }}"
-    echo "Monitor progress: gh run list --workflow release.yml"
-
-# Reset CHANGELOG Unreleased section (after merging release to dev)
-[group('release')]
-reset-changelog:
-    uv run prepare-changelog reset CHANGELOG.md
-
-# Pull image from registry (default: latest)
-[group('release')]
-pull version="latest":
-    #!/usr/bin/env bash
-    echo "Pulling image {{ repo }}:{{ version }}..."
-    TLS_FLAG=""
-    if [ "${REGISTRY_TEST:-}" = "1" ]; then
-        TLS_FLAG="--tls-verify=false"
-    fi
-    podman pull $TLS_FLAG "{{ repo }}:{{ version }}" || echo "[!]  Failed to pull {{ repo }}:{{ version }}"
-
 # ===============================================================================
 # BUILD / CLEAN
 # ===============================================================================

@@ -5,7 +5,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.1] - TBD
+## Unreleased
+
+### Added
+
+- **Downstream `promote-release.yml` workspace template** ([#463](https://github.com/vig-os/devcontainer/issues/463))
+  - Add `assets/workspace/.github/workflows/promote-release.yml` as the counter-party to root `promote-release.yml`: validate draft release and release PR, publish the release, merge to `main`, best-effort git RC tag cleanup (no GHCR/cosign/smoke-test gate)
+  - Document in `docs/DOWNSTREAM_RELEASE.md` and align `docs/RELEASE_CYCLE.md` Phase 5 for consumer vs upstream paths
+- **Optional draft pre-release for downstream release candidates** ([#463](https://github.com/vig-os/devcontainer/issues/463))
+  - Workspace `release.yml` adds `create-release` (`workflow_dispatch`, default `false`); `release-publish.yml` creates a draft GitHub pre-release only when set for `candidate` runs
+  - Smoke-test `repository-dispatch.yml` passes `create-release=true` when triggering downstream `release.yml`
+  - `just publish-candidate` forwards `create-release` in `justfile.gh` and the workspace template copy
+
+### Changed
+
+- **RELEASE_APP permissions and GHCR cleanup token model** ([#463](https://github.com/vig-os/devcontainer/issues/463))
+  - Document Packages read/write on the org for `promote-release` cleanup, align the app table in `docs/RELEASE_CYCLE.md`, and explain why cleanup uses the GitHub App token instead of `GITHUB_TOKEN`
+- **Promote-release cleans up stale RC artifacts after merge** ([#463](https://github.com/vig-os/devcontainer/issues/463))
+  - Best-effort job deletes GHCR package versions for `${VERSION}-rc*` and `sha256-*`-only orphans, and deletes remote git RC tags for that base version when no GitHub Release exists; does not fail the workflow on error
+- **Downstream release helper recipes via GitHub justfile import** ([#373](https://github.com/vig-os/devcontainer/issues/373))
+  - Move `prepare-release`, `finalize-release`, `publish-candidate`, and `reset-changelog` into `justfile.gh` so downstream workspace templates expose these release helpers by default
+  - Keep root recipe availability (including `pull`) through `import 'justfile.gh'` while consolidating release helper ownership in the GitHub-focused recipe file; the workspace template copy omits the `pull` recipe
+- **Split final release into publish and promote phases** ([#456](https://github.com/vig-os/devcontainer/issues/456))
+  - Final `release.yml` publishes versioned GHCR tags and a draft GitHub Release but no longer updates `:latest`
+  - New `promote-release.yml` runs after downstream smoke-test publishes its final release: updates `:latest`, publishes the draft release, merges the release PR to `main`
+  - Add `just promote-release` in `justfile.gh` (and workspace template copy)
+- **Smoke-test dispatch fails fast when deploy PR checks fail** ([#381](https://github.com/vig-os/devcontainer/issues/381))
+  - `wait-deploy-merge` in `assets/smoke-test/.github/workflows/repository-dispatch.yml` exits as soon as all required checks have completed with failures instead of waiting for the merge poll timeout (`gh pr checks --required`)
+- **Nightly CI schedule** ([#461](https://github.com/vig-os/devcontainer/issues/461))
+  - `ci.yml` adds a `schedule` trigger at 04:00 UTC that checks out `dev` and runs all test suites; checkout `ref` and `vcs-ref` are resolved correctly for scheduled runs
+- **Scheduled security scan pulls GHCR `:latest` instead of rebuilding** ([#461](https://github.com/vig-os/devcontainer/issues/461))
+  - Runs nightly at 05:00 UTC, pulls the published image, gates on fixable HIGH/CRITICAL vulnerabilities, auto-creates a deduplicated GitHub issue on failure, and uploads SARIF under `container-image-latest`
+- **Dependabot dependency update batch** ([#474](https://github.com/vig-os/devcontainer/pull/474))
+  - Bump `github/codeql-action` from `4.34.1` to `4.35.1`
+  - Bump `sigstore/cosign-installer` from `4.1.0` to `4.1.1`
+
+### Deprecated
+
+### Removed
+
+- **One-time GHCR/git RC prune script** ([#463](https://github.com/vig-os/devcontainer/issues/463))
+  - Remove `scripts/prune-ghcr-tags.sh`; RC and `sha256-*` orphan cleanup remains in root `promote-release.yml`
+- **Downstream RC pre-release gate from release validate job** ([#463](https://github.com/vig-os/devcontainer/issues/463))
+  - Removed dead `if: false` steps from `release.yml`; downstream final release is verified only in `promote-release.yml` before promote
+
+### Fixed
+
+- **Git commit now falls back to nano when editor config is unusable** ([#383](https://github.com/vig-os/devcontainer/issues/383))
+  - `setup-git-conf.sh` now validates the effective Git editor and sets `core.editor=nano` only when the configured editor is missing or invalid in-container
+  - Add integration regression coverage to ensure invalid editor settings are corrected during setup
+- **Release finalize no longer races sync-issues; CHANGELOG TBD verified after reset** ([#455](https://github.com/vig-os/devcontainer/issues/455))
+  - Run `sync-issues` after capturing finalize SHA so downstream build/publish use the finalized commit
+  - Fail finalize if `CHANGELOG.md` still contains `## [version] - TBD` after `git reset --hard`
+- **generate-docs pre-commit runs when CHANGELOG.md changes** ([#455](https://github.com/vig-os/devcontainer/issues/455))
+  - Keeps README “Latest Version” and other generated docs aligned with the changelog
+- **prepare-release tolerates GitHub API ref propagation and reliable CHANGELOG rollback** ([#453](https://github.com/vig-os/devcontainer/issues/453))
+  - Poll until the new release branch ref resolves before `commit-action` commits to it
+  - Fetch dev `CHANGELOG.md` by resolved commit SHA during rollback so Contents API staleness does not skip the rollback commit
+- **sync-main-to-dev sync job no longer depends on dev's setup-env** ([#459](https://github.com/vig-os/devcontainer/issues/459))
+  - Inline the same `retry` shell helper used by `setup-env` so the job works when `main`'s workflow expects helpers not yet on `dev`
+- **CI container build avoids shared-runner Docker Hub rate limits** ([#473](https://github.com/vig-os/devcontainer/issues/473))
+  - `build-image` logs in to `docker.io` before `setup-buildx-action` when `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets are set; `ci.yml` and `release.yml` pass them
+  - Omitting secrets (e.g. forks) keeps prior anonymous-pull behavior
+
+### Security
+
+- **Nightly vulnerability gate for published container image** ([#461](https://github.com/vig-os/devcontainer/issues/461))
+  - Scheduled security scan now fails on fixable HIGH/CRITICAL CVEs and auto-files a GitHub issue, replacing the previous non-blocking weekly scan
+
+## [0.3.1](https://github.com/vig-os/devcontainer/releases/tag/0.3.1) - 2026-03-26
 
 ### Added
 

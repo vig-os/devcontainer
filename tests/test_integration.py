@@ -1182,8 +1182,6 @@ class TestDevContainerUserConf:
     def test_files_copied_to_home(self, devcontainer_up):
         """Test that files from .devcontainer/.conf have been copied to their destinations."""
         workspace_path = str(devcontainer_up.resolve())
-        # .devcontainer is inside the project subdirectory
-        conf_dir = "/workspace/test_project/.devcontainer/.conf"
 
         # Check that .gitconfig was copied to ~/.gitconfig
         check_gitconfig_cmd = [
@@ -1213,6 +1211,60 @@ class TestDevContainerUserConf:
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}\n"
             f"command: {' '.join(check_gitconfig_cmd)}"
+        )
+
+    def test_setup_git_conf_falls_back_to_nano_for_invalid_editor(
+        self, devcontainer_up
+    ):
+        """Regression: setup-git-conf should enforce a usable editor fallback."""
+        workspace_path = str(devcontainer_up.resolve())
+        conf_dir = "/workspace/test_project/.devcontainer/.conf"
+        exec_cmd = [
+            "devcontainer",
+            "exec",
+            "--workspace-folder",
+            workspace_path,
+            "--config",
+            f"{workspace_path}/.devcontainer/devcontainer.json",
+            "--docker-path",
+            "podman",
+            "bash",
+            "-c",
+            (
+                "set -e && "
+                "cd /workspace/test_project && "
+                "orig_conf=.devcontainer/.conf/.gitconfig && "
+                "bak_conf=.devcontainer/.conf/.gitconfig.test-bak && "
+                '[ -f "$orig_conf" ] && cp "$orig_conf" "$bak_conf" || true && '
+                "export HOME=/tmp/setup-git-conf-home && "
+                'rm -rf "$HOME" && mkdir -p "$HOME" && '
+                'cleanup(){ rm -rf "$HOME"; if [ -f "$bak_conf" ]; then mv "$bak_conf" "$orig_conf"; else rm -f "$orig_conf"; fi; } && '
+                "trap cleanup EXIT && "
+                "printf '[core]\\n\\teditor = missing-editor-command-zzzz-12345\\n' > \"$orig_conf\" && "
+                ".devcontainer/scripts/setup-git-conf.sh >/tmp/setup-git-conf.log 2>&1 && "
+                "git config --global --get core.editor"
+            ),
+        ]
+
+        result = subprocess.run(
+            exec_cmd,
+            capture_output=True,
+            text=True,
+            cwd=workspace_path,
+            env=os.environ.copy(),
+            timeout=60,
+        )
+
+        assert result.returncode == 0, (
+            f"Failed to re-run setup-git-conf.sh\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}\n"
+            f"command: {' '.join(exec_cmd)}"
+        )
+        assert result.stdout.strip() == "nano", (
+            "setup-git-conf.sh should replace invalid core.editor with nano\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}"
         )
 
         # Check that SSH public key was copied (if it exists in .conf)
@@ -1987,7 +2039,7 @@ class TestJustRecipes:
             f"command: {' '.join(just_cmd)}"
         )
 
-    def test_just_pytest(self, devcontainer_up):
+    def test_just_test_recipe(self, devcontainer_up):
         """Test the just test command."""
         workspace_path = str(devcontainer_up.resolve())
 
@@ -2018,6 +2070,43 @@ class TestJustRecipes:
             f"stderr: {result.stderr}\n"
             f"command: {' '.join(just_cmd)}"
         )
+
+    def test_template_justfile_gh_includes_release_recipes(self):
+        """Test that template justfile.gh exposes release helper recipes."""
+        project_root = Path(__file__).resolve().parents[1]
+        justfile_gh = project_root / "assets/workspace/.devcontainer/justfile.gh"
+        content = justfile_gh.read_text()
+
+        for recipe_name in [
+            "prepare-release",
+            "finalize-release",
+            "promote-release",
+            "publish-candidate",
+            "reset-changelog",
+        ]:
+            assert re.search(rf"(?m)^{recipe_name}(?:\s+.*)?:$", content), (
+                f"{recipe_name} recipe definition should exist in .devcontainer/justfile.gh"
+            )
+
+    def test_template_release_helpers_dispatch_expected_workflows(self):
+        """Test release helper dispatch defaults in template justfile.gh."""
+        project_root = Path(__file__).resolve().parents[1]
+        justfile_gh = project_root / "assets/workspace/.devcontainer/justfile.gh"
+        content = justfile_gh.read_text()
+
+        assert 'gh workflow run prepare-release.yml --ref "$REF"' in content
+        assert 'REF="dev"' in content
+        assert 'gh workflow run release.yml --ref "$REF"' in content
+        assert 'gh workflow run promote-release.yml --ref "$REF"' in content
+        assert "release-kind=final" in content
+        assert "release-kind=candidate" in content
+        assert "create-release={{ create-release }}" in content
+        assert "\nreset-changelog:\n    prepare-changelog reset CHANGELOG.md" in content
+        assert "uv run prepare-changelog" not in content
+        assert "build/test images" not in content
+        assert "GHCR :latest" not in content
+        assert 'pull version="latest"' not in content
+        assert "ghcr.io/vig-os/devcontainer" not in content
 
 
 class TestDockerComposeProjectOverrides:

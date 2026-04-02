@@ -1,3 +1,5 @@
+# Publishes git tag and optionally a GitHub Release. Final releases always get a draft release.
+# Candidates get a draft pre-release only when create_release is true (workflow_dispatch input).
 name: Release Publish
 
 on:  # yamllint disable-line rule:truthy
@@ -35,6 +37,11 @@ on:  # yamllint disable-line rule:truthy
         type: string
       tag_already_exists:
         description: "Skip tag create/push when remote tag already points at finalize SHA"
+        required: false
+        default: false
+        type: boolean
+      create_release:
+        description: "For candidates: create draft GitHub pre-release (default false = tag only)"
         required: false
         default: false
         type: boolean
@@ -184,6 +191,7 @@ jobs:
           fi
 
       - name: Create GitHub Release
+        if: ${{ inputs.release_kind == 'final' || (inputs.release_kind == 'candidate' && inputs.create_release) }}
         env:
           PUBLISH_VERSION: ${{ inputs.publish_version }}
           RELEASE_KIND: ${{ inputs.release_kind }}
@@ -211,6 +219,7 @@ jobs:
               --title "$PUBLISH_VERSION" \
               --notes-file /tmp/release-notes.md \
               --verify-tag \
+              --draft \
               --prerelease
           else
             retry --retries 3 --backoff 5 --max-backoff 30 -- gh release create "$PUBLISH_VERSION" \

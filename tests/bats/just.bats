@@ -16,17 +16,22 @@ setup() {
 }
 
 @test "prepare-release dispatches workflow from dev ref" {
-    run bash -lc "awk '/^prepare-release version ref=\"\" \\*flags:/{flag=1; next} /^$/{if(flag){exit}} flag' justfile | grep -Fq -- 'REF=\"dev\"'"
+    run bash -lc "awk '/^prepare-release version ref=\"\" \\*flags:/{flag=1; next} /^$/{if(flag){exit}} flag' justfile.gh | grep -Fq -- 'REF=\"dev\"'"
     assert_success
 }
 
 @test "finalize-release dispatches workflow from release branch ref" {
-    run bash -lc "awk '/^finalize-release version ref=\"\" \\*flags:/{flag=1; next} /^$/{if(flag){exit}} flag' justfile | grep -Fq -- 'REF=\"release/{{ version }}\"'"
+    run bash -lc "awk '/^finalize-release version ref=\"\" \\*flags:/{flag=1; next} /^$/{if(flag){exit}} flag' justfile.gh | grep -Fq -- 'REF=\"release/{{ version }}\"'"
+    assert_success
+}
+
+@test "promote-release dispatches workflow from release branch ref" {
+    run bash -lc "awk '/^promote-release version ref=\"\" \\*flags:/{flag=1; next} /^$/{if(flag){exit}} flag' justfile.gh | grep -Fq -- 'REF=\"release/{{ version }}\"'"
     assert_success
 }
 
 @test "publish-candidate dispatches workflow from release branch ref" {
-    run bash -lc "awk '/^publish-candidate version ref=\"\" \\*flags:/{flag=1; next} /^$/{if(flag){exit}} flag' justfile | grep -Fq -- 'REF=\"release/{{ version }}\"'"
+    run bash -lc "awk '/^publish-candidate version ref=\"\" create-release=\"false\" \\*flags:/{flag=1; next} /^$/{if(flag){exit}} flag' justfile.gh | grep -Fq -- 'REF=\"release/{{ version }}\"'"
     assert_success
 }
 
@@ -56,7 +61,7 @@ setup() {
 }
 
 @test "release workflow refreshes release PR body from changelog" {
-    run bash -lc 'grep -Fq -- "name: Refresh release PR body from finalized changelog" .github/workflows/release.yml && grep -Fq -- "CHANGELOG_CONTENT=\$(sed -n" .github/workflows/release.yml && grep -Fq -- "gh pr edit \"\$PR_NUMBER\" --body-file /tmp/release-pr-body.md" .github/workflows/release.yml'
+    run bash -lc 'grep -Fq -- "name: Refresh release PR body from finalized changelog" .github/workflows/release.yml && grep -Fq -- "CHANGELOG_CONTENT=\$(awk" .github/workflows/release.yml && grep -Fq -- "gh pr edit \"\$PR_NUMBER\" --body-file /tmp/release-pr-body.md" .github/workflows/release.yml'
     assert_success
 }
 
@@ -152,6 +157,11 @@ setup() {
 
 @test "release workflow rollback resolves container image independently of core outputs" {
     run bash -lc "grep -Fq -- 'resolve-image:' assets/workspace/.github/workflows/release.yml && grep -Fq -- 'needs: [resolve-image, core, extension, publish]' assets/workspace/.github/workflows/release.yml && grep -Fq -- 'image: ghcr.io/vig-os/devcontainer:\${{ needs.resolve-image.outputs.image-tag }}' assets/workspace/.github/workflows/release.yml"
+    assert_success
+}
+
+@test "workspace promote-release resolves devcontainer image and gates on draft release" {
+    run bash -lc "grep -Fq -- 'resolve-image:' assets/workspace/.github/workflows/promote-release.yml && grep -Fq -- 'group: publish-release' assets/workspace/.github/workflows/promote-release.yml && grep -Fq -- 'workflow_dispatch:' assets/workspace/.github/workflows/promote-release.yml && grep -Fq -- 'Verify draft GitHub Release exists' assets/workspace/.github/workflows/promote-release.yml && grep -Fq -- 'gh release edit' assets/workspace/.github/workflows/promote-release.yml"
     assert_success
 }
 

@@ -21,6 +21,7 @@ name: Repository Dispatch Listener
 # If this repo (or a fork) orchestrates workspace release.yml for candidates,
 # pass workflow_dispatch input rc-number=<N> where N is needs.validate.outputs.rc_number
 # so downstream candidate tags match the upstream dispatch tag (cross-repo gate).
+# Pass create-release=true so downstream release-publish creates a draft GitHub pre-release for the RC.
 
 on:  # yamllint disable-line rule:truthy
   repository_dispatch:
@@ -325,6 +326,7 @@ jobs:
     timeout-minutes: 35
     needs: deploy
     permissions:
+      checks: read
       pull-requests: read
     steps:
       - name: Poll deploy PR merge status
@@ -350,6 +352,13 @@ jobs:
             fi
             if [ "${STATE}" = "CLOSED" ]; then
               echo "ERROR: deploy PR closed without merge: ${PR_URL}"
+              exit 1
+            fi
+            CHECKS_JSON="$(gh pr checks "${PR_URL}" --required --json bucket 2>/dev/null || echo '[]')"
+            FAIL_COUNT="$(echo "${CHECKS_JSON}" | jq '[.[] | select(.bucket == "fail")] | length')"
+            PENDING_COUNT="$(echo "${CHECKS_JSON}" | jq '[.[] | select(.bucket == "pending")] | length')"
+            if [ "${FAIL_COUNT}" -gt 0 ] && [ "${PENDING_COUNT}" -eq 0 ]; then
+              echo "ERROR: deploy PR checks failed -- auto-merge will not proceed: ${PR_URL}"
               exit 1
             fi
             sleep "${INTERVAL}"
@@ -616,6 +625,7 @@ jobs:
             --ref "${WORKFLOW_REF}" \
             -f version="${BASE_VERSION}" \
             -f release-kind="${RELEASE_KIND}" \
+            -f create-release=true \
             "${EXTRA[@]}"
 
       - name: Wait for release workflow completion

@@ -114,6 +114,10 @@ Available recipes:
     clean version="dev"                        # Remove image (default: dev)
     clean-test-containers                      # Clean up lingering test containers
 
+    [git]
+    branch                                     # Show current branch + list recent branches
+    log                                        # Pretty one-line git log (last 20 commits)
+
     [github]
     gh-issues                                  # List open issues and PRs grouped by milestone [alias: gh-i]
 
@@ -146,8 +150,9 @@ Available recipes:
     [release]
     finalize-release version ref="" *flags     # Finalize and publish release via GitHub Actions workflow (step 3, after testing)
     prepare-release version ref="" *flags      # Prepare release branch for testing (step 1)
-    publish-candidate version ref="" *flags    # Publish release candidate via GitHub Actions workflow
-    pull version="latest"                      # Pull image from registry (default: latest)
+    promote-release version ref="" *flags      # Promote final release: GHCR :latest, publish draft GitHub Release, merge release PR (after downstream smoke-test final release)
+    publish-candidate version ref="" create-release="false" *flags # Publish release candidate via GitHub Actions workflow
+    pull version="latest" repo=""              # Pull image from registry (default: latest)
     reset-changelog                            # Reset CHANGELOG Unreleased section (after merging release to dev)
 
     [test]
@@ -177,7 +182,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **Registry**: `ghcr.io/vig-os/devcontainer`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
-- **Latest Version**: [0.3.0](https://github.com/vig-os/devcontainer/releases/tag/0.3.0) - 2026-03-13
+- **Latest Version**: [0.3.1](https://github.com/vig-os/devcontainer/releases/tag/0.3.1) - 2026-03-26
 - **Image tags**: bare semver (`0.2.1`, `latest`) — git tags use `v` prefix (`v0.2.1`) but image tags do not
 
 ## Features

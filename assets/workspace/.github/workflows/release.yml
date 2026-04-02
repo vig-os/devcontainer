@@ -32,6 +32,11 @@ on:  # yamllint disable-line rule:truthy
         required: false
         default: ""
         type: string
+      create-release:
+        description: "For candidates only: create a draft GitHub pre-release (default tag-only)"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: release
@@ -105,6 +110,7 @@ jobs:
       git_user_name: ${{ inputs.git-user-name }}
       git_user_email: ${{ inputs.git-user-email }}
       tag_already_exists: ${{ needs.core.outputs.tag_already_exists == 'true' }}
+      create_release: ${{ inputs.create-release }}
     secrets: inherit
 
   rollback:
