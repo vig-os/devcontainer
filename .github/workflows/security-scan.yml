@@ -60,7 +60,8 @@ jobs:
       - name: Log when latest image is unavailable
         if: steps.pull.outcome != 'success'
         run: |
-          echo "::warning::Skip scan-latest: GHCR devcontainer:latest pull failed"
+          echo "::error::Scan skipped: GHCR devcontainer:latest pull failed"
+          exit 1
 
       - name: Scan latest image for all vulnerabilities
         if: steps.pull.outcome == 'success'
@@ -163,7 +164,7 @@ jobs:
           gh label create security-scan \
             --description 'Automated nightly security scan findings for :latest image' \
             --color BFD4F2 2>/dev/null || true
-          EXISTING=$(gh issue list --label security-scan --state open --limit 1 --json number -q '.[0].number')
+          EXISTING=$(gh issue list --label security-scan --state open --limit 1 --json number -q '.[0].number // empty')
           if [ -n "$EXISTING" ]; then
             echo "Open security-scan issue already exists: #$EXISTING -- skipping create"
             exit 0
