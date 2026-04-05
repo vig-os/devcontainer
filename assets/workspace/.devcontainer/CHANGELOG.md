@@ -53,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Prepare-release changelog commits silently skipped due to FILE_PATHS delimiter mismatch** ([#483](https://github.com/vig-os/devcontainer/issues/483))
+  - Change `FILE_PATHS` from space-separated to comma-separated in all `commit-action` steps of `prepare-release.yml` so the action correctly commits both `CHANGELOG.md` and `assets/workspace/.devcontainer/CHANGELOG.md`
 - **`publish-candidate` recipe sends unknown `create-release` input** ([#479](https://github.com/vig-os/devcontainer/issues/479))
   - Remove `create-release` parameter and `-f` flag from upstream `justfile.gh`; the input was added to the downstream workflow only but the recipe was updated in both places
 - **Image tests expect current `just` minor** ([#479](https://github.com/vig-os/devcontainer/issues/479))
