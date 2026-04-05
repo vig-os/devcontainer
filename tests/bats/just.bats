@@ -186,7 +186,7 @@ setup() {
 }
 
 @test "prepare-release workflow FILE_PATHS uses comma delimiter for multi-file values" {
-    run bash -lc "! grep -E 'FILE_PATHS:.*CHANGELOG\.md [a-zA-Z]' .github/workflows/prepare-release.yml"
+    run bash -lc "[ -r .github/workflows/prepare-release.yml ] && ! grep -E 'FILE_PATHS:.*CHANGELOG\.md[[:space:]]+[^[:space:]]' .github/workflows/prepare-release.yml"
     assert_success
 }
 
