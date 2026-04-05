@@ -230,7 +230,7 @@ jobs:
 
             Move Unreleased content to [${{ needs.validate.outputs.version }}] - TBD
             and create fresh empty Unreleased section for continued development.
-          FILE_PATHS: CHANGELOG.md assets/workspace/.devcontainer/CHANGELOG.md
+          FILE_PATHS: CHANGELOG.md,assets/workspace/.devcontainer/CHANGELOG.md
 
       - name: Create release branch from dev
         id: create-branch
@@ -293,7 +293,7 @@ jobs:
 
             Strip empty Unreleased section from release branch.
             Release date TBD (set during finalization).
-          FILE_PATHS: CHANGELOG.md assets/workspace/.devcontainer/CHANGELOG.md
+          FILE_PATHS: CHANGELOG.md,assets/workspace/.devcontainer/CHANGELOG.md
 
       - name: Create draft PR to main
         id: pr
@@ -397,7 +397,7 @@ jobs:
             chore: rollback failed prepare-release ${{ needs.validate.outputs.version }}
 
             Restore CHANGELOG.md on dev to pre-prepare state after prepare-release failed.
-          FILE_PATHS: CHANGELOG.md assets/workspace/.devcontainer/CHANGELOG.md
+          FILE_PATHS: CHANGELOG.md,assets/workspace/.devcontainer/CHANGELOG.md
 
       - name: Rollback summary
         if: ${{ failure() }}

@@ -184,3 +184,13 @@ setup() {
     run bash -lc "grep -Fq -- 'rc-number:' assets/workspace/.github/workflows/release.yml && grep -Fq -- 'rc_number:' assets/workspace/.github/workflows/release.yml && grep -Fq -- 'rc_number:' assets/workspace/.github/workflows/release-core.yml"
     assert_success
 }
+
+@test "prepare-release workflow FILE_PATHS uses comma delimiter for multi-file values" {
+    run bash -lc "[ -r .github/workflows/prepare-release.yml ] && ! grep -E 'FILE_PATHS:.*CHANGELOG\.md[[:space:]]+[^[:space:]]' .github/workflows/prepare-release.yml"
+    assert_success
+}
+
+@test "release workflow joins finalization file paths with commas for commit-action" {
+    run bash -lc "awk '/^      - name: Collect finalization files/{flag=1} /^      - name: Commit finalization changes via API/{flag=0} flag {print}' .github/workflows/release.yml | grep -Fq \"tr '\\n' ','\""
+    assert_success
+}
