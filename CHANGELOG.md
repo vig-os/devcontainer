@@ -53,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`publish-candidate` recipe sends unknown `create-release` input** ([#479](https://github.com/vig-os/devcontainer/issues/479))
   - Remove `create-release` parameter and `-f` flag from upstream `justfile.gh`; the input was added to the downstream workflow only but the recipe was updated in both places
+- **Image tests expect current `just` minor** ([#479](https://github.com/vig-os/devcontainer/issues/479))
+  - Align `EXPECTED_VERSIONS["just"]` with the latest `just` release installed by the Containerfile (1.49.x)
 - **Git commit now falls back to nano when editor config is unusable** ([#383](https://github.com/vig-os/devcontainer/issues/383))
   - `setup-git-conf.sh` now validates the effective Git editor and sets `core.editor=nano` only when the configured editor is missing or invalid in-container
   - Add integration regression coverage to ensure invalid editor settings are corrected during setup
