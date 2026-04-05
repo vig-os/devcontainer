@@ -534,7 +534,7 @@ jobs:
             exit 1
           fi
 
-          FILE_PATHS="$(echo "$CHANGED_FILES" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+          FILE_PATHS="$(echo "$CHANGED_FILES" | tr '\n' ',' | sed 's/,$//')"
           echo "file_paths=$FILE_PATHS" >> "$GITHUB_OUTPUT"
           echo "Finalization files: $FILE_PATHS"
 
