@@ -31,7 +31,7 @@ setup() {
 }
 
 @test "publish-candidate dispatches workflow from release branch ref" {
-    run bash -lc "awk '/^publish-candidate version ref=\"\" create-release=\"false\" \\*flags:/{flag=1; next} /^$/{if(flag){exit}} flag' justfile.gh | grep -Fq -- 'REF=\"release/{{ version }}\"'"
+    run bash -lc "awk '/^publish-candidate version ref=\"\" \\*flags:/{flag=1; next} /^$/{if(flag){exit}} flag' justfile.gh | grep -Fq -- 'REF=\"release/{{ version }}\"'"
     assert_success
 }
 
