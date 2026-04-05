@@ -189,3 +189,8 @@ setup() {
     run bash -lc "! grep -E 'FILE_PATHS:.*CHANGELOG\.md [a-zA-Z]' .github/workflows/prepare-release.yml"
     assert_success
 }
+
+@test "release workflow joins finalization file paths with commas for commit-action" {
+    run bash -lc "awk '/^      - name: Collect finalization files/{flag=1} /^      - name: Commit finalization changes via API/{flag=0} flag {print}' .github/workflows/release.yml | grep -Fq \"tr '\\n' ','\""
+    assert_success
+}
