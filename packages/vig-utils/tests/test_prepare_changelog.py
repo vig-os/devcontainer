@@ -1179,8 +1179,16 @@ class TestFinalizeReleaseDate:
         with pytest.raises(ValueError, match="GitHub repository is required"):
             finalize_release_date("1.0.0", "2026-02-11", str(f))
 
-    def test_rejects_invalid_github_repository_slug(self, tmp_path):
-        """Should raise for owner/repo slug that is not exactly two segments."""
+    @pytest.mark.parametrize(
+        "bad_slug",
+        [
+            "too-many/slash/parts",
+            "has spaces/repo",
+            "owner/re(po)",
+        ],
+    )
+    def test_rejects_invalid_github_repository_slug(self, tmp_path, bad_slug):
+        """Should raise for invalid owner/repo slug (segment count or characters)."""
         f = tmp_path / "CHANGELOG.md"
         f.write_text(CHANGELOG_WITH_TBD)
         with pytest.raises(ValueError, match="Invalid github_repository"):
@@ -1188,7 +1196,7 @@ class TestFinalizeReleaseDate:
                 "1.0.0",
                 "2026-02-11",
                 str(f),
-                github_repository="too-many/slash/parts",
+                github_repository=bad_slug,
             )
 
     def test_fails_version_not_found(self, tmp_path):
