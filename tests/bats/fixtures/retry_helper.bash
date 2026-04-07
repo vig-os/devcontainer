@@ -39,9 +39,7 @@ retry() {
   local attempt=1
   local current_backoff="$backoff"
   while [ "$attempt" -le "$retries" ]; do
-    if "$@"; then
-      return 0
-    fi
+    "$@" && return 0
     rc=$?
     if [ "$attempt" -lt "$retries" ]; then
       local wait="$current_backoff"
