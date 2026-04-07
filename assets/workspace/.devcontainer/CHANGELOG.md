@@ -74,6 +74,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CI container build avoids shared-runner Docker Hub rate limits** ([#473](https://github.com/vig-os/devcontainer/issues/473))
   - `build-image` logs in to `docker.io` before `setup-buildx-action` when `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets are set; `ci.yml` and `release.yml` pass them
   - Omitting secrets (e.g. forks) keeps prior anonymous-pull behavior
+- **Release finalize commit blocked by Release protection ruleset** ([#487](https://github.com/vig-os/devcontainer/issues/487))
+  - Generate a dedicated Commit App token (`COMMIT_APP_ID`) for the `commit-action` step in the `finalize` job of `release.yml`, matching the pattern used by `prepare-release.yml` and other workflows; the previous Release App token lacked ruleset bypass
 
 ### Security
 
