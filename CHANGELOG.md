@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.2](https://github.com/vig-os/devcontainer/releases/tag/0.3.2) - 2026-04-07
+## [0.3.2] - TBD
 
 ### Added
 
@@ -86,6 +86,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release finalize installs just for doc generation** ([#494](https://github.com/vig-os/devcontainer/issues/494))
   - Remove `install-just: 'false'` from the finalize job `setup-env` step so `docs/generate.py` can run `just --list`
   - `get_just_help()` exits non-zero on failure instead of writing placeholder content into generated docs
+- **Release rollback and CI `retry` exit codes** ([#500](https://github.com/vig-os/devcontainer/issues/500))
+  - `retry` shell helper now propagates the command's non-zero exit code when all attempts fail
+  - Release rollback creates a fast-forward revert commit via the Git API instead of force-pushing, compatible with branch protection on `release/*`
+  - Rollback Git Data API steps authenticate with the Commit app token (same as finalize) so protected `release/*` ref updates are not blocked
+  - Canonical `retry()` implementation lives in `.github/scripts/retry.sh`; `setup-env` and BATS source it so CI and tests stay aligned (`sync-main-to-dev.yml` keeps an inline copy documented as in sync)
 
 ### Security
 
