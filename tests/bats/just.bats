@@ -55,6 +55,11 @@ setup() {
     assert_success
 }
 
+@test "release workflow finalize job does not disable just install" {
+    run bash -lc "awk '/^  finalize:/{flag=1} /^  build-and-test:/{flag=0} flag {print}' .github/workflows/release.yml | grep -Fq -- \"install-just: 'false'\""
+    assert_failure
+}
+
 @test "prepare-release PR body omits persistent checklist and related sections" {
     run bash -lc "! awk '/^      - name: Create draft PR to main/{flag=1} /^      - name: Roll back prepare-release side effects on failure/{flag=0} flag {print}' .github/workflows/prepare-release.yml | grep -Fq -- '### Testing Checklist' && ! awk '/^      - name: Create draft PR to main/{flag=1} /^      - name: Roll back prepare-release side effects on failure/{flag=0} flag {print}' .github/workflows/prepare-release.yml | grep -Fq -- '### When Ready to Release' && ! awk '/^      - name: Create draft PR to main/{flag=1} /^      - name: Roll back prepare-release side effects on failure/{flag=0} flag {print}' .github/workflows/prepare-release.yml | grep -Fq -- '### Related'"
     assert_success

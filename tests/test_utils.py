@@ -56,21 +56,26 @@ class TestGetJustHelp:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    def test_fallback_when_just_not_found(self):
-        """Should return HTML comment fallback when 'just' binary is missing."""
-        with patch("subprocess.run", side_effect=FileNotFoundError("no just")):
-            result = generate.get_just_help()
-        assert "just --list" in result
-        assert "<!--" in result
-
-    def test_fallback_on_called_process_error(self):
-        """Should return fallback when 'just --list' fails."""
-        with patch(
-            "subprocess.run",
-            side_effect=subprocess.CalledProcessError(1, "just"),
+    def test_exits_when_just_not_found(self):
+        """Should exit non-zero when 'just' binary is missing."""
+        with (
+            patch("subprocess.run", side_effect=FileNotFoundError("no just")),
+            pytest.raises(SystemExit) as exc_info,
         ):
-            result = generate.get_just_help()
-        assert "just --list" in result
+            generate.get_just_help()
+        assert exc_info.value.code == 1
+
+    def test_exits_on_called_process_error(self):
+        """Should exit non-zero when 'just --list' fails."""
+        with (
+            patch(
+                "subprocess.run",
+                side_effect=subprocess.CalledProcessError(1, "just"),
+            ),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            generate.get_just_help()
+        assert exc_info.value.code == 1
 
 
 class TestGetVersionFromChangelog:
