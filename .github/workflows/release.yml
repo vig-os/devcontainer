@@ -1395,11 +1395,31 @@ jobs:
         run: |
           set -euo pipefail
           echo "Rolling back release branch to pre-finalization state..."
-          retry --retries 3 --backoff 5 --max-backoff 30 -- gh api "repos/${{ github.repository }}/git/refs/heads/release/$VERSION" \
-            -X PATCH \
-            -f sha="$PRE_SHA" \
-            -F force=true
-          echo "✓ Release branch rolled back to $PRE_SHA"
+          REPO="${{ github.repository }}"
+          BRANCH_REF="heads/release/$VERSION"
+
+          TREE_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh api "repos/$REPO/git/commits/$PRE_SHA" --jq '.tree.sha')
+          CURRENT_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh api "repos/$REPO/git/refs/$BRANCH_REF" --jq '.object.sha')
+
+          if [ "$CURRENT_SHA" = "$PRE_SHA" ]; then
+            echo "Branch already at pre-finalization SHA, no rollback needed"
+            exit 0
+          fi
+
+          REVERT_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh api -X POST "repos/$REPO/git/commits" \
+              -f message="revert: undo finalize release $VERSION (workflow rollback)" \
+              -f tree="$TREE_SHA" \
+              -f "parents[]=$CURRENT_SHA" \
+              --jq '.sha')
+
+          retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh api "repos/$REPO/git/refs/$BRANCH_REF" \
+              -X PATCH \
+              -f sha="$REVERT_SHA"
+          echo "✓ Release branch rolled back via revert commit $REVERT_SHA (tree at $PRE_SHA)"
 
       - name: Create failure issue
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8.0.0
