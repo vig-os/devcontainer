@@ -318,10 +318,10 @@ def cmd_unprepare(args):
 
 
 def _validate_github_repository_slug(raw: str) -> str:
-    parts = raw.split("/")
-    if len(parts) != 2 or not parts[0] or not parts[1]:
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", raw):
         raise ValueError(
-            f"Invalid github_repository {raw!r} (expected a single 'owner/repo' slug)"
+            f"Invalid github_repository {raw!r} "
+            "(owner and repo must contain only letters, numbers, '_', '.', or '-')"
         )
     return raw
 
