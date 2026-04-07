@@ -6,6 +6,7 @@ Provides commands for managing CHANGELOG.md during the release workflow.
 """
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
@@ -206,9 +207,9 @@ def unprepare_changelog(filepath="CHANGELOG.md"):
     if line == "## Unreleased":
         return False
 
-    # Match ## [X.Y.Z] - TBD or ## [X.Y.Z] - YYYY-MM-DD (same semver rule as prepare)
+    # Match ## [X.Y.Z] - … or ## [X.Y.Z](url) - … (optional release link, same semver rule as prepare)
     version_heading = re.compile(
-        r"^## \[(\d+\.\d+\.\d+)\] - .+$",
+        r"^## \[(\d+\.\d+\.\d+)\](?:\([^)]+\))? - .+$",
     )
     if not version_heading.match(line):
         raise ValueError(
@@ -316,18 +317,54 @@ def cmd_unprepare(args):
         print(f"✓ Top section already ## Unreleased in {args.file} (no changes)")
 
 
-def finalize_release_date(version, release_date, filepath="CHANGELOG.md"):
+def _validate_github_repository_slug(raw: str) -> str:
+    parts = raw.split("/")
+    if len(parts) != 2 or not parts[0] or not parts[1]:
+        raise ValueError(
+            f"Invalid github_repository {raw!r} (expected a single 'owner/repo' slug)"
+        )
+    return raw
+
+
+def _resolve_github_repository(github_repository: str | None) -> str:
+    """Return owner/repo for release links from an explicit value or GITHUB_REPOSITORY."""
+    if github_repository is not None:
+        stripped = github_repository.strip()
+        if stripped:
+            return _validate_github_repository_slug(stripped)
+    env = os.environ.get("GITHUB_REPOSITORY", "").strip()
+    if env:
+        return _validate_github_repository_slug(env)
+    raise ValueError(
+        "GitHub repository is required to finalize the changelog heading "
+        "(set GITHUB_REPOSITORY or pass github_repository='owner/repo', "
+        "or use prepare-changelog finalize --github-repository owner/repo)"
+    )
+
+
+def finalize_release_date(
+    version,
+    release_date,
+    filepath="CHANGELOG.md",
+    *,
+    github_repository: str | None = None,
+):
     """
     Replace TBD date with actual release date for a version.
+
+    The version heading becomes a linked title pointing at the GitHub release tag
+    for this repository (``owner/repo`` from ``github_repository`` or the
+    ``GITHUB_REPOSITORY`` environment variable).
 
     Args:
         version: Semantic version (e.g., "1.0.0")
         release_date: Release date in ISO format (YYYY-MM-DD)
         filepath: Path to CHANGELOG.md
+        github_repository: ``owner/repo`` slug; when omitted, ``GITHUB_REPOSITORY`` is used
 
     Raises:
         ValueError: If version format is invalid, date format is invalid,
-                   or version section with TBD not found
+                   repository slug is missing or invalid, or version section with TBD not found
         FileNotFoundError: If CHANGELOG file doesn't exist
     """
     # Validate version format
@@ -352,8 +389,9 @@ def finalize_release_date(version, release_date, filepath="CHANGELOG.md"):
             f"Version section '## [{version}] - TBD' not found in CHANGELOG"
         )
 
-    # Replace TBD with release date
-    replacement = f"## [{version}] - {release_date}"
+    repo_slug = _resolve_github_repository(github_repository)
+    tag_url = f"https://github.com/{repo_slug}/releases/tag/{version}"
+    replacement = f"## [{version}]({tag_url}) - {release_date}"
     new_content = re.sub(version_pattern, replacement, content)
 
     # Write back
@@ -362,7 +400,12 @@ def finalize_release_date(version, release_date, filepath="CHANGELOG.md"):
 
 def cmd_finalize(args):
     """Handle finalize command."""
-    finalize_release_date(args.version, args.date, args.file)
+    finalize_release_date(
+        args.version,
+        args.date,
+        args.file,
+        github_repository=args.github_repository,
+    )
 
     print(f"✓ Set release date for version {args.version}")
     print(f"✓ Date: {args.date}")
@@ -381,8 +424,9 @@ Examples:
   # Validate CHANGELOG has unreleased changes
   %(prog)s validate
 
-  # Set release date for version 1.0.0
+  # Set release date for version 1.0.0 (uses GITHUB_REPOSITORY if set)
   %(prog)s finalize 1.0.0 2026-02-11
+  %(prog)s finalize 1.0.0 2026-02-11 CHANGELOG.md --github-repository my-org/my-repo
 
   # Reset Unreleased section after release merge
   %(prog)s reset
@@ -473,6 +517,16 @@ Examples:
         nargs="?",
         default="CHANGELOG.md",
         help="Path to CHANGELOG file (default: CHANGELOG.md)",
+    )
+    finalize_parser.add_argument(
+        "--github-repository",
+        dest="github_repository",
+        default=None,
+        metavar="OWNER/REPO",
+        help=(
+            "Repository slug for the release tag link "
+            "(default: GITHUB_REPOSITORY environment variable)"
+        ),
     )
     finalize_parser.set_defaults(func=cmd_finalize)
 
