@@ -892,15 +892,15 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          awk -v version="$VERSION" '
-            index($0, "## [" version "] - ") == 1 {found=1; next}
+          awk -v hdr="## [${VERSION}]" '
+            index($0, hdr) == 1 {found=1; next}
             /^## \[/ && found {found=0}
             found {print}
           ' CHANGELOG.md > /tmp/github-release-notes.md
 
           if [ ! -s /tmp/github-release-notes.md ]; then
             echo "ERROR: Failed to generate GitHub Release notes for $VERSION from CHANGELOG.md"
-            echo "Expected section heading: ## [$VERSION] - YYYY-MM-DD"
+            echo "Expected heading like: ## [$VERSION] - YYYY-MM-DD or ## [$VERSION](url) - YYYY-MM-DD"
             exit 1
           fi
 
