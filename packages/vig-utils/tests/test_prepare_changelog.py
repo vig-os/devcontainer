@@ -10,6 +10,7 @@ Comprehensive coverage including:
 Tests are organized by function under test, from low-level helpers up to the CLI layer.
 """
 
+import os
 import re
 import shutil
 import subprocess
@@ -35,6 +36,9 @@ from vig_utils.prepare_changelog import (
 
 # Find the CLI entry point installed by the package
 ENTRY_POINT = shutil.which("prepare-changelog")
+
+# Owner/repo slug for finalize_release_date tests (not hardcoded in production code)
+_FINALIZE_TEST_REPO = "vig-os/devcontainer"
 
 # ─── Test data constants ──────────────────────────────────────────────────────
 
@@ -933,6 +937,24 @@ class TestUnprepareChangelog:
         assert f.read_text().split("\n")[2] == "## Unreleased"
         assert "- Bug" in f.read_text()
 
+    def test_renames_linked_dated_header(self, tmp_path):
+        """Top ## [semver](url) - YYYY-MM-DD becomes ## Unreleased."""
+        body = """\
+# Changelog
+
+## [2.0.0](https://github.com/o/r/releases/tag/2.0.0) - 2026-03-23
+
+### Fixed
+
+- Bug
+
+"""
+        f = tmp_path / "CHANGELOG.md"
+        f.write_text(body)
+        assert unprepare_changelog(str(f)) is True
+        assert f.read_text().split("\n")[2] == "## Unreleased"
+        assert "- Bug" in f.read_text()
+
     def test_noop_when_already_unreleased(self, tmp_path):
         """Returns False and leaves file unchanged."""
         f = tmp_path / "CHANGELOG.md"
@@ -995,21 +1017,29 @@ class TestFinalizeReleaseDate:
     # ── Happy path ────────────────────────────────────────────────────────
 
     def test_replaces_tbd_with_date(self, tmp_path):
-        """Should substitute TBD → actual date."""
+        """Should substitute TBD → actual date and add release tag link."""
         f = tmp_path / "CHANGELOG.md"
         f.write_text(CHANGELOG_WITH_TBD)
-        finalize_release_date("1.0.0", "2026-02-11", str(f))
+        finalize_release_date(
+            "1.0.0", "2026-02-11", str(f), github_repository=_FINALIZE_TEST_REPO
+        )
         content = f.read_text()
-        assert "## [1.0.0] - 2026-02-11" in content
+        assert (
+            f"## [1.0.0](https://github.com/{_FINALIZE_TEST_REPO}/releases/tag/1.0.0) - 2026-02-11"
+            in content
+        )
         assert "## [1.0.0] - TBD" not in content
 
     def test_preserves_version_content(self, tmp_path):
         """All bullets in the version section should remain."""
         f = tmp_path / "CHANGELOG.md"
         f.write_text(CHANGELOG_WITH_TBD)
-        finalize_release_date("1.0.0", "2026-02-11", str(f))
+        finalize_release_date(
+            "1.0.0", "2026-02-11", str(f), github_repository=_FINALIZE_TEST_REPO
+        )
         content = f.read_text()
-        version_start = content.find("## [1.0.0] - 2026-02-11")
+        heading = f"## [1.0.0](https://github.com/{_FINALIZE_TEST_REPO}/releases/tag/1.0.0) - 2026-02-11"
+        version_start = content.find(heading)
         version_end = content.find("## [0.2.0]")
         version_section = content[version_start:version_end]
         assert "- Feature X" in version_section
@@ -1020,7 +1050,9 @@ class TestFinalizeReleaseDate:
         """Other versions and Unreleased should stay untouched."""
         f = tmp_path / "CHANGELOG.md"
         f.write_text(CHANGELOG_WITH_TBD)
-        finalize_release_date("1.0.0", "2026-02-11", str(f))
+        finalize_release_date(
+            "1.0.0", "2026-02-11", str(f), github_repository=_FINALIZE_TEST_REPO
+        )
         content = f.read_text()
         assert "## [0.2.0] - 2026-01-01" in content
         assert "## Unreleased" in content
@@ -1029,9 +1061,14 @@ class TestFinalizeReleaseDate:
         """Only the specified version's TBD should be replaced."""
         f = tmp_path / "CHANGELOG.md"
         f.write_text(MULTIPLE_TBD_CHANGELOG)
-        finalize_release_date("1.0.0", "2026-02-11", str(f))
+        finalize_release_date(
+            "1.0.0", "2026-02-11", str(f), github_repository=_FINALIZE_TEST_REPO
+        )
         content = f.read_text()
-        assert "## [1.0.0] - 2026-02-11" in content
+        assert (
+            f"## [1.0.0](https://github.com/{_FINALIZE_TEST_REPO}/releases/tag/1.0.0) - 2026-02-11"
+            in content
+        )
         assert "## [2.0.0] - TBD" in content
 
     def test_special_characters_in_content(self, tmp_path):
@@ -1048,11 +1085,40 @@ class TestFinalizeReleaseDate:
 """
         f = tmp_path / "CHANGELOG.md"
         f.write_text(changelog)
-        finalize_release_date("1.0.0", "2026-02-11", str(f))
+        finalize_release_date(
+            "1.0.0", "2026-02-11", str(f), github_repository=_FINALIZE_TEST_REPO
+        )
         content = f.read_text()
-        assert "## [1.0.0] - 2026-02-11" in content
+        assert (
+            f"## [1.0.0](https://github.com/{_FINALIZE_TEST_REPO}/releases/tag/1.0.0) - 2026-02-11"
+            in content
+        )
         assert "[brackets]" in content
         assert "$chars*" in content
+
+    def test_uses_github_repository_from_env(self, tmp_path, monkeypatch):
+        """GITHUB_REPOSITORY should supply the owner/repo slug when unset on the call."""
+        monkeypatch.setenv("GITHUB_REPOSITORY", "acme/cool-widget")
+        f = tmp_path / "CHANGELOG.md"
+        f.write_text(CHANGELOG_WITH_TBD)
+        finalize_release_date("1.0.0", "2026-02-11", str(f))
+        assert "https://github.com/acme/cool-widget/releases/tag/1.0.0" in f.read_text()
+
+    def test_github_repository_param_overrides_env(self, tmp_path, monkeypatch):
+        """Explicit github_repository wins over GITHUB_REPOSITORY."""
+        monkeypatch.setenv("GITHUB_REPOSITORY", "wrong/repo")
+        f = tmp_path / "CHANGELOG.md"
+        f.write_text(CHANGELOG_WITH_TBD)
+        finalize_release_date(
+            "1.0.0",
+            "2026-02-11",
+            str(f),
+            github_repository="right/correct-repo",
+        )
+        assert (
+            "https://github.com/right/correct-repo/releases/tag/1.0.0" in f.read_text()
+        )
+        assert "wrong/repo" not in f.read_text()
 
     # ── Version validation ────────────────────────────────────────────────
 
@@ -1061,14 +1127,24 @@ class TestFinalizeReleaseDate:
         f = tmp_path / "CHANGELOG.md"
         f.write_text(CHANGELOG_WITH_TBD)
         with pytest.raises(ValueError, match="Invalid semantic version"):
-            finalize_release_date("1.0", "2026-02-11", str(f))
+            finalize_release_date(
+                "1.0",
+                "2026-02-11",
+                str(f),
+                github_repository=_FINALIZE_TEST_REPO,
+            )
 
     def test_rejects_v_prefix(self, tmp_path):
         """Should raise for 'v' prefixed versions."""
         f = tmp_path / "CHANGELOG.md"
         f.write_text(CHANGELOG_WITH_TBD)
         with pytest.raises(ValueError, match="Invalid semantic version"):
-            finalize_release_date("v1.0.0", "2026-02-11", str(f))
+            finalize_release_date(
+                "v1.0.0",
+                "2026-02-11",
+                str(f),
+                github_repository=_FINALIZE_TEST_REPO,
+            )
 
     # ── Date validation ───────────────────────────────────────────────────
 
@@ -1089,28 +1165,67 @@ class TestFinalizeReleaseDate:
         f = tmp_path / "CHANGELOG.md"
         f.write_text(CHANGELOG_WITH_TBD)
         with pytest.raises(ValueError, match="Invalid date"):
-            finalize_release_date("1.0.0", bad_date, str(f))
+            finalize_release_date(
+                "1.0.0", bad_date, str(f), github_repository=_FINALIZE_TEST_REPO
+            )
 
     # ── Error handling ────────────────────────────────────────────────────
+
+    def test_raises_without_github_repository(self, tmp_path, monkeypatch):
+        """Should raise when neither argument nor GITHUB_REPOSITORY is set."""
+        monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
+        f = tmp_path / "CHANGELOG.md"
+        f.write_text(CHANGELOG_WITH_TBD)
+        with pytest.raises(ValueError, match="GitHub repository is required"):
+            finalize_release_date("1.0.0", "2026-02-11", str(f))
+
+    @pytest.mark.parametrize(
+        "bad_slug",
+        [
+            "too-many/slash/parts",
+            "has spaces/repo",
+            "owner/re(po)",
+        ],
+    )
+    def test_rejects_invalid_github_repository_slug(self, tmp_path, bad_slug):
+        """Should raise for invalid owner/repo slug (segment count or characters)."""
+        f = tmp_path / "CHANGELOG.md"
+        f.write_text(CHANGELOG_WITH_TBD)
+        with pytest.raises(ValueError, match="Invalid github_repository"):
+            finalize_release_date(
+                "1.0.0",
+                "2026-02-11",
+                str(f),
+                github_repository=bad_slug,
+            )
 
     def test_fails_version_not_found(self, tmp_path):
         """Should raise when the specified version doesn't exist."""
         f = tmp_path / "CHANGELOG.md"
         f.write_text(CHANGELOG_WITH_TBD)
         with pytest.raises(ValueError, match="not found"):
-            finalize_release_date("9.9.9", "2026-02-11", str(f))
+            finalize_release_date(
+                "9.9.9", "2026-02-11", str(f), github_repository=_FINALIZE_TEST_REPO
+            )
 
     def test_fails_already_finalized(self, tmp_path):
         """Should raise when version already has a real date (not TBD)."""
         f = tmp_path / "CHANGELOG.md"
         f.write_text(CHANGELOG_WITH_TBD)
         with pytest.raises(ValueError, match="not found"):
-            finalize_release_date("0.2.0", "2026-02-11", str(f))
+            finalize_release_date(
+                "0.2.0", "2026-02-11", str(f), github_repository=_FINALIZE_TEST_REPO
+            )
 
     def test_raises_for_missing_file(self, tmp_path):
         """Should raise FileNotFoundError for nonexistent file."""
         with pytest.raises(FileNotFoundError, match="CHANGELOG not found"):
-            finalize_release_date("1.0.0", "2026-02-11", str(tmp_path / "nope.md"))
+            finalize_release_date(
+                "1.0.0",
+                "2026-02-11",
+                str(tmp_path / "nope.md"),
+                github_repository=_FINALIZE_TEST_REPO,
+            )
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1127,10 +1242,15 @@ class TestPrepareThenFinalize:
         f.write_text(basic_changelog)
 
         prepare_changelog("1.0.0", str(f))
-        finalize_release_date("1.0.0", "2026-02-11", str(f))
+        finalize_release_date(
+            "1.0.0", "2026-02-11", str(f), github_repository=_FINALIZE_TEST_REPO
+        )
 
         content = f.read_text()
-        assert "## [1.0.0] - 2026-02-11" in content
+        assert (
+            f"## [1.0.0](https://github.com/{_FINALIZE_TEST_REPO}/releases/tag/1.0.0) - 2026-02-11"
+            in content
+        )
         assert "TBD" not in content
         assert "## Unreleased" in content
         assert content.index("## Unreleased") < content.index("## [1.0.0]")
@@ -1141,7 +1261,9 @@ class TestPrepareThenFinalize:
         f.write_text(MINIMAL_CHANGELOG)
 
         prepare_changelog("1.0.0", str(f))
-        finalize_release_date("1.0.0", "2026-02-11", str(f))
+        finalize_release_date(
+            "1.0.0", "2026-02-11", str(f), github_repository=_FINALIZE_TEST_REPO
+        )
 
         # Simulate merging to main: remove the Unreleased block
         content = f.read_text()
@@ -1253,10 +1375,17 @@ class TestCmdReset:
 class TestCmdFinalize:
     """Tests for cmd_finalize handler."""
 
-    def _make_args(self, version, date, filepath):
+    def _make_args(
+        self, version, date, filepath, github_repository=_FINALIZE_TEST_REPO
+    ):
         from argparse import Namespace
 
-        return Namespace(version=version, date=date, file=filepath)
+        return Namespace(
+            version=version,
+            date=date,
+            file=filepath,
+            github_repository=github_repository,
+        )
 
     def test_success_output(self, tmp_path, capsys):
         """Should print version and date."""
@@ -1315,12 +1444,26 @@ class TestMainCLI:
         assert "## Unreleased" in f.read_text()
 
     def test_finalize_via_main(self, tmp_path):
-        """main() with 'finalize' should replace TBD with date."""
+        """main() with 'finalize' should replace TBD with date and release link."""
         f = tmp_path / "CHANGELOG.md"
         f.write_text(CHANGELOG_WITH_TBD)
-        with patch("sys.argv", ["prog", "finalize", "1.0.0", "2026-02-11", str(f)]):
+        with patch(
+            "sys.argv",
+            [
+                "prog",
+                "finalize",
+                "1.0.0",
+                "2026-02-11",
+                str(f),
+                "--github-repository",
+                _FINALIZE_TEST_REPO,
+            ],
+        ):
             main()
-        assert "## [1.0.0] - 2026-02-11" in f.read_text()
+        assert (
+            f"## [1.0.0](https://github.com/{_FINALIZE_TEST_REPO}/releases/tag/1.0.0) - 2026-02-11"
+            in f.read_text()
+        )
 
     def test_unprepare_via_main(self, tmp_path):
         """main() with 'unprepare' should rename top version heading."""
@@ -1352,7 +1495,7 @@ class TestCLISubprocess:
     standalone process.  These complement the import-based unit tests above.
     """
 
-    def _run(self, *args):
+    def _run(self, *args, env=None):
         """Helper to invoke the CLI entry point."""
         if ENTRY_POINT is None:
             pytest.skip("prepare-changelog entry point not installed")
@@ -1360,6 +1503,7 @@ class TestCLISubprocess:
             [ENTRY_POINT, *args],
             capture_output=True,
             text=True,
+            env=env,
         )
 
     # ── prepare ───────────────────────────────────────────────────────────
@@ -1425,18 +1569,44 @@ class TestCLISubprocess:
     # ── finalize ──────────────────────────────────────────────────────────
 
     def test_finalize_e2e(self, tmp_path):
-        """Finalize should replace TBD with date."""
+        """Finalize should replace TBD with date and release tag URL."""
         f = tmp_path / "CHANGELOG.md"
         f.write_text(CHANGELOG_WITH_TBD)
-        result = self._run("finalize", "1.0.0", "2026-02-11", str(f))
+        result = self._run(
+            "finalize",
+            "1.0.0",
+            "2026-02-11",
+            str(f),
+            "--github-repository",
+            _FINALIZE_TEST_REPO,
+        )
         assert result.returncode == 0
-        assert "## [1.0.0] - 2026-02-11" in f.read_text()
+        assert (
+            f"## [1.0.0](https://github.com/{_FINALIZE_TEST_REPO}/releases/tag/1.0.0) - 2026-02-11"
+            in f.read_text()
+        )
+
+    def test_finalize_e2e_requires_repo_without_env(self, tmp_path):
+        """Finalize fails when GITHUB_REPOSITORY is unset and flag omitted."""
+        f = tmp_path / "CHANGELOG.md"
+        f.write_text(CHANGELOG_WITH_TBD)
+        env = {k: v for k, v in os.environ.items() if k != "GITHUB_REPOSITORY"}
+        result = self._run("finalize", "1.0.0", "2026-02-11", str(f), env=env)
+        assert result.returncode != 0
+        assert "GitHub repository" in result.stderr
 
     def test_finalize_invalid_date_e2e(self, tmp_path):
         """Invalid date via subprocess should exit non-zero."""
         f = tmp_path / "CHANGELOG.md"
         f.write_text(CHANGELOG_WITH_TBD)
-        result = self._run("finalize", "1.0.0", "02/11/2026", str(f))
+        result = self._run(
+            "finalize",
+            "1.0.0",
+            "02/11/2026",
+            str(f),
+            "--github-repository",
+            _FINALIZE_TEST_REPO,
+        )
         assert result.returncode != 0
         assert "Invalid" in result.stderr or "date" in result.stderr.lower()
 
@@ -1444,7 +1614,14 @@ class TestCLISubprocess:
         """Non-existent version via subprocess should exit non-zero."""
         f = tmp_path / "CHANGELOG.md"
         f.write_text(CHANGELOG_WITH_TBD)
-        result = self._run("finalize", "9.9.9", "2026-02-11", str(f))
+        result = self._run(
+            "finalize",
+            "9.9.9",
+            "2026-02-11",
+            str(f),
+            "--github-repository",
+            _FINALIZE_TEST_REPO,
+        )
         assert result.returncode != 0
 
     # ── unprepare ─────────────────────────────────────────────────────────

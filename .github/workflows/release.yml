@@ -484,6 +484,13 @@ jobs:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
+      - name: Generate Commit App Token
+        id: commit-app-token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
+        with:
+          app-id: ${{ secrets.COMMIT_APP_ID }}
+          private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
+
       - name: Checkout release branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
@@ -495,7 +502,6 @@ jobs:
         uses: ./.github/actions/setup-env
         with:
           sync-dependencies: 'true'
-          install-just: 'false'
 
       - name: Set release date in CHANGELOG
         if: needs.validate.outputs.release_kind == 'final'
@@ -534,7 +540,7 @@ jobs:
             exit 1
           fi
 
-          FILE_PATHS="$(echo "$CHANGED_FILES" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+          FILE_PATHS="$(echo "$CHANGED_FILES" | tr '\n' ',' | sed 's/,$//')"
           echo "file_paths=$FILE_PATHS" >> "$GITHUB_OUTPUT"
           echo "Finalization files: $FILE_PATHS"
 
@@ -552,7 +558,7 @@ jobs:
         if: needs.validate.outputs.release_kind == 'final'
         uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           TARGET_BRANCH: refs/heads/release/${{ needs.validate.outputs.version }}
           MAX_ATTEMPTS: "3"
@@ -886,15 +892,15 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          awk -v version="$VERSION" '
-            index($0, "## [" version "] - ") == 1 {found=1; next}
+          awk -v hdr="## [${VERSION}]" '
+            index($0, hdr) == 1 {found=1; next}
             /^## \[/ && found {found=0}
             found {print}
           ' CHANGELOG.md > /tmp/github-release-notes.md
 
           if [ ! -s /tmp/github-release-notes.md ]; then
             echo "ERROR: Failed to generate GitHub Release notes for $VERSION from CHANGELOG.md"
-            echo "Expected section heading: ## [$VERSION] - YYYY-MM-DD"
+            echo "Expected heading like: ## [$VERSION] - YYYY-MM-DD or ## [$VERSION](url) - YYYY-MM-DD"
             exit 1
           fi
 
@@ -902,7 +908,7 @@ jobs:
         uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003  # v4
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2  # v4.0.0
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -1359,12 +1365,20 @@ jobs:
     permissions:
       contents: read        # required by actions/checkout in rollback job
       issues: write          # create failure issue
-      # Branch rollback uses the RELEASE_APP token (not GITHUB_TOKEN),
-      # which has Contents read/write configured on the GitHub App.
+      # Git Data API rollback (commit + ref) uses COMMIT_APP (same as finalize) so protected
+      # release/* updates are allowed. Failure issues use the default GITHUB_TOKEN (issues: write).
 
     steps:
-      - name: Generate GitHub App Token
-        id: app-token
+      - name: Generate Commit App Token
+        id: commit-app-token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
+        with:
+          app-id: ${{ secrets.COMMIT_APP_ID }}
+          private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
+
+      - name: Generate Release App Token
+        id: release-app-token
+        if: ${{ needs.validate.outputs.release_kind == 'final' && needs.validate.outputs.pr_number != '' }}
         uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
@@ -1383,17 +1397,77 @@ jobs:
         id: rollback-branch
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
           VERSION: ${{ needs.validate.outputs.version }}
           PRE_SHA: ${{ needs.validate.outputs.pre_finalize_sha }}
         run: |
           set -euo pipefail
           echo "Rolling back release branch to pre-finalization state..."
-          retry --retries 3 --backoff 5 --max-backoff 30 -- gh api "repos/${{ github.repository }}/git/refs/heads/release/$VERSION" \
-            -X PATCH \
-            -f sha="$PRE_SHA" \
-            -F force=true
-          echo "✓ Release branch rolled back to $PRE_SHA"
+          REPO="${{ github.repository }}"
+          BRANCH_REF="heads/release/$VERSION"
+
+          TREE_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh api "repos/$REPO/git/commits/$PRE_SHA" --jq '.tree.sha')
+          CURRENT_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh api "repos/$REPO/git/refs/$BRANCH_REF" --jq '.object.sha')
+
+          if [ "$CURRENT_SHA" = "$PRE_SHA" ]; then
+            echo "Branch already at pre-finalization SHA, no rollback needed"
+            exit 0
+          fi
+
+          REVERT_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh api -X POST "repos/$REPO/git/commits" \
+              -f message="revert: undo finalize release $VERSION (workflow rollback)" \
+              -f tree="$TREE_SHA" \
+              -f "parents[]=$CURRENT_SHA" \
+              --jq '.sha')
+
+          retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh api "repos/$REPO/git/refs/$BRANCH_REF" \
+              -X PATCH \
+              -f sha="$REVERT_SHA"
+          echo "✓ Release branch rolled back via revert commit $REVERT_SHA (tree at $PRE_SHA)"
+
+      - name: Restore release PR body from pre-finalization CHANGELOG
+        id: restore-pr-body
+        if: ${{ needs.validate.outputs.release_kind == 'final' && needs.validate.outputs.pr_number != '' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ steps.release-app-token.outputs.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          PRE_SHA: ${{ needs.validate.outputs.pre_finalize_sha }}
+          PR_NUMBER: ${{ needs.validate.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          REPO="${{ github.repository }}"
+          echo "Restoring release PR #$PR_NUMBER body from CHANGELOG at pre-finalization SHA..."
+
+          retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh api "repos/$REPO/contents/CHANGELOG.md?ref=$PRE_SHA" --jq '.content' | tr -d '\n' | base64 -d > /tmp/changelog-pre.md
+
+          CHANGELOG_CONTENT=$(awk -v hdr="## [${VERSION}]" '
+            index($0, hdr) == 1 { p = 1; print; next }
+            p && /^## \[/ { exit }
+            p { print }
+          ' /tmp/changelog-pre.md)
+
+          if [ -z "$CHANGELOG_CONTENT" ]; then
+            echo "ERROR: Could not extract release section for version $VERSION from CHANGELOG at $PRE_SHA"
+            exit 1
+          fi
+
+          {
+            echo "# Release $VERSION"
+            echo ""
+            echo "This PR prepares release $VERSION for merge to main."
+            echo ""
+            echo "$CHANGELOG_CONTENT"
+          } > /tmp/release-pr-body.md
+
+          retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh pr edit "$PR_NUMBER" --body-file /tmp/release-pr-body.md
+          echo "✓ Restored PR #$PR_NUMBER body to prepare-release format (TBD)"
 
       - name: Create failure issue
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8.0.0
@@ -1410,6 +1484,7 @@ jobs:
             if ('${{ needs.publish.result }}' !== 'success') failedJobs.push('publish');
 
             const rollbackBranch = '${{ steps.rollback-branch.outcome }}';
+            const prBodyRestore = '${{ steps.restore-pr-body.outcome }}';
 
             const title = `Release ${publishVersion} failed -- automatic rollback`;
             const body = `
@@ -1423,6 +1498,7 @@ jobs:
 
             **Rollback Results:**
             - Branch rollback: ${rollbackBranch}
+            - PR body restoration: ${prBodyRestore}
 
             **Tag status (forward-fix policy):**
             - Release tags are **not** deleted by automation (workflow choice; not the same as GitHub immutable-release lock-in).
@@ -1430,6 +1506,7 @@ jobs:
 
             **Actions Taken:**
             - Release branch reset to pre-finalization state (best-effort)
+            - Release PR body restored to TBD / prepare-release format when applicable (best-effort)
             - This issue created for investigation
 
             **Manual Cleanup May Be Needed:**
@@ -1461,6 +1538,7 @@ jobs:
           echo ""
           echo "Automatic rollback completed:"
           echo "  - Release branch reset to pre-finalization state (best-effort)"
+          echo "  - Release PR body restoration: ${{ steps.restore-pr-body.outcome }} (skipped if not a final release or no PR number)"
           echo "  - Tags were not deleted (forward-fix policy)"
           echo "  - GitHub issue created for investigation"
           echo ""

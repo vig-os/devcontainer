@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.3.2](https://github.com/vig-os/devcontainer/releases/tag/0.3.2) - 2026-04-08
 
 ### Added
 
@@ -32,15 +32,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Add `just promote-release` in `justfile.gh` (and workspace template copy)
 - **Smoke-test dispatch fails fast when deploy PR checks fail** ([#381](https://github.com/vig-os/devcontainer/issues/381))
   - `wait-deploy-merge` in `assets/smoke-test/.github/workflows/repository-dispatch.yml` exits as soon as all required checks have completed with failures instead of waiting for the merge poll timeout (`gh pr checks --required`)
-- **Nightly CI schedule** ([#461](https://github.com/vig-os/devcontainer/issues/461))
-  - `ci.yml` adds a `schedule` trigger at 04:00 UTC that checks out `dev` and runs all test suites; checkout `ref` and `vcs-ref` are resolved correctly for scheduled runs
 - **Scheduled security scan pulls GHCR `:latest` instead of rebuilding** ([#461](https://github.com/vig-os/devcontainer/issues/461))
   - Runs nightly at 05:00 UTC, pulls the published image, gates on fixable HIGH/CRITICAL vulnerabilities, auto-creates a deduplicated GitHub issue on failure, and uploads SARIF under `container-image-latest`
 - **Dependabot dependency update batch** ([#474](https://github.com/vig-os/devcontainer/pull/474))
   - Bump `github/codeql-action` from `4.34.1` to `4.35.1`
   - Bump `sigstore/cosign-installer` from `4.1.0` to `4.1.1`
-
-### Deprecated
+- **Dependabot dependency update batch** ([#488](https://github.com/vig-os/devcontainer/pull/488), [#489](https://github.com/vig-os/devcontainer/pull/489))
+  - Bump `@devcontainers/cli` from `0.84.1` to `0.85.0`
+  - Bump `docker/login-action` from `4.0.0` to `4.1.0`
+- **Simplify `just pull` in `justfile.gh`** ([#482](https://github.com/vig-os/devcontainer/issues/482))
+  - Pull `ghcr.io/vig-os/devcontainer` by tag; drop redundant shell fallback, per-recipe `repo` argument, and unused `REGISTRY_TEST` TLS path (imported `justfile.gh` cannot reference root `repo`)
+- **prepare-changelog finalize adds GitHub release link to version headings** ([#496](https://github.com/vig-os/devcontainer/issues/496))
+  - `finalize_release_date` writes `## [X.Y.Z](https://github.com/owner/repo/releases/tag/X.Y.Z) - date`; repository slug comes from `GITHUB_REPOSITORY` (set in Actions) or from `prepare-changelog finalize ... --github-repository owner/repo`
+  - `unprepare` recognizes linked `## [semver](url) - …` headings
 
 ### Removed
 
@@ -48,9 +52,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Remove `scripts/prune-ghcr-tags.sh`; RC and `sha256-*` orphan cleanup remains in root `promote-release.yml`
 - **Downstream RC pre-release gate from release validate job** ([#463](https://github.com/vig-os/devcontainer/issues/463))
   - Removed dead `if: false` steps from `release.yml`; downstream final release is verified only in `promote-release.yml` before promote
+- **Nightly full CI schedule from `ci.yml`** ([#492](https://github.com/vig-os/devcontainer/issues/492))
+  - Remove the `schedule` trigger and schedule-only checkout overrides; CI remains on pull requests and `workflow_dispatch` only
+  - Nightly GHCR `:latest` scan in `security-scan.yml` is unchanged
 
 ### Fixed
 
+- **Prepare-release changelog commits silently skipped due to FILE_PATHS delimiter mismatch** ([#483](https://github.com/vig-os/devcontainer/issues/483))
+  - Change `FILE_PATHS` from space-separated to comma-separated in all `commit-action` steps of `prepare-release.yml` so the action correctly commits both `CHANGELOG.md` and `assets/workspace/.devcontainer/CHANGELOG.md`
+  - Join finalization changed files with commas in `release.yml` (`Collect finalization files`) so `commit-action` receives multiple paths correctly
+- **`publish-candidate` recipe sends unknown `create-release` input** ([#479](https://github.com/vig-os/devcontainer/issues/479))
+  - Remove `create-release` parameter and `-f` flag from upstream `justfile.gh`; the input was added to the downstream workflow only but the recipe was updated in both places
+- **Image tests expect current `just` minor** ([#479](https://github.com/vig-os/devcontainer/issues/479))
+  - Align `EXPECTED_VERSIONS["just"]` with the latest `just` release installed by the Containerfile (1.49.x)
 - **Git commit now falls back to nano when editor config is unusable** ([#383](https://github.com/vig-os/devcontainer/issues/383))
   - `setup-git-conf.sh` now validates the effective Git editor and sets `core.editor=nano` only when the configured editor is missing or invalid in-container
   - Add integration regression coverage to ensure invalid editor settings are corrected during setup
@@ -67,6 +81,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CI container build avoids shared-runner Docker Hub rate limits** ([#473](https://github.com/vig-os/devcontainer/issues/473))
   - `build-image` logs in to `docker.io` before `setup-buildx-action` when `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets are set; `ci.yml` and `release.yml` pass them
   - Omitting secrets (e.g. forks) keeps prior anonymous-pull behavior
+- **Release finalize commit blocked by Release protection ruleset** ([#487](https://github.com/vig-os/devcontainer/issues/487))
+  - Generate a dedicated Commit App token (`COMMIT_APP_ID`) for the `commit-action` step in the `finalize` job of `release.yml`, matching the pattern used by `prepare-release.yml` and other workflows; the previous Release App token lacked ruleset bypass
+- **Release finalize installs just for doc generation** ([#494](https://github.com/vig-os/devcontainer/issues/494))
+  - Remove `install-just: 'false'` from the finalize job `setup-env` step so `docs/generate.py` can run `just --list`
+  - `get_just_help()` exits non-zero on failure instead of writing placeholder content into generated docs
+- **Release rollback and CI `retry` exit codes** ([#500](https://github.com/vig-os/devcontainer/issues/500))
+  - `retry` shell helper now propagates the command's non-zero exit code when all attempts fail
+  - Release rollback creates a fast-forward revert commit via the Git API instead of force-pushing, compatible with branch protection on `release/*`
+  - Rollback Git Data API steps authenticate with the Commit app token (same as finalize) so protected `release/*` ref updates are not blocked
+  - Canonical `retry()` implementation lives in `.github/scripts/retry.sh`; `setup-env` and BATS source it so CI and tests stay aligned (`sync-main-to-dev.yml` keeps an inline copy documented as in sync)
+- **Release rollback restores release PR body after finalize** ([#502](https://github.com/vig-os/devcontainer/issues/502))
+  - `rollback` job in `release.yml` restores the PR description from pre-finalization `CHANGELOG.md` (TBD / prepare-release format) using RELEASE_APP when `release_kind` is final, after branch rollback; failure issue and job summary report the step outcome
+- **Final release notes extraction after linked changelog headings** ([#504](https://github.com/vig-os/devcontainer/issues/504))
+  - Publish job `awk` matches `## [VERSION]` prefix so finalized `## [X.Y.Z](url) - date` headings produce GitHub Release notes (regression after prepare-changelog linked headings in #496)
 
 ### Security
 

@@ -84,7 +84,7 @@ promote-release version ref="" *flags:
 
 # Publish release candidate via GitHub Actions workflow
 [group('release')]
-publish-candidate version ref="" create-release="false" *flags:
+publish-candidate version ref="" *flags:
     #!/usr/bin/env bash
     set -euo pipefail
     # Trigger release workflow in candidate mode (default mode in workflow)
@@ -92,7 +92,7 @@ publish-candidate version ref="" create-release="false" *flags:
     if [ -z "$REF" ]; then
         REF="release/{{ version }}"
     fi
-    gh workflow run release.yml --ref "$REF" -f "version={{ version }}" -f "release-kind=candidate" -f "create-release={{ create-release }}" {{ flags }}
+    gh workflow run release.yml --ref "$REF" -f "version={{ version }}" -f "release-kind=candidate" {{ flags }}
     echo ""
     echo "✓ Candidate release workflow triggered for version {{ version }}"
     echo "Monitor progress: gh run list --workflow release.yml"
@@ -104,12 +104,5 @@ reset-changelog:
 
 # Pull image from registry (default: latest)
 [group('release')]
-pull version="latest" repo="":
-    #!/usr/bin/env bash
-    RESOLVED_REPO="${repo:-${TEST_REGISTRY:-ghcr.io/vig-os/devcontainer}}"
-    echo "Pulling image ${RESOLVED_REPO}:{{ version }}..."
-    TLS_FLAG=""
-    if [ "${REGISTRY_TEST:-}" = "1" ]; then
-        TLS_FLAG="--tls-verify=false"
-    fi
-    podman pull $TLS_FLAG "${RESOLVED_REPO}:{{ version }}" || echo "[!]  Failed to pull ${RESOLVED_REPO}:{{ version }}"
+pull version="latest":
+    podman pull "ghcr.io/vig-os/devcontainer:{{ version }}"

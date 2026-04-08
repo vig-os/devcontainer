@@ -31,7 +31,7 @@ setup() {
 }
 
 @test "publish-candidate dispatches workflow from release branch ref" {
-    run bash -lc "awk '/^publish-candidate version ref=\"\" create-release=\"false\" \\*flags:/{flag=1; next} /^$/{if(flag){exit}} flag' justfile.gh | grep -Fq -- 'REF=\"release/{{ version }}\"'"
+    run bash -lc "awk '/^publish-candidate version ref=\"\" \\*flags:/{flag=1; next} /^$/{if(flag){exit}} flag' justfile.gh | grep -Fq -- 'REF=\"release/{{ version }}\"'"
     assert_success
 }
 
@@ -53,6 +53,11 @@ setup() {
 @test "release workflow commits dynamic finalization file paths" {
     run bash -lc "grep -Fq -- 'id: finalize-files' .github/workflows/release.yml && grep -Fq -- 'steps.finalize-files.outputs.file_paths' .github/workflows/release.yml"
     assert_success
+}
+
+@test "release workflow finalize job does not disable just install" {
+    run bash -lc "awk '/^  finalize:/{flag=1} /^  build-and-test:/{flag=0} flag {print}' .github/workflows/release.yml | grep -Fq -- \"install-just: 'false'\""
+    assert_failure
 }
 
 @test "prepare-release PR body omits persistent checklist and related sections" {
@@ -182,5 +187,15 @@ setup() {
 
 @test "workspace release workflows accept rc-number for pinned candidate RC" {
     run bash -lc "grep -Fq -- 'rc-number:' assets/workspace/.github/workflows/release.yml && grep -Fq -- 'rc_number:' assets/workspace/.github/workflows/release.yml && grep -Fq -- 'rc_number:' assets/workspace/.github/workflows/release-core.yml"
+    assert_success
+}
+
+@test "prepare-release workflow FILE_PATHS uses comma delimiter for multi-file values" {
+    run bash -lc "[ -r .github/workflows/prepare-release.yml ] && ! grep -E 'FILE_PATHS:.*CHANGELOG\.md[[:space:]]+[^[:space:]]' .github/workflows/prepare-release.yml"
+    assert_success
+}
+
+@test "release workflow joins finalization file paths with commas for commit-action" {
+    run bash -lc "awk '/^      - name: Collect finalization files/{flag=1} /^      - name: Commit finalization changes via API/{flag=0} flag {print}' .github/workflows/release.yml | grep -Fq \"tr '\\n' ','\""
     assert_success
 }
