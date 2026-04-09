@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Promote-release draft release validation** ([#507](https://github.com/vig-os/devcontainer/issues/507))
+  - Use the paginated releases list API with jq instead of `GET /releases/tags/{tag}`, which returns 404 for draft releases
+  - Apply the same release lookup for RC git tag cleanup in upstream and workspace `promote-release.yml`
+
 ### Security
 
 ## [0.3.2](https://github.com/vig-os/devcontainer/releases/tag/0.3.2) - 2026-04-08
