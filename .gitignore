@@ -223,5 +223,8 @@ __marimo__/
 # Pre-commit cache
 .pre-commit-cache/
 
+# Worktrees
+.worktrees/
+
 # Bats
 node_modules/
