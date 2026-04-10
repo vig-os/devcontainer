@@ -349,7 +349,7 @@ if [ -z "$GITHUB_REPOSITORY" ] && [ -d "$PROJECT_PATH/.git" ]; then
     url=$(git -C "$PROJECT_PATH" remote get-url origin 2>/dev/null || true)
     if [ -n "$url" ]; then
         if repo=$(parse_github_remote "$url"); then
-            GITHUB_REPOSITORY="$repo"
+            GITHUB_REPOSITORY=$(sanitize_for_security "$repo")
         fi
     fi
 fi
