@@ -43,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Nightly Trivy gate remediation (OpenSSL, gh, typos)** ([#512](https://github.com/vig-os/devcontainer/issues/512))
+  - Pin `python:3.12-slim-bookworm` to current digest and add targeted `libssl3`/`openssl` upgrade to `3.0.19-1~deb12u2` (CVE-2026-28390, CVE-2026-31790)
+  - Refresh `.trivyignore`: drop resolved gh/docker-cli and gRPC entries; add Go stdlib and typos-related suppressions plus `jwt-token` false positive
+  - Suppress unfixable base-image CVEs: ncurses (CVE-2025-69720), SQLite (CVE-2025-7458), systemd (CVE-2026-29111), zlib/minizip (CVE-2023-45853)
+
 ## [0.3.2](https://github.com/vig-os/devcontainer/releases/tag/0.3.2) - 2026-04-08
 
 ### Added
