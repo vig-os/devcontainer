@@ -9,11 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Renovate changelog automation** ([#506](https://github.com/vig-os/devcontainer/issues/506))
+  - `renovate-changelog-pr` CLI tool parses Renovate PR metadata and inserts Keep-a-Changelog entries under `## Unreleased`
+  - `renovate-changelog` workflow runs on `pull_request_target` for `renovate[bot]` PRs in both upstream and workspace template
+- **Devcontainer image version pinning** ([#509](https://github.com/vig-os/devcontainer/issues/509))
+  - `.vig-os` file at repo root declares `DEVCONTAINER_VERSION` as the single source of truth for CI container image tags
+  - `resolve-image` composite action resolves the image tag and validates it exists in GHCR
+- **`GITHUB_REPOSITORY` resolution for workspace init** ([#509](https://github.com/vig-os/devcontainer/issues/509))
+  - `parse-github-remote-lib.sh` extracts `owner/repo` from HTTPS, SSH, and `git@` GitHub URLs
+  - `install.sh` gains `--repo` flag; `init-workspace.sh` replaces `{{GITHUB_REPOSITORY}}` in workspace template files
+
 ### Changed
+
+- **Switch from Dependabot to Renovate** ([#509](https://github.com/vig-os/devcontainer/issues/509))
+  - Replace `.github/dependabot.yml` with `renovate.json` and shared `renovate-default.json` preset
+  - Renovate covers all ecosystems previously tracked (github-actions, pip, npm, docker) plus template directories not reachable by Dependabot
+- **Sync workflows run in devcontainer image** ([#509](https://github.com/vig-os/devcontainer/issues/509))
+  - `sync-issues` and `sync-main-to-dev` use `resolve-image` and run inside the pinned devcontainer, removing the `setup-env` composite action dependency and the inlined retry helper
+  - `sync-main-to-dev` creates sync branches via `git push` instead of the GitHub refs API
 
 ### Deprecated
 
 ### Removed
+
+- **Dependabot configuration** ([#509](https://github.com/vig-os/devcontainer/issues/509))
+  - Delete `.github/dependabot.yml` and `assets/workspace/.github/dependabot.yml`
 
 ### Fixed
 
