@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sync workflows run in devcontainer image** ([#509](https://github.com/vig-os/devcontainer/issues/509))
   - `sync-issues` and `sync-main-to-dev` use `resolve-image` and run inside the pinned devcontainer, removing the `setup-env` composite action dependency and the inlined retry helper
   - `sync-main-to-dev` creates sync branches via `git push` instead of the GitHub refs API
+- **Smoke-test dispatch triggers promote-release for final releases** ([#511](https://github.com/vig-os/devcontainer/issues/511))
+  - Final releases dispatch downstream `promote-release.yml` instead of merging the release PR directly, publishing the draft GitHub Release and satisfying the upstream promote-time downstream gate
+  - RC releases wait for release PR required checks but no longer merge the PR to `main`
 
 ### Deprecated
 
