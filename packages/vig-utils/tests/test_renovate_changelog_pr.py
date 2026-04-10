@@ -188,3 +188,5 @@ def test_insert_empty_changed_section(changelog: str) -> None:
     assert did is True
     assert entry.strip() in new_content
     assert "### Changed" in new_content
+    # Keep-a-Changelog: blank line between ### Changed heading and first list item
+    assert "### Changed\n\n- **X**" in new_content

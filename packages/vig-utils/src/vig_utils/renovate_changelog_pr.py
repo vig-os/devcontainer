@@ -172,8 +172,14 @@ def insert_renovate_changelog_entry(
     # Insert before the next ### heading, or at end of ## Unreleased if Changed is last subsection
     insert_at = next_sec if next_sec is not None else unreleased_end
 
+    # Do not consume the first blank line after ### Changed (empty subsection): keep
+    # Keep-a-Changelog spacing between the heading and the first list item.
+    min_insert = changed_idx + 1
+    if changed_idx + 1 < len(lines) and lines[changed_idx + 1].strip() == "":
+        min_insert = changed_idx + 2
+
     # Keep blank line between list items and the following heading (Keep-a-Changelog)
-    while insert_at > changed_idx + 1 and lines[insert_at - 1].strip() == "":
+    while insert_at > min_insert and lines[insert_at - 1].strip() == "":
         insert_at -= 1
 
     if not entry.endswith("\n"):
