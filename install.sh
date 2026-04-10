@@ -12,6 +12,7 @@
 #   --podman          Force podman
 #   --name NAME       Override project name (SHORT_NAME)
 #   --org ORG         Override organization name (default: vigOS)
+#   --repo OWNER/REPO GitHub repo for Renovate preset (default: detect from origin or OWNER/REPO)
 #   --smoke-test      Deploy smoke-test-specific assets
 #   --dry-run         Show what would be done without executing
 #   -h, --help        Show this help message
@@ -34,6 +35,7 @@ SKIP_PULL=false
 PROJECT_PATH=""
 PROJECT_NAME=""
 ORG_NAME="vigOS"
+GITHUB_REPO_OVERRIDE=""
 SMOKE_TEST=""
 
 # Colors (disabled if not a tty)
@@ -67,6 +69,7 @@ OPTIONS:
     --podman          Force podman runtime
     --name NAME       Override project name (SHORT_NAME, used for module name)
     --org ORG         Override organization name (default: vigOS)
+    --repo OWNER/REPO GitHub repository for Renovate (default: git origin or OWNER/REPO)
     --smoke-test      Deploy smoke-test-specific assets
     --dry-run         Show what would be done
     -h, --help        Show this help
@@ -221,6 +224,26 @@ sanitize_for_security() {
     echo "$1" | sed 's/[^a-zA-Z0-9._\/-]/_/g'
 }
 
+# Parse github.com remote URL to owner/repo (stdout), or return 1 if unsupported
+# Same rules as assets/parse-github-remote-lib.sh (for GITHUB_REPOSITORY / renovate.json).
+parse_github_remote() {
+    local url="$1"
+    [[ -z "$url" ]] && return 1
+    if [[ "$url" =~ https?://github\.com/([^/]+)/([^/.]+)(\.git)?/?$ ]]; then
+        echo "${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+        return 0
+    fi
+    if [[ "$url" =~ ^git@github\.com:([^/]+)/([^/.]+)(\.git)?$ ]]; then
+        echo "${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+        return 0
+    fi
+    if [[ "$url" =~ ^ssh://git@github\.com/([^/]+)/([^/.]+)(\.git)?$ ]]; then
+        echo "${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+        return 0
+    fi
+    return 1
+}
+
 # Run copy-host-user-conf.sh from the deployed project (non-fatal)
 run_user_conf() {
     local project_path="$1"
@@ -270,6 +293,10 @@ while [ $# -gt 0 ]; do
             ORG_NAME="$2"
             shift 2
             ;;
+        --repo)
+            GITHUB_REPO_OVERRIDE="$2"
+            shift 2
+            ;;
         --dry-run)
             DRY_RUN=true
             shift
@@ -314,6 +341,21 @@ PROJECT_NAME=$(sanitize_name "$PROJECT_NAME")
 
 # Sanitize ORG_NAME for security (remove shell metacharacters) but preserve capitalization
 ORG_NAME=$(sanitize_for_security "$ORG_NAME")
+
+# GITHUB_REPOSITORY for init-workspace --no-prompts (Renovate extends in renovate.json)
+GITHUB_REPOSITORY="$GITHUB_REPO_OVERRIDE"
+GITHUB_REPOSITORY=$(sanitize_for_security "$GITHUB_REPOSITORY")
+if [ -z "$GITHUB_REPOSITORY" ] && [ -d "$PROJECT_PATH/.git" ]; then
+    url=$(git -C "$PROJECT_PATH" remote get-url origin 2>/dev/null || true)
+    if [ -n "$url" ]; then
+        if repo=$(parse_github_remote "$url"); then
+            GITHUB_REPOSITORY="$repo"
+        fi
+    fi
+fi
+if [ -z "$GITHUB_REPOSITORY" ]; then
+    GITHUB_REPOSITORY="OWNER/REPO"
+fi
 
 # Detect container runtime
 RUNTIME=$(detect_runtime)
@@ -380,6 +422,7 @@ declare -a CMD=(
     "$RUNTIME" run --rm
     -e "SHORT_NAME=$PROJECT_NAME"
     -e "ORG_NAME=$ORG_NAME"
+    -e "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
     -v "$PROJECT_PATH:/workspace"
     "$IMAGE"
     /root/assets/init-workspace.sh --no-prompts
@@ -395,7 +438,7 @@ fi
 
 if [ "$DRY_RUN" = true ]; then
     info "Would execute:"
-    printf "  %s" "$RUNTIME run --rm -e SHORT_NAME=\"$PROJECT_NAME\" -e ORG_NAME=\"$ORG_NAME\" -v \"$PROJECT_PATH\":/workspace \"$IMAGE\" /root/assets/init-workspace.sh --no-prompts"
+    printf "  %s" "$RUNTIME run --rm -e SHORT_NAME=\"$PROJECT_NAME\" -e ORG_NAME=\"$ORG_NAME\" -e GITHUB_REPOSITORY=\"$GITHUB_REPOSITORY\" -v \"$PROJECT_PATH\":/workspace \"$IMAGE\" /root/assets/init-workspace.sh --no-prompts"
     if [ -n "$FORCE" ]; then
         printf " %s" "--force"
     fi

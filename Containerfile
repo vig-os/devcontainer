@@ -253,7 +253,7 @@ RUN find /root/assets -type f -name "*.sh" -exec chmod +x {} \;
 
 # Generate build-time manifest of files containing placeholders
 # This avoids expensive runtime searching in init-workspace.sh
-RUN grep -rl '{{SHORT_NAME}}\|{{ORG_NAME}}\|{{IMAGE_TAG}}' /root/assets/workspace/ \
+RUN grep -rl '{{SHORT_NAME}}\|{{ORG_NAME}}\|{{IMAGE_TAG}}\|{{GITHUB_REPOSITORY}}' /root/assets/workspace/ \
     --exclude-dir=.git \
     --exclude-dir=.venv \
     --exclude-dir=.pre-commit-cache \
