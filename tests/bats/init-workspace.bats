@@ -134,7 +134,8 @@ setup() {
     git_fixture=$(mktemp -d)
     git init -q "$git_fixture"
     git -C "$git_fixture" remote add origin https://github.com/acme/widget.git
-    run bash -c "source \"$PARSE_GITHUB_REMOTE_LIB\" && WORKSPACE_DIR=\"$git_fixture\" NO_PROMPTS=true resolve_github_repository"
+    # CI sets GITHUB_REPOSITORY (e.g. vig-os/devcontainer); clear it so origin is used.
+    run bash -c "source \"$PARSE_GITHUB_REMOTE_LIB\" && GITHUB_REPOSITORY= WORKSPACE_DIR=\"$git_fixture\" NO_PROMPTS=true resolve_github_repository"
     assert_success
     assert_output --partial "acme/widget (from git remote origin)"
     rm -rf "$git_fixture"
@@ -144,7 +145,8 @@ setup() {
     git_fixture=$(mktemp -d)
     git init -q "$git_fixture"
     git -C "$git_fixture" remote add origin https://gitlab.com/x/y.git
-    run bash -c "source \"$PARSE_GITHUB_REMOTE_LIB\" && WORKSPACE_DIR=\"$git_fixture\" NO_PROMPTS=true resolve_github_repository"
+    # CI sets GITHUB_REPOSITORY; clear it so non-GitHub origin is exercised.
+    run bash -c "source \"$PARSE_GITHUB_REMOTE_LIB\" && GITHUB_REPOSITORY= WORKSPACE_DIR=\"$git_fixture\" NO_PROMPTS=true resolve_github_repository"
     assert_failure
     rm -rf "$git_fixture"
 }
