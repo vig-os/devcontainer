@@ -39,6 +39,7 @@ Workflow dispatch contract:
 - Required downstream workflow IDs/files:
   - `prepare-release.yml`
   - `release.yml`
+  - `promote-release.yml`
 - Required dispatch ref:
   - `dev`
 - Dispatch and wait operations must use the same ref context to avoid default-branch drift:
@@ -53,9 +54,11 @@ The receiver workflow (`assets/smoke-test/.github/workflows/repository-dispatch.
 2. deploy orchestration in the validation repository
 3. release artifact publication for the dispatched tag:
    - candidate tag -> GitHub pre-release
-   - final tag -> GitHub release
+   - final tag -> GitHub release (draft until promoted)
 4. idempotency checks when a release object already exists
 5. preflight validation that required downstream workflow IDs are resolvable on the dispatch ref before orchestration starts
+6. after downstream `release.yml` completes: wait until required checks on the release PR are green (candidate and final)
+7. **final only:** dispatch downstream `promote-release.yml` on `dev` with `version` set to the base semver so the draft GitHub Release is published, the release PR is merged to `main`, and RC git tags are cleaned up (see workspace `promote-release.yml`). **Candidate:** the release PR stays open after checks pass; it is not merged by the receiver.
 
 If the validation repository also runs the shipped workspace `release.yml` workflow for a **candidate** (separate from publishing a release for the dispatched tag), pass workflow input `rc-number` set to the numeric RC suffix of `client_payload.tag` (for example `21` for `0.3.1-rc21`). That keeps the downstream candidate tag aligned with the upstream publish tag. The smoke-test template exposes this value as job output `needs.validate.outputs.rc_number`.
 
@@ -63,7 +66,7 @@ If the validation repository also runs the shipped workspace `release.yml` workf
 
 **`vig-os/devcontainer` `release.yml`:** Dispatches downstream validation during publish but does **not** block on downstream GitHub Release state for RC or final tags. The former validate step that required a published downstream pre-release for the latest RC before finalization was **removed**; it duplicated concerns now owned by promotion.
 
-**`vig-os/devcontainer` `promote-release.yml`:** Before updating GHCR `:latest`, publishing the draft GitHub Release, and merging the release PR, the `validate` job requires a **published** downstream release for the final version tag on `vig-os/devcontainer-smoke-test` that is **not** a draft and **not** a pre-release (`Verify downstream published final release`). Operators must ensure smoke-test has published that final release (including any manual acceptance step on the downstream repo) before running promote.
+**`vig-os/devcontainer` `promote-release.yml`:** Before updating GHCR `:latest`, publishing the draft GitHub Release, and merging the release PR, the `validate` job requires a **published** downstream release for the final version tag on `vig-os/devcontainer-smoke-test` that is **not** a draft and **not** a pre-release (`Verify downstream published final release`). For the canonical smoke-test flow, the receiver dispatches downstream `promote-release.yml` after `release.yml` and required release PR checks succeed, which publishes the downstream final release so this gate is satisfied without a manual publish step on the smoke-test repo.
 
 If promote validation fails, retry after the downstream release is in the expected state; `release.yml` rollback handling applies only to failures within that workflow.
 

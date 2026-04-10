@@ -116,7 +116,7 @@ setup() {
 }
 
 @test "smoke-test dispatch preflight validates required workflow contract" {
-    run bash -lc "grep -Fq -- 'Preflight check required release workflows on dispatch ref' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'REQUIRED_WORKFLOWS=(prepare-release.yml release.yml)' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'for workflow_file in \"\${REQUIRED_WORKFLOWS[@]}\"; do' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'WORKFLOW_CHECK_OUTPUT=\"\$(gh workflow view \"\${workflow_file}\" --ref \"\${WORKFLOW_REF}\" --yaml 2>&1 >/dev/null)\"' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    run bash -lc "grep -Fq -- 'Preflight check required release workflows on dispatch ref' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'REQUIRED_WORKFLOWS=(prepare-release.yml release.yml promote-release.yml)' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'for workflow_file in \"\${REQUIRED_WORKFLOWS[@]}\"; do' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'WORKFLOW_CHECK_OUTPUT=\"\$(gh workflow view \"\${workflow_file}\" --ref \"\${WORKFLOW_REF}\" --yaml 2>&1 >/dev/null)\"' assets/smoke-test/.github/workflows/repository-dispatch.yml"
     assert_success
 }
 
@@ -135,18 +135,13 @@ setup() {
     assert_success
 }
 
-@test "smoke-test dispatch merges release PR after successful release workflow" {
-    run bash -lc 'grep -Fq -- "merge-release-pr:" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "Poll release PR merge status" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "Waiting for release PR merge" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "needs: [ready-release-pr, trigger-release]" assets/smoke-test/.github/workflows/repository-dispatch.yml'
+@test "smoke-test dispatch waits for release PR required checks after release workflow" {
+    run bash -lc 'grep -Fq -- "wait-release-pr-ci:" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "Poll release PR required checks until green" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "Waiting for release PR required checks" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "needs: [ready-release-pr, trigger-release]" assets/smoke-test/.github/workflows/repository-dispatch.yml'
     assert_success
 }
 
 @test "smoke-test dispatch readies release PR with release kind label" {
     run bash -lc 'grep -Fq -- "gh pr ready" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "release-kind:candidate" assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- "Label release PR with release kind" assets/smoke-test/.github/workflows/repository-dispatch.yml'
-    assert_success
-}
-
-@test "smoke-test dispatch tolerates transient auto-merge enable failures" {
-    run bash -lc 'grep -Fq -- "Warning: could not enable auto-merge yet" assets/smoke-test/.github/workflows/repository-dispatch.yml'
     assert_success
 }
 
@@ -156,7 +151,7 @@ setup() {
 }
 
 @test "smoke-test dispatch summary includes release-orchestration job results" {
-    run bash -lc "grep -Fq -- 'needs.wait-deploy-merge.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.cleanup-release.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.trigger-prepare-release.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.ready-release-pr.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.trigger-release.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.merge-release-pr.result' assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    run bash -lc "grep -Fq -- 'needs.wait-deploy-merge.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.cleanup-release.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.trigger-prepare-release.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.ready-release-pr.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.trigger-release.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.wait-release-pr-ci.result' assets/smoke-test/.github/workflows/repository-dispatch.yml && grep -Fq -- 'needs.trigger-promote-release.result' assets/smoke-test/.github/workflows/repository-dispatch.yml"
     assert_success
 }
 
