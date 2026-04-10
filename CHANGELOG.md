@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3](https://github.com/vig-os/devcontainer/releases/tag/0.3.3) - 2026-04-10
+
+### Added
+
+- **Renovate changelog automation** ([#506](https://github.com/vig-os/devcontainer/issues/506))
+  - `renovate-changelog-pr` CLI tool parses Renovate PR metadata and inserts Keep-a-Changelog entries under `## Unreleased`
+  - `renovate-changelog` workflow runs on `pull_request_target` for `renovate[bot]` PRs in both upstream and workspace template
+- **Devcontainer image version pinning** ([#509](https://github.com/vig-os/devcontainer/issues/509))
+  - `.vig-os` file at repo root declares `DEVCONTAINER_VERSION` as the single source of truth for CI container image tags
+  - `resolve-image` composite action resolves the image tag and validates it exists in GHCR
+- **`GITHUB_REPOSITORY` resolution for workspace init** ([#509](https://github.com/vig-os/devcontainer/issues/509))
+  - `parse-github-remote-lib.sh` extracts `owner/repo` from HTTPS, SSH, and `git@` GitHub URLs
+  - `install.sh` gains `--repo` flag; `init-workspace.sh` replaces `{{GITHUB_REPOSITORY}}` in workspace template files
+
+### Changed
+
+- **Switch from Dependabot to Renovate** ([#509](https://github.com/vig-os/devcontainer/issues/509))
+  - Replace `.github/dependabot.yml` with `renovate.json` and shared `renovate-default.json` preset
+  - Renovate covers all ecosystems previously tracked (github-actions, pip, npm, docker) plus template directories not reachable by Dependabot
+- **Sync workflows run in devcontainer image** ([#509](https://github.com/vig-os/devcontainer/issues/509))
+  - `sync-issues` and `sync-main-to-dev` use `resolve-image` and run inside the pinned devcontainer, removing the `setup-env` composite action dependency and the inlined retry helper
+  - `sync-main-to-dev` creates sync branches via `git push` instead of the GitHub refs API
+- **Smoke-test dispatch triggers promote-release for final releases** ([#511](https://github.com/vig-os/devcontainer/issues/511))
+  - Final releases dispatch downstream `promote-release.yml` instead of merging the release PR directly, publishing the draft GitHub Release and satisfying the upstream promote-time downstream gate
+  - RC releases wait for release PR required checks but no longer merge the PR to `main`
+
+### Removed
+
+- **Dependabot configuration** ([#509](https://github.com/vig-os/devcontainer/issues/509))
+  - Delete `.github/dependabot.yml` and `assets/workspace/.github/dependabot.yml`
+
+### Fixed
+
+- **Promote-release draft release validation** ([#507](https://github.com/vig-os/devcontainer/issues/507))
+  - Use the paginated releases list API with jq instead of `GET /releases/tags/{tag}`, which returns 404 for draft releases
+  - Apply the same release lookup for RC git tag cleanup in upstream and workspace `promote-release.yml`
+- **Promote-release validate job cannot see draft releases** ([#517](https://github.com/vig-os/devcontainer/issues/517))
+  - Elevate `validate` job permissions to `contents: write` so the token has push-level access required by the GitHub API to list draft releases
+  - Use `github.token` instead of the release app token for the draft release check in workspace `promote-release.yml`
+
+### Security
+
+- **Nightly Trivy gate remediation (OpenSSL, gh, typos)** ([#512](https://github.com/vig-os/devcontainer/issues/512))
+  - Pin `python:3.12-slim-bookworm` to current digest and add targeted `libssl3`/`openssl` upgrade to `3.0.19-1~deb12u2` (CVE-2026-28390, CVE-2026-31790)
+  - Refresh `.trivyignore`: drop resolved gh/docker-cli and gRPC entries; add Go stdlib and typos-related suppressions plus `jwt-token` false positive
+  - Suppress unfixable base-image CVEs: ncurses (CVE-2025-69720), SQLite (CVE-2025-7458), systemd (CVE-2026-29111), zlib/minizip (CVE-2023-45853)
+
 ## [0.3.2](https://github.com/vig-os/devcontainer/releases/tag/0.3.2) - 2026-04-08
 
 ### Added

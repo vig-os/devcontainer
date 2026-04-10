@@ -435,7 +435,7 @@ jobs:
         run: |
           set -euo pipefail
           # Canonical cross-repo dispatch contract lives in docs/CROSS_REPO_RELEASE_GATE.md.
-          REQUIRED_WORKFLOWS=(prepare-release.yml release.yml)
+          REQUIRED_WORKFLOWS=(prepare-release.yml release.yml promote-release.yml)
           for workflow_file in "${REQUIRED_WORKFLOWS[@]}"; do
             if WORKFLOW_CHECK_OUTPUT="$(gh workflow view "${workflow_file}" --ref "${WORKFLOW_REF}" --yaml 2>&1 >/dev/null)"; then
               echo "Workflow available on ${WORKFLOW_REF}: ${workflow_file}"
@@ -661,15 +661,15 @@ jobs:
           echo "ERROR: timed out waiting for release workflow completion"
           exit 1
 
-  merge-release-pr:
-    name: Enable auto-merge and wait for release PR merge
+  wait-release-pr-ci:
+    name: Wait for release PR required checks
     runs-on: ubuntu-22.04
     timeout-minutes: 35
     env:
       GH_REPO: ${{ github.repository }}
     needs: [ready-release-pr, trigger-release]
     steps:
-      - name: Generate release app token for PR merge
+      - name: Generate release app token for PR checks
         id: generate_release_token
         uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
         with:
@@ -678,23 +678,15 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
 
-      - name: Enable release PR auto-merge
+      - name: Poll release PR required checks until green
         env:
           GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
           PR_NUMBER: ${{ needs.ready-release-pr.outputs.release_pr }}
-        run: |
-          set -euo pipefail
-          gh pr merge "${PR_NUMBER}" --auto --merge || \
-            echo "Warning: could not enable auto-merge yet"
-
-      - name: Poll release PR merge status
-        env:
-          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
           PR_URL: ${{ needs.ready-release-pr.outputs.release_pr_url }}
         run: |
           set -euo pipefail
-          if [ -z "${PR_URL}" ]; then
-            echo "ERROR: missing release PR URL"
+          if [ -z "${PR_NUMBER}" ] || [ -z "${PR_URL}" ]; then
+            echo "ERROR: missing release PR number or URL"
             exit 1
           fi
 
@@ -703,21 +695,127 @@ jobs:
           ELAPSED=0
 
           while [ "${ELAPSED}" -lt "${TIMEOUT}" ]; do
-            STATE="$(gh pr view "${PR_URL}" --json state --jq '.state' 2>/dev/null || echo unknown)"
-            if [ "${STATE}" = "MERGED" ]; then
-              echo "Release PR merged: ${PR_URL}"
-              exit 0
-            fi
-            if [ "${STATE}" = "CLOSED" ]; then
-              echo "ERROR: release PR closed without merge: ${PR_URL}"
+            PR_STATE="$(gh pr view "${PR_NUMBER}" --json state --jq '.state' 2>/dev/null || echo "UNKNOWN")"
+            if [ "${PR_STATE}" = "CLOSED" ]; then
+              echo "ERROR: release PR was closed unexpectedly: ${PR_URL}"
               exit 1
             fi
+            if [ "${PR_STATE}" = "MERGED" ]; then
+              echo "WARNING: release PR was merged unexpectedly -- skipping check wait: ${PR_URL}"
+              exit 0
+            fi
+
+            CHECKS_JSON="$(gh pr checks "${PR_NUMBER}" --required --json bucket 2>&1)" || {
+              echo "WARNING: gh pr checks failed (attempt $((ELAPSED / INTERVAL + 1))): ${CHECKS_JSON}"
+              sleep "${INTERVAL}"
+              ELAPSED=$((ELAPSED + INTERVAL))
+              continue
+            }
+            TOTAL="$(echo "${CHECKS_JSON}" | jq 'length')"
+            if [ "${TOTAL}" -eq 0 ]; then
+              echo "WARNING: no required checks reported yet (attempt $((ELAPSED / INTERVAL + 1)))"
+              sleep "${INTERVAL}"
+              ELAPSED=$((ELAPSED + INTERVAL))
+              continue
+            fi
+            FAIL_COUNT="$(echo "${CHECKS_JSON}" | jq '[.[] | select(.bucket == "fail")] | length')"
+            CANCEL_COUNT="$(echo "${CHECKS_JSON}" | jq '[.[] | select(.bucket == "cancel")] | length')"
+            PENDING_COUNT="$(echo "${CHECKS_JSON}" | jq '[.[] | select(.bucket == "pending" or .bucket == "skipping")] | length')"
+            PASS_COUNT="$(echo "${CHECKS_JSON}" | jq '[.[] | select(.bucket == "pass")] | length')"
+
+            if [ "${FAIL_COUNT}" -gt 0 ] && [ "${PENDING_COUNT}" -eq 0 ]; then
+              echo "ERROR: release PR required checks failed: ${PR_URL}"
+              exit 1
+            fi
+
+            if [ "${CANCEL_COUNT}" -gt 0 ] && [ "${PENDING_COUNT}" -eq 0 ]; then
+              echo "ERROR: release PR required checks cancelled: ${PR_URL}"
+              exit 1
+            fi
+
+            if [ "${TOTAL}" -gt 0 ] && [ "${PASS_COUNT}" -eq "${TOTAL}" ] && [ "${PENDING_COUNT}" -eq 0 ] && [ "${FAIL_COUNT}" -eq 0 ]; then
+              echo "Release PR required checks passed: ${PR_URL}"
+              exit 0
+            fi
+
             sleep "${INTERVAL}"
             ELAPSED=$((ELAPSED + INTERVAL))
-            echo "Waiting for release PR merge... (${ELAPSED}s/${TIMEOUT}s)"
+            echo "Waiting for release PR required checks... (${ELAPSED}s/${TIMEOUT}s)"
           done
 
-          echo "ERROR: timed out waiting for release PR merge"
+          echo "ERROR: timed out waiting for release PR required checks"
+          exit 1
+
+  trigger-promote-release:
+    name: Trigger and wait for promote-release workflow
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    env:
+      GH_REPO: ${{ github.repository }}
+    needs: [validate, wait-release-pr-ci]
+    if: ${{ needs.validate.outputs.release_kind == 'final' }}
+    steps:
+      - name: Generate release app token for promote-release dispatch
+        id: generate_release_token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Capture latest promote-release run id
+        id: capture_promote_before
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+        run: |
+          set -euo pipefail
+          BEFORE_RUN_ID="$(
+            gh run list --workflow promote-release.yml --branch "${WORKFLOW_REF}" --limit 1 --json databaseId --jq '.[0].databaseId // 0' 2>/dev/null || echo 0
+          )"
+          echo "before_run_id=${BEFORE_RUN_ID}" >> "${GITHUB_OUTPUT}"
+
+      - name: Trigger promote-release workflow
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+          BASE_VERSION: ${{ needs.validate.outputs.base_version }}
+        run: |
+          set -euo pipefail
+          gh workflow run promote-release.yml \
+            --ref "${WORKFLOW_REF}" \
+            -f version="${BASE_VERSION}"
+
+      - name: Wait for promote-release workflow completion
+        env:
+          GH_TOKEN: ${{ steps.generate_release_token.outputs.token }}
+          BEFORE_RUN_ID: ${{ steps.capture_promote_before.outputs.before_run_id }}
+        run: |
+          set -euo pipefail
+          TIMEOUT=1800
+          INTERVAL=30
+          ELAPSED=0
+
+          while [ "${ELAPSED}" -lt "${TIMEOUT}" ]; do
+            RUN_ID="$(gh run list --workflow promote-release.yml --branch "${WORKFLOW_REF}" --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true)"
+            if [ -n "${RUN_ID}" ] && [ "${RUN_ID}" -gt "${BEFORE_RUN_ID}" ]; then
+              STATUS="$(gh run view "${RUN_ID}" --json status --jq '.status' 2>/dev/null || echo unknown)"
+              if [ "${STATUS}" = "completed" ]; then
+                CONCLUSION="$(gh run view "${RUN_ID}" --json conclusion --jq '.conclusion' 2>/dev/null || echo unknown)"
+                if [ "${CONCLUSION}" != "success" ]; then
+                  echo "ERROR: promote-release workflow concluded with '${CONCLUSION}'"
+                  exit 1
+                fi
+                echo "promote-release workflow completed successfully"
+                exit 0
+              fi
+            fi
+
+            sleep "${INTERVAL}"
+            ELAPSED=$((ELAPSED + INTERVAL))
+            echo "Waiting for promote-release workflow... (${ELAPSED}s/${TIMEOUT}s)"
+          done
+
+          echo "ERROR: timed out waiting for promote-release workflow completion"
           exit 1
 
   summary:
@@ -732,7 +830,8 @@ jobs:
       - trigger-prepare-release
       - ready-release-pr
       - trigger-release
-      - merge-release-pr
+      - wait-release-pr-ci
+      - trigger-promote-release
     if: always()
     steps:
       - name: Write source context summary
@@ -773,7 +872,8 @@ jobs:
           echo "Prepare:      ${{ needs.trigger-prepare-release.result }}"
           echo "Release PR:   ${{ needs.ready-release-pr.result }}"
           echo "Release run:  ${{ needs.trigger-release.result }}"
-          echo "Release merge: ${{ needs.merge-release-pr.result }}"
+          echo "Release CI:   ${{ needs.wait-release-pr-ci.result }}"
+          echo "Promote run:  ${{ needs.trigger-promote-release.result }}"
           echo "Deploy PR:    ${{ needs.deploy.outputs.pr_url }}"
           echo "Release PR:   ${{ needs.ready-release-pr.outputs.release_pr_url }}"
           echo ""
@@ -815,9 +915,23 @@ jobs:
             FAILED=true
           fi
 
-          if [ "${{ needs.merge-release-pr.result }}" != "success" ]; then
-            echo "ERROR: Merge-release-pr job failed"
+          if [ "${{ needs.wait-release-pr-ci.result }}" != "success" ]; then
+            echo "ERROR: Wait-release-pr-ci job failed"
             FAILED=true
+          fi
+
+          RELEASE_KIND="${{ needs.validate.outputs.release_kind }}"
+          PROMOTE_RESULT="${{ needs.trigger-promote-release.result }}"
+          if [ "${RELEASE_KIND}" = "final" ]; then
+            if [ "${PROMOTE_RESULT}" != "success" ]; then
+              echo "ERROR: Trigger-promote-release must succeed for final releases (got '${PROMOTE_RESULT}')"
+              FAILED=true
+            fi
+          else
+            if [ "${PROMOTE_RESULT}" != "skipped" ]; then
+              echo "ERROR: Trigger-promote-release must be skipped for candidate releases (got '${PROMOTE_RESULT}')"
+              FAILED=true
+            fi
           fi
 
           if [ "${FAILED}" = "true" ]; then
@@ -842,7 +956,8 @@ jobs:
       - trigger-prepare-release
       - ready-release-pr
       - trigger-release
-      - merge-release-pr
+      - wait-release-pr-ci
+      - trigger-promote-release
       - summary
     steps:
       - name: Generate release app token for upstream issue creation
@@ -898,7 +1013,8 @@ jobs:
           - trigger-prepare-release: \`${{ needs.trigger-prepare-release.result }}\`
           - ready-release-pr: \`${{ needs.ready-release-pr.result }}\`
           - trigger-release: \`${{ needs.trigger-release.result }}\`
-          - merge-release-pr: \`${{ needs.merge-release-pr.result }}\`
+          - wait-release-pr-ci: \`${{ needs.wait-release-pr-ci.result }}\`
+          - trigger-promote-release: \`${{ needs.trigger-promote-release.result }}\`
           - summary: \`${{ needs.summary.result }}\`
 
           ## Manual cleanup guidance

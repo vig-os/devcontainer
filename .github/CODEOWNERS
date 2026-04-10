@@ -31,7 +31,8 @@ scripts/init.sh                 @c-vigo
 scripts/requirements.yaml       @c-vigo
 
 # Security-sensitive configuration
-.github/dependabot.yml          @c-vigo
+renovate.json                   @c-vigo
+assets/workspace/.github/renovate-default.json @c-vigo
 .github/CODEOWNERS              @c-vigo
 SECURITY.md                     @c-vigo
 Containerfile                   @c-vigo

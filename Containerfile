@@ -1,7 +1,7 @@
 # Use Python 3.12 as base image (pinned to digest for supply chain integrity)
 # Dependabot (docker ecosystem) will propose digest updates automatically
 # Updated to bookworm (stable) for better security patch cadence
-FROM python:3.12-slim-bookworm@sha256:4c50375fc4b8ea5ca06ac9485186ccb50171c99390b0e9300c2bac871cc2dc3e
+FROM python:3.12-slim-bookworm@sha256:d97792894a6a4162cae14da44542a83c75e56c77a27b92d58f3f83b7bc961292
 
 # Add metadata
 # By default, we build the dev version unless specified as an argument
@@ -48,6 +48,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 # RUN apt-get update && apt-get install -y --only-upgrade \
 #     <package>=<version> \  # CVE-XXXX-XXXXX
 #     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# CVE-2026-28390, CVE-2026-31790 (OpenSSL; bookworm-security ahead of base digest)
+RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade \
+    libssl3=3.0.19-1~deb12u2 \
+    openssl=3.0.19-1~deb12u2 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install minimal system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -253,7 +259,7 @@ RUN find /root/assets -type f -name "*.sh" -exec chmod +x {} \;
 
 # Generate build-time manifest of files containing placeholders
 # This avoids expensive runtime searching in init-workspace.sh
-RUN grep -rl '{{SHORT_NAME}}\|{{ORG_NAME}}\|{{IMAGE_TAG}}' /root/assets/workspace/ \
+RUN grep -rl '{{SHORT_NAME}}\|{{ORG_NAME}}\|{{IMAGE_TAG}}\|{{GITHUB_REPOSITORY}}' /root/assets/workspace/ \
     --exclude-dir=.git \
     --exclude-dir=.venv \
     --exclude-dir=.pre-commit-cache \

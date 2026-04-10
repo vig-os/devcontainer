@@ -1,0 +1,7 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>vig-os/devcontainer-smoke-test//.github/renovate-default"
+  ],
+  "enabledManagers": ["github-actions"]
+}
