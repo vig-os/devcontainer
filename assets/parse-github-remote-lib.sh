@@ -3,20 +3,30 @@
 # Used by init-workspace.sh for {{GITHUB_REPOSITORY}} in renovate.json (Refs: #509).
 parse_github_remote() {
     local url="$1"
+    local owner repo
     [[ -z "$url" ]] && return 1
     # https://github.com/org/repo.git or trailing /
     if [[ "$url" =~ https?://github\.com/([^/]+)/([^/.]+)(\.git)?/?$ ]]; then
-        echo "${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+        owner="${BASH_REMATCH[1]}"
+        repo="${BASH_REMATCH[2]}"
+        [[ "$owner/$repo" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || return 1
+        echo "$owner/$repo"
         return 0
     fi
     # git@github.com:org/repo.git
     if [[ "$url" =~ ^git@github\.com:([^/]+)/([^/.]+)(\.git)?$ ]]; then
-        echo "${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+        owner="${BASH_REMATCH[1]}"
+        repo="${BASH_REMATCH[2]}"
+        [[ "$owner/$repo" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || return 1
+        echo "$owner/$repo"
         return 0
     fi
     # ssh://git@github.com/org/repo.git
     if [[ "$url" =~ ^ssh://git@github\.com/([^/]+)/([^/.]+)(\.git)?$ ]]; then
-        echo "${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+        owner="${BASH_REMATCH[1]}"
+        repo="${BASH_REMATCH[2]}"
+        [[ "$owner/$repo" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || return 1
+        echo "$owner/$repo"
         return 0
     fi
     return 1
