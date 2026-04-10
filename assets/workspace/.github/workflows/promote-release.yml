@@ -53,7 +53,7 @@ jobs:
     outputs:
       version: ${{ steps.vars.outputs.version }}
     permissions:
-      contents: read
+      contents: write
       pull-requests: read
     defaults:
       run:
@@ -87,7 +87,7 @@ jobs:
 
       - name: Verify draft GitHub Release exists
         env:
-          GH_TOKEN: ${{ steps.release_app_token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.vars.outputs.version }}
         run: |
           set -euo pipefail

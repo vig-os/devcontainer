@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:
-      contents: read
+      contents: write
       packages: read
     outputs:
       version: ${{ steps.vars.outputs.version }}
