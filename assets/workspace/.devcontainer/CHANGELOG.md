@@ -5,21 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-
-### Added
-
-### Changed
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
-
-## [0.3.3] - TBD
+## [0.3.3](https://github.com/vig-os/devcontainer/releases/tag/0.3.3) - 2026-04-10
 
 ### Added
 
@@ -55,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Promote-release draft release validation** ([#507](https://github.com/vig-os/devcontainer/issues/507))
   - Use the paginated releases list API with jq instead of `GET /releases/tags/{tag}`, which returns 404 for draft releases
   - Apply the same release lookup for RC git tag cleanup in upstream and workspace `promote-release.yml`
+- **Promote-release validate job cannot see draft releases** ([#517](https://github.com/vig-os/devcontainer/issues/517))
+  - Elevate `validate` job permissions to `contents: write` so the token has push-level access required by the GitHub API to list draft releases
+  - Use `github.token` instead of the release app token for the draft release check in workspace `promote-release.yml`
 
 ### Security
 
