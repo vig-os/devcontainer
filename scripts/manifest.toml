@@ -58,6 +58,9 @@ src = ".github/pull_request_template.md"
 src = ".github/ISSUE_TEMPLATE/"
 
 [[entries]]
+src = ".github/actions/resolve-image/"
+
+[[entries]]
 src = ".github/workflows/scorecard.yml"
 
 [[entries]]
