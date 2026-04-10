@@ -58,13 +58,6 @@ src = ".github/pull_request_template.md"
 src = ".github/ISSUE_TEMPLATE/"
 
 [[entries]]
-src = ".github/dependabot.yml"
-transforms = [
-  { type = "RemoveBlock", start_pattern = "^\\s+# Docker", end_pattern = "^$" },
-  { type = "StripTrailingBlankLines" },
-]
-
-[[entries]]
 src = ".github/workflows/scorecard.yml"
 
 [[entries]]

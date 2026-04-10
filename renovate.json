@@ -1,0 +1,15 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>vig-os/devcontainer//assets/workspace/.github/renovate-default"
+  ],
+  "enabledManagers": ["github-actions", "pep621", "uv", "npm", "dockerfile"],
+  "packageRules": [
+    {
+      "description": "Dockerfile / Containerfile",
+      "matchManagers": ["dockerfile"],
+      "semanticCommitType": "build",
+      "semanticCommitScope": "docker"
+    }
+  ]
+}
