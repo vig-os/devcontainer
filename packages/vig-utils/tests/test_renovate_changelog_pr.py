@@ -108,6 +108,25 @@ def test_insert_appends_to_changed_section() -> None:
     assert "**Existing**" in new_content
 
 
+def test_insert_preserves_blank_line_before_next_heading() -> None:
+    """Keep-a-Changelog: blank line between list items and following ### heading."""
+    changelog = textwrap.dedent(
+        """\
+        ## Unreleased
+
+        ### Changed
+
+        - **Existing** ([#1](https://github.com/o/r/pull/1))
+
+        ### Deprecated
+        """
+    )
+    entry = "- **New** ([#2](https://github.com/o/r/pull/2))\n"
+    new_content, did = insert_renovate_changelog_entry(changelog, 2, entry)
+    assert did is True
+    assert "\n\n### Deprecated\n" in new_content
+
+
 def test_insert_idempotent() -> None:
     changelog = textwrap.dedent(
         """\
