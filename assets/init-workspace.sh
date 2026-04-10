@@ -9,8 +9,9 @@
 #   --smoke-test  Deploy smoke-test-specific assets
 #
 # Environment variables (used with --no-prompts):
-#   SHORT_NAME  - Project short name (required)
-#   ORG_NAME    - Organization name (optional, defaults to "vigOS/devc")
+#   SHORT_NAME           - Project short name (required)
+#   ORG_NAME             - Organization name (optional, defaults to "vigOS/devc")
+#   GITHUB_REPOSITORY    - owner/repo for Renovate preset extends (optional if origin is github.com)
 
 set -euo pipefail
 
@@ -31,11 +32,16 @@ PRESERVE_FILES=(
     ".github/CODEOWNERS"
     ".github/workflows/release-extension.yml"
     "justfile.project"
+    "renovate.json"
 )
 
 # Get script directory for manifest location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST_FILE="$SCRIPT_DIR/.placeholder-manifest.txt"
+
+# Co-located with init-workspace.sh in the image; path is dynamic at runtime.
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/parse-github-remote-lib.sh"
 
 # Parse arguments
 for arg in "$@"; do
@@ -252,12 +258,15 @@ else
     rsync -av --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
 fi
 
+resolve_github_repository
+
 # Replace placeholders in files (using pre-built manifest from image)
 echo "Replacing placeholders in files..."
 
-# Escape special characters in variables for sed (especially slashes in ORG_NAME)
+# Escape special characters in variables for sed (especially slashes in ORG_NAME, GITHUB_REPOSITORY)
 SHORT_NAME_ESCAPED=$(printf '%s\n' "$SHORT_NAME" | sed 's/[&/\]/\\&/g')
 ORG_NAME_ESCAPED=$(printf '%s\n' "$ORG_NAME" | sed 's/[&/\]/\\&/g')
+GITHUB_REPOSITORY_ESCAPED=$(printf '%s\n' "$GITHUB_REPOSITORY" | sed 's/[&/\]/\\&/g')
 
 if [[ -f "$MANIFEST_FILE" ]]; then
     # Use build-time manifest (much faster - no searching at runtime)
@@ -268,15 +277,15 @@ if [[ -f "$MANIFEST_FILE" ]]; then
 
         if [[ -f "$workspace_file" ]]; then
             # Simple sed -i (always Linux in container - no cross-platform needed)
-            sed -i "s/{{SHORT_NAME}}/${SHORT_NAME_ESCAPED}/g; s/{{ORG_NAME}}/${ORG_NAME_ESCAPED}/g" "$workspace_file"
+            sed -i "s/{{SHORT_NAME}}/${SHORT_NAME_ESCAPED}/g; s/{{ORG_NAME}}/${ORG_NAME_ESCAPED}/g; s/{{GITHUB_REPOSITORY}}/${GITHUB_REPOSITORY_ESCAPED}/g" "$workspace_file"
         fi
     done < "$MANIFEST_FILE"
 else
     # Fallback: search at runtime (slower, but works if manifest is missing)
     echo "Warning: Manifest not found, searching at runtime (slower)"
     find "$WORKSPACE_DIR" -type f ! -path "*/.git/*" -print0 | while IFS= read -r -d '' file; do
-        if grep -q '{{SHORT_NAME}}\|{{ORG_NAME}}' "$file" 2>/dev/null; then
-            sed -i "s/{{SHORT_NAME}}/${SHORT_NAME_ESCAPED}/g; s/{{ORG_NAME}}/${ORG_NAME_ESCAPED}/g" "$file"
+        if grep -q '{{SHORT_NAME}}\|{{ORG_NAME}}\|{{GITHUB_REPOSITORY}}' "$file" 2>/dev/null; then
+            sed -i "s/{{SHORT_NAME}}/${SHORT_NAME_ESCAPED}/g; s/{{ORG_NAME}}/${ORG_NAME_ESCAPED}/g; s/{{GITHUB_REPOSITORY}}/${GITHUB_REPOSITORY_ESCAPED}/g" "$file"
         fi
     done
 fi

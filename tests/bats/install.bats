@@ -48,6 +48,7 @@ setup() {
     assert_output --partial "--podman"
     assert_output --partial "--name"
     assert_output --partial "--org"
+    assert_output --partial "--repo"
     assert_output --partial "--dry-run"
     assert_output --partial "--smoke-test"
 }
@@ -117,6 +118,21 @@ setup() {
     run bash "$INSTALL_SH" --dry-run .
     assert_success
     assert_output --partial 'ORG_NAME="vigOS"'
+}
+
+@test "default GITHUB_REPOSITORY is OWNER/REPO when no git origin" {
+    local test_dir
+    test_dir="$(mktemp -d)"
+    run bash "$INSTALL_SH" --dry-run "$test_dir"
+    assert_success
+    assert_output --partial 'GITHUB_REPOSITORY="OWNER/REPO"'
+    rm -rf "$test_dir"
+}
+
+@test "custom --repo is passed to container" {
+    run bash "$INSTALL_SH" --dry-run --repo vig-os/myapp .
+    assert_success
+    assert_output --partial 'GITHUB_REPOSITORY="vig-os/myapp"'
 }
 
 @test "custom org is passed to container" {

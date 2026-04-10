@@ -36,9 +36,36 @@ on:  # yamllint disable-line rule:truthy
 permissions: {}  # restrict default; job declares its own
 
 jobs:
-  sync:
+  resolve-image:
+    name: Resolve image tag
     runs-on: ubuntu-22.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    outputs:
+      image-tag: ${{ steps.resolve.outputs.image-tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          sparse-checkout: |
+            .vig-os
+            .github/actions/resolve-image
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve container image
+        id: resolve
+        uses: ./.github/actions/resolve-image
+
+  sync:
+    needs: [resolve-image]
+    runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
     # Prevent concurrent runs to avoid race conditions when committing and cache collisions
     concurrency:
       group: sync-issues-${{ github.repository }}
@@ -63,15 +90,12 @@ jobs:
           ref: ${{ github.event.inputs.target-branch || 'dev' }}
           persist-credentials: false
 
-      - name: Set up environment
-        uses: ./.github/actions/setup-env
-        with:
-          install-python: 'false'
-          install-just: 'false'
+      - name: Fix git safe.directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Restore sync state (last synced timestamp)
         id: restore-state
-        uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
+        uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
         with:
           path: .sync-state
           key: sync-issues-state-${{ github.repository }}
@@ -118,7 +142,7 @@ jobs:
         uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
         env:
           # Use App token so push can bypass branch protection when App is in bypass list
-          GH_TOKEN: ${{ steps.generate-token.outputs.token || github.token }}
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           TARGET_BRANCH: refs/heads/${{ github.event.inputs.target-branch || 'dev' }}
           MAX_ATTEMPTS: "3"
@@ -127,7 +151,7 @@ jobs:
 
       - name: Save sync state
         if: always()
-        uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
+        uses: actions/cache/save@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
         with:
           path: .sync-state
           key: sync-issues-state-${{ github.repository }}

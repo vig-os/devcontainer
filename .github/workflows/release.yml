@@ -527,6 +527,15 @@ jobs:
           uv run python scripts/sync_manifest.py sync assets/workspace/
           echo "✓ Synced workspace manifest after changelog finalization"
 
+      - name: Update root .vig-os to release version
+        if: needs.validate.outputs.release_kind == 'final'
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          sed -i "s/^DEVCONTAINER_VERSION=.*/DEVCONTAINER_VERSION=$VERSION/" .vig-os
+          echo "✓ Set DEVCONTAINER_VERSION=$VERSION in .vig-os"
+
       - name: Collect finalization files
         if: needs.validate.outputs.release_kind == 'final'
         id: finalize-files

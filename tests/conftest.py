@@ -296,7 +296,16 @@ def _build_podman_cmd(container_image, workspace_mount, smoke_test):
     """Build podman command for init-workspace script."""
     cmd = ["podman", "run", "--rm", "-v", workspace_mount]
     if smoke_test:
-        cmd.extend(["-e", "SHORT_NAME=test_project", "-e", "ORG_NAME=Test Org"])
+        cmd.extend(
+            [
+                "-e",
+                "SHORT_NAME=test_project",
+                "-e",
+                "ORG_NAME=Test Org",
+                "-e",
+                "GITHUB_REPOSITORY=test-org/test-project",
+            ]
+        )
     else:
         cmd.append("-it")
     cmd.extend([container_image, "/root/assets/init-workspace.sh"])
@@ -326,6 +335,7 @@ def _run_interactive_init(cmd, container_image):
         "short_name_prompt": None,
         "org_name_prompt": None,
         "copying_files": None,
+        "renovate_prompt": None,
         "replacing_placeholders": None,
         "setting_permissions": None,
         "syncing_deps": None,
@@ -333,13 +343,13 @@ def _run_interactive_init(cmd, container_image):
     }
     current_stage = "started"
     stages["started"] = time.time()
-    stage_patterns = [
-        ("Copying files from", "copying_files", 30),
+    stage_patterns_after_copy = [
         ("Replacing placeholders", "replacing_placeholders", 60),
         ("Setting executable permissions", "setting_permissions", 30),
         ("Syncing dependencies", "syncing_deps", 60),
         ("Workspace initialized successfully", "completed", 30),
     ]
+    renovate_repo_answer = "test-org/test-project"
 
     try:
         child = pexpect.spawn(" ".join(cmd), encoding="utf-8", timeout=60)
@@ -353,7 +363,78 @@ def _run_interactive_init(cmd, container_image):
         current_stage = "org_name_prompt"
         child.sendline(organization_name)
 
-        for pattern, stage_name, timeout in stage_patterns:
+        pattern = "Copying files from"
+        stage_name = "copying_files"
+        timeout = 30
+        try:
+            child.expect(pattern, timeout=timeout)
+            stages[stage_name] = time.time()
+            current_stage = stage_name
+        except pexpect.TIMEOUT:
+            stage_start = stages.get(current_stage) or stages["started"]
+            time_in_stage = time.time() - stage_start
+            pytest.fail(
+                f"⏱️  Timeout waiting for: '{pattern}'\n"
+                f"\n"
+                f"📊 Progress tracking:\n"
+                f"   Current stage: {current_stage}\n"
+                f"   Time in stage: {time_in_stage:.1f}s (timeout: {timeout}s)\n"
+                f"\n"
+                f"📈 Stage timings:\n"
+                + "\n".join(
+                    f"   {'✓' if stages[s] else '✗'} {s}: "
+                    + (
+                        f"{stages[s] - stages['started']:.1f}s"
+                        if stages[s]
+                        else "not reached"
+                    )
+                    for s in stages
+                )
+                + "\n\n"
+                "💡 If stuck on 'copying_files':\n"
+                "   - Check if .pre-commit-cache is being copied (should be excluded)\n"
+                "   - Volume mounts can be slow\n"
+                f"   - Check: podman run --rm {container_image} du -sh /root/assets/workspace/\n"
+                "\n"
+                f"📤 Last output:\n{child.before}"
+            )
+
+        pattern = "Enter GitHub repository for Renovate"
+        stage_name = "renovate_prompt"
+        timeout = 60
+        current_stage = "awaiting_renovate_prompt"
+        try:
+            child.expect(pattern, timeout=timeout)
+            stages[stage_name] = time.time()
+            current_stage = stage_name
+            child.sendline(renovate_repo_answer)
+        except pexpect.TIMEOUT:
+            stage_start = stages.get(current_stage) or stages["started"]
+            time_in_stage = time.time() - stage_start
+            pytest.fail(
+                f"⏱️  Timeout waiting for: '{pattern}'\n"
+                f"\n"
+                f"📊 Progress tracking:\n"
+                f"   Current stage: {current_stage}\n"
+                f"   Time in stage: {time_in_stage:.1f}s (timeout: {timeout}s)\n"
+                f"\n"
+                f"📈 Stage timings:\n"
+                + "\n".join(
+                    f"   {'✓' if stages[s] else '✗'} {s}: "
+                    + (
+                        f"{stages[s] - stages['started']:.1f}s"
+                        if stages[s]
+                        else "not reached"
+                    )
+                    for s in stages
+                )
+                + "\n\n"
+                "💡 If stuck here: init-workspace may need GITHUB_REPOSITORY or this prompt text changed.\n"
+                "\n"
+                f"📤 Last output:\n{child.before}"
+            )
+
+        for pattern, stage_name, timeout in stage_patterns_after_copy:
             try:
                 child.expect(pattern, timeout=timeout)
                 stages[stage_name] = time.time()
