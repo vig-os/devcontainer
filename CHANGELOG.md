@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Renovate config validation on pull requests** ([#520](https://github.com/vig-os/devcontainer/issues/520))
   - Workflow runs `renovate-config-validator --strict` against `renovate.json` and the shared preset when renovate JSON changes
 
+### Changed
+
+- **Bump expected tool versions in image tests**
+  - `gh` 2.89 → 2.92, `just` 1.49 → 1.50, `cargo-binstall` 1.17 → 1.18 to match the latest upstream releases the image now installs
+
 ### Fixed
 
 - **Renovate preset blocked all dependency updates** ([#520](https://github.com/vig-os/devcontainer/issues/520))
