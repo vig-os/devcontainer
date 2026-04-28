@@ -3,7 +3,7 @@
   "extends": ["config:recommended"],
   "timezone": "Etc/UTC",
   "schedule": ["before 9am on monday"],
-  "baseBranches": ["dev"],
+  "baseBranchPatterns": ["dev"],
   "rebaseWhen": "conflicted",
   "gitIgnoredAuthors": ["41898282+github-actions[bot]@users.noreply.github.com"],
   "packageRules": [
@@ -23,21 +23,17 @@
       "semanticCommitScope": "actions"
     },
     {
-      "description": "Python (PEP 621 + uv) — pin ranges, group minor/patch",
-      "matchManagers": ["pep621", "uv"],
-      "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "python (minor and patch)",
+      "description": "Python (PEP 621 + uv) — always pin ranges",
+      "matchManagers": ["pep621"],
       "rangeStrategy": "pin",
       "semanticCommitType": "build",
       "semanticCommitScope": "pip"
     },
     {
-      "description": "Python — major updates stay separate",
-      "matchManagers": ["pep621", "uv"],
-      "matchUpdateTypes": ["major"],
-      "rangeStrategy": "pin",
-      "semanticCommitType": "build",
-      "semanticCommitScope": "pip"
+      "description": "Python — group minor/patch",
+      "matchManagers": ["pep621"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "python (minor and patch)"
     },
     {
       "description": "npm",

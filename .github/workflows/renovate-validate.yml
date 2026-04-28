@@ -1,0 +1,28 @@
+# Fail PRs that introduce invalid Renovate JSON before merge (Refs: #520).
+
+name: Validate Renovate config
+
+on:  # yamllint disable-line rule:truthy
+  pull_request:
+    paths:
+      - '**/renovate*.json'
+      - '.github/renovate*.json'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Setup Node
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff89692fc16e988  # v4.1.0
+        with:
+          node-version: '20'
+
+      - name: Validate Renovate config
+        run: npx --yes --package renovate@latest -c "renovate-config-validator --strict renovate.json assets/workspace/.github/renovate-default.json"
