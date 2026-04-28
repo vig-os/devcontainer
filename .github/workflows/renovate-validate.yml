@@ -24,5 +24,12 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Validate Renovate config
-        run: npx --yes --package renovate@latest -c "renovate-config-validator --strict renovate.json assets/workspace/.github/renovate-default.json"
+      - name: Discover Renovate configs
+        id: configs
+        run: |
+          mapfile -t files < <(git ls-files 'renovate*.json' '**/renovate*.json')
+          printf '%s\n' "${files[@]}"
+          printf 'files=%s\n' "${files[*]}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate Renovate configs
+        run: npx --yes --package renovate@latest -c "renovate-config-validator --strict ${{ steps.configs.outputs.files }}"
