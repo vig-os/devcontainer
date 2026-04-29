@@ -167,6 +167,23 @@ test-bats:
         npx bats tests/bats/
     fi
 
+# Validate tracked Renovate configs with renovate-config-validator --strict
+[group('test')]
+test-renovate:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Mirror .github/workflows/renovate-validate.yml: skip
+    # assets/workspace/renovate.json because its preset is templated with the
+    # repository name and only resolves after init copies it into a real repo.
+    mapfile -t files < <(git ls-files 'renovate*.json' '**/renovate*.json' \
+        | grep -vx 'assets/workspace/renovate.json' || true)
+    if [ ${#files[@]} -eq 0 ]; then
+        echo "No Renovate configs found."
+        exit 0
+    fi
+    printf '%s\n' "${files[@]}"
+    npx --yes --package renovate@latest -c "renovate-config-validator --strict ${files[*]}"
+
 # Clean up lingering containers before running tests
 [private]
 _test-cleanup-check:
@@ -184,6 +201,7 @@ test version="dev":
     #!/usr/bin/env bash
     TEST_CONTAINER_TAG={{ version }}  uv run pytest tests -v -s --tb=short
     @just test-bats
+    @just test-renovate
 
 # ===============================================================================
 # RELEASE MANAGEMENT
