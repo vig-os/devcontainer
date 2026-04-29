@@ -210,6 +210,7 @@ Available recipes:
     test-image version="dev"                   # Run image tests only
     test-install                               # Run install script tests only
     test-integration version="dev"             # Run integration tests only
+    test-renovate                              # Validate tracked Renovate configs with renovate-config-validator --strict
     test-utils                                 # Run utils tests only
     test-validate-commit-msg                   # Run validate commit msg tests only
     test-vig-utils                             # Run check action pins tests only

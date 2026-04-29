@@ -161,6 +161,7 @@ Available recipes:
     test-image version="dev"                   # Run image tests only
     test-install                               # Run install script tests only
     test-integration version="dev"             # Run integration tests only
+    test-renovate                              # Validate tracked Renovate configs with renovate-config-validator --strict
     test-utils                                 # Run utils tests only
     test-validate-commit-msg                   # Run validate commit msg tests only
     test-vig-utils                             # Run check action pins tests only
@@ -182,7 +183,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **Registry**: `ghcr.io/vig-os/devcontainer`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
-- **Latest Version**: [0.3.3](https://github.com/vig-os/devcontainer/releases/tag/0.3.3) - 2026-04-10
+- **Latest Version**: [0.3.4](https://github.com/vig-os/devcontainer/releases/tag/0.3.4) - 2026-04-29
 - **Image tags**: bare semver (`0.2.1`, `latest`) — git tags use `v` prefix (`v0.2.1`) but image tags do not
 
 ## Features
