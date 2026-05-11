@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-05-08T02:41:22Z
+updated: 2026-05-10T07:28:48Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/devcontainer/issues/529
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-05-08T04:58:31.461Z
+synced: 2026-05-11T06:05:33.734Z
 ---
 
 # [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devcontainer/issues/529)
@@ -31,6 +31,8 @@ These problems occurred while renovating this repository. [View logs](https://de
 The following updates are currently rate-limited. To force their creation now, click on a checkbox below.
 
  - [ ] <!-- unlimit-branch=renovate/bats-file-0.x-lockfile -->build(npm): update dependency bats-file to v0.4.0
+ - [ ] <!-- unlimit-branch=renovate/actions-dependency-review-action-5.x -->ci(actions): update actions/dependency-review-action action to v5
+ - [ ] <!-- create-all-rate-limited-prs -->🔐 **Create all rate-limited PRs at once** 🔐
 
 
 ---
@@ -49,11 +51,11 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
  - [ ] <!-- rebase-branch=renovate/pypi-pytest-vulnerability -->[build(pip): update dependency pytest to v9.0.3 [security]](../pull/528)
  - [ ] <!-- rebase-branch=renovate/pin-dependencies -->[build(pip): pin dependencies](../pull/530) (`bandit`, `bcrypt`, `github-backup`, `hatchling`, `ipykernel`, `jinja2`, `jupyter`, `matplotlib`, `numpy`, `pandas`, `pexpect`, `pip-licenses`, `pre-commit`, `pytest-cov`, `pytest-docker`, `pytest-testinfra`, `python`, `pyyaml`, `rich`, `ruff`, `scipy`, `testcontainers`, `testinfra`)
- - [ ] <!-- rebase-branch=renovate/python-3.12-slim-bookworm -->[build(docker): update python:3.12-slim-bookworm docker digest to 58525e1](../pull/531)
+ - [ ] <!-- rebase-branch=renovate/python-3.12-slim-bookworm -->[build(docker): update python:3.12-slim-bookworm docker digest to d193c6f](../pull/531)
  - [ ] <!-- rebase-branch=renovate/actions-create-github-app-token-digest -->[chore(deps): update actions/create-github-app-token digest to 1b10c78](../pull/532)
  - [ ] <!-- rebase-branch=renovate/astral-sh-setup-uv-digest -->[chore(deps): update astral-sh/setup-uv digest to 37802ad](../pull/533)
  - [ ] <!-- rebase-branch=renovate/github-codeql-action-digest -->[chore(deps): update github/codeql-action digest to 68bde55](../pull/534)
- - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to 6155d2c](../pull/535)
+ - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to e2cb24b](../pull/535)
  - [ ] <!-- rebase-branch=renovate/github-actions-(minor-and-patch) -->[ci(actions): update github-actions (minor and patch)](../pull/536) (`actions/cache`, `actions/setup-node`, `actions/upload-artifact`, `aquasecurity/trivy`, `aquasecurity/trivy-action`, `astral-sh/uv`, `docker/build-push-action`, `docker/login-action`)
  - [ ] <!-- rebase-branch=renovate/python-3.x -->[build(docker): update python docker tag to v3.14](../pull/537)
  - [ ] <!-- rebase-branch=renovate/devcontainers-cli-0.x -->[build(npm): update dependency @devcontainers/cli to v0.86.1](../pull/538)
@@ -101,8 +103,8 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `actions/setup-node v6.3.0@53b83947a5a98c8d113130e565377fae1a50d02f` → [Updates: `v6.4.0`]
  - `taiki-e/install-action just@01159adff8f38113be7211e869405f6f6abf02d7` → [Updates: `just`]
  - `bats-core/bats-action v4.0.0@77d6fb60505b4d0d1d73e48bd035b55074bbfb43`
- - `astral-sh/uv 0.10.0` → [Updates: `0.11.11`]
- - `astral-sh/uv 0.10.0` → [Updates: `0.11.11`]
+ - `astral-sh/uv 0.10.0` → [Updates: `0.11.12`]
+ - `astral-sh/uv 0.10.0` → [Updates: `0.11.12`]
 
 </details>
 
@@ -148,7 +150,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `actions/upload-artifact v7.0.0@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f` → [Updates: `v7.0.1`]
  - `github/codeql-action v4@c10b8064de6f491fea524254123dbe5e09572f13` → [Updates: `v4`]
  - `actions/checkout v6.0.2@de0fac2e4500dabe0009e67214ff5f5447ce83dd`
- - `actions/dependency-review-action v4@2031cfc080254a8a887f58cffee85186f0e49e48`
+ - `actions/dependency-review-action v4@2031cfc080254a8a887f58cffee85186f0e49e48` → [Updates: `v5.0.0`]
  - `ubuntu 22.04` → [Updates: `24.04`]
  - `ubuntu 22.04` → [Updates: `24.04`]
  - `ubuntu 22.04` → [Updates: `24.04`]
