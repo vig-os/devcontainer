@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-05-11T07:38:58Z
+updated: 2026-05-13T03:49:55Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/devcontainer/issues/529
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-05-12T05:44:38.771Z
+synced: 2026-05-13T05:55:11.650Z
 ---
 
 # [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devcontainer/issues/529)
@@ -38,9 +38,9 @@ The following updates are currently rate-limited. To force their creation now, c
 ---
 
 > [!WARNING]
-> Renovate failed to look up the following dependencies: `Could not determine new digest for update (github-tags package bats-core/bats-action)`, `Could not determine new digest for update (github-tags package actions/dependency-review-action)`, `Could not determine new digest for update (github-tags package sigstore/cosign-installer)`.
+> Renovate failed to look up the following dependencies: `Could not determine new digest for update (github-tags package bats-core/bats-action)`, `Failed to look up github-tags package aquasecurity/trivy-action: no-result`, `Could not determine new digest for update (github-tags package actions/dependency-review-action)`, `Could not determine new digest for update (github-tags package sigstore/cosign-installer)`.
 > 
-> Files affected: `.github/actions/setup-env/action.yml`, `.github/workflows/ci.yml`, `.github/workflows/promote-release.yml`, `.github/workflows/release.yml`
+> Files affected: `.github/actions/setup-env/action.yml`, `.github/workflows/ci.yml`, `.github/workflows/promote-release.yml`, `.github/workflows/release.yml`, `.github/workflows/security-scan.yml`
 
 ---
 
@@ -52,14 +52,14 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - [ ] <!-- rebase-branch=renovate/pypi-pytest-vulnerability -->[build(pip): update dependency pytest to v9.0.3 [security]](../pull/528)
  - [ ] <!-- rebase-branch=renovate/pin-dependencies -->[build(pip): pin dependencies](../pull/530) (`bandit`, `bcrypt`, `github-backup`, `hatchling`, `ipykernel`, `jinja2`, `jupyter`, `matplotlib`, `numpy`, `pandas`, `pexpect`, `pip-licenses`, `pre-commit`, `pytest-cov`, `pytest-docker`, `pytest-testinfra`, `python`, `pyyaml`, `rich`, `ruff`, `scipy`, `testcontainers`, `testinfra`)
  - [ ] <!-- rebase-branch=renovate/python-3.12-slim-bookworm -->[build(docker): update python:3.12-slim-bookworm docker digest to d193c6f](../pull/531)
- - [ ] <!-- rebase-branch=renovate/actions-create-github-app-token-digest -->[chore(deps): update actions/create-github-app-token digest to 1b10c78](../pull/532)
+ - [ ] <!-- rebase-branch=renovate/actions-create-github-app-token-digest -->[chore(deps): update actions/create-github-app-token digest to bcd2ba4](../pull/532)
  - [ ] <!-- rebase-branch=renovate/astral-sh-setup-uv-digest -->[chore(deps): update astral-sh/setup-uv digest to 37802ad](../pull/533)
  - [ ] <!-- rebase-branch=renovate/github-codeql-action-digest -->[chore(deps): update github/codeql-action digest to 68bde55](../pull/534)
- - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to d87bac7](../pull/535)
- - [ ] <!-- rebase-branch=renovate/github-actions-(minor-and-patch) -->[ci(actions): update github-actions (minor and patch)](../pull/536) (`actions/cache`, `actions/setup-node`, `actions/upload-artifact`, `aquasecurity/trivy`, `aquasecurity/trivy-action`, `astral-sh/uv`, `docker/build-push-action`, `docker/login-action`)
+ - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to 31aff3c](../pull/535)
+ - [ ] <!-- rebase-branch=renovate/github-actions-(minor-and-patch) -->[ci(actions): update github-actions (minor and patch)](../pull/536) (`actions/cache`, `actions/setup-node`, `actions/upload-artifact`, `aquasecurity/trivy`, `astral-sh/uv`, `docker/build-push-action`, `docker/login-action`)
  - [ ] <!-- rebase-branch=renovate/python-3.x -->[build(docker): update python docker tag to v3.14](../pull/537)
- - [ ] <!-- rebase-branch=renovate/devcontainers-cli-0.x -->[build(npm): update dependency @devcontainers/cli to v0.86.1](../pull/538)
- - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update python to v3.14.4](../pull/539)
+ - [ ] <!-- rebase-branch=renovate/devcontainers-cli-0.x -->[build(npm): update dependency @devcontainers/cli to v0.87.0](../pull/538)
+ - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update python to v3.14.5](../pull/539)
  - [ ] <!-- rebase-branch=renovate/actions-github-script-9.x -->[ci(actions): update actions/github-script action to v9](../pull/540)
  - [ ] <!-- rebase-branch=renovate/actions-setup-node-6.x -->[ci(actions): update actions/setup-node action to v6](../pull/541)
  - [ ] <!-- rebase-branch=renovate/astral-sh-setup-uv-8.x -->[ci(actions): update astral-sh/setup-uv action to v8](../pull/542)
@@ -103,8 +103,8 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `actions/setup-node v6.3.0@53b83947a5a98c8d113130e565377fae1a50d02f` → [Updates: `v6.4.0`]
  - `taiki-e/install-action just@01159adff8f38113be7211e869405f6f6abf02d7` → [Updates: `just`]
  - `bats-core/bats-action v4.0.0@77d6fb60505b4d0d1d73e48bd035b55074bbfb43`
- - `astral-sh/uv 0.10.0` → [Updates: `0.11.13`]
- - `astral-sh/uv 0.10.0` → [Updates: `0.11.13`]
+ - `astral-sh/uv 0.10.0` → [Updates: `0.11.14`]
+ - `astral-sh/uv 0.10.0` → [Updates: `0.11.14`]
 
 </details>
 
@@ -142,11 +142,11 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `actions/upload-artifact v7.0.0@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f` → [Updates: `v7.0.1`]
  - `actions/checkout v6.0.2@de0fac2e4500dabe0009e67214ff5f5447ce83dd`
  - `actions/download-artifact v8.0.1@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c`
- - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1` → [Updates: `v0.36.0`]
- - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1` → [Updates: `v0.36.0`]
- - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1` → [Updates: `v0.36.0`]
- - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1` → [Updates: `v0.36.0`]
- - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1` → [Updates: `v0.36.0`]
+ - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1`
+ - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1`
+ - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1`
+ - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1`
+ - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1`
  - `actions/upload-artifact v7.0.0@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f` → [Updates: `v7.0.1`]
  - `github/codeql-action v4@c10b8064de6f491fea524254123dbe5e09572f13` → [Updates: `v4`]
  - `actions/checkout v6.0.2@de0fac2e4500dabe0009e67214ff5f5447ce83dd`
@@ -218,7 +218,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `actions/checkout v6.0.2@de0fac2e4500dabe0009e67214ff5f5447ce83dd`
  - `vig-os/commit-action v0.2.0@1bc004353d08d9332a0cb54920b148256220c8e0`
  - `actions/checkout v6.0.2@de0fac2e4500dabe0009e67214ff5f5447ce83dd`
- - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1` → [Updates: `v0.36.0`]
+ - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1`
  - `actions/upload-artifact v7.0.0@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f` → [Updates: `v7.0.1`]
  - `actions/create-github-app-token v3@f8d387b68d61c58ab83c6c016672934102569859` → [Updates: `v3`]
  - `actions/checkout v6.0.2@de0fac2e4500dabe0009e67214ff5f5447ce83dd`
@@ -234,11 +234,11 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `actions/attest v4.1.0@59d89421af93a897026c735860bf21b6eb4f7b26`
  - `actions/create-github-app-token v3@f8d387b68d61c58ab83c6c016672934102569859` → [Updates: `v3`]
  - `actions/checkout v6.0.2@de0fac2e4500dabe0009e67214ff5f5447ce83dd`
- - `actions/github-script v8.0.0@ed597411d8f924073f98dfc5c65a23a2325f34cd` → [Updates: `v9`]
+ - `actions/github-script v8.0.0@ed597411d8f924073f98dfc5c65a23a2325f34cd` → [Updates: `v9.0.0`]
  - `actions/create-github-app-token v3@f8d387b68d61c58ab83c6c016672934102569859` → [Updates: `v3`]
  - `actions/create-github-app-token v3@f8d387b68d61c58ab83c6c016672934102569859` → [Updates: `v3`]
  - `actions/checkout v6.0.2@de0fac2e4500dabe0009e67214ff5f5447ce83dd`
- - `actions/github-script v8.0.0@ed597411d8f924073f98dfc5c65a23a2325f34cd` → [Updates: `v9`]
+ - `actions/github-script v8.0.0@ed597411d8f924073f98dfc5c65a23a2325f34cd` → [Updates: `v9.0.0`]
  - `ubuntu 22.04` → [Updates: `24.04`]
  - `ubuntu 22.04` → [Updates: `24.04`]
  - `aquasecurity/trivy v0.69.3` → [Updates: `v0.70.0`]
@@ -280,10 +280,10 @@ The following updates have all been created. To force a retry/rebase of any, cli
 <details><summary>.github/workflows/security-scan.yml (12)</summary>
 
  - `actions/checkout v6.0.2@de0fac2e4500dabe0009e67214ff5f5447ce83dd`
- - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1` → [Updates: `v0.36.0`]
- - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1` → [Updates: `v0.36.0`]
- - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1` → [Updates: `v0.36.0`]
- - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1` → [Updates: `v0.36.0`]
+ - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1`
+ - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1`
+ - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1`
+ - `aquasecurity/trivy-action v0.35.0@57a97c7e7821a5776cebc9bb87c984fa69cba8f1`
  - `actions/upload-artifact v7.0.0@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f` → [Updates: `v7.0.1`]
  - `github/codeql-action v4@c10b8064de6f491fea524254123dbe5e09572f13` → [Updates: `v4`]
  - `ubuntu 22.04` → [Updates: `24.04`]
@@ -498,7 +498,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
 <details><summary>package.json (5)</summary>
 
- - `@devcontainers/cli 0.85.0` → [Updates: `0.86.1`]
+ - `@devcontainers/cli 0.85.0` → [Updates: `0.87.0`]
  - `bats 1.13.0`
  - `bats-support v0.3.0`
  - `bats-assert v2.2.4`
@@ -514,7 +514,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
 <details><summary>assets/workspace/pyproject.toml (11)</summary>
 
- - `python >=3.12` → [Updates: `==3.14.4`]
+ - `python >=3.12` → [Updates: `==3.14.5`]
  - `hatchling >=1.25` → [Updates: `==1.29.0`]
  - `rich >=13.0.0` → [Updates: `==14.3.3`]
  - `pytest >=8.0` → [Updates: `>=8.0`]
@@ -523,20 +523,20 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `jupyter >=1.0` → [Updates: `==1.1.1`]
  - `numpy >=2.0` → [Updates: `==2.4.4`]
  - `scipy >=1.14` → [Updates: `==1.17.1`]
- - `pandas >=2.2` → [Updates: `==3.0.2`]
+ - `pandas >=2.2` → [Updates: `==3.0.3`]
  - `matplotlib >=3.9` → [Updates: `==3.10.9`]
 
 </details>
 
 <details><summary>packages/vig-utils/pyproject.toml (1)</summary>
 
- - `python >=3.10` → [Updates: `==3.14.4`]
+ - `python >=3.10` → [Updates: `==3.14.5`]
 
 </details>
 
 <details><summary>pyproject.toml (24)</summary>
 
- - `python ==3.12.10` → [Updates: `==3.14.4`]
+ - `python ==3.12.10` → [Updates: `==3.14.5`]
  - `github-backup >=0.50.3` → [Updates: `==0.61.5`]
  - `jinja2 >=3.1.0` → [Updates: `==3.1.6`]
  - `pexpect >=4.9.0` → [Updates: `==4.9.0`]
