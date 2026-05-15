@@ -55,7 +55,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade 
     openssl=3.0.19-1~deb12u2 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install minimal system dependencies
+# Install minimal system dependencies + the agent-CLI / TUI-debug toolkit.
+# Bundle includes: tmux for script-driven multiplexing (claude can `new-session
+# -d`, `send-keys`, `capture-pane -p`); expect for driving interactive prompts;
+# neovim for in-container quick edits; ripgrep/fd-find/bat for fast search +
+# pretty file inspection (claude reaches for these constantly); fzf for
+# fuzzy completion in interactive shells.
+# Note: on Debian, fd-find ships as `fdfind` and bat as `batcat` — we add
+# convenience symlinks below so claude can call `fd` and `bat` directly.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
@@ -68,7 +75,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     podman \
     rsync \
     tmux \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    expect \
+    neovim \
+    ripgrep \
+    fd-find \
+    bat \
+    fzf \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* \
+    && ln -s /usr/bin/fdfind /usr/local/bin/fd \
+    && ln -s /usr/bin/batcat /usr/local/bin/bat
 
 # Generate en_US.UTF-8 locale
 RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen
@@ -152,6 +167,106 @@ RUN set -eux; \
     install -m 0755 "taplo-linux-${ARCH}" /usr/local/bin/taplo; \
     rm -f "taplo-linux-${ARCH}"; \
     taplo --version;
+
+# Install eza binary (modern ls). Not in apt for bookworm — pull from release.
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+        amd64) ARCH=x86_64-unknown-linux-musl ;; \
+        arm64) ARCH=aarch64-unknown-linux-gnu ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    EZA_VERSION="$(curl -fsSL https://api.github.com/repos/eza-community/eza/releases/latest | sed -n 's/.*"tag_name": *"\(v[^"]*\)".*/\1/p')"; \
+    URL="https://github.com/eza-community/eza/releases/download/${EZA_VERSION}"; \
+    FILE="eza_${ARCH}.tar.gz"; \
+    curl -fsSL "${URL}/${FILE}" -o eza.tar.gz; \
+    tar -xzf eza.tar.gz; \
+    install -m 0755 eza /usr/local/bin/eza; \
+    rm -f eza eza.tar.gz; \
+    eza --version | head -2;
+
+# Install delta (git-diff prettifier). Not in apt for bookworm.
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+        amd64) ARCH=x86_64-unknown-linux-gnu ;; \
+        arm64) ARCH=aarch64-unknown-linux-gnu ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    DELTA_VERSION="$(curl -fsSL https://api.github.com/repos/dandavison/delta/releases/latest | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')"; \
+    URL="https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}"; \
+    FILE="delta-${DELTA_VERSION}-${ARCH}.tar.gz"; \
+    curl -fsSL "${URL}/${FILE}" -o delta.tar.gz; \
+    tar -xzf delta.tar.gz; \
+    install -m 0755 "delta-${DELTA_VERSION}-${ARCH}/delta" /usr/local/bin/delta; \
+    rm -rf "delta-${DELTA_VERSION}-${ARCH}" delta.tar.gz; \
+    delta --version;
+
+# Install lazygit binary (git TUI). Useful inside the container for quick
+# review during a CC session.
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+        amd64) ARCH=Linux_x86_64 ;; \
+        arm64) ARCH=Linux_arm64 ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    LG_VERSION="$(curl -fsSL https://api.github.com/repos/jesseduffield/lazygit/releases/latest | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')"; \
+    URL="https://github.com/jesseduffield/lazygit/releases/download/v${LG_VERSION}"; \
+    FILE="lazygit_${LG_VERSION}_${ARCH}.tar.gz"; \
+    curl -fsSL "${URL}/${FILE}" -o lazygit.tar.gz; \
+    tar -xzf lazygit.tar.gz lazygit; \
+    install -m 0755 lazygit /usr/local/bin/lazygit; \
+    rm -f lazygit lazygit.tar.gz; \
+    lazygit --version | head -2;
+
+# Install zoxide binary (z/cd-by-frecency). Skip the install.sh wrapper —
+# pull the release tarball directly so we don't bring in a shell-init step.
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+        amd64) ARCH=x86_64-unknown-linux-musl ;; \
+        arm64) ARCH=aarch64-unknown-linux-musl ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    ZX_VERSION="$(curl -fsSL https://api.github.com/repos/ajeetdsouza/zoxide/releases/latest | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')"; \
+    URL="https://github.com/ajeetdsouza/zoxide/releases/download/v${ZX_VERSION}"; \
+    FILE="zoxide-${ZX_VERSION}-${ARCH}.tar.gz"; \
+    curl -fsSL "${URL}/${FILE}" -o zoxide.tar.gz; \
+    tar -xzf zoxide.tar.gz zoxide; \
+    install -m 0755 zoxide /usr/local/bin/zoxide; \
+    rm -f zoxide zoxide.tar.gz; \
+    zoxide --version;
+
+# Install starship prompt binary. Note: starship only ships musl builds for
+# linux, no gnu variant.
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+        amd64) ARCH=x86_64-unknown-linux-musl ;; \
+        arm64) ARCH=aarch64-unknown-linux-musl ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    SS_VERSION="$(curl -fsSL https://api.github.com/repos/starship/starship/releases/latest | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')"; \
+    URL="https://github.com/starship/starship/releases/download/v${SS_VERSION}"; \
+    FILE="starship-${ARCH}.tar.gz"; \
+    curl -fsSL "${URL}/${FILE}" -o starship.tar.gz; \
+    tar -xzf starship.tar.gz; \
+    install -m 0755 starship /usr/local/bin/starship; \
+    rm -f starship starship.tar.gz; \
+    starship --version | head -1;
+
+# Install charm-freeze (render terminal output as styled PNG — claude reads
+# images natively, so this gives the agent a way to "see" colored TUI state).
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+        amd64) ARCH=Linux_x86_64 ;; \
+        arm64) ARCH=Linux_arm64 ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    FZ_VERSION="$(curl -fsSL https://api.github.com/repos/charmbracelet/freeze/releases/latest | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')"; \
+    URL="https://github.com/charmbracelet/freeze/releases/download/v${FZ_VERSION}"; \
+    FILE="freeze_${FZ_VERSION}_${ARCH}.tar.gz"; \
+    curl -fsSL "${URL}/${FILE}" -o freeze.tar.gz; \
+    tar -xzf freeze.tar.gz; \
+    install -m 0755 "freeze_${FZ_VERSION}_${ARCH}/freeze" /usr/local/bin/freeze; \
+    rm -rf "freeze_${FZ_VERSION}_${ARCH}" freeze.tar.gz; \
+    freeze --version;
 
 # Install cursor-agent CLI (installs to ~/.local/bin)
 ENV PATH="/root/.local/bin:${PATH}"
@@ -294,8 +409,39 @@ ENV PRE_COMMIT_HOME="/opt/pre-commit-cache"
 ENV UV_PROJECT_ENVIRONMENT="/root/assets/workspace/.venv"
 ENV VIRTUAL_ENV="/root/assets/workspace/.venv"
 
-# Create aliases for pre-commit
-RUN echo 'alias precommit="pre-commit run"' >> /root/.bashrc
+# IS_SANDBOX=1 lets `claude --dangerously-skip-permissions` bypass the uid-0
+# refusal that otherwise fires when claude detects it's running as root. The
+# container is the trust boundary; this is the documented escape hatch.
+ENV IS_SANDBOX="1"
+
+# Install Claude Code CLI globally so it's on PATH for every shell. Mirrors
+# the cursor-agent install pattern above. Three retries because the install
+# script pulls from a CDN that occasionally hiccups.
+RUN set -eux; \
+    INSTALLER="/tmp/claude-install.sh"; \
+    for attempt in 1 2 3; do \
+        if curl -fsSL https://claude.ai/install.sh -o "${INSTALLER}" \
+            && bash "${INSTALLER}" \
+            && [ -x /root/.local/bin/claude ]; then \
+            ln -s /root/.local/bin/claude /usr/local/bin/claude; \
+            claude --version; \
+            rm -f "${INSTALLER}"; \
+            exit 0; \
+        fi; \
+        rm -f "${INSTALLER}"; \
+        echo "claude install attempt ${attempt} failed, retrying in 10s..."; \
+        sleep 10; \
+    done; \
+    echo "WARNING: claude install failed after 3 attempts (CDN issue); skipping"; \
+    echo "Install manually: curl -fsSL https://claude.ai/install.sh | bash";
+
+# Create aliases for pre-commit + Claude Code variants. `cc` is the safer
+# default (prompts for permissions); `cld` is the auto-approve variant for
+# fully-isolated containers where the dev consciously trades off oversight
+# for autonomy. Both rely on IS_SANDBOX=1 above.
+RUN echo 'alias precommit="pre-commit run"' >> /root/.bashrc \
+ && echo 'alias cc="claude"' >> /root/.bashrc \
+ && echo 'alias cld="claude --dangerously-skip-permissions"' >> /root/.bashrc
 
 # Default command - interactive shell
 CMD ["/bin/bash"]
