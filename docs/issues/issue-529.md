@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-05-15T14:23:40Z
+updated: 2026-05-16T10:41:27Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/devcontainer/issues/529
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-05-16T05:32:50.180Z
+synced: 2026-05-17T05:54:42.224Z
 ---
 
 # [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devcontainer/issues/529)
@@ -521,7 +521,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `pytest-cov >=4.0` → [Updates: `==7.0.0`]
  - `ipykernel >=6.0` → [Updates: `==7.2.0`]
  - `jupyter >=1.0` → [Updates: `==1.1.1`]
- - `numpy >=2.0` → [Updates: `==2.4.4`]
+ - `numpy >=2.0` → [Updates: `==2.4.5`]
  - `scipy >=1.14` → [Updates: `==1.17.1`]
  - `pandas >=2.2` → [Updates: `==3.0.3`]
  - `matplotlib >=3.9` → [Updates: `==3.10.9`]
