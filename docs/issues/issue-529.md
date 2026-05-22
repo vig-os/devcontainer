@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-05-17T07:58:49Z
+updated: 2026-05-21T23:59:25Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/devcontainer/issues/529
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-05-18T06:21:19.531Z
+synced: 2026-05-22T06:15:19.645Z
 ---
 
 # [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devcontainer/issues/529)
@@ -51,11 +51,11 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
  - [ ] <!-- rebase-branch=renovate/pypi-pytest-vulnerability -->[build(pip): update dependency pytest to v9.0.3 [security]](../pull/528)
  - [ ] <!-- rebase-branch=renovate/pin-dependencies -->[build(pip): pin dependencies](../pull/530) (`bandit`, `bcrypt`, `github-backup`, `hatchling`, `ipykernel`, `jinja2`, `jupyter`, `matplotlib`, `numpy`, `pandas`, `pexpect`, `pip-licenses`, `pre-commit`, `pytest-cov`, `pytest-docker`, `pytest-testinfra`, `python`, `pyyaml`, `rich`, `ruff`, `scipy`, `testcontainers`, `testinfra`)
- - [ ] <!-- rebase-branch=renovate/python-3.12-slim-bookworm -->[build(docker): update python:3.12-slim-bookworm docker digest to d193c6f](../pull/531)
+ - [ ] <!-- rebase-branch=renovate/python-3.12-slim-bookworm -->[build(docker): update python:3.12-slim-bookworm docker digest to 93ab4b7](../pull/531)
  - [ ] <!-- rebase-branch=renovate/actions-create-github-app-token-digest -->[chore(deps): update actions/create-github-app-token digest to bcd2ba4](../pull/532)
  - [ ] <!-- rebase-branch=renovate/astral-sh-setup-uv-digest -->[chore(deps): update astral-sh/setup-uv digest to 37802ad](../pull/533)
  - [ ] <!-- rebase-branch=renovate/github-codeql-action-digest -->[chore(deps): update github/codeql-action digest to 9e0d7b8](../pull/534)
- - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to 67914ba](../pull/535)
+ - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to 3c0e4c8](../pull/535)
  - [ ] <!-- rebase-branch=renovate/github-actions-(minor-and-patch) -->[ci(actions): update github-actions (minor and patch)](../pull/536) (`actions/cache`, `actions/setup-node`, `actions/upload-artifact`, `aquasecurity/trivy`, `aquasecurity/trivy-action`, `astral-sh/uv`, `docker/build-push-action`, `docker/login-action`)
  - [ ] <!-- rebase-branch=renovate/python-3.x -->[build(docker): update python docker tag to v3.14](../pull/537)
  - [ ] <!-- rebase-branch=renovate/devcontainers-cli-0.x -->[build(npm): update dependency @devcontainers/cli to v0.87.0](../pull/538)
@@ -89,8 +89,8 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `docker/login-action v4.0.0@b45d80f862d83dbcd57f89517bcf500b2ab88fb2` → [Updates: `v4.1.0`]
  - `docker/setup-buildx-action v4.0.0@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd`
  - `docker/metadata-action v6.0.0@030e881283bb7a6894de51c315a6bfe6a94e05cf`
- - `docker/build-push-action v7.0.0@d08e5c354a6adb9ed34480a06d141179aa583294` → [Updates: `v7.1.0`]
- - `docker/build-push-action v7.0.0@d08e5c354a6adb9ed34480a06d141179aa583294` → [Updates: `v7.1.0`]
+ - `docker/build-push-action v7.0.0@d08e5c354a6adb9ed34480a06d141179aa583294` → [Updates: `v7.2.0`]
+ - `docker/build-push-action v7.0.0@d08e5c354a6adb9ed34480a06d141179aa583294` → [Updates: `v7.2.0`]
 
 </details>
 
@@ -103,8 +103,8 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `actions/setup-node v6.3.0@53b83947a5a98c8d113130e565377fae1a50d02f` → [Updates: `v6.4.0`]
  - `taiki-e/install-action just@01159adff8f38113be7211e869405f6f6abf02d7` → [Updates: `just`]
  - `bats-core/bats-action v4.0.0@77d6fb60505b4d0d1d73e48bd035b55074bbfb43`
- - `astral-sh/uv 0.10.0` → [Updates: `0.11.14`]
- - `astral-sh/uv 0.10.0` → [Updates: `0.11.14`]
+ - `astral-sh/uv 0.10.0` → [Updates: `0.11.16`]
+ - `astral-sh/uv 0.10.0` → [Updates: `0.11.16`]
 
 </details>
 
@@ -521,7 +521,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `pytest-cov >=4.0` → [Updates: `==7.0.0`]
  - `ipykernel >=6.0` → [Updates: `==7.2.0`]
  - `jupyter >=1.0` → [Updates: `==1.1.1`]
- - `numpy >=2.0` → [Updates: `==2.4.5`]
+ - `numpy >=2.0` → [Updates: `==2.4.6`]
  - `scipy >=1.14` → [Updates: `==1.17.1`]
  - `pandas >=2.2` → [Updates: `==3.0.3`]
  - `matplotlib >=3.9` → [Updates: `==3.10.9`]
