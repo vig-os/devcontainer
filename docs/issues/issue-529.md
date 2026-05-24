@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-05-21T23:59:25Z
+updated: 2026-05-23T15:44:40Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/devcontainer/issues/529
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-05-22T06:15:19.645Z
+synced: 2026-05-24T06:08:38.921Z
 ---
 
 # [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devcontainer/issues/529)
@@ -54,9 +54,9 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - [ ] <!-- rebase-branch=renovate/python-3.12-slim-bookworm -->[build(docker): update python:3.12-slim-bookworm docker digest to 93ab4b7](../pull/531)
  - [ ] <!-- rebase-branch=renovate/actions-create-github-app-token-digest -->[chore(deps): update actions/create-github-app-token digest to bcd2ba4](../pull/532)
  - [ ] <!-- rebase-branch=renovate/astral-sh-setup-uv-digest -->[chore(deps): update astral-sh/setup-uv digest to 37802ad](../pull/533)
- - [ ] <!-- rebase-branch=renovate/github-codeql-action-digest -->[chore(deps): update github/codeql-action digest to 9e0d7b8](../pull/534)
- - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to 3c0e4c8](../pull/535)
- - [ ] <!-- rebase-branch=renovate/github-actions-(minor-and-patch) -->[ci(actions): update github-actions (minor and patch)](../pull/536) (`actions/cache`, `actions/setup-node`, `actions/upload-artifact`, `aquasecurity/trivy`, `aquasecurity/trivy-action`, `astral-sh/uv`, `docker/build-push-action`, `docker/login-action`)
+ - [ ] <!-- rebase-branch=renovate/github-codeql-action-digest -->[chore(deps): update github/codeql-action digest to 7211b7c](../pull/534)
+ - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to d9a3293](../pull/535)
+ - [ ] <!-- rebase-branch=renovate/github-actions-(minor-and-patch) -->[ci(actions): update github-actions (minor and patch)](../pull/536) (`actions/cache`, `actions/setup-node`, `actions/upload-artifact`, `aquasecurity/trivy`, `aquasecurity/trivy-action`, `astral-sh/uv`, `docker/build-push-action`, `docker/login-action`, `docker/metadata-action`, `docker/setup-buildx-action`)
  - [ ] <!-- rebase-branch=renovate/python-3.x -->[build(docker): update python docker tag to v3.14](../pull/537)
  - [ ] <!-- rebase-branch=renovate/devcontainers-cli-0.x -->[build(npm): update dependency @devcontainers/cli to v0.87.0](../pull/538)
  - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update python to v3.14.5](../pull/539)
@@ -86,9 +86,9 @@ The following updates have all been created. To force a retry/rebase of any, cli
 
 <details><summary>.github/actions/build-image/action.yml (5)</summary>
 
- - `docker/login-action v4.0.0@b45d80f862d83dbcd57f89517bcf500b2ab88fb2` → [Updates: `v4.1.0`]
- - `docker/setup-buildx-action v4.0.0@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd`
- - `docker/metadata-action v6.0.0@030e881283bb7a6894de51c315a6bfe6a94e05cf`
+ - `docker/login-action v4.0.0@b45d80f862d83dbcd57f89517bcf500b2ab88fb2` → [Updates: `v4.2.0`]
+ - `docker/setup-buildx-action v4.0.0@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd` → [Updates: `v4.1.0`]
+ - `docker/metadata-action v6.0.0@030e881283bb7a6894de51c315a6bfe6a94e05cf` → [Updates: `v6.1.0`]
  - `docker/build-push-action v7.0.0@d08e5c354a6adb9ed34480a06d141179aa583294` → [Updates: `v7.2.0`]
  - `docker/build-push-action v7.0.0@d08e5c354a6adb9ed34480a06d141179aa583294` → [Updates: `v7.2.0`]
 
@@ -193,12 +193,12 @@ The following updates have all been created. To force a retry/rebase of any, cli
 <details><summary>.github/workflows/promote-release.yml (15)</summary>
 
  - `actions/checkout v6.0.2@de0fac2e4500dabe0009e67214ff5f5447ce83dd`
- - `docker/login-action v4.1.0@4907a6ddec9925e35a0a9e82d7399ccc52663121`
+ - `docker/login-action v4.1.0@4907a6ddec9925e35a0a9e82d7399ccc52663121` → [Updates: `v4.2.0`]
  - `sigstore/cosign-installer v4@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003`
  - `actions/create-github-app-token v3@f8d387b68d61c58ab83c6c016672934102569859` → [Updates: `v3`]
  - `actions/checkout v6.0.2@de0fac2e4500dabe0009e67214ff5f5447ce83dd`
  - `actions/create-github-app-token v3@f8d387b68d61c58ab83c6c016672934102569859` → [Updates: `v3`]
- - `docker/login-action v4.1.0@4907a6ddec9925e35a0a9e82d7399ccc52663121`
+ - `docker/login-action v4.1.0@4907a6ddec9925e35a0a9e82d7399ccc52663121` → [Updates: `v4.2.0`]
  - `actions/checkout v6.0.2@de0fac2e4500dabe0009e67214ff5f5447ce83dd`
  - `actions/create-github-app-token v3@f8d387b68d61c58ab83c6c016672934102569859` → [Updates: `v3`]
  - `actions/checkout v6.0.2@de0fac2e4500dabe0009e67214ff5f5447ce83dd`
@@ -223,7 +223,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `actions/create-github-app-token v3@f8d387b68d61c58ab83c6c016672934102569859` → [Updates: `v3`]
  - `actions/checkout v6.0.2@de0fac2e4500dabe0009e67214ff5f5447ce83dd`
  - `sigstore/cosign-installer v4@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003`
- - `docker/login-action v4.1.0@4907a6ddec9925e35a0a9e82d7399ccc52663121`
+ - `docker/login-action v4.1.0@4907a6ddec9925e35a0a9e82d7399ccc52663121` → [Updates: `v4.2.0`]
  - `actions/download-artifact v8.0.1@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c`
  - `anchore/sbom-action v0.24.0@e22c389904149dbc22b58101806040fa8d37a610`
  - `anchore/sbom-action v0.24.0@e22c389904149dbc22b58101806040fa8d37a610`
