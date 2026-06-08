@@ -15,7 +15,7 @@ jobs:
     if: >-
       github.event.pull_request.user.login == 'renovate[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 2
     permissions:
       contents: read
@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
           sparse-checkout: |
             .vig-os
@@ -40,7 +40,7 @@ jobs:
       github.event.pull_request.user.login == 'renovate[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository
     needs: [resolve-image]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     container:
       image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 10
@@ -54,13 +54,13 @@ jobs:
     steps:
       - name: Generate a token
         id: generate-token
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
         with:
           app-id: ${{ secrets.COMMIT_APP_ID }}
           private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
 
       - name: Checkout PR head
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
