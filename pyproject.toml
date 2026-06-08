@@ -4,10 +4,10 @@ version = "0.1.1"
 description = "vigOS development environment"
 requires-python = "==3.14.5"
 dependencies = [
-  "github-backup==0.61.5",
+  "github-backup==0.62.1",
   "jinja2==3.1.6",
   "pexpect==4.9.0",
-  "pre-commit==4.5.1",
+  "pre-commit==4.6.0",
   "pytest>=9.0.1",
   "pyyaml==6.0.3",
   "testinfra==6.0.0",
@@ -21,25 +21,25 @@ dev = [
   { include-group = "test" },
 ]
 devcontainer = [
-  "rich==14.3.3",
-  "pre-commit==4.5.1",
-  "ruff==0.15.5",
-  "pip-licenses==5.5.1",
+  "rich==14.3.4",
+  "pre-commit==4.6.0",
+  "ruff==0.15.16",
+  "pip-licenses==5.5.5",
   "bandit[toml]==1.9.4",
 ]
 lint = [
-  "pre-commit==4.5.1",
-  "ruff==0.15.5",
-  "pip-licenses==5.5.1",
+  "pre-commit==4.6.0",
+  "ruff==0.15.16",
+  "pip-licenses==5.5.5",
   "bandit[toml]==1.9.4",
 ]
 test = [
   "pytest>=8.4.1",
-  "pytest-cov==7.0.0",
+  "pytest-cov==7.1.0",
   "pytest-testinfra==10.2.2",
   "pytest-docker==3.2.5",
   "pexpect==4.9.0",
-  "testcontainers==4.14.1",
+  "testcontainers==4.14.2",
   "bcrypt==5.0.0",
 ]
 
