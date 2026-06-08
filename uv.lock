@@ -230,52 +230,52 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "github-backup", specifier = ">=0.50.3" },
-    { name = "jinja2", specifier = ">=3.1.0" },
-    { name = "pexpect", specifier = ">=4.9.0" },
-    { name = "pre-commit", specifier = ">=4.3.0" },
+    { name = "github-backup", specifier = "==0.61.5" },
+    { name = "jinja2", specifier = "==3.1.6" },
+    { name = "pexpect", specifier = "==4.9.0" },
+    { name = "pre-commit", specifier = "==4.5.1" },
     { name = "pytest", specifier = ">=9.0.1" },
-    { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "testinfra", specifier = ">=6.0.0" },
+    { name = "pyyaml", specifier = "==6.0.3" },
+    { name = "testinfra", specifier = "==6.0.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "bandit", extras = ["toml"], specifier = ">=1.7.5" },
-    { name = "bcrypt", specifier = ">=5.0.0" },
-    { name = "pexpect", specifier = ">=4.8.0" },
-    { name = "pip-licenses", specifier = ">=5.0.0" },
-    { name = "pre-commit", specifier = ">=4.3.0" },
+    { name = "bandit", extras = ["toml"], specifier = "==1.9.4" },
+    { name = "bcrypt", specifier = "==5.0.0" },
+    { name = "pexpect", specifier = "==4.9.0" },
+    { name = "pip-licenses", specifier = "==5.5.1" },
+    { name = "pre-commit", specifier = "==4.5.1" },
     { name = "pytest", specifier = ">=8.4.1" },
-    { name = "pytest-cov", specifier = ">=6.0" },
-    { name = "pytest-docker", specifier = ">=3.2.3" },
-    { name = "pytest-testinfra", specifier = ">=10.2.2" },
-    { name = "rich", specifier = ">=13.0.0" },
-    { name = "ruff", specifier = ">=0.14.3" },
-    { name = "testcontainers", specifier = ">=4.9.0" },
+    { name = "pytest-cov", specifier = "==7.0.0" },
+    { name = "pytest-docker", specifier = "==3.2.5" },
+    { name = "pytest-testinfra", specifier = "==10.2.2" },
+    { name = "rich", specifier = "==14.3.3" },
+    { name = "ruff", specifier = "==0.15.5" },
+    { name = "testcontainers", specifier = "==4.14.1" },
     { name = "vig-utils", editable = "packages/vig-utils" },
 ]
 devcontainer = [
-    { name = "bandit", extras = ["toml"], specifier = ">=1.7.5" },
-    { name = "pip-licenses", specifier = ">=5.0.0" },
-    { name = "pre-commit", specifier = ">=4.3.0" },
-    { name = "rich", specifier = ">=13.0.0" },
-    { name = "ruff", specifier = ">=0.14.3" },
+    { name = "bandit", extras = ["toml"], specifier = "==1.9.4" },
+    { name = "pip-licenses", specifier = "==5.5.1" },
+    { name = "pre-commit", specifier = "==4.5.1" },
+    { name = "rich", specifier = "==14.3.3" },
+    { name = "ruff", specifier = "==0.15.5" },
 ]
 lint = [
-    { name = "bandit", extras = ["toml"], specifier = ">=1.7.5" },
-    { name = "pip-licenses", specifier = ">=5.0.0" },
-    { name = "pre-commit", specifier = ">=4.3.0" },
-    { name = "ruff", specifier = ">=0.14.3" },
+    { name = "bandit", extras = ["toml"], specifier = "==1.9.4" },
+    { name = "pip-licenses", specifier = "==5.5.1" },
+    { name = "pre-commit", specifier = "==4.5.1" },
+    { name = "ruff", specifier = "==0.15.5" },
 ]
 test = [
-    { name = "bcrypt", specifier = ">=5.0.0" },
-    { name = "pexpect", specifier = ">=4.8.0" },
+    { name = "bcrypt", specifier = "==5.0.0" },
+    { name = "pexpect", specifier = "==4.9.0" },
     { name = "pytest", specifier = ">=8.4.1" },
-    { name = "pytest-cov", specifier = ">=6.0" },
-    { name = "pytest-docker", specifier = ">=3.2.3" },
-    { name = "pytest-testinfra", specifier = ">=10.2.2" },
-    { name = "testcontainers", specifier = ">=4.9.0" },
+    { name = "pytest-cov", specifier = "==7.0.0" },
+    { name = "pytest-docker", specifier = "==3.2.5" },
+    { name = "pytest-testinfra", specifier = "==10.2.2" },
+    { name = "testcontainers", specifier = "==4.14.1" },
 ]
 
 [[package]]

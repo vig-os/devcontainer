@@ -7,7 +7,12 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-cov==7.0.0", "ipykernel==7.2.0", "jupyter==1.1.1"]
-science = ["numpy==2.4.6", "scipy==1.17.1", "pandas==3.0.3", "matplotlib==3.10.9"]
+science = [
+  "numpy==2.4.6",
+  "scipy==1.17.1",
+  "pandas==3.0.3",
+  "matplotlib==3.10.9",
+]
 all = ["{{SHORT_NAME}}[dev,science]"]
 
 [build-system]
