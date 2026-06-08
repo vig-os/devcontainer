@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Taplo lint hook no longer fetches remote schema catalogs (fetch started failing in taplo 0.10)
   - Renewed dependency-review allow-list exception for bats-file false positive (`GHSA-wvrr-2x4r-394v`)
 
+- **Image tests red on stale cargo-binstall pin** ([#557](https://github.com/vig-os/devcontainer/issues/557))
+  - Bump expected `cargo-binstall` 1.19 → 1.20 to match the latest upstream release the image installs
+
 ### Security
 
 - **Update pytest to v9.0.3** ([#528](https://github.com/vig-os/devcontainer/issues/528))
