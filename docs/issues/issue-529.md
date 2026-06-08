@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-06-06T19:02:59Z
+updated: 2026-06-07T12:11:29Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/devcontainer/issues/529
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-07T06:37:16.914Z
+synced: 2026-06-08T06:53:32.498Z
 ---
 
 # [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devcontainer/issues/529)
@@ -38,9 +38,9 @@ The following updates are currently rate-limited. To force their creation now, c
 ---
 
 > [!WARNING]
-> Renovate failed to look up the following dependencies: `Could not determine new digest for update (github-tags package bats-core/bats-action)`, `Could not determine new digest for update (github-tags package actions/dependency-review-action)`, `Could not determine new digest for update (github-tags package sigstore/cosign-installer)`.
+> Renovate failed to look up the following dependencies: `Could not determine new digest for update (github-tags package bats-core/bats-action)`, `Could not determine new digest for update (github-tags package actions/dependency-review-action)`, `Failed to look up github-releases package aquasecurity/trivy: no-result`, `Could not determine new digest for update (github-tags package sigstore/cosign-installer)`.
 > 
-> Files affected: `.github/actions/setup-env/action.yml`, `.github/workflows/ci.yml`, `.github/workflows/promote-release.yml`, `.github/workflows/release.yml`
+> Files affected: `.github/actions/setup-env/action.yml`, `.github/workflows/ci.yml`, `.github/workflows/promote-release.yml`, `.github/workflows/release.yml`, `.github/workflows/security-scan.yml`
 
 ---
 
@@ -55,8 +55,8 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - [ ] <!-- rebase-branch=renovate/actions-create-github-app-token-digest -->[chore(deps): update actions/create-github-app-token digest to bcd2ba4](../pull/532)
  - [ ] <!-- rebase-branch=renovate/astral-sh-setup-uv-digest -->[chore(deps): update astral-sh/setup-uv digest to 37802ad](../pull/533)
  - [ ] <!-- rebase-branch=renovate/github-codeql-action-digest -->[chore(deps): update github/codeql-action digest to 8aad20d](../pull/534)
- - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to 95b969f](../pull/535)
- - [ ] <!-- rebase-branch=renovate/github-actions-(minor-and-patch) -->[ci(actions): update github-actions (minor and patch)](../pull/536) (`actions/cache`, `actions/checkout`, `actions/setup-node`, `actions/upload-artifact`, `aquasecurity/trivy`, `aquasecurity/trivy-action`, `astral-sh/uv`, `docker/build-push-action`, `docker/login-action`, `docker/metadata-action`, `docker/setup-buildx-action`)
+ - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to 957bad4](../pull/535)
+ - [ ] <!-- rebase-branch=renovate/github-actions-(minor-and-patch) -->[ci(actions): update github-actions (minor and patch)](../pull/536) (`actions/cache`, `actions/checkout`, `actions/setup-node`, `actions/upload-artifact`, `aquasecurity/trivy-action`, `astral-sh/uv`, `docker/build-push-action`, `docker/login-action`, `docker/metadata-action`, `docker/setup-buildx-action`)
  - [ ] <!-- rebase-branch=renovate/python-3.x -->[build(docker): update python docker tag to v3.14](../pull/537)
  - [ ] <!-- rebase-branch=renovate/devcontainers-cli-0.x -->[build(npm): update dependency @devcontainers/cli to v0.87.0](../pull/538)
  - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update python (minor and patch) to v3.14.5](../pull/539)
@@ -157,11 +157,11 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `ubuntu 22.04` → [Updates: `24.04`]
  - `ubuntu 22.04` → [Updates: `24.04`]
  - `ubuntu 22.04` → [Updates: `24.04`]
- - `aquasecurity/trivy v0.69.3` → [Updates: `v0.71.0`]
- - `aquasecurity/trivy v0.69.3` → [Updates: `v0.71.0`]
- - `aquasecurity/trivy v0.69.3` → [Updates: `v0.71.0`]
- - `aquasecurity/trivy v0.69.3` → [Updates: `v0.71.0`]
- - `aquasecurity/trivy v0.69.3` → [Updates: `v0.71.0`]
+ - `aquasecurity/trivy v0.69.3`
+ - `aquasecurity/trivy v0.69.3`
+ - `aquasecurity/trivy v0.69.3`
+ - `aquasecurity/trivy v0.69.3`
+ - `aquasecurity/trivy v0.69.3`
  - `ubuntu 22.04` → [Updates: `24.04`]
  - `ubuntu 22.04` → [Updates: `24.04`]
 
@@ -241,7 +241,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `actions/github-script v8.0.0@ed597411d8f924073f98dfc5c65a23a2325f34cd` → [Updates: `v9.0.0`]
  - `ubuntu 22.04` → [Updates: `24.04`]
  - `ubuntu 22.04` → [Updates: `24.04`]
- - `aquasecurity/trivy v0.69.3` → [Updates: `v0.71.0`]
+ - `aquasecurity/trivy v0.69.3`
  - `ubuntu 22.04` → [Updates: `24.04`]
  - `ubuntu 22.04` → [Updates: `24.04`]
  - `ubuntu 22.04` → [Updates: `24.04`]
@@ -287,10 +287,10 @@ The following updates have all been created. To force a retry/rebase of any, cli
  - `actions/upload-artifact v7.0.0@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f` → [Updates: `v7.0.1`]
  - `github/codeql-action v4@c10b8064de6f491fea524254123dbe5e09572f13` → [Updates: `v4`]
  - `ubuntu 22.04` → [Updates: `24.04`]
- - `aquasecurity/trivy v0.69.3` → [Updates: `v0.71.0`]
- - `aquasecurity/trivy v0.69.3` → [Updates: `v0.71.0`]
- - `aquasecurity/trivy v0.69.3` → [Updates: `v0.71.0`]
- - `aquasecurity/trivy v0.69.3` → [Updates: `v0.71.0`]
+ - `aquasecurity/trivy v0.69.3`
+ - `aquasecurity/trivy v0.69.3`
+ - `aquasecurity/trivy v0.69.3`
+ - `aquasecurity/trivy v0.69.3`
 
 </details>
 
