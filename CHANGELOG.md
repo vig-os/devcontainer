@@ -16,12 +16,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Update pytest to v9.0.3** ([#528](https://github.com/vig-os/devcontainer/issues/528))
+  - Security patch for pytest dependency bump
+
 - **Remediate nightly scan gate failures on :latest** ([#549](https://github.com/vig-os/devcontainer/issues/549))
   - Rebased base image to latest `python:3.12-slim-bookworm` digest
   - Patched `libgnutls30` to `3.7.9-2+deb12u7` for fixable GnuTLS CVEs
   - Rewrote `.trivyignore` from scratch with fresh expirations for unfixable findings only
 
 ### Changed
+
+- **Consolidate Renovate dependency updates** ([#550](https://github.com/vig-os/devcontainer/issues/550))
+  - Python 3.12 → 3.14.5 (`Containerfile`, `requires-python`, and lockfile)
+  - CI runners `ubuntu-22.04` → `24.04` and Node.js 22 → 24
+  - GitHub Actions major bumps: `setup-node` v6, `setup-uv` v8, `github-script` v9
+  - SHA-pinned digest updates for checkout, codeql, create-github-app-token, and taiki-e/install-action
+  - Pin Python, npm, and workspace template dependencies to exact versions ([#530](https://github.com/vig-os/devcontainer/issues/530))
+  - `@devcontainers/cli` 0.87.0 ([#538](https://github.com/vig-os/devcontainer/issues/538))
 
 - **Bump expected tool versions in image tests**
   - `gh` 2.92 → 2.93, `just` 1.50 → 1.51, `cargo-binstall` 1.18 → 1.19 to match latest upstream releases
