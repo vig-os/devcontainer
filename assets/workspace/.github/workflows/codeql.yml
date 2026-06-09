@@ -1,6 +1,6 @@
 # CodeQL Static Analysis
 #
-# Runs GitHub CodeQL analysis on Python scripts used in the build toolchain.
+# Runs GitHub CodeQL analysis on Python build tooling and GitHub Actions workflows.
 # While these are build tools (not product code), static analysis provides
 # defense-in-depth for scripts that handle git operations, file I/O, and
 # subprocess execution.
@@ -23,6 +23,7 @@ on:  # yamllint disable-line rule:truthy
       - main
     paths:
       - '**.py'
+      - '.github/workflows/**'
   schedule:
     - cron: '15 2 * * 1'  # Monday at 02:15 UTC
 
@@ -41,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['python']
+        language: ['python', 'actions']
 
     steps:
       - name: Checkout repository
