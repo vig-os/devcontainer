@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Bump `urllib3` 2.7.0, `requests` 2.34.2, `idna` 3.18, `Pygments` 2.20.0 in the repo lockfile
   - Constrain workspace-template jupyter stack to patched versions (`notebook` 7.5.6, `jupyterlab` 4.5.7, `jupyter-server` 2.18.0, `mistune` 3.2.1)
 
+- **Add downstream SECURITY.md template and close smoke-test Scorecard gaps** ([#568](https://github.com/vig-os/devcontainer/issues/568))
+  - Add `assets/workspace/SECURITY.md` so generated and smoke-test repos ship a security policy (clears Scorecard `SecurityPolicyID` on the next release re-sync)
+  - Document `FuzzingID` and `CIIBestPracticesID` as accepted won't-fix posture in the template policy
+  - Document smoke-test-specific accepted findings (branch-protection, code-review, pinned `download-then-run`) in the `assets/smoke-test/` overlay, accepted because the deploy-validation repo runs fully unattended
+
 ### Changed
 
 - **Consolidate Renovate dependency updates** ([#550](https://github.com/vig-os/devcontainer/issues/550))
