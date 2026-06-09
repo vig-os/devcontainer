@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Add explicit `permissions:` to workspace `release-extension.yml` template; downstream smoke-test updates flow through release re-sync
   - Document accepted OpenSSF Scorecard posture (Fuzzing, CII) and verified branch-protection rulesets in `SECURITY.md`
 
+- **Update vulnerable Python dependencies** ([#563](https://github.com/vig-os/devcontainer/issues/563))
+  - Bump `urllib3` 2.7.0, `requests` 2.34.2, `idna` 3.18, `Pygments` 2.20.0 in the repo lockfile
+  - Constrain workspace-template jupyter stack to patched versions (`notebook` 7.5.6, `jupyterlab` 4.5.7, `jupyter-server` 2.18.0, `mistune` 3.2.1)
+
 ### Changed
 
 - **Consolidate Renovate dependency updates** ([#550](https://github.com/vig-os/devcontainer/issues/550))
