@@ -38,7 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `@devcontainers/cli` 0.87.0 ([#538](https://github.com/vig-os/devcontainer/issues/538))
 
 - **Bump expected tool versions in image tests**
-  - `gh` 2.92 → 2.93, `just` 1.50 → 1.51, `cargo-binstall` 1.18 → 1.19 to match latest upstream releases
+  - `gh` 2.92 → 2.93, `just` 1.50 → 1.52, `cargo-binstall` 1.18 → 1.19 to match latest upstream releases
+
+- **Consolidate Renovate dependency updates (553–556)** ([#553](https://github.com/vig-os/devcontainer/issues/553), [#554](https://github.com/vig-os/devcontainer/issues/554), [#555](https://github.com/vig-os/devcontainer/issues/555), [#556](https://github.com/vig-os/devcontainer/issues/556))
+  - Pin `pytest` to 9.0.3, bump `pytest-cov` to 7.1.0, `rich` to 15.0.0
+  - Bump `github-backup` to 0.62.1, `pre-commit` to 4.6.0, `ruff` to 0.15.16, `pip-licenses` to 5.5.5
+  - Bump expected `pre-commit` version in image tests to 4.6
+  - Bump `actions/dependency-review-action` to v5.0.0
 
 ## [0.3.4](https://github.com/vig-os/devcontainer/releases/tag/0.3.4) - 2026-04-29
 
