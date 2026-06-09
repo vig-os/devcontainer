@@ -234,7 +234,7 @@ requires-dist = [
     { name = "jinja2", specifier = "==3.1.6" },
     { name = "pexpect", specifier = "==4.9.0" },
     { name = "pre-commit", specifier = "==4.5.1" },
-    { name = "pytest", specifier = ">=9.0.1" },
+    { name = "pytest", specifier = "==9.0.3" },
     { name = "pyyaml", specifier = "==6.0.3" },
     { name = "testinfra", specifier = "==6.0.0" },
 ]
@@ -246,7 +246,7 @@ dev = [
     { name = "pexpect", specifier = "==4.9.0" },
     { name = "pip-licenses", specifier = "==5.5.1" },
     { name = "pre-commit", specifier = "==4.5.1" },
-    { name = "pytest", specifier = ">=8.4.1" },
+    { name = "pytest", specifier = "==9.0.3" },
     { name = "pytest-cov", specifier = "==7.0.0" },
     { name = "pytest-docker", specifier = "==3.2.5" },
     { name = "pytest-testinfra", specifier = "==10.2.2" },
@@ -271,7 +271,7 @@ lint = [
 test = [
     { name = "bcrypt", specifier = "==5.0.0" },
     { name = "pexpect", specifier = "==4.9.0" },
-    { name = "pytest", specifier = ">=8.4.1" },
+    { name = "pytest", specifier = "==9.0.3" },
     { name = "pytest-cov", specifier = "==7.0.0" },
     { name = "pytest-docker", specifier = "==3.2.5" },
     { name = "pytest-testinfra", specifier = "==10.2.2" },
