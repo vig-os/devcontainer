@@ -61,9 +61,10 @@ There is no separate contract-version handshake; compatibility is defined by the
 
 Downstream repositories are expected to provide both app credentials:
 
-- `COMMIT_APP_ID`
+- `COMMIT_APP_ID` (required by `vig-os/sync-issues-action` in `sync-issues.yml`)
+- `COMMIT_APP_CLIENT_ID`
 - `COMMIT_APP_PRIVATE_KEY`
-- `RELEASE_APP_ID`
+- `RELEASE_APP_CLIENT_ID`
 - `RELEASE_APP_PRIVATE_KEY`
 
 Template behavior relies on explicit app-token generation for release operations:
