@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Image tests red on stale cargo-binstall pin** ([#557](https://github.com/vig-os/devcontainer/issues/557))
   - Bump expected `cargo-binstall` to 1.20 to match the latest upstream release the image installs
 
+- **arm64 release build failed with "exec format error"** ([#578](https://github.com/vig-os/devcontainer/issues/578))
+  - Restore the multi-arch index digest for `python:3.14-slim-bookworm` (`sha256:a9bee155…`); the previous bump pinned the amd64-only child manifest, so the arm64 build pulled an amd64 image and the first `RUN` died with `exec /bin/sh: exec format error`
+  - Document in `Containerfile` that manual base-image pins must use the index digest, never a per-platform child manifest
+
 ### Security
 
 - **Accept Debian won't-fix LOW CVEs in .trivyignore** ([#566](https://github.com/vig-os/devcontainer/issues/566))
@@ -44,8 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Security tab LOW count drops after the next release refreshes `:latest`
 
 - **Bump base image digest and clear fixable OS-package CVEs** ([#565](https://github.com/vig-os/devcontainer/issues/565))
-  - Pin `python:3.14-slim-bookworm` to latest upstream digest (`sha256:ec58d916…`)
-  - Retain targeted `libgnutls30=3.7.9-2+deb12u7` upgrade (new base ships `deb12u6`; fixable GnuTLS CVEs require `deb12u7`)
+  - Keep `python:3.14-slim-bookworm` pinned to its multi-arch index digest (`sha256:a9bee155…`)
+  - Retain targeted `libgnutls30=3.7.9-2+deb12u7` upgrade (base ships `deb12u6`; fixable GnuTLS CVEs require `deb12u7`)
   - CI Trivy gate passes with zero fixable HIGH/CRITICAL OS findings after rebuild
 
 - **Refresh bundled gh and uv to clear Go and Rust CVEs** ([#564](https://github.com/vig-os/devcontainer/issues/564))
