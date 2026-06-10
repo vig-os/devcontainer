@@ -5,21 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-
-### Added
-
-### Changed
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
-
-## [0.3.5] - TBD
+## [0.3.5](https://github.com/vig-os/devcontainer/releases/tag/0.3.5) - 2026-06-10
 
 ### Changed
 
@@ -32,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `@devcontainers/cli` 0.87.0 ([#538](https://github.com/vig-os/devcontainer/issues/538))
 
 - **Bump expected tool versions in image tests**
-  - `gh` 2.92 → 2.93, `just` 1.50 → 1.52, `cargo-binstall` 1.18 → 1.19 to match latest upstream releases
+  - `gh` 2.92 → 2.93, `just` 1.50 → 1.52, `cargo-binstall` 1.18 → 1.20 to match latest upstream releases
 
 - **Consolidate Renovate dependency updates (553–556)** ([#553](https://github.com/vig-os/devcontainer/issues/553), [#554](https://github.com/vig-os/devcontainer/issues/554), [#555](https://github.com/vig-os/devcontainer/issues/555), [#556](https://github.com/vig-os/devcontainer/issues/556))
   - Pin `pytest` to 9.0.3, bump `pytest-cov` to 7.1.0, `rich` to 15.0.0
@@ -48,7 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Renewed dependency-review allow-list exception for bats-file false positive (`GHSA-wvrr-2x4r-394v`)
 
 - **Image tests red on stale cargo-binstall pin** ([#557](https://github.com/vig-os/devcontainer/issues/557))
-  - Bump expected `cargo-binstall` 1.19 → 1.20 to match the latest upstream release the image installs
+  - Bump expected `cargo-binstall` to 1.20 to match the latest upstream release the image installs
+
+- **arm64 release build failed with "exec format error"** ([#578](https://github.com/vig-os/devcontainer/issues/578))
+  - Restore the multi-arch index digest for `python:3.14-slim-bookworm` (`sha256:a9bee155…`); the previous bump pinned the amd64-only child manifest, so the arm64 build pulled an amd64 image and the first `RUN` died with `exec /bin/sh: exec format error`
+  - Document in `Containerfile` that manual base-image pins must use the index digest, never a per-platform child manifest
 
 ### Security
 
@@ -58,9 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Security tab LOW count drops after the next release refreshes `:latest`
 
 - **Bump base image digest and clear fixable OS-package CVEs** ([#565](https://github.com/vig-os/devcontainer/issues/565))
-  - Pin `python:3.14-slim-bookworm` to latest upstream digest (`sha256:ec58d916…`)
-  - Retain targeted `libgnutls30=3.7.9-2+deb12u7` upgrade (new base ships `deb12u6`; fixable GnuTLS CVEs require `deb12u7`)
+  - Keep `python:3.14-slim-bookworm` pinned to its multi-arch index digest (`sha256:a9bee155…`)
+  - Retain targeted `libgnutls30=3.7.9-2+deb12u7` upgrade (base ships `deb12u6`; fixable GnuTLS CVEs require `deb12u7`)
   - CI Trivy gate passes with zero fixable HIGH/CRITICAL OS findings after rebuild
+
+- **Patch fixable OpenSSL HIGH CVE blocking the 0.3.5 release** ([#580](https://github.com/vig-os/devcontainer/issues/580))
+  - Targeted `libssl3`/`openssl` upgrade to `3.0.20-1~deb12u2` (base ships `deb12u1`); clears `CVE-2026-45447` flagged by the release Trivy gate
 
 - **Refresh bundled gh and uv to clear Go and Rust CVEs** ([#564](https://github.com/vig-os/devcontainer/issues/564))
   - Fresh image build pulls latest `gh` v2.93.0 and `uv` v0.11.19, clearing all bundled-tool HIGH findings except one awaiting upstream
@@ -71,9 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Security patch for pytest dependency bump
 
 - **Remediate nightly scan gate failures on :latest** ([#549](https://github.com/vig-os/devcontainer/issues/549))
-  - Rebased base image to latest `python:3.12-slim-bookworm` digest
-  - Patched `libgnutls30` to `3.7.9-2+deb12u7` for fixable GnuTLS CVEs
-  - Rewrote `.trivyignore` from scratch with fresh expirations for unfixable findings only
+  - Patched `libgnutls30` to `3.7.9-2+deb12u7` for fixable GnuTLS CVEs (retained across the 3.14 base rebase; see #565)
 
 - **Resolve repo-owned workflow security findings** ([#562](https://github.com/vig-os/devcontainer/issues/562))
   - Split Renovate changelog automation into read-only `pull_request` build + privileged `workflow_run` commit, removing `pull_request_target` and PR-head checkout under elevated permissions (Scorecard `DangerousWorkflowID`)

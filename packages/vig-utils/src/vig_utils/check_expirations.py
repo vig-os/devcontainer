@@ -41,9 +41,16 @@ def parse_entries(path: Path) -> list[tuple[str, date]]:
 
             expiration_match = EXPIRATION_PATTERN.match(line)
             if expiration_match:
-                current_expiration = datetime.strptime(
-                    expiration_match.group(1), "%Y-%m-%d"
-                ).date()
+                try:
+                    current_expiration = datetime.strptime(
+                        expiration_match.group(1), "%Y-%m-%d"
+                    ).date()
+                except ValueError as exc:
+                    msg = (
+                        f"{path}:{line_num}: invalid expiration date "
+                        f"{expiration_match.group(1)!r}"
+                    )
+                    raise ValueError(msg) from exc
                 continue
 
             if current_expiration is None:

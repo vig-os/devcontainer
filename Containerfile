@@ -1,7 +1,12 @@
 # Use Python 3.14 as base image (pinned to digest for supply chain integrity)
 # Renovate (dockerfile manager) will propose digest updates automatically
 # Updated to bookworm (stable) for better security patch cadence
-FROM python:3.14-slim-bookworm@sha256:ec58d916f9e24a6035cab2bdf07f6206c4cc092a16613c60597534711332d9d6
+#
+# IMPORTANT: this MUST be the multi-arch *index* digest (the top-level
+# `Digest:` from `docker buildx imagetools inspect python:3.14-slim-bookworm`),
+# never a per-platform child manifest. Pinning a single-arch (amd64) child
+# manifest breaks the arm64 release build with "exec format error" (see #578).
+FROM python:3.14-slim-bookworm@sha256:a9bee15510a364124aa24692899d269835683b883de42f7ebec8c293cf679ccb
 
 # Add metadata
 # By default, we build the dev version unless specified as an argument
@@ -52,6 +57,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 # CVE-2026-33845, CVE-2026-33846, CVE-2026-3833, CVE-2026-42009, CVE-2026-42010 (GnuTLS; bookworm-security)
 RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade \
     libgnutls30=3.7.9-2+deb12u7 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# CVE-2026-45447 (OpenSSL PKCS#7/S-MIME; bookworm-security)
+RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade \
+    libssl3=3.0.20-1~deb12u2 \
+    openssl=3.0.20-1~deb12u2 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install minimal system dependencies

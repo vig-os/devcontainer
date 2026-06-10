@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-06-10T02:14:17Z
+updated: 2026-06-10T09:39:11Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/devcontainer/issues/529
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-10T06:38:26.174Z
+synced: 2026-06-10T10:26:40.504Z
 ---
 
 # [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devcontainer/issues/529)
@@ -25,8 +25,8 @@ This issue lists Renovate updates and detected dependencies. Read the [Dependenc
 The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
 
  - [ ] <!-- unschedule-branch=renovate/taiki-e-install-action-digest -->chore(deps): update taiki-e/install-action digest to 7592c42
- - [ ] <!-- unschedule-branch=renovate/python-(minor-and-patch) -->build(pip): update python (minor and patch) to v4.14.2
  - [ ] <!-- unschedule-branch=renovate/bats-file-0.x-lockfile -->build(npm): update dependency bats-file to v0.4.0
+ - [ ] <!-- unschedule-branch=renovate/python-(minor-and-patch) -->build(pip): update python (minor and patch) (`ipykernel`, `testcontainers`)
  - [ ] <!-- create-all-awaiting-schedule-prs -->🔐 **Create all awaiting schedule PRs at once** 🔐
 
 
@@ -508,7 +508,7 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `rich ==15.0.0`
  - `pytest ==9.0.3`
  - `pytest-cov ==7.1.0`
- - `ipykernel ==7.2.0`
+ - `ipykernel ==7.2.0` → [Updates: `==7.3.0`]
  - `jupyter ==1.1.1`
  - `numpy ==2.4.6`
  - `scipy ==1.17.1`
