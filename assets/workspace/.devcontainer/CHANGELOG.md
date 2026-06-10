@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `@devcontainers/cli` 0.87.0 ([#538](https://github.com/vig-os/devcontainer/issues/538))
 
 - **Bump expected tool versions in image tests**
-  - `gh` 2.92 → 2.93, `just` 1.50 → 1.52, `cargo-binstall` 1.18 → 1.19 to match latest upstream releases
+  - `gh` 2.92 → 2.93, `just` 1.50 → 1.52, `cargo-binstall` 1.18 → 1.20 to match latest upstream releases
 
 - **Consolidate Renovate dependency updates (553–556)** ([#553](https://github.com/vig-os/devcontainer/issues/553), [#554](https://github.com/vig-os/devcontainer/issues/554), [#555](https://github.com/vig-os/devcontainer/issues/555), [#556](https://github.com/vig-os/devcontainer/issues/556))
   - Pin `pytest` to 9.0.3, bump `pytest-cov` to 7.1.0, `rich` to 15.0.0
@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Renewed dependency-review allow-list exception for bats-file false positive (`GHSA-wvrr-2x4r-394v`)
 
 - **Image tests red on stale cargo-binstall pin** ([#557](https://github.com/vig-os/devcontainer/issues/557))
-  - Bump expected `cargo-binstall` 1.19 → 1.20 to match the latest upstream release the image installs
+  - Bump expected `cargo-binstall` to 1.20 to match the latest upstream release the image installs
 
 ### Security
 
@@ -57,9 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Security patch for pytest dependency bump
 
 - **Remediate nightly scan gate failures on :latest** ([#549](https://github.com/vig-os/devcontainer/issues/549))
-  - Rebased base image to latest `python:3.12-slim-bookworm` digest
-  - Patched `libgnutls30` to `3.7.9-2+deb12u7` for fixable GnuTLS CVEs
-  - Rewrote `.trivyignore` from scratch with fresh expirations for unfixable findings only
+  - Patched `libgnutls30` to `3.7.9-2+deb12u7` for fixable GnuTLS CVEs (retained across the 3.14 base rebase; see #565)
 
 - **Resolve repo-owned workflow security findings** ([#562](https://github.com/vig-os/devcontainer/issues/562))
   - Split Renovate changelog automation into read-only `pull_request` build + privileged `workflow_run` commit, removing `pull_request_target` and PR-head checkout under elevated permissions (Scorecard `DangerousWorkflowID`)
