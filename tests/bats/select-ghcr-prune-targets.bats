@@ -21,14 +21,14 @@ setup() {
 @test "select-ghcr-prune-targets preserves published release signature" {
   run bash "$SCRIPT" 0.3.5 <"$FIXTURE"
   assert_success
-  assert_output --inverse --partial "932331806"
-  assert_output --inverse --partial "932335861"
+  refute_output --partial "932331806"
+  refute_output --partial "932335861"
 }
 
 @test "select-ghcr-prune-targets leaves unrelated orphan signatures untouched" {
   run bash "$SCRIPT" 0.3.5 <"$FIXTURE"
   assert_success
-  assert_output --inverse --partial "829404195"
+  refute_output --partial "829404195"
 }
 
 @test "select-ghcr-prune-targets emits nothing when no RC versions exist" {
