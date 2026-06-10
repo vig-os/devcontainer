@@ -69,6 +69,12 @@ class TestParseEntries:
         with pytest.raises(ValueError, match="no Expiration directive"):
             parse_entries(path)
 
+    def test_invalid_expiration_date_raises_with_context(self, tmp_path: Path):
+        path = tmp_path / "ignore.txt"
+        path.write_text("Expiration: 2026-13-45\nCVE-2010-4756\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="invalid expiration date"):
+            parse_entries(path)
+
     def test_ignores_comments_and_blank_lines(self, tmp_path: Path):
         path = tmp_path / "ignore.txt"
         path.write_text(
