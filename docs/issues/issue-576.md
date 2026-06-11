@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-09T21:33:19Z
-updated: 2026-06-09T21:33:19Z
+updated: 2026-06-10T13:45:07Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devcontainer/issues/576
-comments: 0
+comments: 1
 labels: chore, priority:low, area:ci
-assignees: none
+assignees: c-vigo
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-10T06:38:21.928Z
+synced: 2026-06-11T06:57:23.979Z
 ---
 
 # [Issue 576]: [[CI] Migrate actions/create-github-app-token from app-id to client-id](https://github.com/vig-os/devcontainer/issues/576)
@@ -52,3 +52,11 @@ Templated copies (must stay in sync per single-source-of-truth):
 - `*_CLIENT_ID` secrets provisioned.
 - No workflow emits the `app-id` deprecation warning.
 - Root and `assets/workspace` workflow copies remain consistent.
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on June 10, 2026 at 01:45 PM_
+
+Resolved by #585.
+

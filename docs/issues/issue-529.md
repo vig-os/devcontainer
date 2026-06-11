@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-06-10T09:39:11Z
+updated: 2026-06-11T06:05:46Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/devcontainer/issues/529
@@ -13,21 +13,18 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-10T10:26:40.504Z
+synced: 2026-06-11T06:57:28.949Z
 ---
 
 # [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devcontainer/issues/529)
 
 This issue lists Renovate updates and detected dependencies. Read the [Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) docs to learn more.<br>[View this repository on the Mend.io Web Portal](https://developer.mend.io/github/vig-os/devcontainer).
 
-## Awaiting Schedule
+## Repository Problems
 
-The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
+These problems occurred while renovating this repository. [View logs](https://developer.mend.io//github/vig-os/devcontainer).
 
- - [ ] <!-- unschedule-branch=renovate/taiki-e-install-action-digest -->chore(deps): update taiki-e/install-action digest to 7592c42
- - [ ] <!-- unschedule-branch=renovate/bats-file-0.x-lockfile -->build(npm): update dependency bats-file to v0.4.0
- - [ ] <!-- unschedule-branch=renovate/python-(minor-and-patch) -->build(pip): update python (minor and patch) (`ipykernel`, `testcontainers`)
- - [ ] <!-- create-all-awaiting-schedule-prs -->🔐 **Create all awaiting schedule PRs at once** 🔐
+ - ⚠️ WARN: Package lookup failures
 
 
 ---
@@ -40,6 +37,22 @@ The following updates are awaiting their schedule. To get an update now, click o
 ---
 
 
+## Other Branches
+
+The following updates are pending. To force the creation of a PR, click on a checkbox below.
+
+ - [ ] <!-- other-branch=renovate/bats-file-0.x-lockfile -->build(npm): update dependency bats-file to v0.4.0
+
+## Open
+
+The following updates have all been created. To force a retry/rebase of any, click on a checkbox below.
+
+ - [ ] <!-- rebase-branch=renovate/python-3.14-slim-bookworm -->[build(docker): update python:3.14-slim-bookworm docker digest to 7e2f304](../pull/586)
+ - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to bafb217](../pull/587)
+ - [ ] <!-- rebase-branch=renovate/github-actions-(minor-and-patch) -->[ci(actions): update github-actions (minor and patch) to v0.11.20](../pull/588)
+ - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update python (minor and patch)](../pull/589) (`ipykernel`, `python`, `testcontainers`)
+ - [ ] <!-- rebase-all-open-prs -->**Click on this checkbox to rebase all open PRs at once**
+
 ## Detected Dependencies
 
 <details><summary>dockerfile (1)</summary>
@@ -47,7 +60,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 <details><summary>Containerfile (1)</summary>
 
- - `python 3.14-slim-bookworm@sha256:ec58d916f9e24a6035cab2bdf07f6206c4cc092a16613c60597534711332d9d6`
+ - `python 3.14-slim-bookworm@sha256:a9bee15510a364124aa24692899d269835683b883de42f7ebec8c293cf679ccb` → [Updates: `3.14-slim-bookworm`]
 
 </details>
 
@@ -76,8 +89,8 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `actions/setup-node v6.4.0@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e`
  - `taiki-e/install-action just@e75cfd3544e409eb8da0d09dd5d918cd3e6e3982` → [Updates: `just`]
  - `bats-core/bats-action v4.0.0@77d6fb60505b4d0d1d73e48bd035b55074bbfb43`
- - `astral-sh/uv 0.11.19`
- - `astral-sh/uv 0.11.19`
+ - `astral-sh/uv 0.11.19` → [Updates: `0.11.20`]
+ - `astral-sh/uv 0.11.19` → [Updates: `0.11.20`]
 
 </details>
 
@@ -503,7 +516,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 <details><summary>assets/workspace/pyproject.toml (11)</summary>
 
- - `python ==3.14.5`
+ - `python ==3.14.5` → [Updates: `==3.14.6`]
  - `hatchling ==1.30.1`
  - `rich ==15.0.0`
  - `pytest ==9.0.3`
@@ -519,13 +532,13 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 <details><summary>packages/vig-utils/pyproject.toml (1)</summary>
 
- - `python ==3.14.5`
+ - `python ==3.14.5` → [Updates: `==3.14.6`]
 
 </details>
 
 <details><summary>pyproject.toml (24)</summary>
 
- - `python ==3.14.5`
+ - `python ==3.14.5` → [Updates: `==3.14.6`]
  - `github-backup ==0.62.1`
  - `jinja2 ==3.1.6`
  - `pexpect ==4.9.0`
