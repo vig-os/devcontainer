@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-06-15T03:00:10Z
+updated: 2026-06-16T00:44:08Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/devcontainer/issues/529
@@ -13,36 +13,42 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-15T07:29:35.322Z
+synced: 2026-06-16T07:35:08.662Z
 ---
 
 # [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devcontainer/issues/529)
 
 This issue lists Renovate updates and detected dependencies. Read the [Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) docs to learn more.<br>[View this repository on the Mend.io Web Portal](https://developer.mend.io/github/vig-os/devcontainer).
 
+## Repository Problems
+
+These problems occurred while renovating this repository. [View logs](https://developer.mend.io//github/vig-os/devcontainer).
+
+ - ⚠️ WARN: Package lookup failures
+
+## Awaiting Schedule
+
+The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
+
+ - [ ] <!-- unschedule-branch=renovate/bats-file-0.x-lockfile -->build(npm): update dependency bats-file to v0.4.0
+
 ## PR Edited (Blocked)
 
 The following updates have been manually edited so Renovate will no longer make changes. To discard all commits and start over, click on a checkbox below.
 
  - [ ] <!-- rebase-branch=renovate/python-3.14-slim-bookworm -->[build(docker): update python:3.14-slim-bookworm docker digest to a705190](../pull/586)
- - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to bafb217](../pull/587)
+ - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to 8991259](../pull/587)
 
 
 ---
 
 > [!WARNING]
-> Renovate failed to look up the following dependencies: `Could not determine new digest for update (github-tags package bats-core/bats-action)`, `Could not determine new digest for update (github-tags package sigstore/cosign-installer)`.
+> Renovate failed to look up the following dependencies: `Could not determine new digest for update (github-tags package bats-core/bats-action)`, `Failed to look up github-releases package aquasecurity/trivy: no-result`, `Could not determine new digest for update (github-tags package sigstore/cosign-installer)`.
 > 
-> Files affected: `.github/actions/setup-env/action.yml`, `.github/workflows/promote-release.yml`, `.github/workflows/release.yml`
+> Files affected: `.github/actions/setup-env/action.yml`, `.github/workflows/ci.yml`, `.github/workflows/promote-release.yml`, `.github/workflows/release.yml`, `.github/workflows/security-scan.yml`
 
 ---
 
-
-## Other Branches
-
-The following updates are pending. To force the creation of a PR, click on a checkbox below.
-
- - [ ] <!-- other-branch=renovate/bats-file-0.x-lockfile -->build(npm): update dependency bats-file to v0.4.0
 
 ## Open
 
