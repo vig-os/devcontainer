@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Smoke-test `prepare-release` failed on empty Unreleased section** ([#597](https://github.com/vig-os/devcontainer/issues/597))
+  - The smoke-test fixture has no hand-authored changelog entries, so each release freeze left `## Unreleased` empty and the downstream `prepare-release` gate rejected it ("Unreleased section has no entries")
+  - The deploy step in `repository-dispatch.yml` now seeds a deploy entry into `## Unreleased` when it is empty, so the smoke-test release pipeline can always proceed
 - **`sync-main-to-dev` could silently drop the fresh `## Unreleased` scaffold** ([#590](https://github.com/vig-os/devcontainer/issues/590))
   - `prepare-release` no longer strips `## Unreleased` from the release branch, so `main` keeps an empty `## Unreleased` above the dated release (matching `dev`)
   - With the section present on both branches it is stable common context in the `main`↔`dev` merge base, so the sync merge preserves it cleanly instead of resolving in `main`'s favour and dropping it
