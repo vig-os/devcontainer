@@ -2,21 +2,21 @@
 name = "{{SHORT_NAME}}"
 version = "0.1.0"
 description = "{{SHORT_NAME}} project"
-requires-python = "==3.14.5"
+requires-python = "==3.14.6"
 dependencies = []
 
 [project.optional-dependencies]
 dev = [
-  "pytest==9.0.3",
+  "pytest==9.1.0",
   "pytest-cov==7.1.0",
-  "ipykernel==7.2.0",
+  "ipykernel==7.3.0",
   "jupyter==1.1.1",
 ]
 science = [
   "numpy==2.4.6",
   "scipy==1.17.1",
   "pandas==3.0.3",
-  "matplotlib==3.10.9",
+  "matplotlib==3.11.0",
 ]
 all = ["{{SHORT_NAME}}[dev,science]"]
 
