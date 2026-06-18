@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`sync-main-to-dev` could silently drop the fresh `## Unreleased` scaffold** ([#590](https://github.com/vig-os/devcontainer/issues/590))
+  - `prepare-release` no longer strips `## Unreleased` from the release branch, so `main` keeps an empty `## Unreleased` above the dated release (matching `dev`)
+  - With the section present on both branches it is stable common context in the `main`↔`dev` merge base, so the sync merge preserves it cleanly instead of resolving in `main`'s favour and dropping it
+  - Applied to both the canonical workflow and the workspace template so adopters (e.g. `part-registry`) inherit the fix
 - **`devcontainer-upgrade` / install URL 404s** ([#591](https://github.com/vig-os/devcontainer/issues/591))
   - Replace the unhosted `vig-os.github.io/devcontainer/install.sh` Pages URL with the canonical `raw.githubusercontent.com/vig-os/devcontainer/main/install.sh` already used in `README.md`
   - Pipe the installer to `bash` instead of `sh` (the script has a `#!/bin/bash` shebang and uses bashisms), matching the canonical form

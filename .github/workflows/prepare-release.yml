@@ -4,16 +4,17 @@
 # 1. Validate: Check inputs and prerequisites
 # 2. Prepare:
 #    a. Freeze CHANGELOG on dev (Unreleased → [X.Y.Z] - TBD + fresh empty Unreleased)
-#    b. Fork release branch from the freeze commit
-#    c. Strip empty Unreleased section from release branch
-#    d. Create draft PR to main
+#    b. Fork release branch from the freeze commit (keeps the empty Unreleased)
+#    c. Create draft PR to main
 #
 # CHANGELOG flow:
 #   dev:     ## Unreleased (empty) + ## [X.Y.Z] - TBD (with content)
-#   release: ## [X.Y.Z] - TBD (with content, no Unreleased)
+#   release: ## Unreleased (empty) + ## [X.Y.Z] - TBD (with content)
 #
-# This ensures dev never loses ## Unreleased, and both branches share
-# the [X.Y.Z] section as a common ancestor for clean merges later.
+# The empty ## Unreleased is never stripped, so it is present on both dev and
+# release/main and is stable common context in the freeze commit that becomes
+# the main↔dev merge base. Finalization only edits the [X.Y.Z] line; the sync
+# merge keeps ## Unreleased instead of silently dropping it (#590).
 
 name: Prepare Release
 
@@ -259,41 +260,11 @@ jobs:
             gh api "repos/${{ github.repository }}/git/ref/heads/$RELEASE_BRANCH" --jq '.object.sha'
           echo "✓ Release branch ref verified as resolvable"
 
-      - name: Strip empty Unreleased section for release branch
-        run: |
-          set -euo pipefail
-          python3 -c "
-          import re
-          from pathlib import Path
-          content = Path('CHANGELOG.md').read_text()
-          content = re.sub(
-              r'## Unreleased\s*\n(?:### \w+\s*\n\s*)*\n*(?=## \[)',
-              '',
-              content,
-          )
-          Path('CHANGELOG.md').write_text(content)
-          "
-          echo "✓ Stripped empty Unreleased section from CHANGELOG"
-
-      - name: Sync workspace manifest after release changelog strip
-        run: |
-          set -euo pipefail
-          uv run python scripts/sync_manifest.py sync assets/workspace/
-          echo "✓ Synced workspace manifest after release changelog strip"
-
-      - name: Commit stripped CHANGELOG to release branch via API
-        uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
-        env:
-          GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          TARGET_BRANCH: refs/heads/${{ needs.validate.outputs.release_branch }}
-          MAX_ATTEMPTS: "3"
-          COMMIT_MESSAGE: |-
-            chore: prepare release ${{ needs.validate.outputs.version }}
-
-            Strip empty Unreleased section from release branch.
-            Release date TBD (set during finalization).
-          FILE_PATHS: CHANGELOG.md,assets/workspace/.devcontainer/CHANGELOG.md
+      # The release branch keeps the empty ## Unreleased section (no stripping).
+      # main therefore retains ## Unreleased above the dated release, matching
+      # dev, so the section is stable common context in the eventual main↔dev
+      # sync merge and can never be silently dropped (#590). Keep a Changelog
+      # endorses an always-present Unreleased section.
 
       - name: Create draft PR to main
         id: pr
@@ -425,7 +396,7 @@ jobs:
           echo ""
           echo "CHANGELOG state:"
           echo "  dev:     ## Unreleased (empty) + ## [$VERSION] - TBD"
-          echo "  release: ## [$VERSION] - TBD (no Unreleased)"
+          echo "  release: ## Unreleased (empty) + ## [$VERSION] - TBD"
           echo ""
           echo "Next steps:"
           echo "  1. Test release: git checkout $RELEASE_BRANCH"

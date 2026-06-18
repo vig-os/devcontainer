@@ -16,8 +16,11 @@
 # - COMMIT_APP_* for git/ref operations (least-privilege commit identity)
 # - RELEASE_APP_* for PR/label operations that require pull-request scopes
 #
-# With the new CHANGELOG flow, dev already has ## Unreleased (created during
-# prepare-release), so no CHANGELOG reset is needed here.
+# No CHANGELOG reset is needed here. prepare-release never strips ## Unreleased
+# from the release branch, so main and dev both carry it and it is stable common
+# context in the merge base. main only edits the [X.Y.Z] line at finalization;
+# the merge therefore preserves ## Unreleased instead of silently dropping it
+# (#590).
 #
 # Triggers: push to main · workflow_dispatch
 
