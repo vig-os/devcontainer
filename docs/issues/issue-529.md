@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-06-16T11:48:28Z
+updated: 2026-06-18T00:42:02Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/devcontainer/issues/529
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-17T07:21:12.489Z
+synced: 2026-06-18T07:00:05.778Z
 ---
 
 # [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devcontainer/issues/529)
@@ -37,7 +37,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 The following updates have been manually edited so Renovate will no longer make changes. To discard all commits and start over, click on a checkbox below.
 
  - [ ] <!-- rebase-branch=renovate/python-3.14-slim-bookworm -->[build(docker): update python:3.14-slim-bookworm docker digest to a705190](../pull/586)
- - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to 8991259](../pull/587)
+ - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to ac807be](../pull/587)
 
 
 ---
@@ -55,7 +55,7 @@ The following updates have been manually edited so Renovate will no longer make 
 The following updates have all been created. To force a retry/rebase of any, click on a checkbox below.
 
  - [ ] <!-- rebase-branch=renovate/github-actions-(minor-and-patch) -->[ci(actions): update github-actions (minor and patch)](../pull/588) (`aquasecurity/trivy`, `astral-sh/uv`)
- - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update python (minor and patch)](../pull/589) (`ipykernel`, `matplotlib`, `pytest`, `python`, `ruff`, `testcontainers`)
+ - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update python (minor and patch)](../pull/589) (`github-backup`, `ipykernel`, `matplotlib`, `pytest`, `python`, `ruff`, `testcontainers`)
  - [ ] <!-- rebase-all-open-prs -->**Click on this checkbox to rebase all open PRs at once**
 
 ## Detected Dependencies
@@ -544,7 +544,7 @@ The following updates have all been created. To force a retry/rebase of any, cli
 <details><summary>pyproject.toml (24)</summary>
 
  - `python ==3.14.5` → [Updates: `==3.14.6`]
- - `github-backup ==0.62.1`
+ - `github-backup ==0.62.1` → [Updates: `==0.63.0`]
  - `jinja2 ==3.1.6`
  - `pexpect ==4.9.0`
  - `pre-commit ==4.6.0`
