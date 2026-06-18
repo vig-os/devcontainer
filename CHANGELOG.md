@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`devcontainer-upgrade` / install URL 404s** ([#591](https://github.com/vig-os/devcontainer/issues/591))
+  - Replace the unhosted `vig-os.github.io/devcontainer/install.sh` Pages URL with the canonical `raw.githubusercontent.com/vig-os/devcontainer/main/install.sh` already used in `README.md`
+  - Pipe the installer to `bash` instead of `sh` (the script has a `#!/bin/bash` shebang and uses bashisms), matching the canonical form
+  - Fixes the actual `just devcontainer-upgrade` host command plus error hints, the version-check upgrade nag, smoke-test install docs, and `install.sh` usage/`--help` output
+
 - **GHCR RC artifacts never pruned after promote-release** ([#583](https://github.com/vig-os/devcontainer/issues/583))
   - Switch GHCR package-version deletes to `GITHUB_TOKEN` with repo Admin on the `devcontainer` package (one-time Manage Actions access grant)
   - Replace blanket `sha256-*` deletion with digest-aware selection that prunes RC images and matching RC cosign signatures only
