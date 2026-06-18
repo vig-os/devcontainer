@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Migrate `actions/create-github-app-token` to `client-id`** ([#576](https://github.com/vig-os/devcontainer/issues/576))
   - Replace deprecated `app-id` input with `client-id` across root, workspace template, and smoke-test workflows
   - Requires org-level `COMMIT_APP_CLIENT_ID` and `RELEASE_APP_CLIENT_ID` secrets (GitHub App Client ID, not numeric App ID)
+- **Renovate: update `taiki-e/install-action` to `ac807be`** ([#587](https://github.com/vig-os/devcontainer/pull/587))
 
 ### Fixed
 
