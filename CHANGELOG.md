@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.3.6](https://github.com/vig-os/devcontainer/releases/tag/0.3.6) - 2026-06-19
+
+### Changed
+
+- **Migrate `actions/create-github-app-token` to `client-id`** ([#576](https://github.com/vig-os/devcontainer/issues/576))
+  - Replace deprecated `app-id` input with `client-id` across root, workspace template, and smoke-test workflows
+  - Requires org-level `COMMIT_APP_CLIENT_ID` and `RELEASE_APP_CLIENT_ID` secrets (GitHub App Client ID, not numeric App ID)
+- **Consolidate Renovate dependency updates (586–589)** ([#586](https://github.com/vig-os/devcontainer/pull/586), [#587](https://github.com/vig-os/devcontainer/pull/587), [#588](https://github.com/vig-os/devcontainer/pull/588), [#589](https://github.com/vig-os/devcontainer/pull/589))
+  - Bump `python:3.14-slim-bookworm` base image to multi-arch index digest `sha256:7e2f304…`
+  - Update `taiki-e/install-action` digest to `bafb217`, `astral-sh/setup-uv` to `0.11.21`, and other GitHub Actions minor/patch versions
+  - Bump `requires-python` to `==3.14.6` and Python deps: `pytest` 9.1.0, `ruff` 0.15.17, `github-backup` 0.63.0 (lockfile refreshed)
+
+### Fixed
+
+- **Smoke-test `prepare-release` failed on empty Unreleased section** ([#597](https://github.com/vig-os/devcontainer/issues/597))
+  - The smoke-test fixture has no hand-authored changelog entries, so each release freeze left `## Unreleased` empty and the downstream `prepare-release` gate rejected it ("Unreleased section has no entries")
+  - The deploy step in `repository-dispatch.yml` now seeds a deploy entry into `## Unreleased` when it is empty, so the smoke-test release pipeline can always proceed
+- **`sync-main-to-dev` could silently drop the fresh `## Unreleased` scaffold** ([#590](https://github.com/vig-os/devcontainer/issues/590))
+  - `prepare-release` no longer strips `## Unreleased` from the release branch, so `main` keeps an empty `## Unreleased` above the dated release (matching `dev`)
+  - With the section present on both branches it is stable common context in the `main`↔`dev` merge base, so the sync merge preserves it cleanly instead of resolving in `main`'s favour and dropping it
+  - Applied to both the canonical workflow and the workspace template so adopters (e.g. `part-registry`) inherit the fix
+- **`devcontainer-upgrade` / install URL 404s** ([#591](https://github.com/vig-os/devcontainer/issues/591))
+  - Replace the unhosted `vig-os.github.io/devcontainer/install.sh` Pages URL with the canonical `raw.githubusercontent.com/vig-os/devcontainer/main/install.sh` already used in `README.md`
+  - Pipe the installer to `bash` instead of `sh` (the script has a `#!/bin/bash` shebang and uses bashisms), matching the canonical form
+  - Fixes the actual `just devcontainer-upgrade` host command plus error hints, the version-check upgrade nag, smoke-test install docs, and `install.sh` usage/`--help` output
+
+- **GHCR RC artifacts never pruned after promote-release** ([#583](https://github.com/vig-os/devcontainer/issues/583))
+  - Switch GHCR package-version deletes to `GITHUB_TOKEN` with repo Admin on the `devcontainer` package (one-time Manage Actions access grant)
+  - Replace blanket `sha256-*` deletion with digest-aware selection that prunes RC images and matching RC cosign signatures only
+  - Fail the cleanup step loudly when deletes fail or RC tags remain (job still uses `continue-on-error`)
+
 ## [0.3.5](https://github.com/vig-os/devcontainer/releases/tag/0.3.5) - 2026-06-10
 
 ### Changed

@@ -150,7 +150,7 @@ jobs:
         id: generate_release_token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
@@ -159,7 +159,7 @@ jobs:
         id: generate_commit_token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
         with:
-          app-id: ${{ secrets.COMMIT_APP_ID }}
+          client-id: ${{ secrets.COMMIT_APP_CLIENT_ID }}
           private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
@@ -252,6 +252,41 @@ jobs:
             echo "ERROR: CHANGELOG.md is not readable after ownership repair"
             exit 1
           fi
+
+      - name: Seed CHANGELOG Unreleased entry for release validation
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # The smoke-test repo is a fixture: it has no hand-authored changelog
+          # entries, but each release freeze resets Unreleased to empty and the
+          # downstream prepare-release gate requires Unreleased to have content.
+          # Seed a deploy entry so the release pipeline can always proceed.
+          if awk '
+            /^## Unreleased$/ {in_unreleased=1; next}
+            /^## \[/ && in_unreleased {exit 1}
+            in_unreleased && /^[[:space:]]*-[[:space:]]/ {found=1}
+            END {exit(found ? 0 : 1)}
+          ' CHANGELOG.md; then
+            echo "Unreleased already has entries; nothing to seed."
+            exit 0
+          fi
+          tmp="$(mktemp)"
+          awk -v tag="$TAG" '
+            { print }
+            /^## Unreleased$/ {in_unreleased=1; next}
+            in_unreleased && /^### Changed$/ {
+              print ""
+              print "- **Smoke-test deploy of " tag "** -- automated devcontainer release-pipeline validation; no functional changes"
+              in_unreleased=0
+            }
+          ' CHANGELOG.md > "$tmp"
+          mv "$tmp" CHANGELOG.md
+          if ! grep -q "Smoke-test deploy of ${TAG}" CHANGELOG.md; then
+            echo "ERROR: failed to seed Unreleased entry (no '### Changed' under '## Unreleased'?)"
+            exit 1
+          fi
+          echo "✓ Seeded Unreleased entry for ${TAG}"
 
       - name: Prepare deploy branch and metadata
         id: prepare_branch
@@ -381,7 +416,7 @@ jobs:
         id: generate_release_token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
@@ -424,7 +459,7 @@ jobs:
         id: generate_release_token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
@@ -522,7 +557,7 @@ jobs:
         id: generate_release_token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
@@ -593,7 +628,7 @@ jobs:
         id: generate_release_token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
@@ -673,7 +708,7 @@ jobs:
         id: generate_release_token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
@@ -759,7 +794,7 @@ jobs:
         id: generate_release_token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
@@ -964,7 +999,7 @@ jobs:
         id: generate_release_token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: vig-os
           repositories: devcontainer

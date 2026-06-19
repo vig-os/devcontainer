@@ -19,8 +19,11 @@
 # NOTE: This workspace workflow is intentionally decoupled from upstream
 # `.github/workflows/sync-main-to-dev.yml` and maintained separately.
 #
-# With the new CHANGELOG flow, dev already has ## Unreleased (created during
-# prepare-release), so no CHANGELOG reset is needed here.
+# No CHANGELOG reset is needed here. prepare-release never strips ## Unreleased
+# from the release branch, so main and dev both carry it and it is stable common
+# context in the merge base. main only edits the [X.Y.Z] line at finalization;
+# the merge therefore preserves ## Unreleased instead of silently dropping it
+# (#590).
 #
 # Triggers: push to main · workflow_dispatch
 
@@ -125,7 +128,7 @@ jobs:
         id: commit-app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
         with:
-          app-id: ${{ secrets.COMMIT_APP_ID }}
+          client-id: ${{ secrets.COMMIT_APP_CLIENT_ID }}
           private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
 
       - name: Checkout dev
@@ -157,7 +160,7 @@ jobs:
         id: release-app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
       - name: Check for existing open sync PR

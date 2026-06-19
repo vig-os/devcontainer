@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-06-10T09:39:11Z
+updated: 2026-06-18T00:42:02Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/devcontainer/issues/529
@@ -13,21 +13,31 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-10T10:26:40.504Z
+synced: 2026-06-18T07:00:05.778Z
 ---
 
 # [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devcontainer/issues/529)
 
 This issue lists Renovate updates and detected dependencies. Read the [Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) docs to learn more.<br>[View this repository on the Mend.io Web Portal](https://developer.mend.io/github/vig-os/devcontainer).
 
+## Repository Problems
+
+These problems occurred while renovating this repository. [View logs](https://developer.mend.io//github/vig-os/devcontainer).
+
+ - ⚠️ WARN: Package lookup failures
+
 ## Awaiting Schedule
 
 The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
 
- - [ ] <!-- unschedule-branch=renovate/taiki-e-install-action-digest -->chore(deps): update taiki-e/install-action digest to 7592c42
  - [ ] <!-- unschedule-branch=renovate/bats-file-0.x-lockfile -->build(npm): update dependency bats-file to v0.4.0
- - [ ] <!-- unschedule-branch=renovate/python-(minor-and-patch) -->build(pip): update python (minor and patch) (`ipykernel`, `testcontainers`)
- - [ ] <!-- create-all-awaiting-schedule-prs -->🔐 **Create all awaiting schedule PRs at once** 🔐
+
+## PR Edited (Blocked)
+
+The following updates have been manually edited so Renovate will no longer make changes. To discard all commits and start over, click on a checkbox below.
+
+ - [ ] <!-- rebase-branch=renovate/python-3.14-slim-bookworm -->[build(docker): update python:3.14-slim-bookworm docker digest to a705190](../pull/586)
+ - [ ] <!-- rebase-branch=renovate/taiki-e-install-action-digest -->[chore(deps): update taiki-e/install-action digest to ac807be](../pull/587)
 
 
 ---
@@ -40,6 +50,14 @@ The following updates are awaiting their schedule. To get an update now, click o
 ---
 
 
+## Open
+
+The following updates have all been created. To force a retry/rebase of any, click on a checkbox below.
+
+ - [ ] <!-- rebase-branch=renovate/github-actions-(minor-and-patch) -->[ci(actions): update github-actions (minor and patch)](../pull/588) (`aquasecurity/trivy`, `astral-sh/uv`)
+ - [ ] <!-- rebase-branch=renovate/python-(minor-and-patch) -->[build(pip): update python (minor and patch)](../pull/589) (`github-backup`, `ipykernel`, `matplotlib`, `pytest`, `python`, `ruff`, `testcontainers`)
+ - [ ] <!-- rebase-all-open-prs -->**Click on this checkbox to rebase all open PRs at once**
+
 ## Detected Dependencies
 
 <details><summary>dockerfile (1)</summary>
@@ -47,7 +65,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 <details><summary>Containerfile (1)</summary>
 
- - `python 3.14-slim-bookworm@sha256:ec58d916f9e24a6035cab2bdf07f6206c4cc092a16613c60597534711332d9d6`
+ - `python 3.14-slim-bookworm@sha256:a9bee15510a364124aa24692899d269835683b883de42f7ebec8c293cf679ccb` → [Updates: `3.14-slim-bookworm`]
 
 </details>
 
@@ -76,8 +94,8 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `actions/setup-node v6.4.0@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e`
  - `taiki-e/install-action just@e75cfd3544e409eb8da0d09dd5d918cd3e6e3982` → [Updates: `just`]
  - `bats-core/bats-action v4.0.0@77d6fb60505b4d0d1d73e48bd035b55074bbfb43`
- - `astral-sh/uv 0.11.19`
- - `astral-sh/uv 0.11.19`
+ - `astral-sh/uv 0.11.19` → [Updates: `0.11.21`]
+ - `astral-sh/uv 0.11.19` → [Updates: `0.11.21`]
 
 </details>
 
@@ -130,11 +148,11 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `ubuntu 24.04`
  - `ubuntu 24.04`
  - `ubuntu 24.04`
- - `aquasecurity/trivy v0.71.0`
- - `aquasecurity/trivy v0.71.0`
- - `aquasecurity/trivy v0.71.0`
- - `aquasecurity/trivy v0.71.0`
- - `aquasecurity/trivy v0.71.0`
+ - `aquasecurity/trivy v0.71.0` → [Updates: `v0.71.1`]
+ - `aquasecurity/trivy v0.71.0` → [Updates: `v0.71.1`]
+ - `aquasecurity/trivy v0.71.0` → [Updates: `v0.71.1`]
+ - `aquasecurity/trivy v0.71.0` → [Updates: `v0.71.1`]
+ - `aquasecurity/trivy v0.71.0` → [Updates: `v0.71.1`]
  - `ubuntu 24.04`
  - `ubuntu 24.04`
 
@@ -214,7 +232,7 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `actions/github-script v9.0.0@3a2844b7e9c422d3c10d287c895573f7108da1b3`
  - `ubuntu 24.04`
  - `ubuntu 24.04`
- - `aquasecurity/trivy v0.71.0`
+ - `aquasecurity/trivy v0.71.0` → [Updates: `v0.71.1`]
  - `ubuntu 24.04`
  - `ubuntu 24.04`
  - `ubuntu 24.04`
@@ -268,10 +286,10 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `actions/upload-artifact v7.0.1@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`
  - `github/codeql-action v4@8aad20d150bbac5944a9f9d289da16a4b0d87c1e`
  - `ubuntu 24.04`
- - `aquasecurity/trivy v0.71.0`
- - `aquasecurity/trivy v0.71.0`
- - `aquasecurity/trivy v0.71.0`
- - `aquasecurity/trivy v0.71.0`
+ - `aquasecurity/trivy v0.71.0` → [Updates: `v0.71.1`]
+ - `aquasecurity/trivy v0.71.0` → [Updates: `v0.71.1`]
+ - `aquasecurity/trivy v0.71.0` → [Updates: `v0.71.1`]
+ - `aquasecurity/trivy v0.71.0` → [Updates: `v0.71.1`]
 
 </details>
 
@@ -503,46 +521,46 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 <details><summary>assets/workspace/pyproject.toml (11)</summary>
 
- - `python ==3.14.5`
+ - `python ==3.14.5` → [Updates: `==3.14.6`]
  - `hatchling ==1.30.1`
  - `rich ==15.0.0`
- - `pytest ==9.0.3`
+ - `pytest ==9.0.3` → [Updates: `==9.1.0`]
  - `pytest-cov ==7.1.0`
  - `ipykernel ==7.2.0` → [Updates: `==7.3.0`]
  - `jupyter ==1.1.1`
  - `numpy ==2.4.6`
  - `scipy ==1.17.1`
  - `pandas ==3.0.3`
- - `matplotlib ==3.10.9`
+ - `matplotlib ==3.10.9` → [Updates: `==3.11.0`]
 
 </details>
 
 <details><summary>packages/vig-utils/pyproject.toml (1)</summary>
 
- - `python ==3.14.5`
+ - `python ==3.14.5` → [Updates: `==3.14.6`]
 
 </details>
 
 <details><summary>pyproject.toml (24)</summary>
 
- - `python ==3.14.5`
- - `github-backup ==0.62.1`
+ - `python ==3.14.5` → [Updates: `==3.14.6`]
+ - `github-backup ==0.62.1` → [Updates: `==0.63.0`]
  - `jinja2 ==3.1.6`
  - `pexpect ==4.9.0`
  - `pre-commit ==4.6.0`
- - `pytest ==9.0.3`
+ - `pytest ==9.0.3` → [Updates: `==9.1.0`]
  - `pyyaml ==6.0.3`
  - `testinfra ==6.0.0`
  - `rich ==15.0.0`
  - `pre-commit ==4.6.0`
- - `ruff ==0.15.16`
+ - `ruff ==0.15.16` → [Updates: `==0.15.17`]
  - `pip-licenses ==5.5.5`
  - `bandit ==1.9.4`
  - `pre-commit ==4.6.0`
- - `ruff ==0.15.16`
+ - `ruff ==0.15.16` → [Updates: `==0.15.17`]
  - `pip-licenses ==5.5.5`
  - `bandit ==1.9.4`
- - `pytest ==9.0.3`
+ - `pytest ==9.0.3` → [Updates: `==9.1.0`]
  - `pytest-cov ==7.1.0`
  - `pytest-testinfra ==10.2.2`
  - `pytest-docker ==3.2.5`

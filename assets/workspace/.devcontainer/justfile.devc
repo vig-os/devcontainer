@@ -47,7 +47,7 @@ devcontainer-upgrade:
         echo ""
         echo "Or use the curl method:"
         echo ""
-        echo "    curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- --force ."
+        echo "    curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --force ."
         echo ""
         exit 1
     fi
@@ -74,7 +74,7 @@ devcontainer-upgrade:
     echo "✓ Using $RUNTIME"
     echo ""
     echo "Downloading and running install script..."
-    curl -sSf https://vig-os.github.io/devcontainer/install.sh | sh -s -- --force .
+    curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --force .
 
 # -------------------------------------------------------------------------------
 # DEVCONTAINER (host-side only)
