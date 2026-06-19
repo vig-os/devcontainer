@@ -3,7 +3,8 @@
 # 1. validate: semver, draft GitHub Release for X.Y.Z, release PR approved and CI green
 # 2. promote: publish (undraft) GitHub Release
 # 3. merge: merge release/X.Y.Z PR to main (triggers sync-main-to-dev)
-# 4. cleanup (best-effort): delete remote git RC tags matching X.Y.Z-rc* with no GitHub Release
+# 4. cleanup (best-effort): delete RC draft pre-releases for X.Y.Z, then remote git RC tags
+#    matching X.Y.Z-rc* with no (remaining) GitHub Release
 #
 # See docs/DOWNSTREAM_RELEASE.md. No GHCR/cosign/smoke-test gate (project-specific).
 name: Promote Release
@@ -395,7 +396,7 @@ jobs:
           client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
-      - name: Delete git RC tags without GitHub Release
+      - name: Delete RC draft pre-releases and git RC tags
         env:
           GH_TOKEN: ${{ steps.release_app_token.outputs.token }}
           VERSION: ${{ needs.validate.outputs.version }}
@@ -417,15 +418,27 @@ jobs:
               echo "WARN: release lookup failed for tag $tag, skipping deletion"
               continue
             fi
-            if printf '%s' "$RAW" | \
-              jq -s --arg tag "$tag" 'flatten | map(select(.tag_name == $tag)) | .[0] // empty' 2>/dev/null | \
-              jq -e 'type == "object"' >/dev/null 2>&1; then
-              echo "Skipping tag $tag (GitHub Release exists)"
-              continue
+            RELEASE_JSON=$(printf '%s' "$RAW" | \
+              jq -s --arg tag "$tag" 'flatten | map(select(.tag_name == $tag)) | .[0] // empty' 2>/dev/null || true)
+            if printf '%s' "$RELEASE_JSON" | jq -e 'type == "object"' >/dev/null 2>&1; then
+              IS_DRAFT=$(printf '%s' "$RELEASE_JSON" | jq -r '.draft')
+              IS_PRERELEASE=$(printf '%s' "$RELEASE_JSON" | jq -r '.prerelease')
+              # Only prune RC draft pre-releases; never touch a published release.
+              if [ "$IS_DRAFT" = "true" ] && [ "$IS_PRERELEASE" = "true" ] && \
+                printf '%s' "$tag" | grep -qE "^${VERSION}-rc[0-9]+$"; then
+                echo "Deleting RC draft pre-release $tag (draft pre-release)"
+                retry --retries 3 --backoff 5 --max-backoff 30 -- \
+                  gh release delete "$tag" --yes \
+                  || echo "WARN: failed to delete RC draft pre-release $tag"
+                # Fall through to delete the now-orphaned tag below.
+              else
+                echo "Skipping tag $tag (published GitHub Release exists)"
+                continue
+              fi
             fi
             echo "Deleting remote tag $tag (no GitHub Release)"
             retry --retries 3 --backoff 5 --max-backoff 30 -- \
               gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${tag}" \
               || echo "WARN: failed to delete tag $tag"
           done <<< "$TAGS"
-          echo "✓ Git RC tag cleanup complete for $VERSION"
+          echo "✓ RC draft pre-release and git RC tag cleanup complete for $VERSION"

@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Prune RC draft pre-releases in promote cleanup** ([#600](https://github.com/vig-os/devcontainer/issues/600))
+  - Cleanup now deletes `X.Y.Z-rcN` draft pre-releases (and their now-orphaned tags); guarded to never touch published releases
+
 ### Security
 
 ## [0.3.6](https://github.com/vig-os/devcontainer/releases/tag/0.3.6) - 2026-06-19
