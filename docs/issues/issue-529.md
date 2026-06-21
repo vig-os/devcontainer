@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-06-19T19:06:24Z
+updated: 2026-06-20T09:13:27Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/devcontainer/issues/529
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-20T06:37:44.919Z
+synced: 2026-06-21T06:58:12.675Z
 ---
 
 # [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devcontainer/issues/529)
@@ -24,6 +24,7 @@ This issue lists Renovate updates and detected dependencies. Read the [Dependenc
 
 The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
 
+ - [ ] <!-- unschedule-branch=renovate/taiki-e-install-action-digest -->chore(deps): update taiki-e/install-action digest to eb18f61
  - [ ] <!-- unschedule-branch=renovate/python-(minor-and-patch) -->build(pip): update python (minor and patch) (`pytest`, `ruff`, `scipy`)
  - [ ] <!-- unschedule-branch=renovate/github-actions-(minor-and-patch) -->ci(actions): update github-actions (minor and patch) (`aquasecurity/trivy`, `astral-sh/uv`)
  - [ ] <!-- unschedule-branch=renovate/bats-file-0.x-lockfile -->build(npm): update dependency bats-file to v0.4.0
@@ -81,7 +82,7 @@ The following updates are blocked by an existing closed PR. To recreate the PR, 
  - `astral-sh/setup-uv v8.2.0@fac544c07dec837d0ccb6301d7b5580bf5edae39`
  - `astral-sh/setup-uv v8.2.0@fac544c07dec837d0ccb6301d7b5580bf5edae39`
  - `actions/setup-node v6.4.0@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e`
- - `taiki-e/install-action just@ac807bed34cfaa7b1b6e98b11b170b68b54f193b`
+ - `taiki-e/install-action just@ac807bed34cfaa7b1b6e98b11b170b68b54f193b` → [Updates: `just`]
  - `bats-core/bats-action v4.0.0@77d6fb60505b4d0d1d73e48bd035b55074bbfb43`
  - `astral-sh/uv 0.11.21` → [Updates: `0.11.23`]
  - `astral-sh/uv 0.11.21` → [Updates: `0.11.23`]
