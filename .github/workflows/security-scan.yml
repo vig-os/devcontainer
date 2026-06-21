@@ -1,8 +1,10 @@
 # Scheduled Security Scan
 #
 # Nightly scan of the latest published container image from GHCR (covers main via
-# :latest) without rebuilding. Pull requests to dev/release/main run full CI
-# (ci.yml), including Trivy on the built image (category: container-image).
+# :latest) without rebuilding. This scan (category: container-image-latest) is the
+# single source of truth for the GitHub Security tab. Pull requests to
+# dev/release/main run full CI (ci.yml), where Trivy acts as a blocking GATE only
+# (fail on fixable HIGH/CRITICAL) and does NOT upload SARIF to the Security tab.
 #
 # Triggers:
 #   - Nightly schedule: 05:00 UTC

@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Consolidate container-image vulnerability scanning to a single source of truth** ([#604](https://github.com/vig-os/devcontainer/issues/604))
+  - PR CI Trivy is now a blocking gate only (fail on fixable HIGH/CRITICAL) and no longer uploads SARIF to the Security tab
+  - The nightly scheduled scan of the published `:latest` image (`container-image-latest`) is now the single authoritative scan for the GitHub Security tab, ending duplicate/stale alert categories
+  - Dismissed orphaned `container-image-scheduled` and stale `container-image` code-scanning alerts that could no longer auto-close
+
 ## [0.3.6](https://github.com/vig-os/devcontainer/releases/tag/0.3.6) - 2026-06-19
 
 ### Changed
