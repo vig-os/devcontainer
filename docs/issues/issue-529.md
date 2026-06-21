@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-06-19T06:43:04Z
+updated: 2026-06-20T09:13:27Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/devcontainer/issues/529
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-19T07:20:11.572Z
+synced: 2026-06-21T06:58:12.675Z
 ---
 
 # [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devcontainer/issues/529)
@@ -24,8 +24,9 @@ This issue lists Renovate updates and detected dependencies. Read the [Dependenc
 
 The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
 
- - [ ] <!-- unschedule-branch=renovate/python-(minor-and-patch) -->build(pip): update python (minor and patch) to v0.15.18
- - [ ] <!-- unschedule-branch=renovate/github-actions-(minor-and-patch) -->ci(actions): update github-actions (minor and patch) to v0.11.22
+ - [ ] <!-- unschedule-branch=renovate/taiki-e-install-action-digest -->chore(deps): update taiki-e/install-action digest to eb18f61
+ - [ ] <!-- unschedule-branch=renovate/python-(minor-and-patch) -->build(pip): update python (minor and patch) (`pytest`, `ruff`, `scipy`)
+ - [ ] <!-- unschedule-branch=renovate/github-actions-(minor-and-patch) -->ci(actions): update github-actions (minor and patch) (`aquasecurity/trivy`, `astral-sh/uv`)
  - [ ] <!-- unschedule-branch=renovate/bats-file-0.x-lockfile -->build(npm): update dependency bats-file to v0.4.0
  - [ ] <!-- unschedule-branch=renovate/actions-checkout-7.x -->ci(actions): update actions/checkout action to v7
  - [ ] <!-- create-all-awaiting-schedule-prs -->🔐 **Create all awaiting schedule PRs at once** 🔐
@@ -81,10 +82,10 @@ The following updates are blocked by an existing closed PR. To recreate the PR, 
  - `astral-sh/setup-uv v8.2.0@fac544c07dec837d0ccb6301d7b5580bf5edae39`
  - `astral-sh/setup-uv v8.2.0@fac544c07dec837d0ccb6301d7b5580bf5edae39`
  - `actions/setup-node v6.4.0@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e`
- - `taiki-e/install-action just@ac807bed34cfaa7b1b6e98b11b170b68b54f193b`
+ - `taiki-e/install-action just@ac807bed34cfaa7b1b6e98b11b170b68b54f193b` → [Updates: `just`]
  - `bats-core/bats-action v4.0.0@77d6fb60505b4d0d1d73e48bd035b55074bbfb43`
- - `astral-sh/uv 0.11.21` → [Updates: `0.11.22`]
- - `astral-sh/uv 0.11.21` → [Updates: `0.11.22`]
+ - `astral-sh/uv 0.11.21` → [Updates: `0.11.23`]
+ - `astral-sh/uv 0.11.21` → [Updates: `0.11.23`]
 
 </details>
 
@@ -137,11 +138,11 @@ The following updates are blocked by an existing closed PR. To recreate the PR, 
  - `ubuntu 24.04`
  - `ubuntu 24.04`
  - `ubuntu 24.04`
- - `aquasecurity/trivy v0.71.1`
- - `aquasecurity/trivy v0.71.1`
- - `aquasecurity/trivy v0.71.1`
- - `aquasecurity/trivy v0.71.1`
- - `aquasecurity/trivy v0.71.1`
+ - `aquasecurity/trivy v0.71.1` → [Updates: `v0.71.2`]
+ - `aquasecurity/trivy v0.71.1` → [Updates: `v0.71.2`]
+ - `aquasecurity/trivy v0.71.1` → [Updates: `v0.71.2`]
+ - `aquasecurity/trivy v0.71.1` → [Updates: `v0.71.2`]
+ - `aquasecurity/trivy v0.71.1` → [Updates: `v0.71.2`]
  - `ubuntu 24.04`
  - `ubuntu 24.04`
 
@@ -220,7 +221,7 @@ The following updates are blocked by an existing closed PR. To recreate the PR, 
  - `actions/github-script v9.0.0@3a2844b7e9c422d3c10d287c895573f7108da1b3`
  - `ubuntu 24.04`
  - `ubuntu 24.04`
- - `aquasecurity/trivy v0.71.1`
+ - `aquasecurity/trivy v0.71.1` → [Updates: `v0.71.2`]
  - `ubuntu 24.04`
  - `ubuntu 24.04`
  - `ubuntu 24.04`
@@ -274,10 +275,10 @@ The following updates are blocked by an existing closed PR. To recreate the PR, 
  - `actions/upload-artifact v7.0.1@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`
  - `github/codeql-action v4@8aad20d150bbac5944a9f9d289da16a4b0d87c1e`
  - `ubuntu 24.04`
- - `aquasecurity/trivy v0.71.1`
- - `aquasecurity/trivy v0.71.1`
- - `aquasecurity/trivy v0.71.1`
- - `aquasecurity/trivy v0.71.1`
+ - `aquasecurity/trivy v0.71.1` → [Updates: `v0.71.2`]
+ - `aquasecurity/trivy v0.71.1` → [Updates: `v0.71.2`]
+ - `aquasecurity/trivy v0.71.1` → [Updates: `v0.71.2`]
+ - `aquasecurity/trivy v0.71.1` → [Updates: `v0.71.2`]
 
 </details>
 
@@ -511,12 +512,12 @@ The following updates are blocked by an existing closed PR. To recreate the PR, 
  - `python ==3.14.6`
  - `hatchling ==1.30.1`
  - `rich ==15.0.0`
- - `pytest ==9.1.0`
+ - `pytest ==9.1.0` → [Updates: `==9.1.1`]
  - `pytest-cov ==7.1.0`
  - `ipykernel ==7.3.0`
  - `jupyter ==1.1.1`
  - `numpy ==2.4.6`
- - `scipy ==1.17.1`
+ - `scipy ==1.17.1` → [Updates: `==1.18.0`]
  - `pandas ==3.0.3`
  - `matplotlib ==3.11.0`
 
@@ -535,7 +536,7 @@ The following updates are blocked by an existing closed PR. To recreate the PR, 
  - `jinja2 ==3.1.6`
  - `pexpect ==4.9.0`
  - `pre-commit ==4.6.0`
- - `pytest ==9.1.0`
+ - `pytest ==9.1.0` → [Updates: `==9.1.1`]
  - `pyyaml ==6.0.3`
  - `testinfra ==6.0.0`
  - `rich ==15.0.0`
@@ -547,7 +548,7 @@ The following updates are blocked by an existing closed PR. To recreate the PR, 
  - `ruff ==0.15.17` → [Updates: `==0.15.18`]
  - `pip-licenses ==5.5.5`
  - `bandit ==1.9.4`
- - `pytest ==9.1.0`
+ - `pytest ==9.1.0` → [Updates: `==9.1.1`]
  - `pytest-cov ==7.1.0`
  - `pytest-testinfra ==10.2.2`
  - `pytest-docker ==3.2.5`
