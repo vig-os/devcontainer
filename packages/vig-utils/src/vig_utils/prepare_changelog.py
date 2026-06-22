@@ -382,6 +382,17 @@ def finalize_release_date(
 
     content = path.read_text()
 
+    # Idempotency (#612): a reused release branch can re-run finalize against a
+    # heading this tool already dated. Detect the linked-and-dated form finalize
+    # itself writes (## [X.Y.Z](…) - YYYY-MM-DD) and treat a re-run as a no-op so
+    # candidate→final on one base version stays idempotent. A plain dated heading
+    # with no release link (a historical entry) is still rejected below.
+    finalized_pattern = (
+        rf"## \[{re.escape(version)}\]\([^)]*\) - \d{{4}}-\d{{2}}-\d{{2}}"
+    )
+    if re.search(finalized_pattern, content):
+        return
+
     # Check if version with TBD exists
     version_pattern = rf"## \[{re.escape(version)}\] - TBD"
     if not re.search(version_pattern, content):
