@@ -15,6 +15,79 @@ from pathlib import Path
 STANDARD_SECTIONS = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]
 
 
+def _parse_subsections(body_text):
+    """
+    Extract standard subsections that carry bullet content from a section body.
+
+    Returns dict: {section_name: content_lines}
+    """
+    sections = {}
+    for section in STANDARD_SECTIONS:
+        # Anchor heading markers to line starts so inline ## in content
+        # (e.g. backtick-quoted `##`) is not treated as a heading boundary.
+        pattern = rf"^### {section}\s*\n(.*?)(?=^### |^## |\Z)"
+        match = re.search(pattern, body_text, re.MULTILINE | re.DOTALL)
+        if match:
+            section_content = match.group(1).strip()
+            # Only keep if it has actual bullet points (lines starting with -)
+            if section_content:
+                lines_with_content = [
+                    line
+                    for line in section_content.split("\n")
+                    if line.strip() and line.strip().startswith("-")
+                ]
+                if lines_with_content:
+                    sections[section] = section_content
+    return sections
+
+
+def _merge_sections(primary, secondary):
+    """
+    Merge two {section: content} dicts, keeping bullets from ``primary`` first.
+
+    Exact-duplicate bullet lines are dropped so re-preparing a version does not
+    repeat content already folded into its section (#612).
+    """
+    merged = {}
+    for section in STANDARD_SECTIONS:
+        parts = []
+        seen = set()
+        for src in (primary, secondary):
+            if section in src:
+                for line in src[section].split("\n"):
+                    key = line.strip()
+                    if key and key not in seen:
+                        seen.add(key)
+                        parts.append(line)
+        if parts:
+            merged[section] = "\n".join(parts)
+    return merged
+
+
+def _pop_version_section(content, version):
+    """
+    Remove an existing ``## [version]`` section from ``content``.
+
+    Matches the heading whether it is ``- TBD`` or already dated/linked. Returns
+    ``(new_content, sections)`` where ``sections`` holds the removed section's
+    bullet content (empty dict and unchanged content when no such heading exists).
+    """
+    heading = re.search(
+        rf"^## \[{re.escape(version)}\](?:\([^)]*\))? - .+$",
+        content,
+        re.MULTILINE,
+    )
+    if not heading:
+        return content, {}
+
+    next_heading = re.search(r"^## ", content[heading.end() :], re.MULTILINE)
+    block_end = heading.end() + next_heading.start() if next_heading else len(content)
+    block_body = content[heading.end() : block_end]
+    sections = _parse_subsections(block_body)
+    new_content = content[: heading.start()] + content[block_end:]
+    return new_content, sections
+
+
 def extract_unreleased_content(content):
     """
     Extract content from Unreleased section.
@@ -29,28 +102,7 @@ def extract_unreleased_content(content):
     if not unreleased_match:
         raise ValueError("No '## Unreleased' section found in CHANGELOG")
 
-    unreleased_text = unreleased_match.group(1)
-
-    # Extract each subsection
-    sections = {}
-    for section in STANDARD_SECTIONS:
-        # Anchor heading markers to line starts so inline ## in content
-        # (e.g. backtick-quoted `##`) is not treated as a heading boundary.
-        pattern = rf"^### {section}\s*\n(.*?)(?=^### |^## |\Z)"
-        match = re.search(pattern, unreleased_text, re.MULTILINE | re.DOTALL)
-        if match:
-            section_content = match.group(1).strip()
-            # Only keep if it has actual bullet points (lines starting with -)
-            if section_content:
-                lines_with_content = [
-                    line
-                    for line in section_content.split("\n")
-                    if line.strip() and line.strip().startswith("-")
-                ]
-                if lines_with_content:
-                    sections[section] = section_content
-
-    return sections
+    return _parse_subsections(unreleased_match.group(1))
 
 
 def create_new_changelog(version, old_sections, rest_of_changelog):
@@ -243,6 +295,13 @@ def prepare_changelog(version, filepath="CHANGELOG.md"):
 
     # Extract Unreleased content
     old_sections = extract_unreleased_content(content)
+
+    # Dedupe (#612): if a section for this version already exists (TBD or dated,
+    # e.g. on a reused release branch), fold its bullets back in and drop it so we
+    # produce exactly one ## [version] - TBD heading instead of stacking a second.
+    content, existing_sections = _pop_version_section(content, version)
+    if existing_sections:
+        old_sections = _merge_sections(old_sections, existing_sections)
 
     # Get everything after Unreleased section
     rest_match = re.search(r"## Unreleased\s*\n.*?(?=\n## \[)", content, re.DOTALL)
