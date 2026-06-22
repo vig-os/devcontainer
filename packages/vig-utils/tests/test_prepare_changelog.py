@@ -1227,6 +1227,38 @@ class TestFinalizeReleaseDate:
                 github_repository=_FINALIZE_TEST_REPO,
             )
 
+    def test_idempotent_when_already_finalized(self, tmp_path):
+        """Re-running finalize on a version this tool already finalized is a no-op.
+
+        Guards #612: a reused release branch can re-run finalize against an
+        already-dated heading; the second run must succeed without changing it.
+        """
+        f = tmp_path / "CHANGELOG.md"
+        f.write_text(CHANGELOG_WITH_TBD)
+        finalize_release_date(
+            "1.0.0", "2026-02-11", str(f), github_repository=_FINALIZE_TEST_REPO
+        )
+        after_first = f.read_text()
+        # Second finalize on the same version must not raise...
+        finalize_release_date(
+            "1.0.0", "2026-02-11", str(f), github_repository=_FINALIZE_TEST_REPO
+        )
+        # ...and must leave the already-finalized heading untouched.
+        assert f.read_text() == after_first
+
+    def test_idempotent_keeps_original_date_when_already_finalized(self, tmp_path):
+        """A later finalize with a different date is a no-op once already finalized."""
+        f = tmp_path / "CHANGELOG.md"
+        f.write_text(CHANGELOG_WITH_TBD)
+        finalize_release_date(
+            "1.0.0", "2026-02-11", str(f), github_repository=_FINALIZE_TEST_REPO
+        )
+        after_first = f.read_text()
+        finalize_release_date(
+            "1.0.0", "2026-03-01", str(f), github_repository=_FINALIZE_TEST_REPO
+        )
+        assert f.read_text() == after_first
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Full prepare → finalize cycle
