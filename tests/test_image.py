@@ -30,7 +30,7 @@ EXPECTED_VERSIONS = {
     "hadolint": "2.14.",  # Minor version check (manually installed from pinned release)
     "taplo": "0.10.",  # Minor version check (manually installed from latest release)
     "cargo-binstall": "1.20.",  # Minor version check (installed from latest release)
-    "typstyle": "0.14.",  # Minor version check (installed from latest release)
+    "typstyle": "0.15.",  # Minor version check (installed from latest release)
     "vig_utils": "0.1.",  # Minor version check (installed via uv pip)
     "tmux": "3.3",  # Major.minor version check (from apt package)
     "rsync": "3.2",  # Major.minor version check (from apt package)
