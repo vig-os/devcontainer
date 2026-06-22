@@ -468,6 +468,56 @@ def finalize_release_date(
     path.write_text(new_content)
 
 
+def reset_version_to_tbd(version, filepath="CHANGELOG.md"):
+    """
+    Revert a dated ``## [version]`` heading back to ``## [version] - TBD``.
+
+    Normalizes any finalized heading for ``version`` — linked
+    (``## [X.Y.Z](…) - YYYY-MM-DD``) or plain (``## [X.Y.Z] - YYYY-MM-DD``) — to
+    the ``- TBD`` placeholder, dropping the release link. Idempotent: a no-op when
+    the heading is already TBD or absent (#612, called at dispatch start so a base
+    version released as a candidate can be re-released as final).
+
+    Args:
+        version: Semantic version (e.g., "1.0.0")
+        filepath: Path to CHANGELOG.md
+
+    Returns:
+        True if the file was modified, False otherwise.
+
+    Raises:
+        ValueError: If the version format is invalid
+        FileNotFoundError: If the CHANGELOG file doesn't exist
+    """
+    if not re.match(r"^\d+\.\d+\.\d+$", version):
+        raise ValueError(f"Invalid semantic version: {version}")
+
+    path = Path(filepath)
+    if not path.exists():
+        raise FileNotFoundError(f"CHANGELOG not found: {filepath}")
+
+    content = path.read_text()
+    # Match the version heading with any non-TBD suffix (optional release link)
+    # so we never rewrite an already-TBD heading (keeps the call idempotent).
+    pattern = rf"^## \[{re.escape(version)}\](?:\([^)]*\))? - (?!TBD$).+$"
+    new_content = re.sub(pattern, f"## [{version}] - TBD", content, flags=re.MULTILINE)
+    if new_content == content:
+        return False
+
+    path.write_text(new_content)
+    return True
+
+
+def cmd_reset_version(args):
+    """Handle reset-version command."""
+    if reset_version_to_tbd(args.version, args.file):
+        print(f"✓ Reset version {args.version} heading to TBD in {args.file}")
+    else:
+        print(
+            f"✓ Version {args.version} already TBD or absent in {args.file} (no changes)"
+        )
+
+
 def cmd_finalize(args):
     """Handle finalize command."""
     finalize_release_date(
@@ -500,6 +550,9 @@ Examples:
 
   # Reset Unreleased section after release merge
   %(prog)s reset
+
+  # Revert a dated version heading back to TBD (idempotent candidate→final)
+  %(prog)s reset-version 1.0.0
 
   # Rename top ## [version] - … to ## Unreleased (smoke-test deploy sync)
   %(prog)s unprepare
@@ -555,6 +608,23 @@ Examples:
         help="Path to CHANGELOG file (default: CHANGELOG.md)",
     )
     reset_parser.set_defaults(func=cmd_reset)
+
+    # reset-version command
+    reset_version_parser = subparsers.add_parser(
+        "reset-version",
+        help="Revert a dated ## [version] heading back to ## [version] - TBD",
+    )
+    reset_version_parser.add_argument(
+        "version",
+        help="Semantic version (e.g., 1.0.0)",
+    )
+    reset_version_parser.add_argument(
+        "file",
+        nargs="?",
+        default="CHANGELOG.md",
+        help="Path to CHANGELOG file (default: CHANGELOG.md)",
+    )
+    reset_version_parser.set_defaults(func=cmd_reset_version)
 
     # unprepare command
     unprepare_parser = subparsers.add_parser(
