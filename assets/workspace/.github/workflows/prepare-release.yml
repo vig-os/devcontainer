@@ -197,6 +197,11 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
+          # Normalize any dated `## [X.Y.Z]` heading left by a prior candidate→final
+          # pass on this base version back to `- TBD` before freezing, so prepare/
+          # release stay idempotent on a reused release branch (#612). No-op when
+          # the heading is already TBD or absent.
+          prepare-changelog reset-version "$VERSION" CHANGELOG.md
           prepare-changelog prepare "$VERSION" CHANGELOG.md
 
       - name: Extract CHANGELOG content for PR body
@@ -205,7 +210,11 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          CHANGELOG_CONTENT=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$d')
+          # Anchor the range patterns to start-of-line so only real column-0
+          # version headings delimit the section. An unanchored "## [" also
+          # matches inline backtick-quoted headings inside bullets (e.g.
+          # `## [X.Y.Z] - TBD`), which truncated the PR body early (#620).
+          CHANGELOG_CONTENT=$(sed -n "/^## \[$VERSION\]/,/^## \[/p" CHANGELOG.md | sed '$d')
           {
             echo "changelog<<CHANGELOGEOF"
             echo "$CHANGELOG_CONTENT"
@@ -231,10 +240,29 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.commit_app_token.outputs.token }}
           RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
+          PREPARE_START_SHA: ${{ steps.pre_state.outputs.prepare_start_sha }}
         run: |
           set -euo pipefail
-          DEV_SHA=$(retry --retries 3 --backoff 5 --max-backoff 60 -- \
-            gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
+          # Wait for dev to advance past the pre-freeze SHA before branching (#617).
+          # The freeze commit-action updates dev's ref, but a REST ref read can
+          # briefly return the stale pre-freeze SHA (read-after-write lag); branching
+          # then would create release/X.Y.Z without the freeze. `retry` only retries
+          # on failure, so a stale-but-successful read slips through -- assert the SHA
+          # actually changed instead of trusting the first read.
+          DEV_SHA=""
+          for attempt in $(seq 1 8); do
+            DEV_SHA=$(retry --retries 3 --backoff 5 --max-backoff 60 -- \
+              gh api "repos/${{ github.repository }}/git/ref/heads/dev" --jq '.object.sha')
+            if [ "$DEV_SHA" != "$PREPARE_START_SHA" ]; then
+              break
+            fi
+            echo "dev still at pre-freeze SHA $DEV_SHA (attempt $attempt/8); waiting for freeze to propagate..."
+            sleep 5
+          done
+          if [ "$DEV_SHA" = "$PREPARE_START_SHA" ]; then
+            echo "ERROR: dev did not advance past pre-freeze SHA $PREPARE_START_SHA; freeze commit not visible"
+            exit 1
+          fi
           retry --retries 3 --backoff 5 --max-backoff 60 -- \
             gh api "repos/${{ github.repository }}/git/refs" \
             -f ref="refs/heads/$RELEASE_BRANCH" \
