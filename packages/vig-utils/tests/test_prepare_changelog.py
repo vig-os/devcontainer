@@ -820,6 +820,79 @@ class TestPrepareChangelog:
         assert "## [2.0.0] - TBD" in content
         assert "## [1.0.0] - TBD" in content
 
+    def test_double_prepare_same_version_dedupes_heading(
+        self, tmp_path, basic_changelog
+    ):
+        """Re-preparing the same version must not stack a second heading (#612).
+
+        A reused release branch re-runs prepare for the same base version; the
+        result must keep exactly one ## [X.Y.Z] - TBD section that folds in both
+        the original and the new Unreleased content.
+        """
+        f = tmp_path / "CHANGELOG.md"
+        f.write_text(basic_changelog)
+        prepare_changelog("1.0.0", str(f))
+        # Seed new content into the fresh Unreleased for the second pass.
+        text = f.read_text()
+        text = text.replace(
+            "### Added\n\n### Changed",
+            "### Added\n\n- Second-pass feature\n\n### Changed",
+        )
+        f.write_text(text)
+        prepare_changelog("1.0.0", str(f))
+        content = f.read_text()
+        assert content.count("## [1.0.0]") == 1
+        assert "## [1.0.0] - TBD" in content
+        # Both the original frozen content and the second-pass content survive.
+        assert "- New feature X" in content
+        assert "- Second-pass feature" in content
+        # Unreleased is still present exactly once and precedes the version.
+        assert content.count("## Unreleased") == 1
+        assert content.index("## Unreleased") < content.index("## [1.0.0]")
+
+    def test_prepare_dedupes_dated_same_version_heading(self, tmp_path):
+        """Prepare folds a dated same-version heading into a single TBD section."""
+        changelog = """\
+# Changelog
+
+## Unreleased
+
+### Added
+
+- Late addition
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [1.0.0](https://github.com/vig-os/devcontainer/releases/tag/1.0.0) - 2026-02-11
+
+### Added
+
+- Already shipped
+
+## [0.2.0] - 2026-01-01
+
+### Added
+
+- Old feature
+"""
+        f = tmp_path / "CHANGELOG.md"
+        f.write_text(changelog)
+        prepare_changelog("1.0.0", str(f))
+        content = f.read_text()
+        assert content.count("## [1.0.0]") == 1
+        assert "## [1.0.0] - TBD" in content
+        assert "- Late addition" in content
+        assert "- Already shipped" in content
+        assert "## [0.2.0] - 2026-01-01" in content
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # reset_unreleased
