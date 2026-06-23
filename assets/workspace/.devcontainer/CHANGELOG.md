@@ -9,12 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Renovate `nix` manager for `flake.lock` maintenance** ([#638](https://github.com/vig-os/devcontainer/issues/638))
+  - Enabled the Renovate `nix` manager and weekly `lockFileMaintenance` in `renovate.json` so flake inputs (notably `nixpkgs`) are bumped through the normal PR/CI gate; the existing `pep621`, `npm`, `github-actions`, and `dockerfile` managers are retained
+  - Documented the compensating control in `docs/CONTAINER_SECURITY.md`: every `flake.lock`/nixpkgs-bump PR must include a `vulnix` before/after diff, since the `nix` manager reports only the input revision change and not which CVE a bump fixes
 - **De-duplicate the flake into the toolchain SSoT** ([#631](https://github.com/vig-os/devcontainer/issues/631))
   - Factored a single `devTools` list in `flake.nix` as the source of truth shared by the dev-shell now and the image later, absorbing the agent-CLI toolkit (`rg`, `fd`, `bat`, `eza`, `delta`, `lazygit`, `zoxide`, `starship`, `freeze`, `expect`, `nvim`) plus `claude` ([#545](https://github.com/vig-os/devcontainer/issues/545))
   - Pinned `nixpkgs` to `nixos-25.05` and added a `nixpkgs-unstable` input overlaid only for fast-movers (`uv`, `gh`, `claude-code`); refreshed `flake.lock`
   - Added reusable flake outputs `lib.mkProjectShell`, `overlays.default`, and a `packages.devcontainerImage` stub for the later image build
   - Added a non-blocking `Nix Cachix` workflow (with `workflow_dispatch`) that builds the dev-shell and pushes its closure to the `vig-os` Cachix cache
   - Added a per-tool `nix develop -c <tool> --version` parity test driven from the flake SSoT to guard against future dev-shell/image drift
+- **nix-direnv onboarding fast path** ([#633](https://github.com/vig-os/devcontainer/issues/633))
+  - Switched `.envrc` from bare `use flake` to nix-direnv: the dev-shell evaluation is now GC-rooted and cached under `.direnv/`, so re-entering the directory is instant and the closure is never garbage-collected; nix-direnv self-bootstraps on first `direnv allow` and falls back to bare `use flake` when unavailable
+  - Documented the clone → `direnv allow` onboarding flow, the `vig-os` Cachix substituter (binary fetch instead of from-source build on first allow), and enabling the `nix-command`/`flakes` experimental features in `CONTRIBUTE.md` ([#255](https://github.com/vig-os/devcontainer/issues/255))
 - **Build the devcontainer image with Nix (`buildLayeredImage`, non-publishing)** ([#634](https://github.com/vig-os/devcontainer/issues/634))
   - Fleshed out `packages.devcontainerImage` from a stub into a real, bit-reproducible image assembled by `dockerTools.buildLayeredImage` (not a Dockerfile `FROM`); a `--rebuild` verifies the closure hash is identical
   - Baked the in-container Nix evaluator (upstream CppNix, `pkgs.nix`) plus `direnv`/`nix-direnv` into the closure so `nix`/`direnv` are live inside the container; documented the CppNix-vs-Lix and `pre-commit`-vs-`prek` decisions in the flake
@@ -39,6 +45,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replace dpkg `host.package(...).is_installed` checks (git, curl, openssh-client, nano, tmux, rsync) with path-agnostic `--version`/`-V` runs
   - Resolve `gh`, `just`, `hadolint`, `taplo` and cargo-installed tools via PATH (`command -v`) instead of hardcoded `/usr/local/bin` / `/root/.cargo/bin` / `/root/.local/bin` locations
   - Drop the `DEBIAN_FRONTEND` environment assertion and the apt-sourced version-prefix checks (git, curl, tmux, rsync) from `EXPECTED_VERSIONS`
+- **Provision CI build/test tooling from the flake dev-shell** ([#632](https://github.com/vig-os/devcontainer/issues/632))
+  - The `setup-env` action gained a `provision-via-flake` mode that installs Nix (SHA-pinned `install-nix-action`) and the `vig-os` Cachix substituter, builds the flake dev-shell, and prepends its tools to `PATH`, replacing the ad-hoc installs of `uv`/Python, `just`, `hadolint`, and `taplo`
+  - Enabled the mode in the CI build/test path (`build-image`, `test-image`, `test-integration`, `project-checks`) so jobs run inside the flake shell (the toolchain SSoT); `podman`, Node.js, BATS, and the devcontainer CLI keep their dedicated install paths
+  - The Debian image is still built unchanged and the Docker `type=gha` build cache stays intact
+  - Set `UV_PYTHON_DOWNLOADS_JSON_URL` in the flake dev-shell so the nixpkgs `uv` (whose embedded Python-download list is stripped) can fetch the project's pinned CPython `3.14.6`, which nixpkgs does not package, letting `uv sync --frozen` succeed under flake provisioning
+  - Keep `podman` off the flake-provisioned `PATH` so the runner's rootless-configured host `podman` is used (the nix-store `podman` cannot reach the host's setuid `newuidmap`/`newgidmap`, so `podman info` failed)
 
 ### Deprecated
 

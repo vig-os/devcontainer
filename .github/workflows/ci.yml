@@ -89,6 +89,8 @@ jobs:
           vcs-ref: ${{ steps.version.outputs.vcs_ref }}
           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           output-type: tar
           output-file: /tmp/image.tar
 
@@ -125,6 +127,8 @@ jobs:
         with:
           image-tag: ${{ needs.build-image.outputs.version }}-amd64
           image-source: tar
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
   test-integration:
     name: Integration Tests
@@ -150,6 +154,8 @@ jobs:
         uses: ./.github/actions/test-integration
         with:
           image-tag: ${{ needs.build-image.outputs.version }}-amd64
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Upload test artifacts on failure
         if: failure()
@@ -177,6 +183,9 @@ jobs:
 
       - name: Run project checks
         uses: ./.github/actions/test-project
+        with:
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
   python-security:
     name: Python Security Scan

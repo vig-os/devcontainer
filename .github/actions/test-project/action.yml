@@ -35,6 +35,16 @@ inputs:
     required: false
     default: '-v -s --tb=short'
 
+  cachix-cache:
+    description: 'Cachix binary cache name (passed to flake provisioning)'
+    required: false
+    default: ''
+
+  cachix-auth-token:
+    description: 'Cachix auth token (optional; pulls need no token)'
+    required: false
+    default: ''
+
 runs:
   using: composite
   steps:
@@ -48,6 +58,10 @@ runs:
         install-hadolint: 'true'
         install-taplo: 'true'
         install-bats: 'true'
+        # Provision the toolchain from the flake (SSoT). Refs #632.
+        provision-via-flake: 'true'
+        cachix-cache: ${{ inputs.cachix-cache }}
+        cachix-auth-token: ${{ inputs.cachix-auth-token }}
 
     - name: Cache pre-commit hooks
       if: inputs.suite == 'all' || inputs.suite == 'lint'
