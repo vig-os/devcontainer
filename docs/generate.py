@@ -4,7 +4,7 @@
 This script implements "docs as code" by generating documentation from:
 - Narrative markdown files (docs/narrative/)
 - Requirements definitions (scripts/requirements.yaml)
-- Agent skill definitions (.cursor/skills/*/SKILL.md frontmatter)
+- Agent skill definitions (.claude/skills/*/SKILL.md frontmatter)
 - Just recipe help output (just --list)
 
 Single source of truth principle: All dependency information comes from requirements.yaml,
@@ -121,11 +121,11 @@ SKILL_GROUP_INTROS = {
 
 
 def load_skills() -> list[dict]:
-    """Scan .cursor/skills/*/SKILL.md and return parsed skill metadata.
+    """Scan .claude/skills/*/SKILL.md and return parsed skill metadata.
 
     Each entry has: name, trigger, description, group (prefix before underscore).
     """
-    skills_dir = Path(__file__).parent.parent / ".cursor" / "skills"
+    skills_dir = Path(__file__).parent.parent / ".claude" / "skills"
     skills = []
 
     if not skills_dir.is_dir():

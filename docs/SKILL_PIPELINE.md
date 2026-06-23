@@ -7,7 +7,7 @@ How the `/command` skills fit together, what each one does, and when to use them
 
 ## Overview
 
-Skills are markdown playbooks that live in `.cursor/skills/`. Each one defines a repeatable workflow the agent follows when invoked via `/skill-name`. They are grouped into phases that form two parallel pipelines: **interactive** (human-in-the-loop) and **autonomous** (worktree, no user prompts).
+Skills are markdown playbooks that live in `.claude/skills/`. Each one defines a repeatable workflow the agent follows when invoked via `/skill-name`. They are grouped into phases that form two parallel pipelines: **interactive** (human-in-the-loop) and **autonomous** (worktree, no user prompts).
 
 ```
               ┌─────────────────────────────────────────────┐
@@ -226,7 +226,7 @@ This makes the autonomous pipeline **idempotent** — re-running it picks up whe
 
 ## Subagent Delegation
 
-Skills can delegate mechanical sub-steps (CLI calls, template filling, comment posting) to lightweight subagents via the Task tool, keeping the primary model focused on reasoning. Delegation tiers are defined in `.cursor/rules/subagent-delegation.mdc`:
+Skills can delegate mechanical sub-steps (CLI calls, template filling, comment posting) to lightweight subagents via the Task tool, keeping the primary model focused on reasoning. Delegation tiers are defined in `.claude/skills/subagent-delegation/SKILL.md`:
 
 - **Lightweight** — CLI commands, file reading, template filling, comment posting
 - **Standard** — code review, log analysis, structured verification
@@ -264,7 +264,7 @@ The `--yolo` flag means the agent auto-approves all shell commands — appropria
 
 ### Model Selection
 
-Agent models are read from `.cursor/agent-models.toml`. The worktree recipes use:
+Agent models are read from `.claude/agent-models.toml`. The worktree recipes use:
 - **`autonomous` tier** for the main `agent chat` session (design, code, reasoning).
 - **`lightweight` tier** for the one-shot branch-naming call.
 

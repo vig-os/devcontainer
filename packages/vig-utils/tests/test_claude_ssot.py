@@ -23,6 +23,12 @@ _ARCHIVAL_PREFIXES = (
     "docs/plans/",
 )
 
+# Released CHANGELOG entries are append-only history (never rewritten) and may
+# reference paths that were current at the time of release. This guard module
+# itself must contain the search literal to do its job.
+_THIS_FILE_REL = "packages/vig-utils/tests/test_claude_ssot.py"
+_ARCHIVAL_FILES = ("CHANGELOG.md", _THIS_FILE_REL)
+
 
 def _tracked_files() -> list[str]:
     result = subprocess.run(
@@ -39,7 +45,7 @@ def test_no_tracked_file_references_cursor_skills() -> None:
     """No tracked file (outside the workspace template) references .cursor/skills/."""
     offenders: list[str] = []
     for rel in _tracked_files():
-        if rel.startswith(_ARCHIVAL_PREFIXES):
+        if rel.startswith(_ARCHIVAL_PREFIXES) or rel in _ARCHIVAL_FILES:
             continue
         path = REPO_ROOT / rel
         try:
