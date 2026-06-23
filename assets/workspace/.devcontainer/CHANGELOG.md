@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The `setup-env` action gained a `provision-via-flake` mode that installs Nix (SHA-pinned `install-nix-action`) and the `vig-os` Cachix substituter, builds the flake dev-shell, and prepends its tools to `PATH`, replacing the ad-hoc installs of `uv`/Python, `just`, `hadolint`, and `taplo`
   - Enabled the mode in the CI build/test path (`build-image`, `test-image`, `test-integration`, `project-checks`) so jobs run inside the flake shell (the toolchain SSoT); `podman`, Node.js, BATS, and the devcontainer CLI keep their dedicated install paths
   - The Debian image is still built unchanged and the Docker `type=gha` build cache stays intact
+  - Set `UV_PYTHON_DOWNLOADS_JSON_URL` in the flake dev-shell so the nixpkgs `uv` (whose embedded Python-download list is stripped) can fetch the project's pinned CPython `3.14.6`, which nixpkgs does not package, letting `uv sync --frozen` succeed under flake provisioning
 
 ### Deprecated
 
