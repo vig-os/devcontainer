@@ -118,6 +118,20 @@
       #     extraPackages = [ pkgs.foo ];
       #   };
       # ---------------------------------------------------------------------
+      # uv's Python-download metadata, pinned to the uv release we provision.
+      #
+      # The nixpkgs build of uv ships with its embedded Python-download list
+      # stripped (Nix is expected to supply interpreters), so `uv sync` cannot
+      # fetch a managed CPython on its own — it reports "No interpreter found
+      # ... in managed installations or search path". Our projects pin an exact
+      # patch (requires-python == 3.14.6) that nixpkgs does not package (stable
+      # has 3.14.0, unstable 3.14.4), so the interpreter must come from uv's
+      # managed download. Pointing uv at upstream's download-metadata.json
+      # (pinned to the same uv version installed on the non-flake CI path)
+      # restores that capability without un-pinning nixpkgs. Refs #632.
+      uvPythonDownloadsJsonUrl =
+        "https://raw.githubusercontent.com/astral-sh/uv/0.11.23/crates/uv-python/download-metadata.json";
+
       mkProjectShell =
         {
           pkgs,
@@ -127,6 +141,9 @@
         pkgs.mkShell {
           packages = (devTools pkgs) ++ extraPackages;
           inherit shellHook;
+
+          # Let the nixpkgs uv resolve managed Python downloads (see note above).
+          UV_PYTHON_DOWNLOADS_JSON_URL = uvPythonDownloadsJsonUrl;
         };
     in
     flake-utils.lib.eachDefaultSystem (
