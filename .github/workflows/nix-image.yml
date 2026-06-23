@@ -141,6 +141,34 @@ jobs:
           docker push "${ARCH_TAG}"
           echo "✓ Pushed ${ARCH_TAG}"
 
+      # Regression guard (#664): a Nix image bakes the workspace template as
+      # read-only /nix/store symlinks, so the scaffold must produce REAL, writable
+      # files (not dangling symlinks on the host). The install/integration suite
+      # only covers the Debian image, so assert the Nix scaffold here.
+      - name: Assert the scaffold has no dangling store symlinks (#664)
+        if: matrix.arch == 'amd64'
+        run: |
+          set -euo pipefail
+          dest="$(mktemp -d)"
+          # `just sync` at the end may fail offline; the scaffold (rsync -L +
+          # chmod u+w) runs first, which is what we assert. Bound the run.
+          timeout 300 docker run --rm \
+            -e SHORT_NAME=ci -e ORG_NAME=ci -e GITHUB_REPOSITORY=ci/ci \
+            -v "${dest}":/workspace "${REGISTRY}:${INDEX_TAG}-amd64" \
+            /root/assets/init-workspace.sh --no-prompts --mode both || true
+          echo "Scaffolded top-level:"; ls -A "${dest}"
+          dangling="$(find "${dest}" -xtype l || true)"
+          if [ -n "${dangling}" ]; then
+            echo "::error::scaffold contains dangling symlinks (store-symlink bug regressed):"
+            echo "${dangling}"
+            exit 1
+          fi
+          if [ ! -f "${dest}/flake.nix" ] || [ -L "${dest}/flake.nix" ]; then
+            echo "::error::flake.nix missing or a symlink — expected a real file"
+            exit 1
+          fi
+          echo "✓ scaffold is real files with no dangling symlinks"
+
   multi-arch-index:
     name: Assemble & verify the multi-arch index
     needs: build-and-test

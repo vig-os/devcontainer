@@ -80,6 +80,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Nix image no longer scaffolds dangling, read-only symlinks into a new workspace** ([#664](https://github.com/vig-os/devcontainer/issues/664))
+  - The Nix-built image bakes the workspace template as read-only `/nix/store` symlinks (how `buildLayeredImage` represents the layer); `init-workspace.sh` now rsyncs with `--copy-links` and `chmod -R u+w "$WORKSPACE_DIR"`, so a scaffolded workspace gets real, writable files instead of symlinks that dangle on the host (and the placeholder `sed -i` no longer fails on read-only files). No-op on the Debian image
+  - Added a static bats guard (scaffold rsync uses `--copy-links`; workspace made writable) and a behavioural step in `nix-image.yml` that scaffolds via the real Nix image and asserts no dangling symlinks — the install/integration suite otherwise only exercises the Debian image
 - **`just wt-start` no longer aborts on its helper-CLI prerequisite check** ([#657](https://github.com/vig-os/devcontainer/issues/657))
   - `derive-branch-summary` now handles `-h`/`--help` (prints usage, exits 0) instead of treating the flag as an issue title and failing; the worktree launcher probes availability with `--help`, so the bug blocked worktree creation entirely
 
