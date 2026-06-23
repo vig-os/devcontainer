@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replace dpkg `host.package(...).is_installed` checks (git, curl, openssh-client, nano, tmux, rsync) with path-agnostic `--version`/`-V` runs
   - Resolve `gh`, `just`, `hadolint`, `taplo` and cargo-installed tools via PATH (`command -v`) instead of hardcoded `/usr/local/bin` / `/root/.cargo/bin` / `/root/.local/bin` locations
   - Drop the `DEBIAN_FRONTEND` environment assertion and the apt-sourced version-prefix checks (git, curl, tmux, rsync) from `EXPECTED_VERSIONS`
+- **Provision CI build/test tooling from the flake dev-shell** ([#632](https://github.com/vig-os/devcontainer/issues/632))
+  - The `setup-env` action gained a `provision-via-flake` mode that installs Nix (SHA-pinned `install-nix-action`) and the `vig-os` Cachix substituter, builds the flake dev-shell, and prepends its tools to `PATH`, replacing the ad-hoc installs of `uv`/Python, `just`, `hadolint`, and `taplo`
+  - Enabled the mode in the CI build/test path (`build-image`, `test-image`, `test-integration`, `project-checks`) so jobs run inside the flake shell (the toolchain SSoT); `podman`, Node.js, BATS, and the devcontainer CLI keep their dedicated install paths
+  - The Debian image is still built unchanged and the Docker `type=gha` build cache stays intact
 
 ### Deprecated
 

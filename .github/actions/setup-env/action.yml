@@ -7,6 +7,14 @@
 # - hadolint (for Containerfile linting in pre-commit)
 # - BATS + helper libraries (for shell script testing)
 #
+# Flake provisioning (provision-via-flake, Refs #632):
+# - When 'true', the toolchain comes from the Nix flake (the SSoT) via
+#   `nix develop` instead of the ad-hoc installs below: Nix + Cachix are
+#   installed, the dev-shell is built (a warm vig-os Cachix pull), and its
+#   tool bin dirs are prepended to PATH. Python/uv, just, hadolint, and taplo
+#   ad-hoc steps are skipped; podman, Node.js, BATS, and the devcontainer CLI
+#   keep their dedicated steps (not flake-provided or host-integration tools).
+#
 # IMPORTANT:
 # - This action does NOT checkout code, allowing callers to control ref, token,
 #   persist-credentials, and other checkout options.
@@ -100,6 +108,27 @@ inputs:
     description: 'Install BATS and helper libraries (support, assert, file) for shell testing'
     required: false
     default: 'false'
+  provision-via-flake:
+    description: >-
+      Provision the toolchain from the Nix flake (the toolchain SSoT) instead of
+      ad-hoc installs. When 'true', installs Nix + Cachix, builds the flake
+      dev-shell, and prepends its tools to PATH so every subsequent step runs as
+      if inside `nix develop`. Tools provided by the flake (Python/uv, just,
+      hadolint, taplo, Node.js) skip their ad-hoc install steps. podman is kept
+      on the apt path even under flake provisioning because rootless podman on
+      GitHub runners needs the host's setuid newuidmap/newgidmap and container
+      config; BATS and the devcontainer CLI are not in the flake and keep their
+      dedicated steps. Refs #632.
+    required: false
+    default: 'false'
+  cachix-cache:
+    description: 'Cachix binary cache name (used when provision-via-flake is true)'
+    required: false
+    default: ''
+  cachix-auth-token:
+    description: 'Cachix auth token for pushing (optional; pulls need no token)'
+    required: false
+    default: ''
 
 outputs:
   uv-version:
@@ -109,22 +138,68 @@ outputs:
 runs:
   using: composite
   steps:
+    # ── Nix flake provisioning (toolchain SSoT) ─────────────────────────
+    # When provision-via-flake is true, install Nix + Cachix and build the
+    # flake dev-shell, then prepend its tool bin dirs to GITHUB_PATH so every
+    # subsequent step runs as if inside `nix develop`. The ad-hoc tool installs
+    # below (Python/uv, just, hadolint, taplo, Node.js) are gated off in this
+    # mode. The Nix installer is SHA-pinned to match nix-cachix.yml and the
+    # vig-os Cachix substituter makes the dev-shell a fast binary-cache pull.
+    # Refs #632.
+    - name: Install Nix (upstream CppNix)
+      if: inputs.provision-via-flake == 'true'
+      uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3  # v31.10.6
+      with:
+        extra_nix_config: |
+          experimental-features = nix-command flakes
+          accept-flake-config = true
+
+    - name: Configure Cachix
+      if: inputs.provision-via-flake == 'true' && inputs.cachix-cache != ''
+      uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71  # v17
+      with:
+        name: ${{ inputs.cachix-cache }}
+        authToken: ${{ inputs.cachix-auth-token }}
+
+    - name: Build flake dev-shell and enter it
+      if: inputs.provision-via-flake == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Build the dev-shell into a gcroot profile (warm Cachix pull).
+        nix develop --profile "$RUNNER_TEMP/dev-profile" --command true
+
+        # Capture the dev-shell PATH and prepend its nix-store bin dirs to
+        # GITHUB_PATH so all following steps resolve the flake's tools first.
+        SHELL_PATH="$(nix develop --profile "$RUNNER_TEMP/dev-profile" \
+          --command bash -c 'printf "%s" "$PATH"')"
+
+        printf '%s' "$SHELL_PATH" | tr ':' '\n' \
+          | grep '^/nix/store' >> "$GITHUB_PATH"
+
+        echo "Flake dev-shell provisioned; tools added to PATH:"
+        printf '%s' "$SHELL_PATH" | tr ':' '\n' | grep '^/nix/store' | head -50
+
     # ── Python ───────────────────────────────────────────────────────────
+    # Skipped under flake provisioning: uv (from the flake) manages the
+    # project interpreter via `uv sync` / `uv run`.
     - name: "Set up Python from pyproject"
-      if: inputs.install-python == 'true' && hashFiles('pyproject.toml') != ''
+      if: inputs.provision-via-flake != 'true' && inputs.install-python == 'true' && hashFiles('pyproject.toml') != ''
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
       with:
         python-version-file: "pyproject.toml"
 
     - name: "Set up Python fallback"
-      if: inputs.install-python == 'true' && hashFiles('pyproject.toml') == ''
+      if: inputs.provision-via-flake != 'true' && inputs.install-python == 'true' && hashFiles('pyproject.toml') == ''
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
       with:
         python-version: ${{ inputs.python-version }}
 
     # ── uv ─────────────────────────────────────────────────────────────
+    # Skipped under flake provisioning: uv comes from the flake dev-shell.
     - name: Install uv
       id: setup-uv
+      if: inputs.provision-via-flake != 'true'
       continue-on-error: true
       uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
       with:
@@ -215,15 +290,17 @@ runs:
         node-version: ${{ inputs.node-version }}
 
     # ── Just (task runner) ──────────────────────────────────────────────
+    # Skipped under flake provisioning: just comes from the flake dev-shell.
     - name: Install just
-      if: inputs.install-just == 'true'
+      if: inputs.provision-via-flake != 'true' && inputs.install-just == 'true'
       uses: taiki-e/install-action@ab08a3b50948bd57d91bd2980f025da7e0a88231  # just
       with:
         tool: just
 
     # ── hadolint (Containerfile linter) ───────────────────────────────────
+    # Skipped under flake provisioning: hadolint comes from the flake dev-shell.
     - name: Install hadolint
-      if: inputs.install-hadolint == 'true'
+      if: inputs.provision-via-flake != 'true' && inputs.install-hadolint == 'true'
       shell: bash
       run: |
         set -euo pipefail
@@ -256,8 +333,9 @@ runs:
         hadolint --version
 
     # ── taplo (TOML linter/formatter) ──────────────────────────────────
+    # Skipped under flake provisioning: taplo comes from the flake dev-shell.
     - name: Install taplo
-      if: inputs.install-taplo == 'true'
+      if: inputs.provision-via-flake != 'true' && inputs.install-taplo == 'true'
       shell: bash
       run: |
         set -euo pipefail
