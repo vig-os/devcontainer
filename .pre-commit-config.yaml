@@ -69,8 +69,10 @@ repos:
     hooks:
       - id: shellcheck
         name: shellcheck
+        # .envrc files (root + the scaffolded template stub) are direnv stdlib
+        # scripts with no shebang; exclude them from SC2148 at any path.
         args: ["-x"]
-        exclude: ^\.envrc$
+        exclude: (^|/)\.envrc$
 
   # Containerfile
   - repo: local

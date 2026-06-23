@@ -33,6 +33,10 @@ PRESERVE_FILES=(
     ".github/workflows/release-extension.yml"
     "justfile.project"
     "renovate.json"
+    # direnv/flake stub (#640): the user owns the extraPackages block, so a
+    # dev-env upgrade must never clobber it — same class as justfile.project.
+    "flake.nix"
+    ".envrc"
 )
 
 # Get script directory for manifest location
