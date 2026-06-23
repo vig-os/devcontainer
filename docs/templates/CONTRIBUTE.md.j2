@@ -28,6 +28,51 @@ This guide explains how to develop, build, test, and release the vigOS developme
 - Run `./scripts/init.sh` to check dependencies and get OS-specific installation commands.
 - Ensure Docker is installed if you plan to use it instead of Podman.
 
+## Nix dev shell (fast path)
+
+The repository ships a Nix flake (`flake.nix`) whose `devTools` list is the single
+source of truth for the toolchain. With [Nix](https://nixos.org/download) and
+[direnv](https://direnv.net/) installed you get the full dev environment on
+`cd` into the clone — no manual dependency install. On a warm
+[Cachix](https://www.cachix.org/) cache this is a binary fetch, not a from-source
+build, so the first `direnv allow` completes in seconds.
+
+1. **Enable the flakes experimental features.** Add to `~/.config/nix/nix.conf`
+   (or `/etc/nix/nix.conf`):
+
+   ```conf
+   experimental-features = nix-command flakes
+   ```
+
+2. **Add the `vig-os` Cachix substituter** so the dev-shell closure is fetched
+   from the binary cache instead of built locally. Add to the same `nix.conf`:
+
+   ```conf
+   substituters = https://cache.nixos.org https://vig-os.cachix.org
+   trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= vig-os.cachix.org-1:yoOYRi3bvnM6ThxO0joLt7vtzhTfkq3r6jykeUMg7Bk=
+   ```
+
+   Pulling from the public `vig-os` cache needs no token. (If you have the Cachix
+   CLI: `cachix use vig-os` writes the same lines for you.)
+
+3. **Clone and allow direnv:**
+
+   ```bash
+   git clone git@github.com:vig-os/devcontainer.git
+   cd devcontainer
+   direnv allow        # first allow fetches the closure from Cachix (seconds on a warm cache)
+   ```
+
+   The committed `.envrc` uses
+   [nix-direnv](https://github.com/nix-community/nix-direnv): the dev-shell
+   evaluation is cached and GC-rooted (under `.direnv/`, which is gitignored), so
+   re-entering the directory is instant and the closure is never garbage-collected.
+   nix-direnv is self-bootstrapped by `.envrc` on first allow; if you already
+   source it from `~/.config/direnv/direnvrc`, that installation is used instead.
+
+This Nix dev shell is an alternative to the devcontainer image below; use whichever
+fits your workflow.
+
 ## Setup
 
 Clone this repository and prepare it for container development:
