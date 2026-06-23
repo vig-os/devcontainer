@@ -30,11 +30,14 @@ setup() {
     assert_failure
 }
 
-@test "template carries no Cursor editor glue (cursor-remote / cursor-agent)" {
-    # Exclude CHANGELOG.md: released entries are immutable history and may name
-    # cursor-agent for the change that removed it.
+@test "template carries no Cursor editor glue (#629 scope)" {
+    # #629 owns: the cursor-remote-ssh socket glob and the `command -v cursor`
+    # editor launch. The remaining `cursor-agent` worktree-pipeline references
+    # are owned by #627; the AI blocklist's "cursor" entries by #630.
+    # Exclude CHANGELOG.md: released/Unreleased prose legitimately names the
+    # removed glue when describing the change.
     run grep -rn --exclude=CHANGELOG.md \
-        'cursor-remote\|cursor-agent\|command -v cursor' "$TEMPLATE_DIR"
+        'cursor-remote\|command -v cursor' "$TEMPLATE_DIR"
     assert_failure
 }
 
