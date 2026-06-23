@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **De-duplicate the flake into the toolchain SSoT** ([#631](https://github.com/vig-os/devcontainer/issues/631))
+  - Factored a single `devTools` list in `flake.nix` as the source of truth shared by the dev-shell now and the image later, absorbing the agent-CLI toolkit (`rg`, `fd`, `bat`, `eza`, `delta`, `lazygit`, `zoxide`, `starship`, `freeze`, `expect`, `nvim`) plus `claude` ([#545](https://github.com/vig-os/devcontainer/issues/545))
+  - Pinned `nixpkgs` to `nixos-25.05` and added a `nixpkgs-unstable` input overlaid only for fast-movers (`uv`, `gh`, `claude-code`); refreshed `flake.lock`
+  - Added reusable flake outputs `lib.mkProjectShell`, `overlays.default`, and a `packages.devcontainerImage` stub for the later image build
+  - Added a non-blocking `Nix Cachix` workflow (with `workflow_dispatch`) that builds the dev-shell and pushes its closure to the `vig-os` Cachix cache
+  - Added a per-tool `nix develop -c <tool> --version` parity test driven from the flake SSoT to guard against future dev-shell/image drift
+
 ### Changed
 
 - **Make `.claude/` the single source of truth for agent rules and skills** ([#626](https://github.com/vig-os/devcontainer/issues/626))
