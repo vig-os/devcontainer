@@ -178,8 +178,9 @@ echo "Organization name set to: $ORG_NAME"
 # Get MODE - from flag, prompt, or default. Selects which delivery the workspace
 # scaffolds: a devcontainer, the Nix/direnv stub, or both.
 if [[ -z "$MODE" ]]; then
-    if [[ "$NO_PROMPTS" == "true" ]]; then
-        # Non-interactive mode: default to "both" (preserves prior behaviour).
+    if [[ "$NO_PROMPTS" == "true" ]] || [[ ! -t 0 ]]; then
+        # Non-interactive (--no-prompts, or no TTY: CI / piped stdin): default to
+        # "both" without blocking on the prompt, preserving prior behaviour.
         MODE="both"
     else
         # Interactive mode: prompt user (default selection: both).
