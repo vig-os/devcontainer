@@ -1,20 +1,31 @@
-# Nix-built devcontainer image (discovery phase, non-publishing)
+# Nix-built devcontainer image (discovery phase, multi-arch, non-cutover)
 #
 # Builds the devcontainer image with Nix (`dockerTools.buildLayeredImage`, NOT a
-# Dockerfile `FROM`) and runs the portable testinfra suite (#635) against it.
+# Dockerfile `FROM`) natively on amd64 + arm64, runs the portable testinfra suite
+# (#635) against each arch, pushes per-arch discovery tags, and assembles a
+# multi-arch index so downstream digest-pinning can resolve a top-level index
+# (#636).
 #
-# This workflow is intentionally NON-BLOCKING and NON-PUBLISHING (T2.1, #634):
+# This workflow is intentionally NON-BLOCKING and PRE-CUTOVER (T2.x):
 #   - It is a standalone workflow, not part of the required CI gate.
-#   - The build+test job is guarded with `continue-on-error: true`, so the
-#     FHS/bootstrap gaps the discovery phase is meant to surface (uv-pip tools,
-#     cargo tools, network-populated venv / pre-commit cache, version-pin
-#     differences vs. the Debian build) can never fail CI.
-#   - The image is loaded into the runner's local podman only; it is never
-#     pushed to any registry. Publishing is #639.
+#   - Every job is guarded with `continue-on-error: true`, so the FHS/bootstrap
+#     gaps the discovery phase is meant to surface (uv-pip tools, cargo tools,
+#     network-populated venv / pre-commit cache, version-pin differences vs. the
+#     Debian build) can never fail CI.
+#   - It pushes ONLY the disposable `nix-dev*` discovery tags (per-arch +
+#     index). It never touches the versioned or `:latest` cutover tags — the
+#     publish-cutover is #639. These tags exist so `imagetools inspect` can prove
+#     the index shape and so the arm64 closure lands in Cachix.
 #
 # Evaluator choice: upstream CppNix via cachix/install-nix-action, matching
 # nix-cachix.yml. The flake bakes CppNix (`pkgs.nix`) into the image closure so
 # `nix`/`direnv` are live inside the container.
+#
+# Multi-arch: each leg builds natively on its own runner (no QEMU /
+# cross-compilation) — `nix build .#devcontainerImage` resolves to x86_64-linux
+# on the amd64 runner and aarch64-linux on the arm64 runner, so the per-arch
+# image config carries the correct `architecture`. The index is then assembled
+# with `docker buildx imagetools create`, mirroring the proven release.yml flow.
 #
 # Triggers:
 #   - Push to the migration epic branch when the flake or this workflow changes.
@@ -34,15 +45,25 @@ on:  # yamllint disable-line rule:truthy
 
 permissions:
   contents: read
+  packages: write   # push per-arch discovery tags + assemble the multi-arch index
+
+env:
+  REGISTRY: ghcr.io/vig-os/devcontainer
+  # Disposable discovery index tag. NOT a cutover tag (versioned/:latest is #639).
+  INDEX_TAG: nix-dev
 
 jobs:
   build-and-test:
-    name: Build Nix image & run portable testinfra
-    runs-on: ubuntu-24.04
+    name: Build Nix image & run portable testinfra (${{ matrix.arch }})
+    runs-on: ${{ matrix.arch == 'amd64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
     timeout-minutes: 45
     # Non-blocking: discovery phase. Remaining FHS/bootstrap gaps must not fail
     # the wider CI while the image story is being iterated toward green.
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
 
     steps:
       - name: Checkout repository
@@ -55,7 +76,9 @@ jobs:
             experimental-features = nix-command flakes
             accept-flake-config = true
 
-      - name: Configure Cachix (pull-only substituter)
+      # authToken set => cachix-action pushes every store path built in this job
+      # on post-run, so the arm64 closure lands in the `vig-os` cache too (#636).
+      - name: Configure Cachix (push arch closure)
         uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71  # v17
         with:
           name: ${{ vars.CACHIX_CACHE }}
@@ -64,7 +87,8 @@ jobs:
       - name: Build the devcontainer image with Nix
         run: |
           set -euo pipefail
-          # buildLayeredImage emits a gzipped OCI tarball at ./result.
+          # buildLayeredImage emits a gzipped OCI tarball at ./result. Built
+          # natively for ${{ matrix.arch }} on this runner's own architecture.
           nix build .#devcontainerImage --print-build-logs
           # Stage it where the test-image composite action expects a tar file.
           cp -L result /tmp/nix-devcontainer-image.tar.gz
@@ -73,14 +97,17 @@ jobs:
       - name: Record image size
         run: |
           set -euo pipefail
-          echo "Compressed tarball size:"
+          echo "Compressed tarball size (${{ matrix.arch }}):"
           du -h /tmp/nix-devcontainer-image.tar.gz
 
       # Reuse the shared composite action: it loads the tar into podman, retags
       # it to ghcr.io/vig-os/devcontainer:nix-image (local only, never pushed),
       # and runs tests/test_image.py via TEST_CONTAINER_TAG.
+      # continue-on-error so a discovery-phase testinfra failure (expected while
+      # FHS/bootstrap gaps remain) does not skip the per-arch push steps below.
       - name: Load image and run portable testinfra
         id: testinfra
+        continue-on-error: true
         uses: ./.github/actions/test-image
         with:
           image-tag: 'nix-image'
@@ -93,3 +120,82 @@ jobs:
         run: |
           echo "Portable testinfra result code: ${{ steps.testinfra.outputs.test-result }}"
           echo "Discovery phase: non-zero is expected while FHS/bootstrap gaps remain."
+
+      - name: Log in to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ github.token }}
+
+      - name: Push the per-arch discovery tag
+        run: |
+          set -euo pipefail
+          # Load into docker (separate engine from the podman testinfra step) and
+          # read back whatever tag the flake stamped, so we never hardcode it.
+          LOADED=$(docker load -i /tmp/nix-devcontainer-image.tar.gz \
+            | sed -n 's/^Loaded image: //p' | head -n1)
+          echo "Loaded: ${LOADED}"
+          ARCH_TAG="${REGISTRY}:${INDEX_TAG}-${{ matrix.arch }}"
+          docker tag "${LOADED}" "${ARCH_TAG}"
+          docker push "${ARCH_TAG}"
+          echo "✓ Pushed ${ARCH_TAG}"
+
+  multi-arch-index:
+    name: Assemble & verify the multi-arch index
+    needs: build-and-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Non-blocking: discovery phase (cutover is #639).
+    continue-on-error: true
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ github.token }}
+
+      - name: Create the multi-arch index
+        run: |
+          set -euo pipefail
+          # Mirror release.yml: combine the per-arch tags into a single top-level
+          # OCI image index (what downstream digest-pinning resolves against).
+          docker buildx imagetools create \
+            --tag "${REGISTRY}:${INDEX_TAG}" \
+            "${REGISTRY}:${INDEX_TAG}-amd64" \
+            "${REGISTRY}:${INDEX_TAG}-arm64"
+          echo "✓ Created index ${REGISTRY}:${INDEX_TAG}"
+
+      - name: Verify the index covers amd64 + arm64
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "${REGISTRY}:${INDEX_TAG}" | tee /tmp/index-inspect.txt
+          missing=0
+          for plat in linux/amd64 linux/arm64; do
+            if grep -q "${plat}" /tmp/index-inspect.txt; then
+              echo "✓ index advertises ${plat}"
+            else
+              echo "::error::index ${REGISTRY}:${INDEX_TAG} is missing ${plat}"
+              missing=1
+            fi
+          done
+          [ "${missing}" -eq 0 ]
+
+      - name: Write index summary
+        if: always()
+        run: |
+          {
+            echo "## Nix multi-arch index (discovery)"
+            echo ""
+            echo "- **Index tag:** \`${REGISTRY}:${INDEX_TAG}\` (disposable; cutover is #639)"
+            echo "- **Per-arch tags:** \`${INDEX_TAG}-amd64\`, \`${INDEX_TAG}-arm64\`"
+            echo ""
+            echo '```'
+            cat /tmp/index-inspect.txt 2>/dev/null || echo "(index not assembled)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
