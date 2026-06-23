@@ -2,7 +2,7 @@
 
 ## Custom Commands
 
-Available slash commands (SSoT: `.cursor/skills/`, mapped via `.claude/commands/`):
+Available slash commands (SSoT: `.claude/skills/`, mapped via `.claude/commands/`):
 
 | Command | Description |
 |---------|-------------|
@@ -40,11 +40,11 @@ Available slash commands (SSoT: `.cursor/skills/`, mapped via `.claude/commands/
 
 ## Always-Apply Rules
 
-Rules SSoT: `.cursor/rules/` (read these files for full detail).
+This file is the SSoT for always-on principles. Workflow-style rules live as
+on-demand skills in `.claude/skills/` (`branch-naming`, `tdd`,
+`subagent-delegation`).
 
 ### Coding Principles
-
-See `.cursor/rules/coding-principles.mdc` for full detail.
 
 1. **YAGNI** -- Implement only what the issue or user explicitly requests. No speculative features. Ask before adding anything unasked.
 2. **Minimal diff** -- Touch only files and lines required for the task. No drive-by refactors, renames, or reformats. Mention improvements separately; don't silently change them.
@@ -57,7 +57,7 @@ See `.cursor/rules/coding-principles.mdc` for full detail.
 
 ### Commit Message Standard
 
-See `.cursor/rules/commit-messages.mdc` and `docs/COMMIT_MESSAGE_STANDARD.md` for full detail.
+See `docs/COMMIT_MESSAGE_STANDARD.md` for the full reference.
 
 Format:
 
@@ -85,7 +85,7 @@ Refs: #<issue>
 
 ### Branch Naming
 
-See `.cursor/rules/branch-naming.mdc` for full detail.
+See the `branch-naming` skill (`.claude/skills/branch-naming/SKILL.md`) for full detail.
 
 Format: `<type>/<issue_number>-<short_summary>`
 
@@ -99,7 +99,7 @@ Every piece of knowledge lives in exactly one place. Reference it everywhere els
 
 ### TDD
 
-See `.cursor/rules/tdd.mdc` for the scenario checklist and full detail.
+See the `tdd` skill (`.claude/skills/tdd/SKILL.md`) for the scenario checklist and full detail.
 
 1. Write the failing test first. Run it. Confirm it fails.
 2. **Commit** the failing test (`test: ...`) following the Commit Message Standard above. Do not proceed before committing.

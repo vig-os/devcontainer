@@ -5,7 +5,7 @@
 # changes to matching files. Later rules take precedence over earlier ones.
 
 # agent workflows
-.cursor/skills/                 @gerchowl
+.claude/skills/                 @gerchowl
 justfile.worktree               @gerchowl
 
 

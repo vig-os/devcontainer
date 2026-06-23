@@ -4,21 +4,20 @@
 [[entries]]
 src = "docs/COMMIT_MESSAGE_STANDARD.md"
 
+# Agent skills/config now live in .claude/ (SSoT, #626). They sync into the
+# downstream template under assets/workspace/.claude/. The stale
+# assets/workspace/.cursor/ template tree is removed by #629. The former
+# .cursor/rules/ entry is dropped: workflow rules became skills (synced below)
+# and static principles moved into CLAUDE.md.
 [[entries]]
-src = ".cursor/rules/"
+src = ".claude/skills/"
 transforms = [
-  { type = "RemoveLines", pattern = "Full reference: \\[docs/COMMIT_MESSAGE_STANDARD\\.md\\]", target = "commit-messages.mdc" },
+  { type = "Sed", pattern = "just test-image", replace = "just test", target = "code_verify/SKILL.md" },
+  { type = "Sed", pattern = "just test-image", replace = "just test", target = "design_plan/SKILL.md" },
 ]
 
 [[entries]]
-src = ".cursor/skills/"
-transforms = [
-  { type = "Sed", pattern = "just test-image", replace = "just test", target = "code:verify/SKILL.md" },
-  { type = "Sed", pattern = "just test-image", replace = "just test", target = "design:plan/SKILL.md" },
-]
-
-[[entries]]
-src = ".cursor/worktrees.json"
+src = ".claude/worktrees.json"
 
 [[entries]]
 src = ".gitmessage"
