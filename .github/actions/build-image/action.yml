@@ -68,6 +68,10 @@ inputs:
     description: 'Container registry URL'
     required: false
     default: 'ghcr.io/vig-os/devcontainer'
+  builder:
+    description: 'Image builder: "debian" (Containerfile) or "nix" (flake devcontainerImage). Default debian keeps the cutover paused (#639).'
+    required: false
+    default: 'debian'
   output-type:
     description: 'Output type: "tar" (save to file) or "registry" (push to registry)'
     required: false
@@ -162,8 +166,8 @@ runs:
           org.opencontainers.image.vendor=vigOS
           org.opencontainers.image.licenses=MIT
 
-    - name: Build image (tar output)
-      if: inputs.output-type == 'tar'
+    - name: Build image (tar output, Debian/Containerfile)
+      if: inputs.output-type == 'tar' && inputs.builder != 'nix'
       uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
       with:
         context: ./build
@@ -179,6 +183,21 @@ runs:
           IMAGE_TAG=${{ inputs.version }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+
+    # Nix build path (#639 cutover). Native per-arch: `nix build .#devcontainerImage`
+    # resolves to the runner's own architecture, mirroring nix-image.yml. Nix is
+    # already provisioned by the setup-env step above (provision-via-flake). The
+    # flake stamps its own OCI labels; the docker metadata-action labels are not
+    # applied to the Nix image. Inert unless builder=nix (default debian).
+    - name: Build image (tar output, Nix flake)
+      if: inputs.output-type == 'tar' && inputs.builder == 'nix'
+      shell: bash
+      run: |
+        set -euo pipefail
+        nix build .#devcontainerImage --print-build-logs
+        # buildLayeredImage emits a gzipped OCI tar; docker load handles gzip.
+        cp -L result "${{ inputs.output-file }}"
+        ls -lL "${{ inputs.output-file }}"
 
     - name: Verify tar output was created
       if: inputs.output-type == 'tar'
@@ -212,8 +231,8 @@ runs:
       shell: bash
       run: echo "tar-file=${{ inputs.output-file }}" >> $GITHUB_OUTPUT
 
-    - name: Build image (registry output)
-      if: inputs.output-type == 'registry'
+    - name: Build image (registry output, Debian/Containerfile)
+      if: inputs.output-type == 'registry' && inputs.builder != 'nix'
       uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
       with:
         context: ./build
