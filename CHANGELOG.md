@@ -62,6 +62,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`just wt-start` no longer aborts on its helper-CLI prerequisite check** ([#657](https://github.com/vig-os/devcontainer/issues/657))
+  - `derive-branch-summary` now handles `-h`/`--help` (prints usage, exits 0) instead of treating the flag as an issue title and failing; the worktree launcher probes availability with `--help`, so the bug blocked worktree creation entirely
+
 ### Security
 
 - **Drop the piscina CVE ignore tied to `cursor-agent`** ([#628](https://github.com/vig-os/devcontainer/issues/628))
