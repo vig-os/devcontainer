@@ -1,4 +1,4 @@
-# Project: eXoma Devcontainer
+# Project: vigOS Devcontainer
 
 ## Custom Commands
 
