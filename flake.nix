@@ -3,7 +3,7 @@
 
   inputs = {
     # Pinned stable channel: the controlled version document (flake.lock).
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     # Secondary channel, overlaid only for fast-moving tools (uv, gh, claude).
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
