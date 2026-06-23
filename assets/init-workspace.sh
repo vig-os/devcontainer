@@ -282,12 +282,12 @@ echo "Copying files from $TEMPLATE_DIR to $WORKSPACE_DIR..."
 # Pre-commit cache is now at /opt/pre-commit-cache (not in assets/workspace)
 if [[ "$SMOKE_TEST" == "true" ]]; then
     # Smoke mode: clean deploy (--delete removes stale files), then overlay smoke-test assets
-    rsync -av --delete --exclude='.git' --exclude='.venv' --exclude='docs/issues/' --exclude='docs/pull-requests/' "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
+    rsync -avL --delete --exclude='.git' --exclude='.venv' --exclude='docs/issues/' --exclude='docs/pull-requests/' "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
 
     SMOKE_TEST_DIR="$SCRIPT_DIR/smoke-test"
     if [[ -d "$SMOKE_TEST_DIR" ]]; then
         echo "Deploying smoke-test-specific files..."
-        rsync -av "$SMOKE_TEST_DIR/" "$WORKSPACE_DIR/"
+        rsync -avL "$SMOKE_TEST_DIR/" "$WORKSPACE_DIR/"
     else
         echo "Warning: Smoke-test directory not found at $SMOKE_TEST_DIR" >&2
     fi
@@ -312,8 +312,15 @@ else
         fi
     done
 
-    rsync -av --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
+    rsync -avL --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
 fi
+
+# The Nix-built image stores the baked template as read-only symlinks into the
+# Nix store. The rsync `-L` (--copy-links) above dereferences them into real
+# files, but those inherit the store's read-only (0444) mode. Make the scaffold
+# user-writable so the placeholder substitution below — and the user's own edits
+# — work. No-op on the Debian image (its template files are already writable).
+chmod -R u+w "$WORKSPACE_DIR"
 
 # Prune the scaffold to the chosen delivery mode. Idempotent and safe: only
 # removes paths inside the new workspace.

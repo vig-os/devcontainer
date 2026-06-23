@@ -227,15 +227,35 @@ prune_mode() {
 }
 
 @test "init-workspace.sh smoke mode uses rsync --delete for clean deploy" {
-    run grep 'rsync -av --delete' "$INIT_WORKSPACE_SH"
+    run grep 'rsync -avL --delete' "$INIT_WORKSPACE_SH"
     assert_success
 }
 
 @test "init-workspace.sh smoke mode excludes synced docs directories from delete" {
-    run grep -A1 'rsync -av --delete' "$INIT_WORKSPACE_SH"
+    run grep -A1 'rsync -avL --delete' "$INIT_WORKSPACE_SH"
     assert_success
     assert_output --partial "--exclude='docs/issues/'"
     assert_output --partial "--exclude='docs/pull-requests/'"
+}
+
+# ── Nix-image scaffold: real, writable files (#664) ───────────────────────────
+# The Nix image bakes the template as read-only /nix/store symlinks. The scaffold
+# rsync must --copy-links (-L) so a new workspace gets real files (not dangling
+# symlinks on the host), and must restore writability (the store mode is 0444).
+
+@test "init-workspace.sh dereferences store symlinks when scaffolding (#664)" {
+    # Every template/asset rsync must copy referents, not symlinks.
+    run grep -nE 'rsync -avL' "$INIT_WORKSPACE_SH"
+    assert_success
+    # ...and none may scaffold with a plain `rsync -av ` (symlinks-as-symlinks).
+    run grep -nE 'rsync -av ' "$INIT_WORKSPACE_SH"
+    assert_failure
+}
+
+@test "init-workspace.sh makes the scaffold user-writable (#664)" {
+    # shellcheck disable=SC2016
+    run grep -E 'chmod -R u\+w "\$WORKSPACE_DIR"' "$INIT_WORKSPACE_SH"
+    assert_success
 }
 
 # ── parse-github-remote-lib (#509) ─────────────────────────────────────────
