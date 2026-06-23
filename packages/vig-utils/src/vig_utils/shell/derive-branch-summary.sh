@@ -13,6 +13,18 @@
 #      DERIVE_BRANCH_TIMEOUT — timeout in seconds (default: 30). Use 2 for tests.
 set -euo pipefail
 
+case "${1:-}" in
+-h | --help)
+    cat <<'USAGE'
+Usage: derive-branch-summary <TITLE> [NAMING_RULE] [MODEL_TIER]
+  TITLE        issue title
+  NAMING_RULE  path to the branch-naming skill (default: .claude/skills/branch-naming/SKILL.md)
+  MODEL_TIER   agent-models.toml tier (default: lightweight; use standard for retry)
+USAGE
+    exit 0
+    ;;
+esac
+
 TITLE="${1:?Usage: derive-branch-summary.sh <TITLE> [NAMING_RULE] [MODEL_TIER]}"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 NAMING_RULE="${2:-${REPO_ROOT}/.claude/skills/branch-naming/SKILL.md}"
