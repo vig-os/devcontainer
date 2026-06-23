@@ -1,4 +1,4 @@
-Read and follow the workflow in `.cursor/skills/git_commit/SKILL.md`.
-Also read `.cursor/rules/commit-messages.mdc` for the commit message format.
+Read and follow the workflow in `.claude/skills/git_commit/SKILL.md`.
+Also read the Commit Message Standard in `CLAUDE.md` for the commit message format.
 
 Context: $ARGUMENTS

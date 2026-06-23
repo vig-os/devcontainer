@@ -178,7 +178,7 @@ Examples:
 
 ```bash
 check-skill-names
-check-skill-names .cursor/skills
+check-skill-names .claude/skills
 ```
 
 ### `setup-labels`

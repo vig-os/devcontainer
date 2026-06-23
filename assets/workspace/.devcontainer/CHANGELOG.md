@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Make `.claude/` the single source of truth for agent rules and skills** ([#626](https://github.com/vig-os/devcontainer/issues/626))
+  - Moved the 30 agent skills from `.cursor/skills/` to `.claude/skills/` and rewrote the 29 `.claude/commands/*.md` wrappers to point at the new paths
+  - Split the seven `.cursor/rules/*.mdc`: static principles (coding principles, commit messages, changelog, single source of truth) are now consolidated in `CLAUDE.md`; workflow rules (`branch-naming`, `tdd`, `subagent-delegation`) became on-demand `.claude/skills/`
+  - Ported `agent-models.toml` and `worktrees.json` to `.claude/`, updated the docs generator, pre-commit hooks, shell entrypoints, and the workspace sync manifest, and deleted the root `.cursor/` directory
 - **Make the image testinfra suite portable across Debian and Nix images** ([#635](https://github.com/vig-os/devcontainer/issues/635))
   - Replace dpkg `host.package(...).is_installed` checks (git, curl, openssh-client, nano, tmux, rsync) with path-agnostic `--version`/`-V` runs
   - Resolve `gh`, `just`, `hadolint`, `taplo` and cargo-installed tools via PATH (`command -v`) instead of hardcoded `/usr/local/bin` / `/root/.cargo/bin` / `/root/.local/bin` locations
@@ -21,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+
+- **Stop promote-release cleanup from orphaning RC draft pre-releases** ([#623](https://github.com/vig-os/devcontainer/issues/623))
+  - The cleanup step deleted RC draft pre-releases with `gh release delete <tag>`, which cannot resolve a draft, then deleted the git RC tag anyway — stranding the draft and making it undiscoverable on later runs (the loop was seeded from git tags)
+  - Cleanup now enumerates RC draft pre-releases from the releases list, deletes them by release id, removes a git RC tag only when no release is attached, and fails loudly if any RC draft survives — also reclaiming drafts whose tag was already removed by an earlier partial run
 
 ### Security
 
