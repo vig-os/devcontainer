@@ -44,6 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Stage the Nix publish-cutover; advance the nixpkgs baseline to 26.05** ([#639](https://github.com/vig-os/devcontainer/issues/639))
+  - Bumped the pinned channel `nixos-25.05` → `nixos-26.05` (the "advance the rev" CVE lever), cutting the vulnix HIGH/CRITICAL surface 83 → 27 and Trivy HIGH 244 → 14 on the image; triaged the residual 27 into `.vulnixignore` (4 CPE-mismatch false positives — VS Code/Jenkins, not the binaries; 23 recent CVEs accepted as low-risk in an interactive dev container with a 3-month re-review)
+  - Made the nightly `vulnix-gate` **blocking** (the #639 go/no-go gate) now that it is legitimately green, and archived the `vulnix`-vs-Trivy scan overlap in `docs/security/nix-cutover-scan-overlap.md` (zero overlap — disjoint surfaces, no finding class lost in the Debian→Nix switch)
+  - Added a `builder: debian|nix` selector to the `build-image` action and a matching `release.yml` input (**default `debian`**), so the release pipeline can build the Nix multi-arch image while the actual `:latest` publish stays paused — the cutover is the deliberate `release.yml -f builder=nix` run
 - **Make `.claude/` the single source of truth for agent rules and skills** ([#626](https://github.com/vig-os/devcontainer/issues/626))
   - Moved the 30 agent skills from `.cursor/skills/` to `.claude/skills/` and rewrote the 29 `.claude/commands/*.md` wrappers to point at the new paths
   - Split the seven `.cursor/rules/*.mdc`: static principles (coding principles, commit messages, changelog, single source of truth) are now consolidated in `CLAUDE.md`; workflow rules (`branch-naming`, `tdd`, `subagent-delegation`) became on-demand `.claude/skills/`
