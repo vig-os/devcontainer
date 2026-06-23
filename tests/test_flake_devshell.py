@@ -33,6 +33,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 VERSION_FLAG_OVERRIDES: dict[str, list[str]] = {
     # expect is a Tcl interpreter; it has no --version. `-v` prints the version.
     "expect": ["-v"],
+    # tmux uses -V (uppercase) to print its version.
+    "tmux": ["-V"],
 }
 
 pytestmark = pytest.mark.skipif(
@@ -55,10 +57,25 @@ def _nix_env() -> dict[str, str]:
 
 
 @pytest.fixture(scope="session")
-def dev_shell_tools() -> list[str]:
+def current_system() -> str:
+    """The Nix system double for the host (e.g. x86_64-linux)."""
+    result = subprocess.run(
+        ["nix", "eval", "--raw", "--impure", "--expr", "builtins.currentSystem"],
+        capture_output=True,
+        text=True,
+        env=_nix_env(),
+        timeout=120,
+    )
+    if result.returncode != 0:
+        pytest.fail("Failed to resolve builtins.currentSystem:\n" + result.stderr)
+    return result.stdout.strip()
+
+
+@pytest.fixture(scope="session")
+def dev_shell_tools(current_system: str) -> list[str]:
     """Binary names of every tool in the flake's ``devTools`` SSoT."""
     result = subprocess.run(
-        ["nix", "eval", "--json", f"{REPO_ROOT}#devShellTools"],
+        ["nix", "eval", "--json", f"{REPO_ROOT}#devShellTools.{current_system}"],
         capture_output=True,
         text=True,
         env=_nix_env(),
