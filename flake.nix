@@ -154,6 +154,52 @@
           overlays = [ overlay ];
           config.allowUnfree = true;
         };
+
+        python = pkgs.python314;
+
+        # The toolchain SSoT plus the runtime substrate a bare layered image
+        # lacks (an FHS base distro would provide these; here we add them
+        # explicitly — this is the discovery surface for FHS gaps). Shared by
+        # the image (`devcontainerImage`) and its vulnix scan target
+        # (`devcontainerImageEnv`, #637).
+        imageTools =
+          (devTools pkgs)
+          ++ (with pkgs; [
+            # Nix package manager in the closure (CppNix).
+            nix
+            direnv
+            nix-direnv
+
+            # Locale support without locale-gen.
+            glibcLocales
+
+            # Python + uv-managed venv bootstrap.
+            python
+            pre-commit
+
+            # Base runtime substrate (no FHS base distro to inherit).
+            bashInteractive
+            coreutils-full
+            findutils
+            gnugrep
+            gnused
+            gawk
+            gnutar
+            gzip
+            which
+            cacert
+            curl
+            openssh
+            nano
+            rsync
+
+            # /etc/passwd + /etc/group with a root (uid 0) entry. A bare
+            # layered image has no FHS user database, so anything that
+            # resolves the current uid (ssh, tmux, git) fails with
+            # "No user exists for uid 0". fakeNss provides the minimal
+            # nss files an FHS base distro would have supplied.
+            dockerTools.fakeNss
+          ]);
       in
       {
         devShells.default = mkProjectShell { inherit pkgs; };
@@ -184,50 +230,6 @@
           # nixpkgs, so it is a drop-in swap once that issue lands.
           devcontainerImage =
             let
-              python = pkgs.python314;
-
-              # The toolchain SSoT plus the runtime substrate a bare layered
-              # image lacks (an FHS base distro would provide these; here we add
-              # them explicitly — this is the discovery surface for FHS gaps).
-              imageTools =
-                (devTools pkgs)
-                ++ (with pkgs; [
-                  # Nix package manager in the closure (CppNix).
-                  nix
-                  direnv
-                  nix-direnv
-
-                  # Locale support without locale-gen.
-                  glibcLocales
-
-                  # Python + uv-managed venv bootstrap.
-                  python
-                  pre-commit
-
-                  # Base runtime substrate (no FHS base distro to inherit).
-                  bashInteractive
-                  coreutils-full
-                  findutils
-                  gnugrep
-                  gnused
-                  gawk
-                  gnutar
-                  gzip
-                  which
-                  cacert
-                  curl
-                  openssh
-                  nano
-                  rsync
-
-                  # /etc/passwd + /etc/group with a root (uid 0) entry. A bare
-                  # layered image has no FHS user database, so anything that
-                  # resolves the current uid (ssh, tmux, git) fails with
-                  # "No user exists for uid 0". fakeNss provides the minimal
-                  # nss files an FHS base distro would have supplied.
-                  dockerTools.fakeNss
-                ]);
-
               # Bake the workspace assets, pre-commit cache dir and template
               # .venv scaffold as a normal image layer. UV_PYTHON pins the Nix
               # interpreter and UV_PYTHON_DOWNLOADS=never forbids uv from
@@ -309,6 +311,21 @@
                 };
               };
             };
+
+          # devcontainerImageEnv — vulnix scan target (T3.1, #637). A buildEnv
+          # whose runtime closure equals the image's package set (imageTools),
+          # so `vulnix --closure` sees exactly what ships in the image. The OCI
+          # tarball itself is gzipped and exposes no scannable store references,
+          # hence this dedicated env rather than scanning the image output.
+          devcontainerImageEnv = pkgs.buildEnv {
+            name = "devcontainer-image-env";
+            paths = imageTools;
+            ignoreCollisions = true;
+          };
+
+          # vulnix — pinned CVE scanner (#637) from the locked nixpkgs so the
+          # nightly scan is reproducible rather than tracking a rolling channel.
+          vulnix = pkgs.vulnix;
         };
       }
     )
