@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Multi-arch Nix image (amd64 + arm64) discovery build** ([#636](https://github.com/vig-os/devcontainer/issues/636))
+  - The `Nix Image (discovery)` workflow now builds `packages.devcontainerImage` natively on an amd64 (`ubuntu-24.04`) + arm64 (`ubuntu-24.04-arm`) matrix — no QEMU or cross-compilation — pushes per-arch discovery tags (`nix-dev-amd64`, `nix-dev-arm64`), and assembles a top-level multi-arch index (`nix-dev`) with `docker buildx imagetools create`, verifying both platforms via `imagetools inspect`
+  - `cachix-action` runs with an auth token on every leg so the arm64 closure is pushed to the `vig-os` Cachix cache; the workflow stays `continue-on-error` and only touches the disposable `nix-dev*` tags — the versioned/`:latest` publish-cutover remains #639
 - **Renovate `nix` manager for `flake.lock` maintenance** ([#638](https://github.com/vig-os/devcontainer/issues/638))
   - Enabled the Renovate `nix` manager and weekly `lockFileMaintenance` in `renovate.json` so flake inputs (notably `nixpkgs`) are bumped through the normal PR/CI gate; the existing `pep621`, `npm`, `github-actions`, and `dockerfile` managers are retained
   - Documented the compensating control in `docs/CONTAINER_SECURITY.md`: every `flake.lock`/nixpkgs-bump PR must include a `vulnix` before/after diff, since the `nix` manager reports only the input revision change and not which CVE a bump fixes
