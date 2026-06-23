@@ -58,6 +58,14 @@ inputs:
     description: 'Git ref to checkout (e.g., commit SHA, branch, tag)'
     required: false
     default: ''
+  cachix-cache:
+    description: 'Cachix binary cache name (passed to flake provisioning)'
+    required: false
+    default: ''
+  cachix-auth-token:
+    description: 'Cachix auth token (optional; pulls need no token)'
+    required: false
+    default: ''
 
 outputs:
   test-result:
@@ -76,7 +84,12 @@ runs:
       uses: ./.github/actions/setup-env
       with:
         sync-dependencies: 'true'
+        # podman stays on the apt path (rootless host integration). uv and the
+        # rest of the toolchain come from the flake (SSoT). Refs #632.
         install-podman: 'true'
+        provision-via-flake: 'true'
+        cachix-cache: ${{ inputs.cachix-cache }}
+        cachix-auth-token: ${{ inputs.cachix-auth-token }}
 
     - name: Load image from tar
       if: inputs.image-source == 'tar'

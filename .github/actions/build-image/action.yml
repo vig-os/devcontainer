@@ -88,6 +88,14 @@ inputs:
     description: 'Docker Hub access token for authenticated pulls (optional; omit on forks)'
     required: false
     default: ''
+  cachix-cache:
+    description: 'Cachix binary cache name (passed to flake provisioning)'
+    required: false
+    default: ''
+  cachix-auth-token:
+    description: 'Cachix auth token (optional; pulls need no token)'
+    required: false
+    default: ''
 
 outputs:
   image-tag:
@@ -115,6 +123,11 @@ runs:
       uses: ./.github/actions/setup-env
       with:
         sync-dependencies: 'true'
+        # Provision the toolchain from the flake (SSoT). The Debian image build
+        # itself (buildx + Containerfile) is unchanged. Refs #632.
+        provision-via-flake: 'true'
+        cachix-cache: ${{ inputs.cachix-cache }}
+        cachix-auth-token: ${{ inputs.cachix-auth-token }}
 
     - name: Prepare build directory
       shell: bash
