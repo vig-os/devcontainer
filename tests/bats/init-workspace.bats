@@ -41,6 +41,37 @@ setup() {
     assert_failure
 }
 
+# ── direnv / flake stub (#640) ────────────────────────────────────────────────
+# The downstream minimal flake stub + .envrc let a new repo `direnv allow` /
+# `nix develop` into the shared toolchain. They are never-overwritten on
+# upgrade (the user owns the extraPackages block).
+
+@test "template scaffolds the downstream flake.nix stub (#640)" {
+    run test -f "$TEMPLATE_DIR/flake.nix"
+    assert_success
+}
+
+@test "template scaffolds the .envrc (use flake) stub (#640)" {
+    run test -f "$TEMPLATE_DIR/.envrc"
+    assert_success
+}
+
+@test "downstream flake stub consumes the vigos toolchain SSoT (#640)" {
+    run grep -q 'vigos.lib.mkProjectShell' "$TEMPLATE_DIR/flake.nix"
+    assert_success
+    run grep -q 'vigos/nixpkgs' "$TEMPLATE_DIR/flake.nix"
+    assert_success
+}
+
+@test "flake.nix and .envrc are preserved on --force upgrade (#640)" {
+    # shellcheck disable=SC2016
+    run grep -E '"flake\.nix"' "$INIT_WORKSPACE_SH"
+    assert_success
+    # shellcheck disable=SC2016
+    run grep -E '"\.envrc"' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
 # ── script structure ──────────────────────────────────────────────────────────
 
 @test "init-workspace.sh is executable" {
