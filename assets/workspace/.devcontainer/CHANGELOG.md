@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added reusable flake outputs `lib.mkProjectShell`, `overlays.default`, and a `packages.devcontainerImage` stub for the later image build
   - Added a non-blocking `Nix Cachix` workflow (with `workflow_dispatch`) that builds the dev-shell and pushes its closure to the `vig-os` Cachix cache
   - Added a per-tool `nix develop -c <tool> --version` parity test driven from the flake SSoT to guard against future dev-shell/image drift
+- **nix-direnv onboarding fast path** ([#633](https://github.com/vig-os/devcontainer/issues/633))
+  - Switched `.envrc` from bare `use flake` to nix-direnv: the dev-shell evaluation is now GC-rooted and cached under `.direnv/`, so re-entering the directory is instant and the closure is never garbage-collected; nix-direnv self-bootstraps on first `direnv allow` and falls back to bare `use flake` when unavailable
+  - Documented the clone → `direnv allow` onboarding flow, the `vig-os` Cachix substituter (binary fetch instead of from-source build on first allow), and enabling the `nix-command`/`flakes` experimental features in `CONTRIBUTE.md` ([#255](https://github.com/vig-os/devcontainer/issues/255))
 
 ### Changed
 
