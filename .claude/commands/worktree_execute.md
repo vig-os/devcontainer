@@ -1,4 +1,4 @@
-Read and follow the workflow in `.cursor/skills/worktree_execute/SKILL.md`.
-Also read `.cursor/rules/tdd.mdc` for TDD rules.
+Read and follow the workflow in `.claude/skills/worktree_execute/SKILL.md`.
+Also read `.claude/skills/tdd/SKILL.md` for TDD rules.
 
 Context: $ARGUMENTS

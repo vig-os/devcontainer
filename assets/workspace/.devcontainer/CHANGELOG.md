@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Make `.claude/` the single source of truth for agent rules and skills** ([#626](https://github.com/vig-os/devcontainer/issues/626))
+  - Moved the 30 agent skills from `.cursor/skills/` to `.claude/skills/` and rewrote the 29 `.claude/commands/*.md` wrappers to point at the new paths
+  - Split the seven `.cursor/rules/*.mdc`: static principles (coding principles, commit messages, changelog, single source of truth) are now consolidated in `CLAUDE.md`; workflow rules (`branch-naming`, `tdd`, `subagent-delegation`) became on-demand `.claude/skills/`
+  - Ported `agent-models.toml` and `worktrees.json` to `.claude/`, updated the docs generator, pre-commit hooks, shell entrypoints, and the workspace sync manifest, and deleted the root `.cursor/` directory
+
 ### Deprecated
 
 ### Removed

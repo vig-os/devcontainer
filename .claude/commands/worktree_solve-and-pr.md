@@ -1,4 +1,4 @@
-Read and follow the workflow in `.cursor/skills/worktree_solve-and-pr/SKILL.md`.
-Also read `.cursor/rules/subagent-delegation.mdc` for delegation patterns.
+Read and follow the workflow in `.claude/skills/worktree_solve-and-pr/SKILL.md`.
+Also read `.claude/skills/subagent-delegation/SKILL.md` for delegation patterns.
 
 Context: $ARGUMENTS
