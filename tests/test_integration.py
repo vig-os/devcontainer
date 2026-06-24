@@ -173,7 +173,14 @@ class TestHostGitSignatureSetup:
         # Verify it has some content
         content = allowed_signers.read_text()
         assert len(content.strip()) > 0, "Allowed signers file is empty"
-        assert "ssh-ed25519" in content or "ssh-rsa" in content, (
+        key_types = (
+            "ssh-ed25519",
+            "ssh-rsa",
+            "ecdsa-sha2-nistp",
+            "sk-ssh-ed25519@openssh.com",
+            "sk-ecdsa-sha2-nistp256@openssh.com",
+        )
+        assert any(k in content for k in key_types), (
             "Allowed signers file doesn't appear to contain SSH public keys"
         )
 
