@@ -116,6 +116,25 @@ jobs:
         run: |
           echo "Portable testinfra result code: ${{ steps.testinfra.outputs.test-result }}"
 
+      # Runtime smoke test (#675): the portable testinfra suite only asserts that
+      # `nix`/`direnv`/`nix-direnv` are PRESENT, not that the baked Nix runtime
+      # actually FUNCTIONS. A regression that left the binaries on PATH but broke
+      # the evaluator or direnv would slip through. Run the self-contained smoke
+      # script INSIDE the image (loaded into podman by the test-image action as
+      # ${REGISTRY}:nix-image) — it checks `nix --version`, `direnv version`, a
+      # real `nix eval` (evaluator + nix-command/flakes), and a direnv
+      # allow/exec round-trip, all network-free, and fails CI if any is broken.
+      - name: Smoke-test the in-container Nix runtime (#675)
+        run: |
+          set -euo pipefail
+          # Bind-mount the repo's scripts/ read-only and execute the smoke
+          # script with the image's baked bash, so we never bake the test into
+          # the image. Gates this job: a non-zero exit fails the build/test gate.
+          podman run --rm \
+            -v "${PWD}/scripts":/smoke:ro \
+            "${REGISTRY}:nix-image" \
+            bash /smoke/nix_runtime_smoke.sh
+
       - name: Log in to GHCR
         uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4.2.0
         with:
