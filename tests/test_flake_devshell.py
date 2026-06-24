@@ -72,6 +72,73 @@ def current_system() -> str:
 
 
 @pytest.fixture(scope="session")
+def dev_shell_env() -> dict[str, str]:
+    """Environment variables exported by the Nix dev-shell.
+
+    Runs ``nix develop -c env`` once and parses the result so the UV-bootstrap
+    assertions below share a single (slow) shell instantiation.
+    """
+    result = subprocess.run(
+        ["nix", "develop", str(REPO_ROOT), "-c", "env"],
+        capture_output=True,
+        text=True,
+        env=_nix_env(),
+        timeout=900,
+    )
+    if result.returncode != 0:
+        pytest.fail("Failed to capture the dev-shell environment:\n" + result.stderr)
+    env: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        key, sep, value = line.partition("=")
+        if sep:
+            env[key] = value
+    return env
+
+
+def test_devshell_disables_uv_python_downloads(dev_shell_env: dict[str, str]) -> None:
+    """The dev-shell must forbid uv from downloading a managed CPython (#683).
+
+    On a NixOS host a downloaded generic CPython is a dynamically-linked ELF the
+    host cannot execute out of the box, so ``uv sync`` (``just init``) aborts.
+    ``UV_PYTHON_DOWNLOADS=never`` forces uv to resolve a Nix store interpreter
+    instead, mirroring the image path.
+    """
+    assert dev_shell_env.get("UV_PYTHON_DOWNLOADS") == "never", (
+        "UV_PYTHON_DOWNLOADS must be 'never' so uv never fetches a generic "
+        f"CPython; got {dev_shell_env.get('UV_PYTHON_DOWNLOADS')!r}"
+    )
+
+
+def test_devshell_uv_python_pins_nix_store_interpreter(
+    dev_shell_env: dict[str, str],
+) -> None:
+    """UV_PYTHON must point at a runnable Nix store CPython 3.14 (#683).
+
+    A store interpreter is patched to the store's loader, so it runs on both
+    NixOS and FHS hosts — the cross-host fix for the failed ``uv sync``.
+    """
+    uv_python = dev_shell_env.get("UV_PYTHON")
+    assert uv_python, "UV_PYTHON must be set in the dev-shell"
+    assert uv_python.startswith("/nix/store/"), (
+        f"UV_PYTHON must be a Nix store interpreter, not {uv_python!r}"
+    )
+    interpreter = Path(uv_python)
+    assert interpreter.is_file() and os.access(interpreter, os.X_OK), (
+        f"UV_PYTHON does not point at an executable file: {uv_python}"
+    )
+    proc = subprocess.run(
+        [uv_python, "--version"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert proc.returncode == 0 and "3.14" in proc.stdout, (
+        f"UV_PYTHON did not report Python 3.14: rc={proc.returncode} "
+        f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
+    )
+
+
+@pytest.fixture(scope="session")
 def dev_shell_tools(current_system: str) -> list[str]:
     """Binary names of every tool in the flake's ``devTools`` SSoT."""
     result = subprocess.run(
