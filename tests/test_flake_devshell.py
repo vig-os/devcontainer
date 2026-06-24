@@ -21,6 +21,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -93,6 +94,68 @@ def dev_shell_env() -> dict[str, str]:
         if sep:
             env[key] = value
     return env
+
+
+def test_devshell_ld_library_path_provides_libstdcpp(
+    dev_shell_env: dict[str, str],
+) -> None:
+    """The dev-shell must expose ``libstdc++.so.6`` on ``LD_LIBRARY_PATH`` (#698).
+
+    The ``pymarkdown`` pre-commit hook runs from pre-commit's own manylinux-wheel
+    Python env, whose dependency ``pyjson5`` is a C extension linked against
+    ``libstdc++.so.6``. On a NixOS host that library is not on the loader path
+    outside an FHS environment, so the hook fails with
+    ``ImportError: libstdc++.so.6: cannot open shared object file``. The dev-shell
+    therefore exports ``LD_LIBRARY_PATH`` including the Nix C++ runtime so the
+    wheel resolves it (the same libstdc++ the Nix toolchain itself links, so no
+    version clash with the other dev-shell binaries).
+    """
+    lib_path = dev_shell_env.get("LD_LIBRARY_PATH", "")
+    assert lib_path, "LD_LIBRARY_PATH must be set in the dev-shell"
+    roots = [Path(p) for p in lib_path.split(":") if p]
+    assert any((root / "libstdc++.so.6").exists() for root in roots), (
+        f"libstdc++.so.6 not found under any LD_LIBRARY_PATH entry: {lib_path}"
+    )
+
+
+def test_devshell_pymarkdown_c_extension_imports(dev_shell_env: dict[str, str]) -> None:
+    """``pyjson5``'s C extension must load under the dev-shell loader (#698).
+
+    Mirrors how the ``pymarkdown`` hook fails: load the manylinux C library with
+    the dev-shell's ``LD_LIBRARY_PATH`` in scope. With ``libstdc++`` on the loader
+    path the load succeeds; without it it raises the ``libstdc++.so.6``
+    ``ImportError`` the hook hit on NixOS.
+    """
+    lib_path = dev_shell_env.get("LD_LIBRARY_PATH", "")
+    assert lib_path, "LD_LIBRARY_PATH must be set in the dev-shell"
+    libstdcpp = next(
+        (
+            p
+            for p in (Path(d) / "libstdc++.so.6" for d in lib_path.split(":") if d)
+            if p.exists()
+        ),
+        None,
+    )
+    assert libstdcpp is not None, (
+        f"libstdc++.so.6 not found under LD_LIBRARY_PATH: {lib_path}"
+    )
+    # ctypes.CDLL exercises the exact dynamic-loader path the C extension uses,
+    # without depending on pyjson5 being installed in the project venv.
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            f"import ctypes; ctypes.CDLL({str(libstdcpp)!r}); print('ok')",
+        ],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "LD_LIBRARY_PATH": lib_path},
+        timeout=120,
+    )
+    assert proc.returncode == 0 and "ok" in proc.stdout, (
+        f"loading libstdc++ via LD_LIBRARY_PATH failed: rc={proc.returncode} "
+        f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
+    )
 
 
 def test_devshell_disables_uv_python_downloads(dev_shell_env: dict[str, str]) -> None:
