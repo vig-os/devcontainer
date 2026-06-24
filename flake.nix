@@ -160,10 +160,29 @@
           # loader and runs in the dev-shell on both NixOS and FHS hosts. The
           # IMAGE path sets the same two vars (baking pythonEnv). Refs #666, #683.
           python = pkgs.python314;
+
+          # The C++ runtime (libstdc++.so.6). The `pymarkdown` pre-commit hook
+          # runs from pre-commit's OWN manylinux-wheel Python env (not the project
+          # venv), whose dependency `pyjson5` is a C extension linked against
+          # `libstdc++.so.6`. On a NixOS host that library is not on the loader
+          # path outside an FHS environment, so the hook aborts with
+          # `ImportError: libstdc++.so.6: cannot open shared object file`. Exposing
+          # it on LD_LIBRARY_PATH lets the wheel resolve it. It is the same
+          # libstdc++ the Nix toolchain itself links (`stdenv.cc.cc.lib`), so the
+          # other dev-shell binaries keep working (no version clash); pymarkdown is
+          # not in nixpkgs, so the #697 "add to devTools + language:system" recipe
+          # does not apply here. Refs #698.
+          ldLibraryPath = "${pkgs.stdenv.cc.cc.lib}/lib";
+
+          # mkShell injects an LD_LIBRARY_PATH from some packages' propagated libs;
+          # APPEND rather than clobber so that value (and any host-set one) survives.
+          ldLibraryPathHook = ''
+            export LD_LIBRARY_PATH="''${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}${ldLibraryPath}"
+          '';
         in
         pkgs.mkShell {
           packages = (devTools pkgs) ++ extraPackages;
-          inherit shellHook;
+          shellHook = ldLibraryPathHook + "\n" + shellHook;
 
           UV_PYTHON = "${python}/bin/python3.14";
           UV_PYTHON_DOWNLOADS = "never";

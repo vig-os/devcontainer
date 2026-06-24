@@ -132,6 +132,28 @@ These are decided inline in `flake.nix`; summarized here.
   cache layer to `prek` is deferred to #40; both are in nixpkgs, so it is a
   drop-in swap once that issue lands.
 
+### `libstdc++` for C-extension pre-commit hooks (#698)
+
+Some pre-commit hooks run from pre-commit's **own** manylinux-wheel Python env
+(not the project venv) and ship a C extension. The `pymarkdown` hook is the case
+in point: its dependency `pyjson5` is a C extension linked against
+`libstdc++.so.6`, which a NixOS host does not put on the loader path outside an
+FHS environment — so the hook aborted with
+`ImportError: libstdc++.so.6: cannot open shared object file` and forced
+`--no-verify`. Unlike the standalone binaries in #697 (`ruff`/`typos`),
+`pymarkdown` is **not** in nixpkgs, so the "add to `devTools` + `language:
+system`" recipe does not apply.
+
+`mkProjectShell` therefore **appends** `${pkgs.stdenv.cc.cc.lib}/lib` to
+`LD_LIBRARY_PATH` in the dev-shell, so the wheel resolves the Nix C++ runtime.
+That is the same `libstdc++` the Nix toolchain itself links, so the other
+dev-shell binaries keep working (no version clash), and the existing
+mkShell-injected `LD_LIBRARY_PATH` is appended to rather than clobbered. The fix
+generalises to any future C-extension Python hook. A `nix-ld` host config
+(`programs.nix-ld.enable` + `libraries = [ pkgs.stdenv.cc.cc ]`) would also work
+but is per-contributor system config the repo cannot enforce, so it is at most a
+fallback, not the fix.
+
 ## Cachix and the `direnv allow` onboarding flow
 
 The dev-shell closure is published to the public **`vig-os`** Cachix binary
