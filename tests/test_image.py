@@ -10,6 +10,7 @@ base functionality is preserved in their containers.
 """
 
 import hashlib
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -112,6 +113,41 @@ def assert_tool_runs(host, *cmd):
     result = host.run(command)
     assert result.rc == 0, f"{command} failed (tool not installed?): {result.stderr}"
     return result
+
+
+def test_image_oci_config_declares_path(container_image):
+    """The image's OCI config.Env must declare PATH including the toolchain (#697).
+
+    ``buildLayeredImage`` symlinks every tool into ``/bin`` but sets no PATH in
+    the OCI config. ``podman run`` masks this by injecting a default PATH, but
+    docker-compose and ``devcontainer exec`` inherit ``config.Env`` verbatim — so
+    without a declared PATH the baked toolchain is off PATH there, and
+    pre-commit's ``language: system`` ruff/typos hooks fail with
+    ``Executable ... not found`` during an in-container ``git commit``. A
+    ``host.run`` check cannot catch this (its shell synthesises a default PATH),
+    so assert the declared config directly.
+    """
+    result = subprocess.run(
+        [
+            "podman",
+            "inspect",
+            container_image,
+            "--format",
+            "{{range .Config.Env}}{{println .}}{{end}}",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, f"podman inspect failed: {result.stderr}"
+    path_lines = [ln for ln in result.stdout.splitlines() if ln.startswith("PATH=")]
+    assert path_lines, (
+        "image OCI config declares no PATH; docker-compose / devcontainer exec "
+        "would run without the baked toolchain on PATH"
+    )
+    path_dirs = path_lines[0][len("PATH=") :].split(":")
+    assert "/bin" in path_dirs, (
+        f"image PATH must include /bin (the toolchain symlink dir): {path_lines[0]}"
+    )
 
 
 class TestSystemTools:

@@ -434,6 +434,15 @@
                 Cmd = [ "${pkgs.bashInteractive}/bin/bash" ];
                 WorkingDir = "/workspace";
                 Env = [
+                  # Declare PATH explicitly. buildLayeredImage symlinks every
+                  # tool's bin into /bin but sets no PATH in the OCI config; a
+                  # Debian base used to provide one. `podman run` masks this by
+                  # injecting a default PATH, but the docker-compose +
+                  # `devcontainer exec` path (and VS Code) does not, so the
+                  # baked toolchain was off PATH there — breaking pre-commit's
+                  # `language: system` ruff/typos hooks (`Executable not found`)
+                  # during an in-container `git commit`. Refs #697, #698.
+                  "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
                   "LANG=en_US.UTF-8"
                   "LANGUAGE=en_US:en"
                   "LC_ALL=en_US.UTF-8"
