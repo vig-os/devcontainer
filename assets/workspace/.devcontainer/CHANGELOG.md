@@ -44,6 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Nix image passes the full testinfra suite (toolchain parity)** ([#666](https://github.com/vig-os/devcontainer/issues/666))
+  - Packaged `vig-utils` (and `pip-licenses` from its PyPI wheel, as it is not in nixpkgs) as Nix python packages exposed through a `python314.withPackages` env, and added `ruff`, `bandit`, `cargo-binstall`, `just-lsp`, and `typstyle` from nixpkgs — the Nix image now carries the project Python toolchain hermetically, replacing the Debian image's build-time `uv pip install`
+  - Relaxed `requires-python` from `==3.14.6` to `>=3.14,<3.15` across the root, `vig-utils`, and workspace-template pyprojects: `flake.lock` is the reproducibility anchor now, so the exact pin was redundant and unsatisfiable against nixpkgs (3.14.4)
+  - Adapted `tests/test_image.py` to the Nix toolchain (version prefixes are nixpkgs-pinned, so fast-movers/mismatched tools are checked for presence/run only; the pre-commit cache dir is asserted present rather than pre-populated, since a hermetic build cannot fetch hook repos), taking the suite to 63/63 — and made the `nix-image.yml` `build-and-test` job gate on it (discovery phase closed)
 - **Stage the Nix publish-cutover; advance the nixpkgs baseline to 26.05** ([#639](https://github.com/vig-os/devcontainer/issues/639))
   - Bumped the pinned channel `nixos-25.05` → `nixos-26.05` (the "advance the rev" CVE lever), cutting the vulnix HIGH/CRITICAL surface 83 → 27 and Trivy HIGH 244 → 14 on the image; triaged the residual 27 into `.vulnixignore` (4 CPE-mismatch false positives — VS Code/Jenkins, not the binaries; 23 recent CVEs accepted as low-risk in an interactive dev container with a 3-month re-review)
   - Made the nightly `vulnix-gate` **blocking** (the #639 go/no-go gate) now that it is legitimately green, and archived the `vulnix`-vs-Trivy scan overlap in `docs/security/nix-cutover-scan-overlap.md` (zero overlap — disjoint surfaces, no finding class lost in the Debian→Nix switch)
