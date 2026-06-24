@@ -82,7 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Provision CI build/test tooling from the flake dev-shell** ([#632](https://github.com/vig-os/devcontainer/issues/632))
   - The `setup-env` action gained a `provision-via-flake` mode that installs Nix (SHA-pinned `install-nix-action`) and the `vig-os` Cachix substituter, builds the flake dev-shell, and prepends its tools to `PATH`, replacing the ad-hoc installs of `uv`/Python, `just`, `hadolint`, and `taplo`
   - Enabled the mode in the CI build/test path (`build-image`, `test-image`, `test-integration`, `project-checks`) so jobs run inside the flake shell (the toolchain SSoT); `podman`, Node.js, BATS, and the devcontainer CLI keep their dedicated install paths
-  - Pinned the project interpreter for the flake-provisioned `uv` so `uv sync --frozen` succeeds under flake provisioning: the dev-shell exports `UV_PYTHON` (a Nix store CPython, which nixpkgs does not package as a managed download) with `UV_PYTHON_DOWNLOADS=never`, and the `setup-env` action forwards both to later CI steps
+  - Set `UV_PYTHON_DOWNLOADS_JSON_URL` in the flake dev-shell so the nixpkgs `uv` (whose embedded Python-download list is stripped) can fetch the project's pinned CPython `3.14.6`, which nixpkgs does not package, letting `uv sync --frozen` succeed under flake provisioning
   - Keep `podman` off the flake-provisioned `PATH` so the runner's rootless-configured host `podman` is used (the nix-store `podman` cannot reach the host's setuid `newuidmap`/`newgidmap`, so `podman info` failed)
 
 ### Deprecated
@@ -106,7 +106,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`just init` no longer fails on NixOS hosts (uv downloaded a CPython NixOS cannot execute)** ([#683](https://github.com/vig-os/devcontainer/issues/683))
   - The flake dev-shell carried no Python and let the nixpkgs `uv` fetch a managed CPython — a generic, dynamically-linked ELF a NixOS host cannot execute out of the box (no FHS `ld-linux`) — so `uv sync` (`just init`) aborted on NixOS hosts while FHS hosts were unaffected
-  - `mkProjectShell` now pins a Nix store CPython via `UV_PYTHON` and sets `UV_PYTHON_DOWNLOADS=never` (mirroring the image path), so the venv is built from a store interpreter patched to the store loader that runs on both NixOS and FHS hosts; the CI `setup-env` flake-provision step forwards both vars in place of the retired `UV_PYTHON_DOWNLOADS_JSON_URL`
+  - `mkProjectShell` now pins a Nix store CPython via `UV_PYTHON` and sets `UV_PYTHON_DOWNLOADS=never`, so the dev-shell builds the venv from a store interpreter (patched to the store loader) that runs on both NixOS and FHS hosts instead of a downloaded one
+  - CI keeps its managed-download path (`UV_PYTHON_DOWNLOADS_JSON_URL`) and does **not** receive `UV_PYTHON`: the `provision-via-flake` jobs run outside `nix develop` on an FHS runner, where a Nix store interpreter cannot load pre-commit's manylinux-wheel C extensions (`libstdc++.so.6`)
   - Added dev-shell tests asserting `UV_PYTHON_DOWNLOADS=never` and `UV_PYTHON` pinned to a runnable Nix store CPython 3.14
 - **Nix image no longer scaffolds dangling, read-only symlinks into a new workspace** ([#664](https://github.com/vig-os/devcontainer/issues/664))
   - The Nix-built image bakes the workspace template as read-only `/nix/store` symlinks (how `buildLayeredImage` represents the layer); `init-workspace.sh` now rsyncs with `--copy-links` and `chmod -R u+w "$WORKSPACE_DIR"`, so a scaffolded workspace gets real, writable files instead of symlinks that dangle on the host (and the placeholder `sed -i` no longer fails on read-only files). No-op on the Debian image
