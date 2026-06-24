@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # vigOS devcontainer quick install script
 #
 # Usage:

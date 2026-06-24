@@ -104,6 +104,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Host-executed scripts no longer fail on NixOS (non-portable `#!/bin/bash` shebang)** ([#687](https://github.com/vig-os/devcontainer/issues/687))
+  - `install.sh`, `assets/workspace/.devcontainer/scripts/initialize.sh`, and `assets/workspace/.devcontainer/scripts/version-check.sh` hardcoded `#!/bin/bash`, which has no `/bin/bash` on NixOS and similar hosts, so they failed to execute (and `just test` aborted). Switched all three to the portable `#!/usr/bin/env bash` (already used by `scripts/init.sh`), which resolves `bash` via `PATH`
 - **`just build` no longer fails on dev-shell-only podman hosts (missing containers `policy.json`)** ([#685](https://github.com/vig-os/devcontainer/issues/685))
   - On a NixOS host that gets `podman` purely from the flake dev-shell (no `virtualisation.containers` module), no signature-verification `policy.json` exists at `/etc/containers/policy.json` or `~/.config/containers/policy.json`, so `podman load` (`just build`) failed even though `nix build` and the advisory `podman info` check (`just init`) were green
   - `just init` now ensures the user-level `~/.config/containers/policy.json` with the standard permissive default (`{ "default": [ { "type": "insecureAcceptAnything" } ] }`, the same content `containers-common` / the NixOS module ship); the write is idempotent and never overwrites a system or user policy. Documented in `docs/NIX.md`
