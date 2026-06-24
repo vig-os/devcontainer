@@ -29,6 +29,13 @@ import pytest
 import testinfra
 import yaml
 
+# Timeout (seconds) for `just sync` to finish during interactive init. The
+# test-project pulls heavy scientific extras (numpy, scipy, pandas, matplotlib,
+# jupyter) and the image ships no warm uv cache, so a cold/slow network can take
+# well over a minute to download them. Generous default, overridable via env for
+# fast-cache/CI tuning. Refs: #692.
+DEPS_SYNC_TIMEOUT = int(os.environ.get("INIT_DEPS_SYNC_TIMEOUT", "300"))
+
 
 def pytest_sessionstart(session):
     """
@@ -347,7 +354,9 @@ def _run_interactive_init(cmd, container_image):
         ("Replacing placeholders", "replacing_placeholders", 60),
         ("Setting executable permissions", "setting_permissions", 30),
         ("Syncing dependencies", "syncing_deps", 60),
-        ("Workspace initialized successfully", "completed", 30),
+        # `uv sync` downloads the heavy extras between this line and the success
+        # banner; allow a generous, env-overridable window. Refs: #692.
+        ("Workspace initialized successfully", "completed", DEPS_SYNC_TIMEOUT),
     ]
     renovate_repo_answer = "test-org/test-project"
 
