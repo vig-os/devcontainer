@@ -257,15 +257,14 @@ The autonomous pipeline doesn't run inside your current editor session. It runs 
    - Creates and links the branch via `gh issue develop`.
    - Assigns the issue to `@me`.
 4. **Worktree setup** — `git worktree add`, then inside the worktree: `uv sync`, `pre-commit install`, copies `.env` from the main worktree.
-5. **Trust** — adds the worktree path to `~/.cursor/cli-config.json` `trustedDirectories`.
-6. **Launch** — starts `tmux new-session` running `agent chat --model <autonomous-model> --yolo "<prompt>"`.
+5. **Launch** — starts `tmux new-session` running `claude --dangerously-skip-permissions "<prompt>"`.
 
-The `--yolo` flag means the agent auto-approves all shell commands — appropriate because there's no human at this terminal.
+The `--dangerously-skip-permissions` flag means the agent auto-approves all shell commands — appropriate because there's no human at this terminal (the container is the trust boundary; `IS_SANDBOX=1` is set in the image).
 
 ### Model Selection
 
 Agent models are read from `.claude/agent-models.toml`. The worktree recipes use:
-- **`autonomous` tier** for the main `agent chat` session (design, code, reasoning).
+- **`autonomous` tier** for the main `claude` session (design, code, reasoning).
 - **`lightweight` tier** for the one-shot branch-naming call.
 
 ## Typical Interactive Workflow

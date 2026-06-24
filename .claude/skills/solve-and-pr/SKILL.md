@@ -29,7 +29,7 @@ This command:
 - Resolves or creates the linked branch
 - Sets up the environment (`uv sync`, `pre-commit install`)
 - Captures the local gh user as the reviewer (`gh api user --jq '.login'`)
-- Launches a tmux session running `cursor-agent` with `--yolo` mode
+- Launches a tmux session running `claude --dangerously-skip-permissions`
 - Passes `/worktree-solve-and-pr` as the initial prompt
 
 ### 3. Report back to the user
