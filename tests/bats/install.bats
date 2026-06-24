@@ -349,5 +349,5 @@ setup() {
 
 @test "install.sh has shebang" {
     run head -1 "$INSTALL_SH"
-    assert_output "#!/bin/bash"
+    assert_output "#!/usr/bin/env bash"
 }
