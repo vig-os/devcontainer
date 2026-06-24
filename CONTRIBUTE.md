@@ -16,7 +16,7 @@ three things on the host:
 | Prerequisite | Purpose |
 |--------------|---------|
 | **[Nix](https://nixos.org/download)** | Provides the entire dev toolchain (just, git, gh, uv, node, jq, tmux, ripgrep, claude, …) from the flake — no manual installs |
-| **[direnv](https://direnv.net/)** | Loads the flake dev-shell automatically on `cd` (recommended; `nix develop` works without it) |
+| **[direnv](https://direnv.net/)** | Loads the flake dev-shell automatically on `cd` — **once its [shell hook](https://direnv.net/docs/hook.html) is installed** (e.g. `eval "$(direnv hook bash)"` in `~/.bashrc`). Without the hook, `direnv allow` still succeeds but nothing loads on `cd` and you silently fall back to host tools. Recommended; `nix develop` works without direnv |
 | **A working container runtime** (podman or Docker) | Building and testing the image needs a usable rootless runtime. The flake ships the `podman` CLI, but rootless operation depends on host setup — `subuid`/`subgid` + `uidmap` on Linux, or `podman machine` on macOS |
 
 Everything else comes from the flake. See the fast path below to get set up.
@@ -55,6 +55,14 @@ build, so the first `direnv allow` completes in seconds.
    cd devcontainer
    direnv allow        # first allow fetches the closure from Cachix (seconds on a warm cache)
    ```
+
+   > **First time using direnv on this machine?** Install its shell hook first —
+   > add `eval "$(direnv hook bash)"` (or the
+   > [equivalent for your shell](https://direnv.net/docs/hook.html)) to your shell
+   > rc and start a new shell. The hook is what loads/unloads the environment on
+   > `cd`; without it `direnv allow` reports success but the flake never activates,
+   > so you keep host tooling (e.g. an old system Node) with no warning. Prefer not
+   > to install the hook? Use `nix develop` instead.
 
    The committed `.envrc` uses
    [nix-direnv](https://github.com/nix-community/nix-direnv): the dev-shell
