@@ -20,7 +20,7 @@
       # ---------------------------------------------------------------------
       # Overlay: pull fast-movers from nixpkgs-unstable.
       #
-      # The stable channel (nixos-25.05) lags on tools that ship frequently and
+      # The stable channel (nixos-26.05) lags on tools that ship frequently and
       # whose latest version we want in both the dev-shell and the image. We
       # overlay only those few packages from unstable; everything else stays on
       # the pinned stable channel for reproducibility.
