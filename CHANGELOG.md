@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Consolidated `docs/NIX.md` Nix reference** ([#255](https://github.com/vig-os/devcontainer/issues/255))
+  - Added a single onboarding/architecture doc for the flake: the `devTools` toolchain SSoT and the dev-shell ↔ image parity guard, the stable/unstable channel split + fast-mover overlay, the Nix-built (`buildLayeredImage`) reproducible multi-arch image, the CppNix-vs-Lix and `pre-commit`-vs-`prek` decisions, the `vig-os` Cachix `direnv allow` flow, how `nixpkgs` bumps flow (Renovate `nix` manager + `vulnix` before/after), and the #639 publish-cutover — cross-linking `CONTRIBUTE.md`, `docs/NIX2CONTAINER.md`, and `docs/CONTAINER_SECURITY.md`
 - **Install/init delivery-mode picker (`--mode devcontainer|direnv|both`)** ([#641](https://github.com/vig-os/devcontainer/issues/641))
   - `install.sh` gained a `--mode devcontainer|direnv|both` flag (accepts both `--mode X` and `--mode=X`), validated up front and passed through to `init-workspace.sh`. Empty means "let init-workspace decide": the one-line install runs non-interactively and defaults to `both` (unchanged behaviour)
   - `init-workspace.sh` gained the same `--mode` flag plus an interactive prompt when the mode is unset and prompts are enabled (default selection `both`); under `--no-prompts`/`--smoke-test` with no `--mode` it defaults to `both`. After the rsync scaffold it prunes to the chosen mode: `devcontainer` removes the `flake.nix` + `.envrc` stub, `direnv` removes the `.devcontainer/` scaffold, and `both` keeps everything (prune is idempotent and scoped to the new workspace)
