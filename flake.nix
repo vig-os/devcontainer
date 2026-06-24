@@ -32,6 +32,19 @@
         "claude-code"
       ];
 
+      # bats + helper libraries as one wrapped package. The wrapper exports a
+      # BATS_LIB_PATH covering bats-support/-assert/-file so `bats_load_library`
+      # (tests/bats/test_helper.bash) resolves them from the Nix store — the
+      # flake SSoT — replacing the npm (node_modules) / Debian (/usr/lib)
+      # resolution that does not exist on the Nix toolchain. Refs #695.
+      batsWithLibs =
+        pkgs:
+        pkgs.bats.withLibraries (p: [
+          p.bats-support
+          p.bats-assert
+          p.bats-file
+        ]);
+
       overlay =
         final: prev:
         let
@@ -69,8 +82,12 @@
           # Python tooling (uv from unstable via overlay)
           uv
 
-          # Node.js (bats, devcontainer CLI via npm)
+          # Node.js (devcontainer CLI via npm)
           nodejs
+
+          # Shell testing: bats core + helper libraries (support/assert/file).
+          # Wrapped so BATS_LIB_PATH is exported for bats_load_library. Refs #695.
+          (batsWithLibs pkgs)
 
           # Shell & JSON utilities
           jq
@@ -150,6 +167,11 @@
 
           UV_PYTHON = "${python}/bin/python3.14";
           UV_PYTHON_DOWNLOADS = "never";
+
+          # Resolve the bats helper libraries from the Nix store. The wrapper
+          # also sets this when `bats` runs, but exporting it in the dev-shell
+          # makes the path visible (and works for a bare `bats` too). Refs #695.
+          BATS_LIB_PATH = "${batsWithLibs pkgs}/share/bats";
 
           # For CI only: the pin above means downloads never happen in the
           # dev-shell, but CI forwards this URL (NOT UV_PYTHON) so its FHS runner
@@ -406,6 +428,7 @@
                   "VIRTUAL_ENV=/root/assets/workspace/.venv"
                   "UV_PYTHON_DOWNLOADS=never"
                   "UV_PYTHON=${python}/bin/python3.14"
+                  "BATS_LIB_PATH=${batsWithLibs pkgs}/share/bats"
                   "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
                   "NIX_SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
                   "HOME=/root"
