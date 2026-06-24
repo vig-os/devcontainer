@@ -177,6 +177,38 @@ def test_devshell_tools_is_superset_of_agent_toolkit(
     assert not missing, f"devTools is missing agent-toolkit tools: {sorted(missing)}"
 
 
+def test_devshell_provides_bats(dev_shell_tools: list[str]) -> None:
+    """The flake must provide BATS so shell tests run without npm (#695).
+
+    The BATS helper libraries (bats-support/-assert/-file) were resolved from
+    ``node_modules`` (npm) or the now-removed Debian ``/usr/lib`` path. On the
+    Nix toolchain neither exists locally, so the suite must come from the flake
+    SSoT: ``bats.withLibraries`` puts ``bats`` on PATH and exports a
+    ``BATS_LIB_PATH`` covering the helper libraries.
+    """
+    assert "bats" in dev_shell_tools, (
+        "devTools must provide 'bats' (via bats.withLibraries) so the BATS "
+        "suite resolves its helper libraries from the flake, not node_modules"
+    )
+
+
+def test_devshell_bats_lib_path_resolves_helpers(dev_shell_env: dict[str, str]) -> None:
+    """BATS_LIB_PATH in the dev-shell must expose the three helper libraries.
+
+    ``bats_load_library bats-support`` (test_helper.bash) only works when
+    ``BATS_LIB_PATH`` points at a directory containing the helper libraries.
+    The ``bats.withLibraries`` wrapper exports it; assert the libraries are
+    actually reachable through it. Refs #695.
+    """
+    lib_path = dev_shell_env.get("BATS_LIB_PATH", "")
+    assert lib_path, "BATS_LIB_PATH must be set in the dev-shell"
+    roots = [Path(p) for p in lib_path.split(":") if p]
+    for lib in ("bats-support", "bats-assert", "bats-file"):
+        assert any((root / lib).is_dir() for root in roots), (
+            f"{lib} not found under any BATS_LIB_PATH entry: {lib_path}"
+        )
+
+
 def test_each_tool_runs_in_devshell(dev_shell_tools: list[str]) -> None:
     """Every tool in ``devTools`` is runnable inside ``nix develop``."""
     failures: list[str] = []
