@@ -118,17 +118,12 @@
       #   };
       # ---------------------------------------------------------------------
       # uv's Python-download metadata, pinned to the uv release we provision.
-      #
       # The nixpkgs build of uv ships with its embedded Python-download list
-      # stripped (Nix is expected to supply interpreters), so `uv sync` cannot
-      # fetch a managed CPython on its own — it reports "No interpreter found
-      # ... in managed installations or search path". The dev-shell carries no
-      # Python on PATH (the project venv is uv-managed), so uv must fetch a
-      # CPython matching `requires-python` (>=3.14,<3.15). Pointing uv at
-      # upstream's download-metadata.json (pinned to the provisioned uv version)
-      # restores that capability without un-pinning nixpkgs. The IMAGE does not
-      # use this: it bakes the interpreter (pythonEnv) + the toolchain from
-      # nixpkgs and sets UV_PYTHON_DOWNLOADS=never. Refs #632, #666.
+      # stripped, so it cannot fetch a managed CPython on its own. CI provisions
+      # FROM this dev-shell on an FHS runner and forwards this URL (see the
+      # setup-env action) so the runner's uv can download a managed CPython for
+      # `uv sync` / pre-commit — a Nix-store interpreter cannot load pre-commit's
+      # manylinux-wheel C extensions outside `nix develop`. Refs #632, #666, #683.
       uvPythonDownloadsJsonUrl = "https://raw.githubusercontent.com/astral-sh/uv/0.11.23/crates/uv-python/download-metadata.json";
 
       mkProjectShell =
@@ -137,11 +132,29 @@
           extraPackages ? [ ],
           shellHook ? ''echo "devcontainer dev environment loaded (nix)"'',
         }:
+        let
+          # CPython matching `requires-python` (>=3.14,<3.15). The dev-shell
+          # carries no Python on PATH (the project venv is uv-managed). Pin a
+          # Nix store CPython via UV_PYTHON and forbid downloads
+          # (UV_PYTHON_DOWNLOADS=never): the nixpkgs uv would otherwise fetch a
+          # generic, dynamically-linked managed CPython a NixOS host cannot
+          # execute out of the box (no FHS ld-linux), so `uv sync` (`just init`)
+          # aborted there (#683). A store interpreter is patched to the store
+          # loader and runs in the dev-shell on both NixOS and FHS hosts. The
+          # IMAGE path sets the same two vars (baking pythonEnv). Refs #666, #683.
+          python = pkgs.python314;
+        in
         pkgs.mkShell {
           packages = (devTools pkgs) ++ extraPackages;
           inherit shellHook;
 
-          # Let the nixpkgs uv resolve managed Python downloads (see note above).
+          UV_PYTHON = "${python}/bin/python3.14";
+          UV_PYTHON_DOWNLOADS = "never";
+
+          # For CI only: the pin above means downloads never happen in the
+          # dev-shell, but CI forwards this URL (NOT UV_PYTHON) so its FHS runner
+          # downloads a managed CPython for pre-commit's manylinux-wheel hooks,
+          # which a Nix-store interpreter cannot load there. Refs #632, #683.
           UV_PYTHON_DOWNLOADS_JSON_URL = uvPythonDownloadsJsonUrl;
         };
     in

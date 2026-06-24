@@ -49,15 +49,26 @@ list — `uv`, `gh`, and `claude-code` — with their `nixpkgs-unstable` builds.
 These ship frequently and we want the latest version in both shell and image;
 everything else stays on the pinned stable channel for reproducibility.
 
-### uv and managed CPython
+### uv and the project interpreter
 
-The dev-shell carries no Python on `PATH` (the project venv is uv-managed). The
-nixpkgs build of `uv` ships with its embedded Python-download metadata stripped,
-so `uv sync` cannot fetch a managed CPython on its own. `mkProjectShell` therefore
-sets `UV_PYTHON_DOWNLOADS_JSON_URL` to upstream's `download-metadata.json` pinned
-to the provisioned `uv` version, restoring that capability without un-pinning
-nixpkgs. The **image** does not use this: it bakes the interpreter and toolchain
-from nixpkgs and sets `UV_PYTHON_DOWNLOADS=never`.
+The dev-shell carries no Python on `PATH` (the project venv is uv-managed), so
+`uv sync` must be told which interpreter to build the venv from. `mkProjectShell`
+pins a Nix store CPython via `UV_PYTHON` and forbids downloads with
+`UV_PYTHON_DOWNLOADS=never`. This avoids letting the nixpkgs `uv` fetch a managed
+CPython: that download is a generic, dynamically-linked ELF a NixOS host cannot
+execute out of the box (no FHS `ld-linux`), so `uv sync` (`just init`) aborted
+there (#683). A store interpreter is patched to the store loader and runs in the
+dev-shell on both NixOS and FHS hosts. The **image** path uses the same two
+variables, baking the interpreter and toolchain from nixpkgs.
+
+**CI is the exception.** The `provision-via-flake` jobs (#632) run *outside*
+`nix develop` — they only prepend the dev-shell's tool `PATH` — on an FHS runner,
+where a Nix store interpreter cannot load pre-commit's manylinux-wheel C
+extensions (`libstdc++.so.6`). So the dev-shell also keeps
+`UV_PYTHON_DOWNLOADS_JSON_URL` set (pinned to the provisioned `uv` release), and
+the `setup-env` action forwards **that URL only** — not `UV_PYTHON` — so the
+runner's stripped nixpkgs `uv` downloads a managed CPython instead. Locally the
+pin wins and no download happens; the URL matters only on the CI runner.
 
 ## The Nix-built image
 

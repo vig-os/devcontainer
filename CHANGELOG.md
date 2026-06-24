@@ -104,6 +104,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`just init` no longer fails on NixOS hosts (uv downloaded a CPython NixOS cannot execute)** ([#683](https://github.com/vig-os/devcontainer/issues/683))
+  - The flake dev-shell carried no Python and let the nixpkgs `uv` fetch a managed CPython — a generic, dynamically-linked ELF a NixOS host cannot execute out of the box (no FHS `ld-linux`) — so `uv sync` (`just init`) aborted on NixOS hosts while FHS hosts were unaffected
+  - `mkProjectShell` now pins a Nix store CPython via `UV_PYTHON` and sets `UV_PYTHON_DOWNLOADS=never`, so the dev-shell builds the venv from a store interpreter (patched to the store loader) that runs on both NixOS and FHS hosts instead of a downloaded one
+  - CI keeps its managed-download path (`UV_PYTHON_DOWNLOADS_JSON_URL`) and does **not** receive `UV_PYTHON`: the `provision-via-flake` jobs run outside `nix develop` on an FHS runner, where a Nix store interpreter cannot load pre-commit's manylinux-wheel C extensions (`libstdc++.so.6`)
+  - Added dev-shell tests asserting `UV_PYTHON_DOWNLOADS=never` and `UV_PYTHON` pinned to a runnable Nix store CPython 3.14
 - **Nix image no longer scaffolds dangling, read-only symlinks into a new workspace** ([#664](https://github.com/vig-os/devcontainer/issues/664))
   - The Nix-built image bakes the workspace template as read-only `/nix/store` symlinks (how `buildLayeredImage` represents the layer); `init-workspace.sh` now rsyncs with `--copy-links` and `chmod -R u+w "$WORKSPACE_DIR"`, so a scaffolded workspace gets real, writable files instead of symlinks that dangle on the host (and the placeholder `sed -i` no longer fails on read-only files). No-op on the Debian image
   - Added a static bats guard (scaffold rsync uses `--copy-links`; workspace made writable) and a behavioural step in `nix-image.yml` that scaffolds via the real Nix image and asserts no dangling symlinks — the install/integration suite otherwise only exercises the Debian image
