@@ -14,28 +14,24 @@ from pathlib import Path
 
 import pytest
 
-# Expected versions for installed tools
-# These should be updated when the Containerfile is updated.
+# Expected version prefixes for the few tools whose version we still assert.
 #
-# Only tools whose versions are pinned/managed by the image build are checked.
-# System packages sourced from the base image's package manager (e.g. git,
-# curl, tmux, rsync) are intentionally omitted: their versions are determined
-# by the upstream distribution and differ between the Debian and Nix images, so
-# we only assert their presence (via `--version`), not a version prefix.
+# Under the Nix image the toolchain is pinned by flake.lock, so each tool's exact
+# version is determined by nixpkgs and intentionally changes on a nixpkgs bump.
+# Fast-movers (gh) and tools whose nixpkgs version simply differs from the old
+# Debian pin (just, pre-commit, cargo-binstall, typstyle) are checked for
+# presence/run only, not a version prefix — otherwise they'd need updating on
+# every nixpkgs bump. System packages (git, curl, tmux, rsync) were already
+# presence-only. Refs #635, #666.
 EXPECTED_VERSIONS = {
-    "gh": "2.95.",  # Minor version check (GitHub CLI, manually installed from latest release)
-    "uv": "0.11.",  # Minor version check (manually installed from latest release)
-    "python": "3.14",  # Python (from base image)
-    "pre_commit": "4.6.",  # Minor version check (installed via uv pip)
-    "ruff": "0.15.",  # Minor version check (installed via uv pip)
-    "bandit": "1.9.",  # Minor version check (installed via uv pip)
-    "pip_licenses": "5.",  # Major version check (installed via uv pip)
-    "just": "1.54.",  # Minor version check (manually installed from latest release)
-    "hadolint": "2.14.",  # Minor version check (manually installed from pinned release)
-    "taplo": "0.10.",  # Minor version check (manually installed from latest release)
-    "cargo-binstall": "1.20.",  # Minor version check (installed from latest release)
-    "typstyle": "0.15.",  # Minor version check (installed from latest release)
-    "vig_utils": "0.1.",  # Minor version check (installed via uv pip)
+    "uv": "0.11.",  # uv (fast-mover overlaid from nixpkgs-unstable)
+    "python": "3.14",  # interpreter major.minor (pinned to python314)
+    "ruff": "0.15.",  # nixpkgs-26.05
+    "bandit": "1.9.",  # nixpkgs-26.05
+    "pip_licenses": "5.",  # PyPI wheel pinned in flake.nix
+    "hadolint": "2.14.",  # nixpkgs-26.05
+    "taplo": "0.10.",  # nixpkgs-26.05
+    "vig_utils": "0.1.",  # our package version
 }
 
 
@@ -154,28 +150,20 @@ class TestSystemTools:
         assert_tool_on_path(host, "gh")
 
     def test_gh_version(self, host):
-        """Test that gh version is correct."""
+        """Test that gh runs (version is nixpkgs-pinned via flake.lock, not asserted)."""
         result = host.run("gh --version")
         assert result.rc == 0, "gh --version failed"
         assert "gh version" in result.stdout.lower()
-        expected = EXPECTED_VERSIONS["gh"]
-        assert expected in result.stdout, (
-            f"Expected gh {expected}, got: {result.stdout}"
-        )
 
     def test_just_installed(self, host):
         """Test that just is installed (path-agnostic)."""
         assert_tool_on_path(host, "just")
 
     def test_just_version(self, host):
-        """Test that just version is correct."""
+        """Test that just runs (version is nixpkgs-pinned via flake.lock, not asserted)."""
         result = host.run("just --version")
         assert result.rc == 0, "just --version failed"
         assert "just" in result.stdout.lower()
-        expected = EXPECTED_VERSIONS["just"]
-        assert expected in result.stdout, (
-            f"Expected just {expected}, got: {result.stdout}"
-        )
 
     def test_hadolint_installed(self, host):
         """Test that hadolint is installed (path-agnostic)."""
@@ -204,22 +192,14 @@ class TestSystemTools:
         )
 
     def test_cargo_binstall(self, host):
-        """Test that cargo-binstall is installed and right version."""
+        """Test that cargo-binstall runs (version nixpkgs-pinned, not asserted)."""
         result = host.run("cargo-binstall -V")
         assert result.rc == 0, "cargo-binstall -V failed"
-        expected = EXPECTED_VERSIONS["cargo-binstall"]
-        assert expected in result.stdout, (
-            f"Expected cargo-binstall {expected}, got: {result.stdout}"
-        )
 
     def test_typstyle(self, host):
-        """Test that typstyle is installed and right version."""
+        """Test that typstyle runs (version nixpkgs-pinned, not asserted)."""
         result = host.run("typstyle --version")
         assert result.rc == 0, "typstyle --version failed"
-        expected = EXPECTED_VERSIONS["typstyle"]
-        assert expected in result.stdout, (
-            f"Expected typstyle {expected}, got: {result.stdout}"
-        )
 
     def test_just_lsp_installed(self, host):
         """Test that just-lsp is installed."""
@@ -370,14 +350,10 @@ class TestDevelopmentTools:
     """Test that development tools are installed."""
 
     def test_pre_commit_installed(self, host):
-        """Test that pre-commit is installed."""
+        """Test that pre-commit runs (version nixpkgs-pinned via flake.lock)."""
         result = host.run("pre-commit --version")
         assert result.rc == 0, "pre-commit --version failed"
         assert "pre-commit" in result.stdout.lower()
-        expected = EXPECTED_VERSIONS["pre_commit"]
-        assert expected in result.stdout, (
-            f"Expected pre-commit {expected}, got: {result.stdout}"
-        )
 
     def test_ruff_installed(self, host):
         """Test that ruff is installed."""
@@ -615,19 +591,19 @@ class TestFileStructure:
             )
 
     def test_workspace_template_pre_commit_hooks_initialized(self, host):
-        """Test that pre-commit hooks are pre-initialized at system cache location."""
-        # Pre-commit cache is built to /opt/pre-commit-cache (not in workspace assets)
-        # This allows init-workspace.sh to skip excluding it during copy
+        """Test that the pre-commit cache dir exists at the system cache location.
+
+        The dir is `PRE_COMMIT_HOME=/opt/pre-commit-cache` (set in the image env)
+        so init-workspace.sh need not exclude it during copy. Unlike the Debian
+        build, a hermetic Nix build cannot pre-fetch the hook repos (no network),
+        so we assert the cache *directory* is present; it populates on the first
+        `pre-commit run` / `install-hooks`.
+        """
         cache_dir = host.file("/opt/pre-commit-cache")
         assert cache_dir.exists, (
             "Pre-commit cache directory not found at /opt/pre-commit-cache"
         )
         assert cache_dir.is_directory, "Pre-commit cache is not a directory"
-        # Verify the cache directory is not empty (contains installed hooks)
-        result = host.run('test -n "$(ls -A /opt/pre-commit-cache 2>/dev/null)"')
-        assert result.rc == 0, (
-            "Pre-commit cache directory is empty - hooks were not initialized"
-        )
 
     def test_manifest_files(self, host, parse_manifest):
         """Test that all files in manifest are copied to the image.
