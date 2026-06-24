@@ -1441,6 +1441,48 @@ class TestDevContainerUserConf:
 class TestDevContainerCLI:
     """Tests for the devcontainer CLI environment."""
 
+    def test_devcontainer_runs_image_under_test(self, devcontainer_up, container_tag):
+        """The running devcontainer must use the freshly-built image under test.
+
+        The scaffolded docker-compose.yml pins the runtime image as
+        ``ghcr.io/vig-os/devcontainer:${DEVCONTAINER_VERSION:-latest}`` and
+        ``initialize.sh`` writes the pinned ``DEVCONTAINER_VERSION`` (from the
+        scaffolded ``.vig-os``) into ``.env``. Without an override the suite
+        would validate fresh scaffolding running inside an old *published*
+        image, not the image actually being built. The ``devcontainer_up``
+        fixture overrides ``DEVCONTAINER_VERSION`` to ``TEST_CONTAINER_TAG`` so
+        compose resolves the image to the build under test. Refs #701.
+        """
+        workspace_path = devcontainer_up.resolve()
+
+        result = subprocess.run(
+            [
+                "podman",
+                "ps",
+                "--filter",
+                f"name={workspace_path.name}",
+                "--format",
+                "{{.Image}}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0, (
+            f"Failed to list running devcontainer\nstderr: {result.stderr}"
+        )
+        images = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        assert images, (
+            f"No running devcontainer found for workspace {workspace_path.name}"
+        )
+
+        expected_image = f"ghcr.io/vig-os/devcontainer:{container_tag}"
+        assert any(expected_image in image for image in images), (
+            f"Devcontainer is running from {images}, but the suite must validate "
+            f"the image under test ({expected_image}). DEVCONTAINER_VERSION is not "
+            f"being overridden to TEST_CONTAINER_TAG."
+        )
+
     def test_ssh_github_authentication(self, devcontainer_up):
         """Test that SSH authentication to GitHub works in the devcontainer."""
         workspace_path = str(devcontainer_up.resolve())
