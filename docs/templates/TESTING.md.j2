@@ -30,7 +30,7 @@ These tests run against a running container instance to verify the image itself
 (installed tools, versions, environment variables, file structure).
 
 - `TestSystemTools` - git, curl, openssh-client, gh, just
-- `TestPythonEnvironment` - Python 3.12, uv
+- `TestPythonEnvironment` - Python 3.14, uv
 - `TestDevelopmentTools` - pre-commit, ruff, just
 - `TestEnvironmentVariables` - environment variables
 - `TestFileStructure` - file structure
