@@ -423,7 +423,10 @@
               # (#635), which targets ghcr.io/vig-os/devcontainer:<tag>, runs
               # unchanged against the loaded image under a unique tag.
               name = "ghcr.io/vig-os/devcontainer";
-              tag = "nix-wt634";
+              # Disposable discovery tag, matching the CI workflow's
+              # INDEX_TAG (.github/workflows/nix-image.yml). The versioned
+              # / :latest cutover is handled separately (#639).
+              tag = "nix-dev";
 
               contents = imageTools ++ [ bootstrap ];
 
