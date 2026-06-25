@@ -169,7 +169,7 @@ def is_running_in_container() -> bool:
     try:
         with Path("/proc/1/cgroup").open() as f:
             return "docker" in f.read() or "podman" in f.read()
-    except (FileNotFoundError, PermissionError):
+    except FileNotFoundError, PermissionError:
         pass
     return False
 
@@ -1006,7 +1006,7 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image, container_ta
                     parts = error_message.split("Command failed:")
                     if len(parts) > 1:
                         podman_command = parts[1].strip()
-        except (json.JSONDecodeError, KeyError):
+        except json.JSONDecodeError, KeyError:
             pass
 
         # Extract actual podman error from stderr
