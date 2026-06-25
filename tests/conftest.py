@@ -809,7 +809,7 @@ def _teardown_devcontainer_containers(
 
 
 @pytest.fixture(scope="session")
-def devcontainer_up(initialized_workspace):
+def devcontainer_up(initialized_workspace, container_tag):
     """
     Set up a devcontainer using devcontainer CLI.
 
@@ -832,6 +832,15 @@ def devcontainer_up(initialized_workspace):
     bin_dir = str(Path("node_modules/.bin").resolve())
     if bin_dir not in os.environ.get("PATH", ""):
         os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")
+
+    # Run the devcontainer from the image *under test*, not the published
+    # DEVCONTAINER_VERSION baked into the scaffolded .vig-os/.env. The
+    # scaffolded docker-compose.yml resolves the runtime image as
+    # ghcr.io/vig-os/devcontainer:${DEVCONTAINER_VERSION:-latest}; compose reads
+    # the shell environment over the .env file, so exporting DEVCONTAINER_VERSION
+    # here pins compose -- and every `devcontainer exec` below, which inherits
+    # os.environ -- to TEST_CONTAINER_TAG. Refs #701.
+    os.environ["DEVCONTAINER_VERSION"] = container_tag
 
     docker_path = "podman"
     env, original_config = _prepare_devcontainer_env(
@@ -922,7 +931,7 @@ def sidecar_image():
 
 
 @pytest.fixture(scope="session")
-def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
+def devcontainer_with_sidecar(initialized_workspace, sidecar_image, container_tag):
     """
     Set up a devcontainer WITH a sidecar for testing multi-container setups.
 
@@ -943,6 +952,10 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
     )
     if not _find_devcontainer_cli():
         pytest.skip("devcontainer CLI not available. Install with: npm install")
+
+    # Pin compose to the image under test, not the published DEVCONTAINER_VERSION
+    # (see devcontainer_up for the rationale). Refs #701.
+    os.environ["DEVCONTAINER_VERSION"] = container_tag
 
     docker_path = "podman"
     env, _ = _prepare_devcontainer_env(
