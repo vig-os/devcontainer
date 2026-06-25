@@ -54,8 +54,8 @@ vig-utils = { path = "packages/vig-utils", editable = true }
 # Black-compatible line length
 line-length = 88
 
-# Target Python 3.12
-target-version = "py312"
+# Target Python 3.14
+target-version = "py314"
 
 [tool.ruff.lint]
 

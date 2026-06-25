@@ -50,7 +50,7 @@ def test_no_tracked_file_references_cursor_skills() -> None:
         path = REPO_ROOT / rel
         try:
             text = path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, FileNotFoundError):
+        except UnicodeDecodeError, FileNotFoundError:
             continue
         if ".cursor/skills/" in text:
             offenders.append(rel)
