@@ -66,9 +66,7 @@ class TestWorkspaceInterpreterPath:
         sync_manifest = _load_sync_manifest()
         sync_manifest.sync(project_root, tmp_path)
 
-        settings = json.loads(
-            (tmp_path / ".vscode" / "settings.json").read_text()
-        )
+        settings = json.loads((tmp_path / ".vscode" / "settings.json").read_text())
         interpreter = settings["python.defaultInterpreterPath"]
 
         assert interpreter == "${workspaceFolder}/.venv/bin/python3"
