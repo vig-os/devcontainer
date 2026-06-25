@@ -145,6 +145,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `derive-branch-summary` now handles `-h`/`--help` (prints usage, exits 0) instead of treating the flag as an issue title and failing; the worktree launcher probes availability with `--help`, so the bug blocked worktree creation entirely
 - **CONTRIBUTE prerequisites now document the direnv shell hook** ([#633](https://github.com/vig-os/devcontainer/issues/633))
   - The `direnv` prerequisite promised the dev-shell "loads automatically on `cd`" but never documented installing direnv's shell hook (`eval "$(direnv hook bash)"`), the step that behaviour depends on. Without the hook, `direnv allow` still succeeds yet the flake never activates on `cd` and host tooling (e.g. an old system Node) is used with no warning. Documented the hook in the prerequisites table and as a fast-path note, with `nix develop` as the hook-free fallback
+- **Workspace python interpreter pointed at the dead `/opt/venv` path** ([#706](https://github.com/vig-os/devcontainer/issues/706))
+  - The synced `.vscode/settings.json` rewrote `python.defaultInterpreterPath` to `/opt/venv/bin/python3`, which no longer exists on the Nix image, breaking the VS Code interpreter for downstream projects
+  - The interpreter now stays workspace-relative (`${workspaceFolder}/.venv/bin/python3`), matching the `uv`-created `.venv` in the opened project
 
 ### Security
 
