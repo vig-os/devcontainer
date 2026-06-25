@@ -43,9 +43,6 @@ dest = ".devcontainer/CHANGELOG.md"
 
 [[entries]]
 src = ".vscode/settings.json"
-transforms = [
-  { type = "Sed", pattern = "\\$\\{workspaceFolder\\}/\\.venv/bin/python3", replace = "/opt/venv/bin/python3" },
-]
 
 [[entries]]
 src = ".github/agent-blocklist.toml"
