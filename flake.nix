@@ -169,17 +169,26 @@
           # `libstdc++.so.6`. On a NixOS host that library is not on the loader
           # path outside an FHS environment, so the hook aborts with
           # `ImportError: libstdc++.so.6: cannot open shared object file`. Exposing
-          # it on LD_LIBRARY_PATH lets the wheel resolve it. It is the same
-          # libstdc++ the Nix toolchain itself links (`stdenv.cc.cc.lib`), so the
-          # other dev-shell binaries keep working (no version clash); pymarkdown is
-          # not in nixpkgs, so the #697 "add to devTools + language:system" recipe
-          # does not apply here. Refs #698.
+          # the Nix C++ runtime on LD_LIBRARY_PATH lets the wheel resolve it; it is
+          # the same libstdc++ the Nix toolchain itself links (`stdenv.cc.cc.lib`).
+          # pymarkdown is not in nixpkgs, so the #697 "add to devTools +
+          # language:system" recipe does not apply here. Refs #698.
           ldLibraryPath = "${pkgs.stdenv.cc.cc.lib}/lib";
 
-          # mkShell injects an LD_LIBRARY_PATH from some packages' propagated libs;
+          # Inject it ONLY on NixOS, where it is both required (above) and ABI-safe
+          # (the system glibc IS the Nix glibc). On an FHS host the system
+          # libstdc++ already resolves the wheel, and exporting the Nix one — built
+          # against a newer glibc — leaks into host binaries (every `just` recipe's
+          # `#!/usr/bin/env bash`, plus anything an `/etc/ld.so.preload` agent pulls
+          # `libstdc++` into), dragging in the Nix `libm.so.6` and aborting them with
+          # `version 'GLIBC_ABI_DT_X86_64_PLT' not found`. `/etc/NIXOS` marks NixOS.
+          # mkShell may itself inject an LD_LIBRARY_PATH from propagated libs;
           # APPEND rather than clobber so that value (and any host-set one) survives.
+          # Refs #703.
           ldLibraryPathHook = ''
-            export LD_LIBRARY_PATH="''${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}${ldLibraryPath}"
+            if [ -e /etc/NIXOS ]; then
+              export LD_LIBRARY_PATH="''${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}${ldLibraryPath}"
+            fi
           '';
         in
         pkgs.mkShell {

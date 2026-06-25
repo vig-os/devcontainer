@@ -29,6 +29,14 @@ import pytest
 # Repository root (two levels up: tests/ -> repo root).
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# Whether the host is NixOS. The dev-shell injects the Nix C++ runtime onto
+# LD_LIBRARY_PATH only here: NixOS lacks libstdc++ on the default loader path
+# (so the pymarkdown wheel needs it, #698) and its system glibc IS the Nix glibc
+# (so the injection is ABI-safe). On FHS hosts the system libstdc++ already
+# serves the wheel and the injection would leak a newer-glibc runtime into host
+# binaries, breaking them with GLIBC_ABI_DT_X86_64_PLT (#703).
+IS_NIXOS = Path("/etc/NIXOS").exists()
+
 # Tools whose executable name differs from a plain `<tool> --version` call.
 # Default version flag is `--version`; override here when a tool differs.
 VERSION_FLAG_OVERRIDES: dict[str, list[str]] = {
@@ -96,10 +104,17 @@ def dev_shell_env() -> dict[str, str]:
     return env
 
 
+@pytest.mark.skipif(
+    not IS_NIXOS,
+    reason=(
+        "The Nix C++ runtime is injected onto LD_LIBRARY_PATH only on NixOS; "
+        "FHS hosts resolve libstdc++ from the system loader (#703)"
+    ),
+)
 def test_devshell_ld_library_path_provides_libstdcpp(
     dev_shell_env: dict[str, str],
 ) -> None:
-    """The dev-shell must expose ``libstdc++.so.6`` on ``LD_LIBRARY_PATH`` (#698).
+    """On NixOS the dev-shell exposes ``libstdc++.so.6`` on ``LD_LIBRARY_PATH`` (#698).
 
     The ``pymarkdown`` pre-commit hook runs from pre-commit's own manylinux-wheel
     Python env, whose dependency ``pyjson5`` is a C extension linked against
@@ -108,7 +123,8 @@ def test_devshell_ld_library_path_provides_libstdcpp(
     ``ImportError: libstdc++.so.6: cannot open shared object file``. The dev-shell
     therefore exports ``LD_LIBRARY_PATH`` including the Nix C++ runtime so the
     wheel resolves it (the same libstdc++ the Nix toolchain itself links, so no
-    version clash with the other dev-shell binaries).
+    version clash with the other dev-shell binaries). The injection is gated to
+    NixOS (#703), so this assertion only applies there.
     """
     lib_path = dev_shell_env.get("LD_LIBRARY_PATH", "")
     assert lib_path, "LD_LIBRARY_PATH must be set in the dev-shell"
@@ -118,13 +134,21 @@ def test_devshell_ld_library_path_provides_libstdcpp(
     )
 
 
+@pytest.mark.skipif(
+    not IS_NIXOS,
+    reason=(
+        "Exercises the NixOS-only LD_LIBRARY_PATH injection; FHS hosts resolve "
+        "libstdc++ from the system loader (#703)"
+    ),
+)
 def test_devshell_pymarkdown_c_extension_imports(dev_shell_env: dict[str, str]) -> None:
-    """``pyjson5``'s C extension must load under the dev-shell loader (#698).
+    """``pyjson5``'s C extension must load under the dev-shell loader on NixOS (#698).
 
     Mirrors how the ``pymarkdown`` hook fails: load the manylinux C library with
     the dev-shell's ``LD_LIBRARY_PATH`` in scope. With ``libstdc++`` on the loader
     path the load succeeds; without it it raises the ``libstdc++.so.6``
-    ``ImportError`` the hook hit on NixOS.
+    ``ImportError`` the hook hit on NixOS. Gated to NixOS, where the injection is
+    active (#703).
     """
     lib_path = dev_shell_env.get("LD_LIBRARY_PATH", "")
     assert lib_path, "LD_LIBRARY_PATH must be set in the dev-shell"
@@ -155,6 +179,40 @@ def test_devshell_pymarkdown_c_extension_imports(dev_shell_env: dict[str, str]) 
     assert proc.returncode == 0 and "ok" in proc.stdout, (
         f"loading libstdc++ via LD_LIBRARY_PATH failed: rc={proc.returncode} "
         f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
+    )
+
+
+@pytest.mark.skipif(
+    IS_NIXOS,
+    reason=(
+        "On NixOS the system glibc IS the Nix glibc, so injecting the Nix C++ "
+        "runtime onto LD_LIBRARY_PATH is ABI-safe and required; this leak guard "
+        "only applies to FHS hosts (#703)"
+    ),
+)
+def test_devshell_no_nix_cxx_runtime_leak_on_fhs_host(
+    dev_shell_env: dict[str, str],
+) -> None:
+    """On an FHS host the dev-shell must not put the Nix C++ runtime on ``LD_LIBRARY_PATH`` (#703).
+
+    The Nix ``libstdc++`` is linked against a newer glibc (2.42) than an FHS
+    host's system glibc (e.g. Ubuntu 24.04 ships 2.39). Exporting it on
+    ``LD_LIBRARY_PATH`` leaks it into host binaries — notably ``/usr/bin/env``,
+    which every ``just`` recipe shebang invokes — dragging in the Nix
+    ``libm.so.6`` and aborting with ``version 'GLIBC_ABI_DT_X86_64_PLT' not
+    found``. FHS hosts already carry ``libstdc++`` on the default loader path, so
+    the #698 injection is gated to NixOS; here it must be absent.
+    """
+    lib_path = dev_shell_env.get("LD_LIBRARY_PATH", "")
+    leaked = [
+        entry
+        for entry in lib_path.split(":")
+        if entry.startswith("/nix/store/") and (Path(entry) / "libstdc++.so.6").exists()
+    ]
+    assert not leaked, (
+        "FHS dev-shell must not expose the Nix C++ runtime on LD_LIBRARY_PATH "
+        "(it breaks host binaries linked against an older system glibc with "
+        f"GLIBC_ABI_DT_X86_64_PLT); leaked entries: {leaked}"
     )
 
 
