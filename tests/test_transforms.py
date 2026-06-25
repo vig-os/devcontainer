@@ -2,21 +2,32 @@
 
 from __future__ import annotations
 
+import importlib.util
+import json
 import sys
 from pathlib import Path
 
 scripts_dir = Path(__file__).parent.parent / "scripts"
-sys.path.insert(0, str(scripts_dir.parent))
+project_root = scripts_dir.parent
+sys.path.insert(0, str(project_root))
 
 
 def _load_transforms():
-    import importlib.util
-
     spec = importlib.util.spec_from_file_location(
         "transforms", scripts_dir / "transforms.py"
     )
     module = importlib.util.module_from_spec(spec)
     sys.modules["transforms"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_sync_manifest():
+    spec = importlib.util.spec_from_file_location(
+        "sync_manifest", scripts_dir / "sync_manifest.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["sync_manifest"] = module
     spec.loader.exec_module(module)
     return module
 
@@ -45,6 +56,23 @@ class TestTransformsModule:
         transforms.RemoveLines(pattern=r"remove me").apply(f)
 
         assert f.read_text() == "keep\nkeep\n"
+
+
+class TestWorkspaceInterpreterPath:
+    """The synced workspace settings must point at the workspace venv."""
+
+    def test_synced_settings_uses_workspace_relative_venv(self, tmp_path):
+        """Syncing must leave the python interpreter workspace-relative, never /opt/venv."""
+        sync_manifest = _load_sync_manifest()
+        sync_manifest.sync(project_root, tmp_path)
+
+        settings = json.loads(
+            (tmp_path / ".vscode" / "settings.json").read_text()
+        )
+        interpreter = settings["python.defaultInterpreterPath"]
+
+        assert interpreter == "${workspaceFolder}/.venv/bin/python3"
+        assert "/opt/venv" not in interpreter
 
 
 class TestRemovePrecommitHooks:
