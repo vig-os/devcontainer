@@ -26,7 +26,6 @@ packages/vig-utils/src/vig_utils/shell/resolve-branch.sh        @gerchowl
 
 # Dev environment setup
 scripts/init.sh                 @c-vigo
-scripts/requirements.yaml       @c-vigo
 
 # Security-sensitive configuration
 renovate.json                   @c-vigo
