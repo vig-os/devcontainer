@@ -191,6 +191,13 @@ jobs:
       - name: Check flake quality gates
         run: nix flake check --accept-flake-config
 
+      # Validate the scaffolded downstream stub (assets/workspace/flake.nix)
+      # against THIS toolchain, not the published vigos, so a change to the flake
+      # API (lib.mkProjectShell / overlays.default) can't silently break a
+      # downstream repo's `direnv allow`. Refs #640.
+      - name: Check downstream flake stub
+        run: nix flake check ./assets/workspace --override-input vigos "path:$PWD" --accept-flake-config
+
   python-security:
     name: Python Security Scan
     runs-on: ubuntu-24.04
