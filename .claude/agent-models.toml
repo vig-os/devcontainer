@@ -4,9 +4,9 @@
 # Values are claude CLI model aliases (resolved to the latest in each family).
 
 [models]
-lightweight = "haiku"  # branch naming, quick single-shot tasks
-standard = "sonnet"    # structured output, data gathering, mechanical steps
-autonomous = "opus"    # full agent sessions (solve-and-pr, execute, etc.)
+lightweight = "haiku" # branch naming, quick single-shot tasks
+standard = "sonnet"   # structured output, data gathering, mechanical steps
+autonomous = "opus"   # full agent sessions (solve-and-pr, execute, etc.)
 
 [skill-tiers]
 # Which model tier each skill category should use for delegated sub-steps
