@@ -52,13 +52,6 @@ worktree-start issue prompt="" reviewer="":
         exit 1
     fi
 
-    # Helper: read agent model from config
-    _read_model() {
-        local tier="$1"
-        local cfg="$(git rev-parse --show-toplevel)/.cursor/agent-models.toml"
-        grep "^${tier}" "$cfg" | sed 's/.*= *"//' | sed 's/".*//'
-    }
-
     # Auth: check existing login first, then fall back to ANTHROPIC_API_KEY
     if claude auth status 2>/dev/null | grep -qi "logged in\|authenticated"; then
         echo "[OK] claude: authenticated via browser login"
@@ -145,7 +138,7 @@ worktree-start issue prompt="" reviewer="":
 
         # Use agent ONLY for the intelligent part: deriving the short summary
         # Try lightweight first; on failure retry with standard model (#183)
-        NAMING_RULE="$(pwd)/.cursor/rules/branch-naming.mdc"
+        NAMING_RULE="$(pwd)/.claude/skills/branch-naming/SKILL.md"
         SUMMARY=$(uv run derive-branch-summary "$TITLE" "$NAMING_RULE" "lightweight") || true
 
         if [ -z "$SUMMARY" ]; then
