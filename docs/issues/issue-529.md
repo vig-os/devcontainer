@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-06-24T05:29:47Z
+updated: 2026-06-25T22:12:31Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/devcontainer/issues/529
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-24T06:13:09.527Z
+synced: 2026-06-26T06:17:59.825Z
 ---
 
 # [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devcontainer/issues/529)
@@ -24,10 +24,11 @@ This issue lists Renovate updates and detected dependencies. Read the [Dependenc
 
 The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
 
+ - [ ] <!-- unschedule-branch=renovate/python-3.14-slim-bookworm -->build(docker): update python:3.14-slim-bookworm docker digest to 4ff4b92
  - [ ] <!-- unschedule-branch=renovate/actions-setup-python-digest -->chore(deps): update actions/setup-python digest to ece7cb0
- - [ ] <!-- unschedule-branch=renovate/taiki-e-install-action-digest -->chore(deps): update taiki-e/install-action digest to 1848b81
- - [ ] <!-- unschedule-branch=renovate/python-(minor-and-patch) -->build(pip): update python (minor and patch)
- - [ ] <!-- unschedule-branch=renovate/github-actions-(minor-and-patch) -->ci(actions): update github-actions (minor and patch)
+ - [ ] <!-- unschedule-branch=renovate/taiki-e-install-action-digest -->chore(deps): update taiki-e/install-action digest to 6a261c3
+ - [ ] <!-- unschedule-branch=renovate/python-(minor-and-patch) -->build(pip): update dependency ruff to v0.15.20
+ - [ ] <!-- unschedule-branch=renovate/github-actions-(minor-and-patch) -->ci(actions): update dependency astral-sh/uv to v0.11.24
  - [ ] <!-- unschedule-branch=renovate/bats-file-0.x-lockfile -->build(npm): update dependency bats-file to v0.4.0
  - [ ] <!-- unschedule-branch=renovate/actions-cache-6.x -->ci(actions): update actions/cache action to v6
  - [ ] <!-- create-all-awaiting-schedule-prs -->🔐 **Create all awaiting schedule PRs at once** 🔐
@@ -42,12 +43,6 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 ---
 
-
-## PR Closed (Blocked)
-
-The following updates are blocked by an existing closed PR. To recreate the PR, click on a checkbox below.
-
- - [ ] <!-- recreate-branch=renovate/python-3.14-slim-bookworm -->[build(docker): update python:3.14-slim-bookworm docker digest to a705190](../pull/586)
 
 ## Detected Dependencies
 
@@ -539,11 +534,11 @@ The following updates are blocked by an existing closed PR. To recreate the PR, 
  - `testinfra ==6.0.0`
  - `rich ==15.0.0`
  - `pre-commit ==4.6.0`
- - `ruff ==0.15.18` → [Updates: `==0.15.19`]
+ - `ruff ==0.15.18` → [Updates: `==0.15.20`]
  - `pip-licenses ==5.5.5`
  - `bandit ==1.9.4`
  - `pre-commit ==4.6.0`
- - `ruff ==0.15.18` → [Updates: `==0.15.19`]
+ - `ruff ==0.15.18` → [Updates: `==0.15.20`]
  - `pip-licenses ==5.5.5`
  - `bandit ==1.9.4`
  - `pytest ==9.1.1`
