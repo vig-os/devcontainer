@@ -109,6 +109,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **FHS loader symlink is now architecture-aware** ([#736](https://github.com/vig-os/devcontainer/issues/736))
+  - The manylinux FHS loader was hardcoded to `/lib64/ld-linux-x86-64.so.2`, which does not exist on `aarch64` (the loader is `/lib/ld-linux-aarch64.so.1`), so the arm64 image build failed the `test_fhs_loader_exists` portable testinfra check. The loader name and FHS dir are now derived from the build platform, and the test asserts the arch-appropriate path
+- **Baked `.venv` prompt is now renameable by consumer `post-create.sh`** ([#735](https://github.com/vig-os/devcontainer/issues/735))
+  - `python -m venv` writes `VIRTUAL_ENV_PROMPT` unquoted, but the consumer `post-create.sh` rewrites the double-quoted form, so its prompt rename no-opped and the integration `test_venv_prompt_name` check failed. The bootstrap now normalizes the activate prompt assignment to the quoted `"template-project"` the template targets
 - **Nix image now bakes the template `/root/assets/workspace/.venv`** ([#735](https://github.com/vig-os/devcontainer/issues/735))
   - The image advertised `UV_PROJECT_ENVIRONMENT`/`VIRTUAL_ENV` at `/root/assets/workspace/.venv` but never created it (the Debian image did). The published 0.3.x consumer `post-create.sh` runs `sed -i .../.venv/bin/activate` as its first venv step and aborted under `set -euo pipefail` (`exit 2`) when the file was missing — so git setup, gh auth, pre-commit install, and `just sync` never ran. The flake bootstrap layer now pre-creates the venv from the baked CPython (hermetic, network-free, no packages — `just sync` populates it), so `.venv/bin/activate` exists and matches the advertised env vars
 - **Nix image now runs pre-compiled PyPI (manylinux) wheels at runtime** ([#736](https://github.com/vig-os/devcontainer/issues/736))
