@@ -190,6 +190,85 @@ class TestFhsShims:
             host.run(f"rm -f {script}")
 
 
+def _pypi_reachable(host):
+    """Best-effort probe: can the image reach PyPI to fetch a wheel?
+
+    The loader-existence assertion is unconditional, but the wheel-import
+    assertions need network and the image bakes no warm uv cache, so when the
+    suite runs offline (e.g. a hermetic build sandbox) those tests skip rather
+    than fail. Refs #736.
+    """
+    return (
+        host.run(
+            'python3 -c "import socket,sys; socket.setdefaulttimeout(5); '
+            "socket.create_connection(('pypi.org', 443)); sys.exit(0)\""
+        ).rc
+        == 0
+    )
+
+
+class TestManylinuxRuntime:
+    """Runtime support for pre-compiled PyPI (manylinux) wheels (#736).
+
+    The bare Nix layered image is Nix-but-not-NixOS: it shipped neither the FHS
+    dynamic loader (``/lib64/ld-linux-x86-64.so.2``) that every manylinux
+    x86_64 wheel hardcodes as its ``PT_INTERP``, nor the Nix C++/compression
+    runtime on the loader path. So runtime-installed PyPI binaries broke —
+    standalone tools (pre-commit's PyPI ruff/typos: ``cannot execute: required
+    file not found``) and C extensions dlopened by the baked CPython (numpy,
+    scipy, pre-commit's ``pyjson5``: ``ImportError: libstdc++.so.6``). This is
+    the image-scope analogue of the dev-shell's #698 fix.
+    """
+
+    def test_fhs_loader_exists(self, host):
+        """The FHS loader manylinux x86_64 wheels exec must exist.
+
+        Unconditional (needs no network): a missing
+        ``/lib64/ld-linux-x86-64.so.2`` is the root cause of ``cannot execute:
+        required file not found`` for any PyPI-pinned standalone tool. Refs #736.
+        """
+        loader = host.file("/lib64/ld-linux-x86-64.so.2")
+        assert loader.exists, (
+            "/lib64/ld-linux-x86-64.so.2 missing; manylinux wheel executables "
+            "(e.g. PyPI-pinned pre-commit ruff/typos) cannot exec"
+        )
+
+    @pytest.mark.parametrize(
+        ("install_spec", "import_name"),
+        [
+            ("numpy", "numpy"),  # heavy manylinux wheel (libstdc++ / libgcc_s)
+            ("pyjson5", "pyjson5"),  # pre-commit pymarkdown's C-extension dep
+        ],
+        ids=["numpy", "pyjson5"],
+    )
+    def test_manylinux_wheel_imports(self, host, install_spec, import_name):
+        """A runtime-installed manylinux wheel imports under the baked CPython.
+
+        Exercises the C-extension path the loader symlink alone cannot fix: the
+        ``.so`` is dlopened by the Nix-store CPython (which uses its own store
+        loader, not ``/lib64``), so its ``libstdc++``/``libgcc_s`` must resolve
+        via the baked ``LD_LIBRARY_PATH``. Network-guarded — the image ships no
+        warm cache. Refs #736.
+        """
+        if not _pypi_reachable(host):
+            pytest.skip("PyPI unreachable; cannot fetch manylinux wheel offline")
+        venv = f"/tmp/manylinux_{import_name}"
+        host.run(f"rm -rf {venv}")
+        try:
+            result = host.run(
+                f"uv venv {venv} "
+                f"&& uv pip install --python {venv}/bin/python {install_spec} "
+                f"&& {venv}/bin/python -c "
+                f"'import {import_name}; print({import_name}.__file__)'"
+            )
+            assert result.rc == 0, (
+                f"manylinux wheel {install_spec!r} failed to import: "
+                f"{result.stdout}\n{result.stderr}"
+            )
+        finally:
+            host.run(f"rm -rf {venv}")
+
+
 class TestSystemTools:
     """Test that system tools are installed with correct versions."""
 
@@ -517,6 +596,36 @@ class TestDevelopmentTools:
         assert result.rc == 0, f"{name} command failed: {result.stderr}"
 
 
+class TestContainerRuntime:
+    """Test the container runtime tooling (#740)."""
+
+    def test_podman_installed(self, host):
+        """podman is installed (the image's container runtime)."""
+        result = assert_tool_runs(host, "podman", "--version")
+        assert "podman" in result.stdout.lower()
+
+    def test_docker_shim_on_path(self, host):
+        """A `docker` shim must resolve on PATH (#740).
+
+        The image ships `podman` but no `docker` binary. Docker-out-of-Docker
+        works because podman honors DOCKER_HOST, but any recipe/script that
+        invokes `docker` literally fails with "command not found" without a
+        shim. The image bakes a `docker -> podman` wrapper on /usr/local/bin.
+        """
+        assert_tool_on_path(host, "docker")
+
+    def test_docker_shim_runs_podman(self, host):
+        """The `docker` shim must run and report podman's version (#740).
+
+        Proves the wrapper execs podman rather than merely existing on PATH.
+        """
+        result = host.run("docker --version")
+        assert result.rc == 0, f"docker --version failed: {result.stderr}"
+        assert "podman" in result.stdout.lower(), (
+            f"docker shim did not exec podman: {result.stdout!r}"
+        )
+
+
 class TestNodeEnvironment:
     """Test the Node.js / npm environment (#728)."""
 
@@ -784,6 +893,51 @@ class TestFileStructure:
                         )
                     else:
                         verify_file_identity(host, str(rel), dest_file_path)
+
+
+class TestNixConfiguration:
+    """Test that the baked /etc/nix/nix.conf enables the modern Nix CLI.
+
+    The image bakes CppNix but historically shipped no nix.conf, leaving
+    `nix-command`/`flakes` disabled by default so ad-hoc on-demand tooling
+    (`nix shell nixpkgs#<x>`, `nix run`, `nix eval`) failed without an explicit
+    `--extra-experimental-features` flag. Refs #739.
+    """
+
+    def test_nix_conf_exists(self, host):
+        """/etc/nix/nix.conf is present as a regular file."""
+        conf = host.file("/etc/nix/nix.conf")
+        assert conf.exists, "/etc/nix/nix.conf not found"
+        assert conf.is_file, "/etc/nix/nix.conf is not a regular file"
+
+    def test_nix_conf_enables_experimental_features(self, host):
+        """nix.conf turns on the nix-command and flakes experimental features."""
+        content = host.file("/etc/nix/nix.conf").content_string
+        feature_line = next(
+            (
+                line
+                for line in content.splitlines()
+                if line.strip().startswith("experimental-features")
+            ),
+            None,
+        )
+        assert feature_line is not None, (
+            "no experimental-features setting in /etc/nix/nix.conf"
+        )
+        assert "nix-command" in feature_line, (
+            "nix-command not enabled in /etc/nix/nix.conf"
+        )
+        assert "flakes" in feature_line, "flakes not enabled in /etc/nix/nix.conf"
+
+    def test_nix_command_works_without_flag(self, host):
+        """`nix eval` succeeds without an explicit experimental-features flag."""
+        result = host.run('nix eval --expr "1 + 1"')
+        assert result.rc == 0, (
+            f"nix eval failed without experimental-features flag: {result.stderr}"
+        )
+        assert result.stdout.strip() == "2", (
+            f"unexpected nix eval output: {result.stdout!r}"
+        )
 
 
 class TestPlaceholders:
