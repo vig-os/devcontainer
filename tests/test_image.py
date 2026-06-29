@@ -190,6 +190,85 @@ class TestFhsShims:
             host.run(f"rm -f {script}")
 
 
+def _pypi_reachable(host):
+    """Best-effort probe: can the image reach PyPI to fetch a wheel?
+
+    The loader-existence assertion is unconditional, but the wheel-import
+    assertions need network and the image bakes no warm uv cache, so when the
+    suite runs offline (e.g. a hermetic build sandbox) those tests skip rather
+    than fail. Refs #736.
+    """
+    return (
+        host.run(
+            'python3 -c "import socket,sys; socket.setdefaulttimeout(5); '
+            "socket.create_connection(('pypi.org', 443)); sys.exit(0)\""
+        ).rc
+        == 0
+    )
+
+
+class TestManylinuxRuntime:
+    """Runtime support for pre-compiled PyPI (manylinux) wheels (#736).
+
+    The bare Nix layered image is Nix-but-not-NixOS: it shipped neither the FHS
+    dynamic loader (``/lib64/ld-linux-x86-64.so.2``) that every manylinux
+    x86_64 wheel hardcodes as its ``PT_INTERP``, nor the Nix C++/compression
+    runtime on the loader path. So runtime-installed PyPI binaries broke —
+    standalone tools (pre-commit's PyPI ruff/typos: ``cannot execute: required
+    file not found``) and C extensions dlopened by the baked CPython (numpy,
+    scipy, pre-commit's ``pyjson5``: ``ImportError: libstdc++.so.6``). This is
+    the image-scope analogue of the dev-shell's #698 fix.
+    """
+
+    def test_fhs_loader_exists(self, host):
+        """The FHS loader manylinux x86_64 wheels exec must exist.
+
+        Unconditional (needs no network): a missing
+        ``/lib64/ld-linux-x86-64.so.2`` is the root cause of ``cannot execute:
+        required file not found`` for any PyPI-pinned standalone tool. Refs #736.
+        """
+        loader = host.file("/lib64/ld-linux-x86-64.so.2")
+        assert loader.exists, (
+            "/lib64/ld-linux-x86-64.so.2 missing; manylinux wheel executables "
+            "(e.g. PyPI-pinned pre-commit ruff/typos) cannot exec"
+        )
+
+    @pytest.mark.parametrize(
+        ("install_spec", "import_name"),
+        [
+            ("numpy", "numpy"),  # heavy manylinux wheel (libstdc++ / libgcc_s)
+            ("pyjson5", "pyjson5"),  # pre-commit pymarkdown's C-extension dep
+        ],
+        ids=["numpy", "pyjson5"],
+    )
+    def test_manylinux_wheel_imports(self, host, install_spec, import_name):
+        """A runtime-installed manylinux wheel imports under the baked CPython.
+
+        Exercises the C-extension path the loader symlink alone cannot fix: the
+        ``.so`` is dlopened by the Nix-store CPython (which uses its own store
+        loader, not ``/lib64``), so its ``libstdc++``/``libgcc_s`` must resolve
+        via the baked ``LD_LIBRARY_PATH``. Network-guarded — the image ships no
+        warm cache. Refs #736.
+        """
+        if not _pypi_reachable(host):
+            pytest.skip("PyPI unreachable; cannot fetch manylinux wheel offline")
+        venv = f"/tmp/manylinux_{import_name}"
+        host.run(f"rm -rf {venv}")
+        try:
+            result = host.run(
+                f"uv venv {venv} "
+                f"&& uv pip install --python {venv}/bin/python {install_spec} "
+                f"&& {venv}/bin/python -c "
+                f"'import {import_name}; print({import_name}.__file__)'"
+            )
+            assert result.rc == 0, (
+                f"manylinux wheel {install_spec!r} failed to import: "
+                f"{result.stdout}\n{result.stderr}"
+            )
+        finally:
+            host.run(f"rm -rf {venv}")
+
+
 class TestSystemTools:
     """Test that system tools are installed with correct versions."""
 
