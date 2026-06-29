@@ -6,7 +6,7 @@
 # `Digest:` from `docker buildx imagetools inspect python:3.14-slim-bookworm`),
 # never a per-platform child manifest. Pinning a single-arch (amd64) child
 # manifest breaks the arm64 release build with "exec format error" (see #578).
-FROM python:3.14-slim-bookworm@sha256:7e2f3044e0eccc2d61476a63a9ff0564dacc7064b4e514e3e6fce7bf80b3cf0d
+FROM python:3.14-slim-bookworm@sha256:4ff4b92a68355dbdb52584ab3391dff8d371a61d4e063468bfd0130e3189c6d9
 
 # Add metadata
 # By default, we build the dev version unless specified as an argument
