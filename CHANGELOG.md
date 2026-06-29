@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Renovate: update `taiki-e/install-action` to `9cfa436`** ([#725](https://github.com/vig-os/devcontainer/pull/725))
 ### Deprecated
 
 ### Removed
