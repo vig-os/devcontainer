@@ -423,10 +423,7 @@
               # aarch64 -> /lib/ld-linux-aarch64.so.1. Derive from the build
               # platform so the multi-arch image is correct on both. Refs #736.
               fhsLoaderName =
-                if pkgs.stdenv.hostPlatform.isAarch64 then
-                  "ld-linux-aarch64.so.1"
-                else
-                  "ld-linux-x86-64.so.2";
+                if pkgs.stdenv.hostPlatform.isAarch64 then "ld-linux-aarch64.so.1" else "ld-linux-x86-64.so.2";
               fhsLoaderDir = if pkgs.stdenv.hostPlatform.isAarch64 then "lib" else "lib64";
 
               # Bake the workspace assets, pre-commit cache dir and template
