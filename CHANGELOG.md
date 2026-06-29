@@ -107,6 +107,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`docker` now resolves in the Nix-built image (podman compatibility shim)** ([#740](https://github.com/vig-os/devcontainer/issues/740))
+  - The image shipped `podman` but no `docker` binary, while the consumer `.devcontainer/docker-compose.yml` mounts the socket at `/var/run/docker.sock` and sets `DOCKER_HOST`/`CONTAINER_HOST`. Docker-out-of-Docker worked because podman honors `DOCKER_HOST`, but any recipe/script invoking `docker` literally failed with `command not found`. The bootstrap layer now bakes a tiny `docker -> podman` wrapper at `/usr/local/bin/docker` (already on the baked `PATH`) that execs the baked podman, so `docker`-literal callers get a working binary without pulling in the Docker engine
 - **`/usr/bin/env` now exists in the Nix-built image** ([#727](https://github.com/vig-os/devcontainer/issues/727))
   - The bare `dockerTools.buildLayeredImage` had no `/usr/bin` at all, so the ubiquitous `#!/usr/bin/env <interp>` shebang failed with `/usr/bin/env: bad interpreter: No such file or directory` — breaking essentially every Node/Python/Ruby CLI (e.g. `node_modules/.bin/tsc`) for image-mode consumers. Added `dockerTools.usrBinEnv` (the FHS shim symlinking `/usr/bin/env` to coreutils `env`) to the image package set, alongside the existing `fakeNss` shim
 - **`npm install -g` now lands CLIs on PATH in the Nix image** ([#728](https://github.com/vig-os/devcontainer/issues/728))
