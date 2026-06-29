@@ -23,13 +23,13 @@ dev = [
 devcontainer = [
   "rich==15.0.0",
   "pre-commit==4.6.0",
-  "ruff==0.15.18",
+  "ruff==0.15.20",
   "pip-licenses==5.5.5",
   "bandit[toml]==1.9.4",
 ]
 lint = [
   "pre-commit==4.6.0",
-  "ruff==0.15.18",
+  "ruff==0.15.20",
   "pip-licenses==5.5.5",
   "bandit[toml]==1.9.4",
 ]
