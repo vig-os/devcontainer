@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Renovate: update `actions/setup-python` to `ece7cb0`** ([#722](https://github.com/vig-os/devcontainer/pull/722))
 ### Deprecated
 
 ### Removed
