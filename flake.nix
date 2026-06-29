@@ -401,6 +401,23 @@
           # nixpkgs, so it is a drop-in swap once that issue lands.
           devcontainerImage =
             let
+              # Nix C++/compression runtime exposed on the loader path so
+              # runtime-installed manylinux wheels resolve their NEEDED libs.
+              # stdenv.cc.cc.lib carries libstdc++.so.6 + libgcc_s.so.1; zlib
+              # carries libz.so.1 — the libraries pre-compiled PyPI wheels link
+              # against. Set as LD_LIBRARY_PATH (config.Env) so it is honoured
+              # both by standalone wheel executables (via the /lib64 loader
+              # below) and, crucially, by C-extension .so files dlopened by the
+              # baked Nix CPython (numpy, scipy, pre-commit's pyjson5) — those
+              # never traverse /lib64, so the loader symlink alone cannot fix
+              # them. The image-scope analogue of the dev-shell's #698 fix, but
+              # UNGATED: an all-Nix container has no foreign FHS host binaries
+              # to pollute, so the #698 /etc/NIXOS ABI gate never applies. #736.
+              manylinuxLibPath = pkgs.lib.makeLibraryPath [
+                pkgs.stdenv.cc.cc.lib
+                pkgs.zlib
+              ];
+
               # Bake the workspace assets, pre-commit cache dir and template
               # .venv scaffold as a normal image layer. UV_PYTHON pins the Nix
               # interpreter and UV_PYTHON_DOWNLOADS=never forbids uv from
@@ -472,6 +489,18 @@
                     mkdir -p "$out/tmp"
                     chmod 1777 "$out/tmp"
 
+                    # FHS dynamic loader for runtime-installed manylinux wheels.
+                    # A bare Nix layered image has no /lib64/ld-linux-x86-64.so.2
+                    # — the interpreter every manylinux x86_64 wheel hardcodes as
+                    # its PT_INTERP — so PyPI-pinned standalone tools (e.g.
+                    # pre-commit's ruff/typos) abort with "cannot execute:
+                    # required file not found". Symlink the Nix glibc loader
+                    # there; being newer it runs the old-glibc wheels (glibc is
+                    # backward compatible). Paired with LD_LIBRARY_PATH
+                    # (config.Env) for the C++/z runtime the wheels need. #736.
+                    mkdir -p "$out/lib64"
+                    ln -s ${pkgs.glibc}/lib/ld-linux-x86-64.so.2 \
+                      "$out/lib64/ld-linux-x86-64.so.2"
                     # /etc/nix/nix.conf enabling the experimental features the
                     # modern Nix CLI needs. The image bakes CppNix but shipped
                     # no nix.conf, so `nix-command`/`flakes` were off by default
@@ -523,6 +552,12 @@
                   "LANGUAGE=en_US:en"
                   "LC_ALL=en_US.UTF-8"
                   "LOCALE_ARCHIVE=${pkgs.glibcLocales}/lib/locale/locale-archive"
+                  # Expose the Nix C++/compression runtime on the loader path
+                  # for runtime-installed manylinux wheels (see manylinuxLibPath
+                  # above). Required for the C-extension .so files the baked Nix
+                  # CPython dlopens (numpy/scipy/pyjson5), which never traverse
+                  # the /lib64 loader. Ungated image analogue of #698. #736.
+                  "LD_LIBRARY_PATH=${manylinuxLibPath}"
                   "PYTHONUNBUFFERED=1"
                   "IN_CONTAINER=true"
                   # #545: the container is the trust boundary; bypass the uid-0
