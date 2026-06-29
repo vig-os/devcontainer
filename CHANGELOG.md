@@ -107,6 +107,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Dev-shell now exposes `python3` and `pre-commit` on PATH (image parity)** ([#729](https://github.com/vig-os/devcontainer/issues/729))
+  - A downstream consumer of the toolchain via the flake-input / direnv path (`vigos.lib.mkProjectShell`, `nix develop`) got a shell with no bare `python`/`python3` and no `pre-commit`: Python was reachable only through `uv run`, breaking parity with the image (`imageTools` ships both via `pythonEnv` + `pre-commit`). `mkProjectShell` now adds the pinned store CPython (`python314`, the same interpreter `UV_PYTHON` points at) and `pre-commit` to the dev-shell's base packages; the project venv stays uv-managed. They are deliberately kept out of the `devTools` SSoT because the image already provides them and a bare interpreter there would collide with `pythonEnv`. Added a `--ignore-environment` dev-shell parity test so a host `python3`/`pre-commit` can no longer mask the gap
 - **`init-workspace --mode direnv` now produces a loadable `justfile`** ([#641](https://github.com/vig-os/devcontainer/issues/641))
   - The scaffolded root `justfile` hard-imported `.devcontainer/justfile.devc` and `.devcontainer/justfile.gh`, but `direnv` mode prunes `.devcontainer/` — so every `just` command (including init-workspace's own final `just sync`) failed to parse in a direnv-mode workspace. Made the two `.devcontainer/` imports optional (`import?`, matching `justfile.project`/`justfile.local`); the `sync` recipe lives in the preserved `justfile.project`, so `just sync` still works in all modes
 - **Worktree recipes read agent config from the `.claude/` SSoT** ([#627](https://github.com/vig-os/devcontainer/issues/627))
