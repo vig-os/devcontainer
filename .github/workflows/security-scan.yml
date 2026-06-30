@@ -141,7 +141,7 @@ jobs:
             echo "- **Scan target:** flake \`devcontainerImageEnv\` (image package closure)"
             echo "- **Primary scanner:** vulnix (nixpkgs-native)"
             echo "- **Date (UTC):** $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "- **Gate:** ${{ steps.vulnix-gate.outcome }} (non-blocking during discovery; blocking at #639)"
+            echo "- **Gate:** ${{ steps.vulnix-gate.outcome }} (blocking: fails on unexcepted HIGH/CRITICAL findings)"
             echo ""
             echo "vulnix over-reports CVEs already patched in nixpkgs; triage findings"
             echo "into \`.vulnixignore\` and advance the nixpkgs rev before #639."
