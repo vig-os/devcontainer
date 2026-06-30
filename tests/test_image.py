@@ -1115,10 +1115,11 @@ class TestNixConfiguration:
             None,
         )
         assert sub_line is not None, "no substituters setting in /etc/nix/nix.conf"
-        assert "https://cache.nixos.org" in sub_line, (
+        substituters = sub_line.split("=", 1)[1].split()
+        assert "https://cache.nixos.org" in substituters, (
             "cache.nixos.org missing from substituters in /etc/nix/nix.conf"
         )
-        assert "https://vig-os.cachix.org" in sub_line, (
+        assert "https://vig-os.cachix.org" in substituters, (
             "vig-os.cachix.org missing from substituters in /etc/nix/nix.conf"
         )
 
@@ -1136,12 +1137,14 @@ class TestNixConfiguration:
         assert key_line is not None, (
             "no trusted-public-keys setting in /etc/nix/nix.conf"
         )
+        trusted_keys = key_line.split("=", 1)[1].split()
         assert (
-            "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" in key_line
+            "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+            in trusted_keys
         ), "cache.nixos.org public key missing from trusted-public-keys"
         assert (
             "vig-os.cachix.org-1:yoOYRi3bvnM6ThxO0joLt7vtzhTfkq3r6jykeUMg7Bk="
-            in key_line
+            in trusted_keys
         ), "vig-os.cachix.org public key missing from trusted-public-keys"
 
 
