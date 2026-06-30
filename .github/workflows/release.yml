@@ -1421,7 +1421,8 @@ jobs:
     needs: [validate, finalize, build-and-test, vulnix-gate, publish]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    if: ${{ always() && (needs.validate.result == 'failure' || needs.finalize.result == 'failure' || needs.build-and-test.result == 'failure' || needs.vulnix-gate.result == 'failure' || needs.publish.result == 'failure') }}
+    # A cancelled required job is treated as not-green (same as failure): roll back rather than leave a partial release.
+    if: ${{ always() && (contains(fromJSON('["failure", "cancelled"]'), needs.validate.result) || contains(fromJSON('["failure", "cancelled"]'), needs.finalize.result) || contains(fromJSON('["failure", "cancelled"]'), needs.build-and-test.result) || contains(fromJSON('["failure", "cancelled"]'), needs.vulnix-gate.result) || contains(fromJSON('["failure", "cancelled"]'), needs.publish.result)) }}
     permissions:
       contents: read        # required by actions/checkout in rollback job
       issues: write          # create failure issue

@@ -212,9 +212,9 @@ if [ -f .gitmessage ] && git config commit.template .gitmessage; then
 fi
 
 if uv run pre-commit install-hooks; then
-    log_success "Pre-commit hooks installed"
+    log_success "Pre-commit hook environments installed"
 else
-    log_warning "Could not install pre-commit hooks"
+    log_warning "Could not install pre-commit hook environments"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════

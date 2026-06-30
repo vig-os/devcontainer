@@ -477,18 +477,21 @@ fi
 
 if [ "$DRY_RUN" = true ]; then
     info "Would execute:"
-    printf "  %s" "$RUNTIME run --rm -e SHORT_NAME=\"$PROJECT_NAME\" -e ORG_NAME=\"$ORG_NAME\" -e GITHUB_REPOSITORY=\"$GITHUB_REPOSITORY\" -v \"$PROJECT_PATH\":/workspace \"$IMAGE\" /root/assets/init-workspace.sh --no-prompts"
-    if [ -n "$FORCE" ]; then
-        printf " %s" "--force"
-    fi
-    if [ -n "$SMOKE_TEST" ]; then
-        printf " %s" "--smoke-test"
-    fi
-    if [ -n "$MODE" ]; then
-        printf " %s %s" "--mode" "$MODE"
-    fi
-    printf "\n"
+    # Derive the shown command from the real CMD array (built above, including
+    # --force/--smoke-test/--mode) via printf '%q' so it is shell-safe and stays
+    # in sync with what would actually run — no hand-maintained duplicate string.
+    printf '  '
+    printf '%q ' "${CMD[@]}"
+    printf '\n'
     exit 0
+fi
+
+# Record whether the target was empty BEFORE the container scaffolds it. The git
+# step below only auto-commits a freshly scaffolded tree, so it never sweeps a
+# pre-populated directory into a misleading "initial scaffold" commit (#759).
+TARGET_WAS_EMPTY=false
+if [ -z "$(ls -A "$PROJECT_PATH" 2>/dev/null)" ]; then
+    TARGET_WAS_EMPTY=true
 fi
 
 # Check if terminal is interactive (needed for init-workspace.sh prompts)
@@ -569,13 +572,22 @@ setup_git_repo() {
         echo "Git repository initialized with 'main' branch"
     fi
 
-    # Create initial commit if repo has no commits (enables branch creation)
+    # Create initial commit if repo has no commits (enables branch creation).
+    # Only auto-commit when we scaffolded an empty target; never sweep a
+    # pre-populated directory into a misleading "initial scaffold" commit (#759).
     if ! git rev-parse HEAD >/dev/null 2>&1; then
-        echo "Creating initial commit..."
-        git add -A
-        git commit -m "chore: initial project scaffold" --allow-empty
-        created_repo=true
-        echo "Initial commit created"
+        if [ "${TARGET_WAS_EMPTY:-false}" = true ]; then
+            echo "Creating initial commit..."
+            git add -A
+            git commit -m "chore: initial project scaffold" --allow-empty
+            created_repo=true
+            echo "Initial commit created"
+        else
+            echo "Existing files detected; skipping the automatic scaffold commit."
+            echo "  Review and commit your files yourself, e.g.:"
+            echo "    git add -A && git commit -m 'chore: initial commit'"
+            created_repo=false
+        fi
     fi
 
     # Verify or create branches
