@@ -207,11 +207,11 @@ against the `.vulnixignore` exception register.
 
 ## Publish cutover
 
-The Nix image build is currently in the **discovery phase**: the workflows are
-non-publishing (`continue-on-error`) and touch only disposable discovery tags. The
-publish-cutover — flipping the versioned/`:latest` publish to the Nix builder and
-making the `vulnix` gate blocking — is tracked in **issue #639** (the release
-pipeline exposes a `builder: debian|nix` selector for the deliberate cutover run).
+The build pipeline is Nix-only (the Debian path was decommissioned in #642), and
+the nightly `vulnix` gate is **blocking** — any unexcepted HIGH/CRITICAL finding
+fails the scan. The remaining step is the deliberate Nix release that flips the
+versioned/`:latest` publish, tracked in **issue #639**; the nightly `vulnix` gate
+is the go/no-go signal for it.
 
 ## See also
 

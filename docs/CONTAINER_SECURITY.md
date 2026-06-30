@@ -55,9 +55,8 @@ instead.
 > advance the `nixpkgs` rev (layer 1); genuinely-not-applicable findings are
 > accepted in `.vulnixignore` with a rationale (layer 5).
 
-During the discovery phase the gate is **non-blocking** (`continue-on-error`).
-The publish-cutover (#639) flips it to blocking and wires SARIF upload and a
-deduplicated issue.
+The gate is **blocking** (#639): any unexcepted HIGH/CRITICAL finding fails the
+nightly scan.
 
 ### 3. CycloneDX SBOM + Trivy SBOM-mode scan (defence in depth)
 
