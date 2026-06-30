@@ -1,135 +1,165 @@
 # Container Security Patching Strategy
 
-This document describes how the devcontainer image handles system-level
-security vulnerabilities (CVEs) in OS packages.
+This document describes how the devcontainer image handles software
+vulnerabilities (CVEs).
+
+The image is a **Nix-built image** (`dockerTools.buildLayeredImage`, see
+`flake.nix`). This document describes the **Nix posture** — the mechanisms now in
+place. The Debian/`apt` build path has been decommissioned (#642).
 
 ## Principles
 
-1. **Reproducibility first** – Every build from the same commit must produce
-   the same image. Non-deterministic operations (`apt-get upgrade`) are
-   forbidden in the default build path.
-2. **Defence in depth** – Multiple layers detect and remediate CVEs at
-   different speeds so that no single mechanism is a bottleneck.
-3. **Minimal blast radius** – When manual patching is necessary, only the
-   specific vulnerable package is upgraded, and the change is traceable to a
-   CVE identifier.
+1. **Reproducibility first** – Every build from the same commit and the same
+   `flake.lock` produces a byte-identical image closure. There is no
+   non-deterministic upgrade step (no `apt-get upgrade`) in the build path.
+2. **Defence in depth** – Multiple scanners and levers detect and remediate CVEs
+   at different speeds and over different surfaces so no single mechanism is a
+   bottleneck.
+3. **Minimal blast radius** – When a CVE must be remediated out-of-band, the
+   change is the smallest pin that fixes it and is traceable to a CVE identifier.
 
 ## Layers of defence
 
-### 1. Base image digest pinning (primary)
+### 1. Pinned `nixpkgs` revision (primary)
 
-The `FROM` line in the Containerfile pins the base image to an immutable
-SHA-256 digest:
+The toolchain and the image contents come from a single pinned `nixpkgs`
+revision in `flake.lock`. Because the closure is fully pinned, the CVE surface
+is exactly what that revision ships. Renovate keeps the pin current through two
+mechanisms in `renovate.json`:
 
-```dockerfile
-FROM python:3.14-slim-bookworm@sha256:<digest>
-```
+- The **`nix` manager** detects flake inputs and proposes pinned-input updates.
+- **`lockFileMaintenance`** (enabled, scheduled weekly) refreshes the locked
+  revisions of all inputs (notably `nixpkgs`) so upstream security fixes land
+  through the normal PR/CI gate rather than a manual `nix flake update`.
 
-Renovate (configured with the `dockerfile` manager in `renovate.json`) monitors
-the upstream image and opens a pull request whenever a new digest is published.
-Because the upstream maintainers rebuild the image to include Debian security
-patches, most CVEs are resolved simply by merging the Renovate PR.
+**Typical remediation time:** within the weekly `lockFileMaintenance` cycle, or
+immediately by merging an out-of-cycle `nixpkgs`-bump PR.
 
-**Typical remediation time:** 1–7 days after the upstream image is rebuilt.
+### 2. Nightly `vulnix` scan (primary detection)
 
-### 2. Nightly Trivy scan (detection)
+The scheduled workflow (`.github/workflows/security-scan.yml`, job
+`scan-nix-image`) builds the image's package closure (the flake
+`devcontainerImageEnv` target) nightly and runs **`vulnix`**, the nixpkgs-native
+CVE scanner. A Nix image has no `apt`/`dpkg` database, so Trivy's OS-package
+scanner goes dark; `vulnix` matches the Nix store closure against the NVD feeds
+instead.
 
-The scheduled workflow (`.github/workflows/security-scan.yml`) pulls the
-published `:latest` image nightly (05:00 UTC) and runs a full Trivy vulnerability
-scan. Results are:
+- HIGH/CRITICAL findings (CVSS v3 ≥ 7.0) are gated by `vulnix-gate`
+  (`packages/vig-utils`) against the `.vulnixignore` exception register; a
+  finding blocks only when it is **not** covered by a non-expired exception.
+- Sub-threshold and unscored CVEs are awareness-only and never gate.
 
-- Printed as a table in the workflow log.
-- Uploaded as a SARIF report to the GitHub Security tab.
-- Accompanied by a CycloneDX SBOM artifact.
+> **`vulnix` over-reporting.** `vulnix` matches by package name + *upstream*
+> version and does not see `nixpkgs`' backported security patches, so it reports
+> CVEs already fixed in the shipped derivation. The primary lever is therefore to
+> advance the `nixpkgs` rev (layer 1); genuinely-not-applicable findings are
+> accepted in `.vulnixignore` with a rationale (layer 5).
 
-This scan is **non-blocking** for the full report (exit-code 0) and serves as
-an early-warning system for newly published CVEs. A separate gate step fails
-on fixable HIGH/CRITICAL findings (`ignore-unfixed: true`).
+The gate is **blocking** (#639): any unexcepted HIGH/CRITICAL finding fails the
+nightly scan.
 
-### 3. Targeted package upgrades (escape hatch)
+### 3. CycloneDX SBOM + Trivy SBOM-mode scan (defence in depth)
 
-When a HIGH or CRITICAL CVE is detected that:
+The same nightly job emits a **CycloneDX SBOM** of the Nix image (via Trivy) and
+runs Trivy in **SBOM-scan mode** over it for a second, independent vulnerability
+view. `vulnix` (Nix store closure) and Trivy (SBOM components) cover different
+surfaces, so both outputs are uploaded as an artifact to support a
+`vulnix`-vs-Trivy overlap comparison (confidence evidence, not a numeric-parity
+gate).
 
-- Has a fix available in the Debian stable repository, **and**
-- Cannot wait for the next base image rebuild (e.g., actively exploited),
+### 4. Advance the `nixpkgs` rev (remediation lever)
 
-a targeted upgrade is added to the Containerfile:
+When a HIGH/CRITICAL CVE is real (not a `vulnix` false positive) and fixed
+upstream:
 
-```dockerfile
-RUN apt-get update && apt-get install -y --only-upgrade \
-    libfoo=1.2.3-1+deb12u1 \  # CVE-2026-XXXXX
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-```
-
-Rules for targeted upgrades:
+- **Preferred:** bump the pinned `nixpkgs` rev (merge the Renovate
+  `nix`-manager / `lockFileMaintenance` PR, or open an out-of-cycle bump) so the
+  patched derivation enters the closure. This is reproducible and is captured by
+  the PR/CI gate.
+- **Rare escape hatch:** if only some inputs can move, pin the single patched
+  package through a flake overlay, referencing the CVE in a comment, and remove
+  the override once the base `nixpkgs` rev includes the fix.
 
 | Rule | Rationale |
 |------|-----------|
-| Each package must reference a CVE in a comment | Auditability |
-| Pin the package to an exact version | Reproducibility |
-| Remove the entry once the base image digest includes the fix | Avoid drift |
-| Never use blanket `apt-get upgrade` or `dist-upgrade` | Reproducibility |
+| Reference the CVE in the PR / overlay comment | Auditability |
+| Move the smallest pin that fixes it | Minimal blast radius |
+| Remove an overlay override once `nixpkgs` ships the fix | Avoid drift |
+| Never disable the pin to "take latest everything" | Reproducibility |
 
-### 4. Trivy ignore list (risk acceptance)
+**Compensating control — `vulnix` before/after diff.** A `nixpkgs` revision bump
+does not declare *which* CVE it fixes (the `nix` manager reports only the
+old → new git revision). To keep the audit trail, each `flake.lock` /
+`nixpkgs`-bump PR should include a `vulnix` scan diff taken **before and after**
+the bump, showing which advisories the new revision clears (or introduces).
 
-Low-risk CVEs that are not exploitable in the devcontainer context are
-documented in `.trivyignore` with:
+### 5. Exception registers (risk acceptance)
 
-- A risk assessment explaining why the CVE is acceptable.
+CVEs that are not exploitable in the devcontainer context, or are `vulnix`
+false positives (already patched in `nixpkgs`), are accepted in an exception
+register with:
+
+- A risk assessment / rationale (patched-in-nixpkgs, not-exploitable, or
+  awaiting-upstream).
 - An expiration date after which the entry must be re-evaluated.
 - A link to the tracking issue.
 
-Expired entries fail CI via `check-expirations` (pre-commit hook and CI
-workflows), forcing periodic review consistent with the IEC 62304 exception
-register model.
+Two registers share one format and one validator:
 
-As of the next release image (Debian 12.14 base), 78 unfixed LOW CVEs in OS
-packages are accepted in `.trivyignore` with expiration 2026-12-01. These
-have no available Debian patch; the nightly gate only fails on fixable
-HIGH/CRITICAL findings. Re-scan after each base-image digest bump and drop
-entries when Debian ships fixes. Tracking: #566, #512, #521.
+- **`.vulnixignore`** — `vulnix` findings on the Nix image (consumed by
+  `vulnix-gate`).
+- **`.trivyignore`** — image-agnostic Trivy findings on the Nix image (bundled-
+  binary CVEs) and Trivy secret-scan false positives.
 
-## Why not `apt-get upgrade`?
+Both use the `Expiration: YYYY-MM-DD` directive format and are validated by
+`check-expirations` (pre-commit hook and CI). Expired entries fail CI, forcing
+periodic review consistent with the IEC 62304 exception-register model.
 
-Running `apt-get upgrade` (or `dist-upgrade`) in the Containerfile has several
-drawbacks:
+## Why pin `nixpkgs` (and not track an unpinned channel)?
+
+Building from an unpinned/rolling input has the same drawbacks the old
+`apt-get upgrade` escape hatch had:
 
 | Problem | Explanation |
 |---------|-------------|
-| **Non-reproducible builds** | The same Containerfile produces different images on different days because the Debian mirror contents change constantly. |
-| **Defeats digest pinning** | The digest guarantees a known starting point; upgrading everything immediately discards that guarantee. |
-| **Untraceable changes** | There is no record of *which* packages changed or *why*. A targeted upgrade with a CVE comment is auditable. |
-| **`dist-upgrade` risk** | `dist-upgrade` can remove packages or change dependencies, potentially breaking the image silently. |
-| **Cache invalidation** | A blanket upgrade invalidates the Docker layer cache on every build, increasing build times. |
+| **Non-reproducible builds** | The same flake produces different closures on different days as the channel moves. |
+| **Defeats pinning** | The lock guarantees a known closure; tracking latest immediately discards that guarantee. |
+| **Untraceable changes** | There is no record of *which* packages changed or *why*. A pinned bump with a `vulnix` diff is auditable. |
+| **Cache invalidation** | A wholesale input move rebuilds (and re-pushes) the entire closure on every build. |
 
 ## Decision flow
 
 ```
-New CVE detected by Trivy
+New CVE reported by vulnix (Nix image)
         │
         ▼
- Is severity HIGH or CRITICAL?
+ Is severity HIGH or CRITICAL (CVSS v3 >= 7.0)?
         │
    No ──┤──── Yes
    │         │
    ▼         ▼
- Add to    Is a fix available in Debian stable?
- .trivyignore    │
- (with risk   No ──┤──── Yes
- assessment)  │         │
-              ▼         ▼
-           Add to    Can it wait for a base image rebuild?
-           .trivyignore    │
-           (with risk   No ──┤──── Yes
-           assessment)  │         │
-                        ▼         ▼
-                   Add targeted   Wait for Renovate
-                   --only-upgrade   digest update PR
-                   to Containerfile
+ Awareness  Is it real (not already patched in nixpkgs / not a vulnix FP)?
+ only            │
+            No ──┤──── Yes
+            │         │
+            ▼         ▼
+   Accept in      Is the fix available upstream in a newer nixpkgs?
+   .vulnixignore       │
+   (patched-in-    No ──┤──── Yes
+   nixpkgs,        │         │
+   with expiry)    ▼         ▼
+              Accept in   Advance the nixpkgs rev
+              .vulnixignore  (Renovate bump / overlay
+              (awaiting-      pinning the patched pkg)
+              upstream,
+              with expiry)
 ```
 
 ## References
 
-- [Containerfile](../Containerfile) – Build definition with inline comments
-- [.trivyignore](../.trivyignore) – Accepted low-risk CVEs
+- [flake.nix](../flake.nix) – Nix image (`devcontainerImage`), scan target
+  (`devcontainerImageEnv`), and pinned `vulnix`
+- [.vulnixignore](../.vulnixignore) – Accepted `vulnix` findings (Nix image)
+- [.trivyignore](../.trivyignore) – Accepted Trivy findings (Nix image, image-agnostic)
 - [security-scan.yml](../.github/workflows/security-scan.yml) – Nightly scan workflow
+- `vulnix-gate` / `check-expirations` (`packages/vig-utils`) – Gate and expiry validators

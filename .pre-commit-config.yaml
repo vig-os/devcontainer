@@ -34,13 +34,19 @@ repos:
       - id: mixed-line-ending
       - id: trailing-whitespace
 
-  # Python Linting and Formatting (Ruff)
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: aad66557af3b56ba6d4d69cd1b6cba87cef50cbb  # v0.14.3
+  # Python Linting and Formatting (Ruff, sourced from the flake dev-shell)
+  - repo: local
     hooks:
       - id: ruff
-        args: [--fix]
+        name: ruff (lint/fix python)
+        entry: ruff check --fix
+        language: system
+        types: [python]
       - id: ruff-format
+        name: ruff-format (format python)
+        entry: ruff format
+        language: system
+        types: [python]
 
   # YAML Linting
   - repo: https://github.com/adrienverge/yamllint
@@ -69,17 +75,10 @@ repos:
     hooks:
       - id: shellcheck
         name: shellcheck
+        # .envrc files (root + the scaffolded template stub) are direnv stdlib
+        # scripts with no shebang; exclude them from SC2148 at any path.
         args: ["-x"]
-        exclude: ^\.envrc$
-
-  # Containerfile
-  - repo: local
-    hooks:
-      - id: hadolint
-        name: hadolint
-        entry: hadolint
-        language: system
-        files: ^(.*/)?(Containerfile|Dockerfile)$
+        exclude: (^|/)\.envrc$
 
   # Markdown Linting (excludes auto-generated docs)
   - repo: https://github.com/jackdewinter/pymarkdown
@@ -100,6 +99,16 @@ repos:
         files: ^justfile(\..*)?$
         pass_filenames: false
 
+  # Nix formatting (nixfmt-rfc-style from the flake dev-shell toolchain)
+  - repo: local
+    hooks:
+      - id: nixfmt
+        name: nixfmt (format/check nix files)
+        entry: nixfmt --check
+        language: system
+        files: \.nix$
+        types: [file]
+
   # Documentation Generation (auto-regenerate on template/requirements changes)
   - repo: local
     hooks:
@@ -107,7 +116,7 @@ repos:
         name: generate-docs (regenerate from templates)
         entry: uv run python docs/generate.py
         language: system
-        files: ^(docs/templates/.*\.j2|docs/narrative/.*\.md|scripts/requirements\.yaml|justfile|CHANGELOG\.md)$
+        files: ^(docs/templates/.*\.j2|docs/narrative/.*\.md|scripts/requirements\.yaml|justfile|CHANGELOG\.md|\.claude/skills/.*/SKILL\.md)$
         pass_filenames: false
 
   # Workspace sync (keep assets/workspace in sync with manifest)
@@ -119,11 +128,13 @@ repos:
         language: system
         pass_filenames: false
 
-  # Typo Linting
-  - repo: https://github.com/crate-ci/typos
-    rev: 07d900b8fa1097806b8adb6391b0d3e0ac2fdea7  # v1.39.0
+  # Typo Linting (typos sourced from the flake dev-shell)
+  - repo: local
     hooks:
       - id: typos
+        name: typos (source typo checker)
+        entry: typos
+        language: system
 
   # License Compliance Check (runs only when dependencies change)
   - repo: local
@@ -160,19 +171,19 @@ repos:
     hooks:
       - id: check-skill-names
         name: check-skill-names (enforce naming convention)
-        entry: uv run check-skill-names .cursor/skills
+        entry: uv run check-skill-names .claude/skills
         language: system
-        files: ^\.cursor/skills/
+        files: ^\.claude/skills/
         pass_filenames: false
 
   # Security exception expiry enforcement (Refs: #566)
   - repo: local
     hooks:
       - id: check-expirations
-        name: check-expirations (.trivyignore expiry enforcement)
-        entry: uv run check-expirations .trivyignore
+        name: check-expirations (.trivyignore/.vulnixignore expiry enforcement)
+        entry: uv run check-expirations .trivyignore .vulnixignore
         language: system
-        files: ^\.trivyignore$
+        files: ^\.(trivyignore|vulnixignore)$
         pass_filenames: false
 
   # AI agent identity: strip trailers before commit-msg (Refs: #163)
@@ -208,13 +219,3 @@ repos:
           "--refs-optional-types", "chore",
           "--blocked-patterns", ".github/agent-blocklist.toml",
         ]
-
-  # Sync manifest
-  - repo: local
-    hooks:
-      - id: sync-manifest
-        name: sync manifest
-        entry: uv run python scripts/sync_manifest.py sync assets/workspace/
-        language: system
-        files: ^scripts/manifest\.toml$
-        pass_filenames: false

@@ -6,95 +6,92 @@
 
 This guide explains how to develop, build, test, and release the vigOS development container image.
 
-## Requirements
+## Prerequisites
 
-| Component            | Version | Purpose |
-|----------------------|---------|---------|
-| **podman** | >=4.0 | Container runtime, compose, and image building |
-| **just** | >=1.40.0 | Command runner for task automation |
-| **git** | >=2.34 | Version control and pre-commit hooks |
-| **ssh** | latest | GitHub authentication and commit signing |
-| **gh** | latest | GitHub CLI for repository and PR/issue management |
-| **jq** | latest | JSON parsing for worktree commands and issue metadata |
-| **tmux** | latest | Session manager required by worktree-start and worktree-attach |
-| **agent** | latest | Cursor Agent CLI required by worktree-start/worktree-attach flows |
-| **npm** | latest | Node.js package manager (for DevContainer CLI) |
-| **uv** | >=0.8 | Python package and project manager |
-| **bats** | 1.13.0 | Bash Automated Testing System for shell script tests |
-| **devcontainer** | 0.81.1 | DevContainer CLI for testing devcontainer functionality |
-| **hadolint** | latest | Containerfile/Dockerfile linter used by pre-commit |
-| **taplo** | latest | TOML formatter and linter used by pre-commit |
-| **parallel** | latest | Parallelizes BATS test execution for faster test runs |
+This repository is **Nix-first**: the toolchain is defined by the Nix flake
+(`flake.nix` — its `devTools` list is the single source of truth) and provisioned
+into your shell by [direnv](https://direnv.net/) or `nix develop`. You only need
+three things on the host:
 
-**Ubuntu/Debian:**
+| Prerequisite | Purpose |
+|--------------|---------|
+| **[Nix](https://nixos.org/download)** | Provides the entire dev toolchain (just, git, gh, uv, node, jq, tmux, ripgrep, claude, …) from the flake — no manual installs |
+| **[direnv](https://direnv.net/)** | Loads the flake dev-shell automatically on `cd` — **once its [shell hook](https://direnv.net/docs/hook.html) is installed** (e.g. `eval "$(direnv hook bash)"` in `~/.bashrc`). Without the hook, `direnv allow` still succeeds but nothing loads on `cd` and you silently fall back to host tools. Recommended; `nix develop` works without direnv |
+| **A working container runtime** (podman or Docker) | Building and testing the image needs a usable rootless runtime. The flake ships the `podman` CLI, but rootless operation depends on host setup — `subuid`/`subgid` + `uidmap` on Linux, or `podman machine` on macOS |
 
-```bash
-sudo apt update
-sudo apt install -y podman git openssh-client jq tmux nodejs npm parallel
-# just
-curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+Everything else comes from the flake. See the fast path below to get set up.
 
-# gh
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-sudo apt update && sudo apt install -y gh
+## Nix dev shell (fast path)
 
-# hadolint
-case "$(dpkg --print-architecture)" in
-  amd64) ARCH="linux-x86_64" ;;
-  arm64) ARCH="linux-arm64" ;;
-  *)
-    echo "Unsupported architecture: $(dpkg --print-architecture)"
-    exit 1
-    ;;
-esac
-BASE_URL="https://github.com/hadolint/hadolint/releases/latest/download"
-BIN_FILE="hadolint-${ARCH}"
-SHA_FILE="${BIN_FILE}.sha256"
-curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
-curl -fsSL "${BASE_URL}/${SHA_FILE}" -o "${SHA_FILE}"
-EXPECTED_SHA="$(awk '{print $1}' "${SHA_FILE}")"
-echo "${EXPECTED_SHA}  ${BIN_FILE}" | sha256sum -c -
-sudo install -m 0755 "${BIN_FILE}" /usr/local/bin/hadolint
-rm -f "${BIN_FILE}" "${SHA_FILE}"
+The repository ships a Nix flake (`flake.nix`) whose `devTools` list is the single
+source of truth for the toolchain. With [Nix](https://nixos.org/download) and
+[direnv](https://direnv.net/) installed you get the full dev environment on
+`cd` into the clone — no manual dependency install. On a warm
+[Cachix](https://www.cachix.org/) cache this is a binary fetch, not a from-source
+build, so the first `direnv allow` completes in seconds.
 
-# taplo
-case "$(dpkg --print-architecture)" in
-  amd64) ARCH="x86_64" ;;
-  arm64) ARCH="aarch64" ;;
-  *)
-    echo "Unsupported architecture: $(dpkg --print-architecture)"
-    exit 1
-    ;;
-esac
-BASE_URL="https://github.com/tamasfe/taplo/releases/latest/download"
-BIN_FILE="taplo-linux-${ARCH}.gz"
-curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
-gunzip "${BIN_FILE}"
-sudo install -m 0755 "taplo-linux-${ARCH}" /usr/local/bin/taplo
-rm -f "taplo-linux-${ARCH}"
+1. **Enable the flakes experimental features.** Add to `~/.config/nix/nix.conf`
+   (or `/etc/nix/nix.conf`):
 
-```
+   ```conf
+   experimental-features = nix-command flakes
+   ```
 
-**macOS (Homebrew):**
+2. **Add the `vig-os` Cachix substituter** so the dev-shell closure is fetched
+   from the binary cache instead of built locally. Add to the same `nix.conf`:
 
-```bash
-brew install podman just git openssh gh jq tmux node hadolint taplo parallel
-```
+   ```conf
+   substituters = https://cache.nixos.org https://vig-os.cachix.org
+   trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= vig-os.cachix.org-1:yoOYRi3bvnM6ThxO0joLt7vtzhTfkq3r6jykeUMg7Bk=
+   ```
 
-- For other Linux distributions, use your package manager (e.g., `dnf`, `yum`, `zypper`, `apk`) to install these dependencies.
-- Run `./scripts/init.sh` to check dependencies and get OS-specific installation commands.
-- Ensure Docker is installed if you plan to use it instead of Podman.
+   Pulling from the public `vig-os` cache needs no token. (If you have the Cachix
+   CLI: `cachix use vig-os` writes the same lines for you.)
+
+3. **Clone and allow direnv:**
+
+   ```bash
+   git clone git@github.com:vig-os/devcontainer.git
+   cd devcontainer
+   direnv allow        # first allow fetches the closure from Cachix (seconds on a warm cache)
+   ```
+
+   > **First time using direnv on this machine?** Install its shell hook first —
+   > add `eval "$(direnv hook bash)"` (or the
+   > [equivalent for your shell](https://direnv.net/docs/hook.html)) to your shell
+   > rc and start a new shell. The hook is what loads/unloads the environment on
+   > `cd`; without it `direnv allow` reports success but the flake never activates,
+   > so you keep host tooling (e.g. an old system Node) with no warning. Prefer not
+   > to install the hook? Use `nix develop` instead.
+
+   The committed `.envrc` uses
+   [nix-direnv](https://github.com/nix-community/nix-direnv): the dev-shell
+   evaluation is cached and GC-rooted (under `.direnv/`, which is gitignored), so
+   re-entering the directory is instant and the closure is never garbage-collected.
+   nix-direnv is self-bootstrapped by `.envrc` on first allow; if you already
+   source it from `~/.config/direnv/direnvrc`, that installation is used instead.
+
+This Nix dev shell is an alternative to the devcontainer image below; use whichever
+fits your workflow. Downstream workspaces scaffolded by `install.sh` choose between
+the two (or both) via the delivery mode: `--mode devcontainer|direnv|both`
+(default `both`; the interactive `init-workspace.sh` prompts, defaulting to
+`both`). `devcontainer` scaffolds `.devcontainer/` only, `direnv` scaffolds
+`flake.nix` + `.envrc` only, and `both` scaffolds everything.
 
 ## Setup
 
-Clone this repository and prepare it for container development:
+Clone this repository, enter the Nix dev shell, then bootstrap the project:
 
 ```bash
 git clone git@github.com:vig-os/devcontainer.git
 cd devcontainer
-just init           # Install dependencies and setup development environment
+direnv allow        # (recommended) loads the flake toolchain — or run `nix develop`
+just init           # Gate prerequisites and bootstrap the project (venv, git hooks, pre-commit)
 ```
+
+`just init` does not install tools — it verifies the Nix prerequisites are in
+place and then performs one-time project bootstrap (`uv sync`, git hooks, commit
+template, pre-commit). It is safe to re-run.
 
 ## Development Workflow
 
@@ -175,7 +172,7 @@ Available recipes:
     docs                                       # Generate documentation from templates
     help                                       # Show available commands
     info                                       # Show image information
-    init *args                                 # Install system dependencies and setup development environment
+    init *args                                 # Gate Nix prerequisites and bootstrap the project (venv, git hooks, pre-commit)
     login                                      # Test login to GHCR
     sync-workspace                             # Sync workspace templates from repo root to assets/workspace/
 
@@ -219,7 +216,7 @@ Available recipes:
     worktree-attach issue                      # before attaching. See tests/bats/worktree.bats for integration tests. [alias: wt-attach]
     worktree-clean mode=""                     # Default (no args): clean only stopped worktrees. Use 'all' to clean everything. [alias: wt-clean]
     worktree-list                              # List active worktrees and their tmux sessions [alias: wt-list]
-    worktree-start issue prompt="" reviewer="" # Create a worktree for an issue, open tmux session, launch cursor-agent [alias: wt-start]
+    worktree-start issue prompt="" reviewer="" # Create a worktree for an issue, open tmux session, launch the claude CLI [alias: wt-start]
     worktree-stop issue                        # Stop a worktree's tmux session and remove the worktree [alias: wt-stop]
 
 ```

@@ -1,3 +1,3 @@
-Read and follow the workflow in `.cursor/skills/pr_solve/SKILL.md`.
+Read and follow the workflow in `.claude/skills/pr_solve/SKILL.md`.
 
 Context: $ARGUMENTS

@@ -4,21 +4,24 @@
 [[entries]]
 src = "docs/COMMIT_MESSAGE_STANDARD.md"
 
+# Agent skills/config live in .claude/ (SSoT, #626). They sync into the
+# downstream template under assets/workspace/.claude/. Workflow rules became
+# skills (synced below) and static principles moved into CLAUDE.md. The template
+# carries the same .claude/ payload: skills, agent-models.toml, and
+# worktrees.json. Command wrappers (.claude/commands/) are not synced — the
+# downstream template has no CLAUDE.md command table and never carried them.
 [[entries]]
-src = ".cursor/rules/"
+src = ".claude/skills/"
 transforms = [
-  { type = "RemoveLines", pattern = "Full reference: \\[docs/COMMIT_MESSAGE_STANDARD\\.md\\]", target = "commit-messages.mdc" },
+  { type = "Sed", pattern = "just test-image", replace = "just test", target = "code_verify/SKILL.md" },
+  { type = "Sed", pattern = "just test-image", replace = "just test", target = "design_plan/SKILL.md" },
 ]
 
 [[entries]]
-src = ".cursor/skills/"
-transforms = [
-  { type = "Sed", pattern = "just test-image", replace = "just test", target = "code:verify/SKILL.md" },
-  { type = "Sed", pattern = "just test-image", replace = "just test", target = "design:plan/SKILL.md" },
-]
+src = ".claude/agent-models.toml"
 
 [[entries]]
-src = ".cursor/worktrees.json"
+src = ".claude/worktrees.json"
 
 [[entries]]
 src = ".gitmessage"
@@ -37,13 +40,7 @@ src = "CHANGELOG.md"
 dest = ".devcontainer/CHANGELOG.md"
 
 [[entries]]
-src = ".hadolint.yaml"
-
-[[entries]]
 src = ".vscode/settings.json"
-transforms = [
-  { type = "Sed", pattern = "\\$\\{workspaceFolder\\}/\\.venv/bin/python3", replace = "/opt/venv/bin/python3" },
-]
 
 [[entries]]
 src = ".github/agent-blocklist.toml"
@@ -98,8 +95,14 @@ transforms = [
 [[entries]]
 src = ".pre-commit-config.yaml"
 transforms = [
+  # ruff/ruff-format/typos stay as repo-local language:system hooks in the
+  # scaffold too, resolved from the toolchain baked into the devcontainer image
+  # (devTools SSoT). The #697 decoupling shipped self-contained upstream hooks
+  # because the integration suite still ran the published Debian image, whose
+  # PATH lacked those tools; that workaround is dropped now that the suite runs
+  # the freshly-built Nix image — whose non-FHS userland cannot even execute the
+  # upstream manylinux hook binaries. #701.
   { type = "RemovePrecommitHooks", hook_ids = [
-    "hadolint",
     "generate-docs",
     "sync-manifest",
     "pip-licenses",

@@ -7,6 +7,266 @@ setup() {
     load test_helper
     INIT_WORKSPACE_SH="$PROJECT_ROOT/assets/init-workspace.sh"
     PARSE_GITHUB_REMOTE_LIB="$PROJECT_ROOT/assets/parse-github-remote-lib.sh"
+    TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace"
+}
+
+# ── Claude-native template scaffold (#629) ────────────────────────────────────
+# init-workspace.sh rsyncs assets/workspace/ verbatim into a new workspace, so
+# asserting on the template tree is a faithful, build-free proxy for "what new
+# workspaces scaffold".
+
+@test "template scaffolds .claude/ directory" {
+    run test -d "$TEMPLATE_DIR/.claude"
+    assert_success
+}
+
+@test "template scaffolds .claude/skills/" {
+    run test -d "$TEMPLATE_DIR/.claude/skills"
+    assert_success
+}
+
+@test "template does NOT scaffold .cursor/ directory" {
+    run test -e "$TEMPLATE_DIR/.cursor"
+    assert_failure
+}
+
+@test "template carries no Cursor editor glue (#629 scope)" {
+    # #629 owns: the cursor-remote-ssh socket glob and the `command -v cursor`
+    # editor launch. The remaining `cursor-agent` worktree-pipeline references
+    # are owned by #627; the AI blocklist's "cursor" entries by #630.
+    # Exclude CHANGELOG.md: released/Unreleased prose legitimately names the
+    # removed glue when describing the change.
+    run grep -rn --exclude=CHANGELOG.md \
+        'cursor-remote\|command -v cursor' "$TEMPLATE_DIR"
+    assert_failure
+}
+
+# ── direnv / flake stub (#640) ────────────────────────────────────────────────
+# The downstream minimal flake stub + .envrc let a new repo `direnv allow` /
+# `nix develop` into the shared toolchain. They are never-overwritten on
+# upgrade (the user owns the extraPackages block).
+
+@test "template scaffolds the downstream flake.nix stub (#640)" {
+    run test -f "$TEMPLATE_DIR/flake.nix"
+    assert_success
+}
+
+@test "template scaffolds the .envrc (use flake) stub (#640)" {
+    run test -f "$TEMPLATE_DIR/.envrc"
+    assert_success
+}
+
+@test "downstream flake stub consumes the vigos toolchain SSoT (#640)" {
+    run grep -q 'vigos.lib.mkProjectShell' "$TEMPLATE_DIR/flake.nix"
+    assert_success
+    run grep -q 'vigos/nixpkgs' "$TEMPLATE_DIR/flake.nix"
+    assert_success
+}
+
+@test "flake.nix and .envrc are preserved on --force upgrade (#640)" {
+    # shellcheck disable=SC2016
+    run grep -E '"flake\.nix"' "$INIT_WORKSPACE_SH"
+    assert_success
+    # shellcheck disable=SC2016
+    run grep -E '"\.envrc"' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+# ── delivery-mode picker (#641) ───────────────────────────────────────────────
+# init-workspace.sh scaffolds the template, then prunes to the chosen mode:
+#   devcontainer -> .devcontainer/ only (no flake.nix/.envrc)
+#   direnv       -> flake.nix + .envrc only (no .devcontainer/)
+#   both         -> everything (default, current behaviour)
+# We exercise the prune on a copy of the template (build-free proxy for the
+# in-container scaffold), and assert the flag/default wiring on script structure.
+
+# Apply the same prune the script does for a given mode to $1 (a workspace copy).
+prune_mode() {
+    local ws="$1" mode="$2"
+    case "$mode" in
+        devcontainer) rm -f "$ws/flake.nix" "$ws/.envrc" ;;
+        direnv) rm -rf "$ws/.devcontainer" ;;
+        both) : ;;
+    esac
+}
+
+@test "mode=devcontainer keeps .devcontainer/, drops flake.nix and .envrc (#641)" {
+    ws="$BATS_TEST_TMPDIR/ws-devcontainer"
+    cp -r "$TEMPLATE_DIR" "$ws"
+    prune_mode "$ws" devcontainer
+    run test -d "$ws/.devcontainer"
+    assert_success
+    run test -e "$ws/flake.nix"
+    assert_failure
+    run test -e "$ws/.envrc"
+    assert_failure
+}
+
+@test "mode=direnv keeps flake.nix and .envrc, drops .devcontainer/ (#641)" {
+    ws="$BATS_TEST_TMPDIR/ws-direnv"
+    cp -r "$TEMPLATE_DIR" "$ws"
+    prune_mode "$ws" direnv
+    run test -f "$ws/flake.nix"
+    assert_success
+    run test -f "$ws/.envrc"
+    assert_success
+    run test -e "$ws/.devcontainer"
+    assert_failure
+}
+
+@test "mode=both keeps .devcontainer/, flake.nix and .envrc (#641)" {
+    ws="$BATS_TEST_TMPDIR/ws-both"
+    cp -r "$TEMPLATE_DIR" "$ws"
+    prune_mode "$ws" both
+    run test -d "$ws/.devcontainer"
+    assert_success
+    run test -f "$ws/flake.nix"
+    assert_success
+    run test -f "$ws/.envrc"
+    assert_success
+}
+
+@test "init-workspace.sh accepts a --mode flag (#641)" {
+    run grep -- '--mode' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+@test "init-workspace.sh validates --mode against the three modes (#641)" {
+    run grep -E 'devcontainer\|direnv\|both' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+@test "init-workspace.sh defaults to 'both' under --no-prompts (#641)" {
+    # shellcheck disable=SC2016
+    run grep -A4 'if \[\[ -z "\$MODE" \]\]' "$INIT_WORKSPACE_SH"
+    assert_success
+    assert_output --partial 'MODE="both"'
+}
+
+@test "init-workspace.sh prunes the scaffold by delivery mode (#641)" {
+    # devcontainer drops the flake stub; direnv drops the devcontainer scaffold.
+    # shellcheck disable=SC2016
+    run grep -A12 'case "\$MODE" in' "$INIT_WORKSPACE_SH"
+    assert_success
+    # shellcheck disable=SC2016
+    assert_output --partial 'rm -f "$WORKSPACE_DIR/flake.nix" "$WORKSPACE_DIR/.envrc"'
+    # shellcheck disable=SC2016
+    assert_output --partial 'rm -rf "$WORKSPACE_DIR/.devcontainer"'
+}
+
+# ── delivery-mode scaffold, end to end (#641) ─────────────────────────────────
+# The tests above assert the prune in isolation; these run init-workspace.sh
+# itself (arg-parse → rsync → prune → placeholder substitution) against a temp
+# workspace and assert the real scaffold. TEMPLATE_DIR/WORKSPACE_DIR are
+# overridden to host paths and `just` is stubbed so the final `just sync` step
+# is a fast no-op rather than a real `uv sync`.
+
+# Run the real script in delivery mode $1, scaffolding into the empty dir $2.
+_scaffold() {
+    local mode="$1" ws="$2"
+    local stub="$BATS_TEST_TMPDIR/stub-bin"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/just"
+    env PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=testproj \
+        GITHUB_REPOSITORY=test/repo \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts --mode "$mode"
+}
+
+@test "init-workspace --mode=devcontainer scaffolds .devcontainer only (#641)" {
+    ws="$BATS_TEST_TMPDIR/e2e-devcontainer"
+    mkdir -p "$ws"
+    run _scaffold devcontainer "$ws"
+    assert_success
+    run test -d "$ws/.devcontainer"
+    assert_success
+    run test -e "$ws/flake.nix"
+    assert_failure
+    run test -e "$ws/.envrc"
+    assert_failure
+}
+
+@test "init-workspace --mode=direnv scaffolds flake.nix + .envrc only (#641)" {
+    ws="$BATS_TEST_TMPDIR/e2e-direnv"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    run test -f "$ws/flake.nix"
+    assert_success
+    run test -f "$ws/.envrc"
+    assert_success
+    run test -e "$ws/.devcontainer"
+    assert_failure
+}
+
+@test "init-workspace --mode=both scaffolds everything (#641)" {
+    ws="$BATS_TEST_TMPDIR/e2e-both"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    run test -d "$ws/.devcontainer"
+    assert_success
+    run test -f "$ws/flake.nix"
+    assert_success
+    run test -f "$ws/.envrc"
+    assert_success
+}
+
+@test "init-workspace --mode=direnv yields a justfile that still loads (#641)" {
+    # Regression guard: direnv mode prunes .devcontainer/, so the scaffolded
+    # justfile's .devcontainer imports must be optional or `just` fails to parse.
+    real_just="$(command -v just)"
+    ws="$BATS_TEST_TMPDIR/e2e-direnv-just"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    run bash -c "cd '$ws' && '$real_just' --list"
+    assert_success
+}
+
+@test "init-workspace rejects an invalid --mode (#641)" {
+    ws="$BATS_TEST_TMPDIR/e2e-bad"
+    mkdir -p "$ws"
+    run _scaffold bogus "$ws"
+    assert_failure
+    assert_output --partial "Invalid --mode"
+}
+
+# ── direnv (re)scaffold must not clobber a populated consumer repo (#738) ──────
+# `install.sh --mode direnv --force` on an existing project deployed the full
+# template over it: overwrote a real pyproject.toml and deleted a populated
+# .devcontainer/. direnv mode must only ADD the Nix/direnv stub.
+
+@test "init-workspace --mode=direnv --force preserves a populated pyproject.toml (#738)" {
+    ws="$BATS_TEST_TMPDIR/e2e-direnv-keep-pyproject"
+    mkdir -p "$ws"
+    printf '# SENTINEL-738 real consumer pyproject\n[project]\nname = "real_consumer"\n' \
+        >"$ws/pyproject.toml"
+    run _scaffold direnv "$ws"
+    assert_success
+    run grep -q 'SENTINEL-738 real consumer pyproject' "$ws/pyproject.toml"
+    assert_success
+    # ...and the Nix/direnv stub was still added.
+    run test -f "$ws/flake.nix"
+    assert_success
+    run test -f "$ws/.envrc"
+    assert_success
+}
+
+@test "init-workspace --mode=direnv --force preserves a populated .devcontainer/ (#738)" {
+    ws="$BATS_TEST_TMPDIR/e2e-direnv-keep-devcontainer"
+    mkdir -p "$ws/.devcontainer"
+    printf '{ "name": "SENTINEL-738 real devcontainer" }\n' \
+        >"$ws/.devcontainer/devcontainer.json"
+    run _scaffold direnv "$ws"
+    assert_success
+    run test -f "$ws/.devcontainer/devcontainer.json"
+    assert_success
+    run grep -q 'SENTINEL-738 real devcontainer' "$ws/.devcontainer/devcontainer.json"
+    assert_success
 }
 
 # ── script structure ──────────────────────────────────────────────────────────
@@ -82,15 +342,35 @@ setup() {
 }
 
 @test "init-workspace.sh smoke mode uses rsync --delete for clean deploy" {
-    run grep 'rsync -av --delete' "$INIT_WORKSPACE_SH"
+    run grep 'rsync -avL --delete' "$INIT_WORKSPACE_SH"
     assert_success
 }
 
 @test "init-workspace.sh smoke mode excludes synced docs directories from delete" {
-    run grep -A1 'rsync -av --delete' "$INIT_WORKSPACE_SH"
+    run grep -A1 'rsync -avL --delete' "$INIT_WORKSPACE_SH"
     assert_success
     assert_output --partial "--exclude='docs/issues/'"
     assert_output --partial "--exclude='docs/pull-requests/'"
+}
+
+# ── Nix-image scaffold: real, writable files (#664) ───────────────────────────
+# The Nix image bakes the template as read-only /nix/store symlinks. The scaffold
+# rsync must --copy-links (-L) so a new workspace gets real files (not dangling
+# symlinks on the host), and must restore writability (the store mode is 0444).
+
+@test "init-workspace.sh dereferences store symlinks when scaffolding (#664)" {
+    # Every template/asset rsync must copy referents, not symlinks.
+    run grep -nE 'rsync -avL' "$INIT_WORKSPACE_SH"
+    assert_success
+    # ...and none may scaffold with a plain `rsync -av ` (symlinks-as-symlinks).
+    run grep -nE 'rsync -av ' "$INIT_WORKSPACE_SH"
+    assert_failure
+}
+
+@test "init-workspace.sh makes the scaffold user-writable (#664)" {
+    # shellcheck disable=SC2016
+    run grep -E 'chmod -R u\+w "\$WORKSPACE_DIR"' "$INIT_WORKSPACE_SH"
+    assert_success
 }
 
 # ── parse-github-remote-lib (#509) ─────────────────────────────────────────

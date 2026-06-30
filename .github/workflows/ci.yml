@@ -87,9 +87,8 @@ jobs:
           release-url: ${{ steps.version.outputs.release_url }}
           build-timestamp: ${{ steps.version.outputs.build_timestamp }}
           vcs-ref: ${{ steps.version.outputs.vcs_ref }}
-          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
-          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
-          output-type: tar
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           output-file: /tmp/image.tar
 
       - name: Upload image artifact
@@ -125,6 +124,8 @@ jobs:
         with:
           image-tag: ${{ needs.build-image.outputs.version }}-amd64
           image-source: tar
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
   test-integration:
     name: Integration Tests
@@ -150,6 +151,8 @@ jobs:
         uses: ./.github/actions/test-integration
         with:
           image-tag: ${{ needs.build-image.outputs.version }}-amd64
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Upload test artifacts on failure
         if: failure()
@@ -177,6 +180,33 @@ jobs:
 
       - name: Run project checks
         uses: ./.github/actions/test-project
+        with:
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      # Gate the flake itself: `test-project` provisions Nix + the flake
+      # dev-shell, so nix is on PATH here. `nix flake check` runs the flake's
+      # lightweight checks (nixfmt --check, dev-shell build, devShellTools
+      # eval). The richer pytest parity test stays in `test-project`. Refs #674.
+      - name: Check flake quality gates
+        run: nix flake check --accept-flake-config
+
+      # Guard the dev-shell <-> image parity: the dev-shell must expose
+      # `python3`/`pre-commit` (#729) and must NOT leak the Nix C++ runtime onto
+      # an FHS host's LD_LIBRARY_PATH (#703). These drive `nix develop` directly
+      # (not covered by `test-project`'s pytest scope), so run them explicitly
+      # here where Nix + the dev profile are warm. Refs #729, #703.
+      - name: Check dev-shell python/pre-commit parity + FHS leak-guard
+        run: |
+          uv run pytest tests/test_flake_devshell.py \
+            -k "exposes_python3_and_precommit or no_nix_cxx_runtime_leak" -v
+
+      # Validate the scaffolded downstream stub (assets/workspace/flake.nix)
+      # against THIS toolchain, not the published vigos, so a change to the flake
+      # API (lib.mkProjectShell / overlays.default) can't silently break a
+      # downstream repo's `direnv allow`. Refs #640.
+      - name: Check downstream flake stub
+        run: nix flake check ./assets/workspace --override-input vigos "path:$PWD" --accept-flake-config
 
   python-security:
     name: Python Security Scan
@@ -210,7 +240,7 @@ jobs:
       - name: Run Safety (dependency vulnerability check)
         id: safety
         run: |
-          safety check --json > safety-report.json || true
+          uv run safety check --json > safety-report.json || true
           echo "Safety scan completed"
 
       - name: Upload security reports as artifacts
@@ -244,11 +274,11 @@ jobs:
     permissions:
       contents: read
 
-    # PR CI runs Trivy as a blocking GATE only (fail on fixable HIGH/CRITICAL)
-    # plus non-blocking reports in the job log. It does NOT upload SARIF to the
-    # Security tab: the nightly scheduled scan of the published :latest image
-    # (security-scan.yml, category container-image-latest) is the single source
-    # of truth for the GitHub Security tab. Refs #604.
+    # The Nix image has no apt/dpkg DB, so Trivy's OS-package scanner is largely
+    # dark here; the authoritative CVE gate is the nightly vulnix scan
+    # (security-scan.yml, scan-nix-image — blocking via vulnix-gate). PR CI runs
+    # Trivy non-blocking for awareness + a CycloneDX SBOM artifact, and validates
+    # the exception registers' expiry. Refs #642, #637.
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -258,8 +288,8 @@ jobs:
         with:
           sync-dependencies: 'true'
 
-      - name: Validate .trivyignore exception expirations
-        run: uv run check-expirations .trivyignore
+      - name: Validate .trivyignore/.vulnixignore exception expirations
+        run: uv run check-expirations .trivyignore .vulnixignore
 
       - name: Download image artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
@@ -267,19 +297,7 @@ jobs:
           name: container-image-${{ needs.build-image.outputs.version }}-amd64
           path: /tmp
 
-      - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
-        with:
-          version: 'v0.71.2'
-          input: /tmp/image.tar
-          format: 'table'
-          severity: 'HIGH,CRITICAL'
-          exit-code: '1'
-          ignore-unfixed: true
-          trivyignores: '.trivyignore'
-
-      - name: Report unfixed HIGH/CRITICAL vulnerabilities (non-blocking)
-        if: always()
+      - name: Report HIGH/CRITICAL vulnerabilities (non-blocking)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           version: 'v0.71.2'

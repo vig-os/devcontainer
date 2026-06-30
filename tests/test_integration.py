@@ -173,7 +173,14 @@ class TestHostGitSignatureSetup:
         # Verify it has some content
         content = allowed_signers.read_text()
         assert len(content.strip()) > 0, "Allowed signers file is empty"
-        assert "ssh-ed25519" in content or "ssh-rsa" in content, (
+        key_types = (
+            "ssh-ed25519",
+            "ssh-rsa",
+            "ecdsa-sha2-nistp",
+            "sk-ssh-ed25519@openssh.com",
+            "sk-ecdsa-sha2-nistp256@openssh.com",
+        )
+        assert any(k in content for k in key_types), (
             "Allowed signers file doesn't appear to contain SSH public keys"
         )
 
@@ -1433,6 +1440,48 @@ class TestDevContainerUserConf:
 
 class TestDevContainerCLI:
     """Tests for the devcontainer CLI environment."""
+
+    def test_devcontainer_runs_image_under_test(self, devcontainer_up, container_tag):
+        """The running devcontainer must use the freshly-built image under test.
+
+        The scaffolded docker-compose.yml pins the runtime image as
+        ``ghcr.io/vig-os/devcontainer:${DEVCONTAINER_VERSION:-latest}`` and
+        ``initialize.sh`` writes the pinned ``DEVCONTAINER_VERSION`` (from the
+        scaffolded ``.vig-os``) into ``.env``. Without an override the suite
+        would validate fresh scaffolding running inside an old *published*
+        image, not the image actually being built. The ``devcontainer_up``
+        fixture overrides ``DEVCONTAINER_VERSION`` to ``TEST_CONTAINER_TAG`` so
+        compose resolves the image to the build under test. Refs #701.
+        """
+        workspace_path = devcontainer_up.resolve()
+
+        result = subprocess.run(
+            [
+                "podman",
+                "ps",
+                "--filter",
+                f"name={workspace_path.name}",
+                "--format",
+                "{{.Image}}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0, (
+            f"Failed to list running devcontainer\nstderr: {result.stderr}"
+        )
+        images = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        assert images, (
+            f"No running devcontainer found for workspace {workspace_path.name}"
+        )
+
+        expected_image = f"ghcr.io/vig-os/devcontainer:{container_tag}"
+        assert any(expected_image in image for image in images), (
+            f"Devcontainer is running from {images}, but the suite must validate "
+            f"the image under test ({expected_image}). DEVCONTAINER_VERSION is not "
+            f"being overridden to TEST_CONTAINER_TAG."
+        )
 
     def test_ssh_github_authentication(self, devcontainer_up):
         """Test that SSH authentication to GitHub works in the devcontainer."""
@@ -3377,14 +3426,18 @@ class TestVersionCheckJustIntegration:
             )
 
     def test_workspace_justfile_imports_justfile_devc(self, initialized_workspace):
-        """Test that workspace justfile imports justfile.devc."""
+        """Test that workspace justfile optionally imports justfile.devc.
+
+        The import is optional (``import?``) so a ``direnv``-mode workspace, which
+        prunes ``.devcontainer/``, still loads `just` (#641).
+        """
         workspace_justfile = initialized_workspace / "justfile"
 
         if not workspace_justfile.exists():
             pytest.skip("workspace justfile not found")
 
         content = workspace_justfile.read_text()
-        assert "import '.devcontainer/justfile.devc'" in content
+        assert "import? '.devcontainer/justfile.devc'" in content
         assert "import '.devcontainer/justfile.base'" not in content
 
     def test_just_check_mute_functionality(self, initialized_workspace):

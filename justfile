@@ -30,12 +30,12 @@ help:
 # Run all linters
 [group('quality')]
 lint:
-    uv run ruff check .
+    ruff check .
 
 # Format code
 [group('quality')]
 format:
-    uv run ruff format .
+    ruff format .
 
 # Run pre-commit hooks on all files
 [group('quality')]
@@ -53,10 +53,10 @@ info:
         NATIVE_ARCH="linux/amd64"
     fi
     echo "Image: {{ repo }}"
-    echo "Containerfile: Containerfile"
+    echo "Image builder: Nix flake (.#devcontainerImage)"
     echo "Native arch: $NATIVE_ARCH"
 
-# Install system dependencies and setup development environment
+# Gate Nix prerequisites and bootstrap the project (venv, git hooks, pre-commit)
 [group('info')]
 init *args:
     ./scripts/init.sh {{ args }}
@@ -86,17 +86,16 @@ login:
 [group('build')]
 build no_cache="":
     #!/usr/bin/env bash
-    ARCH=$(uname -m)
-    if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-        NATIVE_ARCH="linux/arm64"
-    else
-        NATIVE_ARCH="linux/amd64"
-    fi
-    if [ -n "{{ no_cache }}" ]; then
-        ./scripts/build.sh --no-cache dev "{{ repo }}" "$NATIVE_ARCH"
-    else
-        ./scripts/build.sh dev "{{ repo }}" "$NATIVE_ARCH"
-    fi
+    set -euo pipefail
+    # Nix-only (#642): build the layered image from the flake and load it into
+    # podman under the local `dev` tag. Builds natively for the host arch.
+    # `no_cache` is accepted for compatibility but is a no-op — Nix builds are
+    # content-addressed (there is no Docker layer cache to bust).
+    echo "Building the Nix devcontainer image (.#devcontainerImage)..."
+    nix build .#devcontainerImage --accept-flake-config --print-build-logs
+    loaded=$(podman load -i result | sed -n 's/^Loaded image: //p' | head -n1)
+    podman tag "${loaded}" "{{ repo }}:dev"
+    echo "Loaded and tagged {{ repo }}:dev (from ${loaded})"
 
 # ===============================================================================
 # TEST
@@ -158,13 +157,15 @@ test-vig-utils:
 [group('test')]
 test-bats:
     #!/usr/bin/env bash
+    # bats and its helper libraries come from the flake (the toolchain SSoT);
+    # the wrapper exports BATS_LIB_PATH so test_helper.bash resolves them. #695.
     # Use GNU parallel if available for faster test execution
     if command -v parallel >/dev/null 2>&1; then
         echo "Running BATS tests in parallel..."
-        find tests/bats -name '*.bats' -print0 | parallel -0 -j+0 npx bats {}
+        find tests/bats -name '*.bats' -print0 | parallel -0 -j+0 bats {}
     else
         echo "Running BATS tests sequentially (install 'parallel' for faster execution)..."
-        npx bats tests/bats/
+        bats tests/bats/
     fi
 
 # Validate tracked Renovate configs with renovate-config-validator --strict
@@ -247,7 +248,7 @@ clean version="dev":
 [group('build')]
 clean-test-containers:
     #!/usr/bin/env bash
-    echo "Cleaning Cleaning up lingering test containers..."
+    echo "Cleaning up lingering test containers..."
     FMT=$(printf '\x7b\x7b.ID\x7d\x7d')
     DEVCONTAINERS=$(podman ps -a --filter "name=workspace-devcontainer" --format "$FMT" 2>/dev/null)
     SIDECARS=$(podman ps -a --filter "name=test-sidecar" --format "$FMT" 2>/dev/null)

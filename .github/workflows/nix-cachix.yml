@@ -1,0 +1,67 @@
+# Nix dev-shell cache warming (Cachix)
+#
+# Builds the flake dev-shell and pushes its closure to the `vig-os` Cachix
+# binary cache so later tracks (#633, T2.x) and contributors get a warm cache.
+#
+# This workflow is intentionally NON-BLOCKING: it is a standalone workflow that
+# is not part of the required CI gate, and the build/push step is guarded with
+# `continue-on-error: true`. It can never fail the existing CI.
+#
+# Evaluator choice: upstream CppNix via cachix/install-nix-action. The flake is
+# installer-agnostic — swapping to the Lix or Determinate installer needs no
+# flake changes.
+#
+# Triggers:
+#   - Push to the migration epic / main branches (warm the cache on merge)
+#   - workflow_dispatch (manually warm from any branch, incl. feature branches)
+
+name: Nix Cachix
+
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - main
+      - dev
+      - 'feature/625-nix-claude-migration'
+    paths:
+      - 'flake.nix'
+      - 'flake.lock'
+      - '.github/workflows/nix-cachix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  push-devshell:
+    name: Build & push dev-shell to Cachix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Non-blocking: this job is not a required check and never fails CI.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Install Nix (upstream CppNix)
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3  # v31.10.6
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Configure Cachix
+        uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71  # v17
+        with:
+          name: ${{ vars.CACHIX_CACHE }}
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Build dev-shell and push closure to Cachix
+        run: |
+          set -euo pipefail
+          # Build the dev-shell derivation and its full closure.
+          nix develop --profile dev-profile --command true
+          # Push the dev-shell closure (and its build-time deps) to the cache.
+          nix path-info --recursive ./dev-profile \
+            | cachix push "${{ vars.CACHIX_CACHE }}"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ###############################################################################
 # version-check.sh - Devcontainer Update Checker
 #
@@ -14,7 +14,7 @@
 #   ./version-check.sh interval <dur>   # Set check interval
 #   ./version-check.sh config           # Display current configuration
 #
-# DURATIONS: And (days), Nw (weeks), Nh (hours), Nm (minutes)
+# DURATIONS: Nd (days), Nw (weeks), Nh (hours), Nm (minutes)
 #
 # CONFIGURATION:
 #   Stored in .devcontainer/.local/version-check.conf (gitignored)
@@ -359,7 +359,7 @@ cmd_mute() {
     local seconds
     seconds=$(parse_duration "$duration") || {
         echo "Invalid duration format: $duration"
-        echo "Use: And (days), Nw (weeks), Nh (hours), Nm (minutes)"
+        echo "Use: Nd (days), Nw (weeks), Nh (hours), Nm (minutes)"
         echo "Examples: 7d, 1w, 12h, 30m"
         return 1
     }
@@ -392,7 +392,7 @@ cmd_set_interval() {
     local seconds
     seconds=$(parse_duration "$duration") || {
         echo "Invalid duration format: $duration"
-        echo "Use: And (days), Nw (weeks), Nh (hours), Nm (minutes)"
+        echo "Use: Nd (days), Nw (weeks), Nh (hours), Nm (minutes)"
         return 1
     }
 

@@ -1018,6 +1018,6 @@ Follow [Semantic Versioning 2.0.0](https://semver.org/):
 - [CHANGELOG Format](../CHANGELOG.md) - Keep a Changelog standard
 - [Commit Message Standard](COMMIT_MESSAGE_STANDARD.md) - Commit format and validation
 - [Downstream Release Workflows](DOWNSTREAM_RELEASE.md) - Release process for consumer projects using `assets/workspace/` templates (not this repo’s pipeline)
-- [Branch Naming Rules](../.cursor/rules/branch-naming.mdc) - Topic branch conventions
+- [Branch Naming Rules](../.claude/skills/branch-naming/SKILL.md) - Topic branch conventions
 - [IEC 62304](https://www.iso.org/standard/38421.html) - Medical device software lifecycle
 - [Semantic Versioning](https://semver.org/) - Version numbering scheme

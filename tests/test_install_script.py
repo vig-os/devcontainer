@@ -30,7 +30,8 @@ class TestInstallScriptIntegration:
     """
 
     @pytest.fixture(scope="class")
-    def install_workspace(self, container_image):
+    @staticmethod
+    def install_workspace(container_image):
         """
         Deploy devcontainer using install.sh (not init-workspace.sh directly).
         Tests the full user-facing workflow.
@@ -136,10 +137,10 @@ class TestInstallScriptIntegration:
             f"install.sh --dry-run --name failed:\n"
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
-        assert 'SHORT_NAME="install_test_project"' in result.stdout, (
+        assert "SHORT_NAME=install_test_project" in result.stdout, (
             "Expected sanitized name without trailing underscore in dry-run output"
         )
-        assert 'SHORT_NAME="install_test_project_"' not in result.stdout, (
+        assert "SHORT_NAME=install_test_project_" not in result.stdout, (
             "Sanitized name should not end with an underscore"
         )
 
@@ -385,3 +386,42 @@ class TestInstallScriptIntegration:
         assert result.returncode == 0, "Failed to check git status"
         # Should be empty (no uncommitted changes)
         assert not result.stdout.strip(), f"Found uncommitted changes:\n{result.stdout}"
+
+
+class TestHostScriptShebangPortability:
+    """Assert host-executed scripts use a portable shebang.
+
+    These scripts run on the *host* (not inside the container), so they must
+    not hardcode ``#!/bin/bash``: NixOS and other distros that follow the
+    Filesystem Hierarchy Standard loosely have no ``/bin/bash``, which makes
+    them fail to execute. The portable form ``#!/usr/bin/env bash`` resolves
+    ``bash`` via ``PATH`` and works everywhere. Refs #687.
+
+    This is a pure content check — it needs no built container image — so it
+    runs in any pytest invocation that collects this module.
+    """
+
+    # Host-executed scripts that must carry the portable shebang. Scoped to
+    # the three scripts in issue #687; the broader in-container sweep is out
+    # of scope.
+    HOST_SCRIPTS = (
+        "install.sh",
+        "assets/workspace/.devcontainer/scripts/initialize.sh",
+        "assets/workspace/.devcontainer/scripts/version-check.sh",
+    )
+
+    PORTABLE_SHEBANG = "#!/usr/bin/env bash"
+
+    @pytest.mark.parametrize("rel_path", HOST_SCRIPTS)
+    def test_host_script_uses_portable_shebang(self, rel_path):
+        """Each host-executed script must start with #!/usr/bin/env bash."""
+        project_root = Path(__file__).resolve().parents[1]
+        script = project_root / rel_path
+        assert script.exists(), f"Expected host script not found: {rel_path}"
+
+        first_line = script.read_text().splitlines()[0]
+        assert first_line == self.PORTABLE_SHEBANG, (
+            f"{rel_path} must use the portable shebang "
+            f"'{self.PORTABLE_SHEBANG}' (NixOS has no /bin/bash), "
+            f"but found: {first_line!r}"
+        )

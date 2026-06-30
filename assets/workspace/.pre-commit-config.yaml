@@ -34,13 +34,19 @@ repos:
       - id: mixed-line-ending
       - id: trailing-whitespace
 
-  # Python Linting and Formatting (Ruff)
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: aad66557af3b56ba6d4d69cd1b6cba87cef50cbb  # v0.14.3
+  # Python Linting and Formatting (Ruff, sourced from the flake dev-shell)
+  - repo: local
     hooks:
       - id: ruff
-        args: [--fix]
+        name: ruff (lint/fix python)
+        entry: ruff check --fix
+        language: system
+        types: [python]
       - id: ruff-format
+        name: ruff-format (format python)
+        entry: ruff format
+        language: system
+        types: [python]
 
   # YAML Linting
   - repo: https://github.com/adrienverge/yamllint
@@ -55,8 +61,10 @@ repos:
     hooks:
       - id: shellcheck
         name: shellcheck
+        # .envrc files (root + the scaffolded template stub) are direnv stdlib
+        # scripts with no shebang; exclude them from SC2148 at any path.
         args: ["-x"]
-        exclude: ^\.envrc$
+        exclude: (^|/)\.envrc$
 
   # Markdown Linting (excludes auto-generated docs)
   - repo: https://github.com/jackdewinter/pymarkdown
@@ -77,18 +85,30 @@ repos:
         files: ^justfile(\..*)?$
         pass_filenames: false
 
-  # Typo Linting
-  - repo: https://github.com/crate-ci/typos
-    rev: 07d900b8fa1097806b8adb6391b0d3e0ac2fdea7  # v1.39.0
+  # Nix formatting (nixfmt-rfc-style from the flake dev-shell toolchain)
+  - repo: local
+    hooks:
+      - id: nixfmt
+        name: nixfmt (format/check nix files)
+        entry: nixfmt --check
+        language: system
+        files: \.nix$
+        types: [file]
+
+  # Typo Linting (typos sourced from the flake dev-shell)
+  - repo: local
     hooks:
       - id: typos
+        name: typos (source typo checker)
+        entry: typos
+        language: system
 
   # Security exception expiry enforcement (Refs: #566)
   - repo: local
     hooks:
       - id: check-expirations
-        name: check-expirations (.trivyignore expiry enforcement)
-        entry: uv run check-expirations .trivyignore
+        name: check-expirations (.trivyignore/.vulnixignore expiry enforcement)
+        entry: uv run check-expirations .trivyignore .vulnixignore
         language: system
-        files: ^\.trivyignore$
+        files: ^\.(trivyignore|vulnixignore)$
         pass_filenames: false

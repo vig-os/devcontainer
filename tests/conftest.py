@@ -29,6 +29,13 @@ import pytest
 import testinfra
 import yaml
 
+# Timeout (seconds) for `just sync` to finish during interactive init. The
+# test-project pulls heavy scientific extras (numpy, scipy, pandas, matplotlib,
+# jupyter) and the image ships no warm uv cache, so a cold/slow network can take
+# well over a minute to download them. Generous default, overridable via env for
+# fast-cache/CI tuning. Refs: #692.
+DEPS_SYNC_TIMEOUT = int(os.environ.get("INIT_DEPS_SYNC_TIMEOUT", "300"))
+
 
 def pytest_sessionstart(session):
     """
@@ -162,7 +169,7 @@ def is_running_in_container() -> bool:
     try:
         with Path("/proc/1/cgroup").open() as f:
             return "docker" in f.read() or "podman" in f.read()
-    except (FileNotFoundError, PermissionError):
+    except FileNotFoundError, PermissionError:
         pass
     return False
 
@@ -347,7 +354,9 @@ def _run_interactive_init(cmd, container_image):
         ("Replacing placeholders", "replacing_placeholders", 60),
         ("Setting executable permissions", "setting_permissions", 30),
         ("Syncing dependencies", "syncing_deps", 60),
-        ("Workspace initialized successfully", "completed", 30),
+        # `uv sync` downloads the heavy extras between this line and the success
+        # banner; allow a generous, env-overridable window. Refs: #692.
+        ("Workspace initialized successfully", "completed", DEPS_SYNC_TIMEOUT),
     ]
     renovate_repo_answer = "test-org/test-project"
 
@@ -362,6 +371,11 @@ def _run_interactive_init(cmd, container_image):
         stages["org_name_prompt"] = time.time()
         current_stage = "org_name_prompt"
         child.sendline(organization_name)
+
+        # Delivery-mode picker (#641): answer "both" to keep the full scaffold
+        # (prior behaviour) so the downstream structure assertions still hold.
+        child.expect("Delivery mode", timeout=30)
+        child.sendline("both")
 
         pattern = "Copying files from"
         stage_name = "copying_files"
@@ -795,7 +809,7 @@ def _teardown_devcontainer_containers(
 
 
 @pytest.fixture(scope="session")
-def devcontainer_up(initialized_workspace):
+def devcontainer_up(initialized_workspace, container_tag):
     """
     Set up a devcontainer using devcontainer CLI.
 
@@ -818,6 +832,15 @@ def devcontainer_up(initialized_workspace):
     bin_dir = str(Path("node_modules/.bin").resolve())
     if bin_dir not in os.environ.get("PATH", ""):
         os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")
+
+    # Run the devcontainer from the image *under test*, not the published
+    # DEVCONTAINER_VERSION baked into the scaffolded .vig-os/.env. The
+    # scaffolded docker-compose.yml resolves the runtime image as
+    # ghcr.io/vig-os/devcontainer:${DEVCONTAINER_VERSION:-latest}; compose reads
+    # the shell environment over the .env file, so exporting DEVCONTAINER_VERSION
+    # here pins compose -- and every `devcontainer exec` below, which inherits
+    # os.environ -- to TEST_CONTAINER_TAG. Refs #701.
+    os.environ["DEVCONTAINER_VERSION"] = container_tag
 
     docker_path = "podman"
     env, original_config = _prepare_devcontainer_env(
@@ -908,7 +931,7 @@ def sidecar_image():
 
 
 @pytest.fixture(scope="session")
-def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
+def devcontainer_with_sidecar(initialized_workspace, sidecar_image, container_tag):
     """
     Set up a devcontainer WITH a sidecar for testing multi-container setups.
 
@@ -929,6 +952,10 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
     )
     if not _find_devcontainer_cli():
         pytest.skip("devcontainer CLI not available. Install with: npm install")
+
+    # Pin compose to the image under test, not the published DEVCONTAINER_VERSION
+    # (see devcontainer_up for the rationale). Refs #701.
+    os.environ["DEVCONTAINER_VERSION"] = container_tag
 
     docker_path = "podman"
     env, _ = _prepare_devcontainer_env(
@@ -979,7 +1006,7 @@ def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
                     parts = error_message.split("Command failed:")
                     if len(parts) > 1:
                         podman_command = parts[1].strip()
-        except (json.JSONDecodeError, KeyError):
+        except json.JSONDecodeError, KeyError:
             pass
 
         # Extract actual podman error from stderr
