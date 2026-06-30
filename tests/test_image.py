@@ -279,6 +279,21 @@ class TestFhsShims:
             host.run(f"rm -f {script}")
 
 
+def _host_can_reach(host, hostname, port=443):
+    """Best-effort probe: can the image open a TCP connection to host:port?
+
+    Network-dependent image tests (PyPI wheel fetches, ``uv add``/``uv sync``,
+    ``npm install -g``) bake no warm cache, so on an offline/air-gapped runner
+    (e.g. a hermetic build sandbox) they must skip rather than fail. This single
+    socket probe backs every such guard. Refs #761.
+    """
+    probe = (
+        "import socket,sys; socket.setdefaulttimeout(5); "
+        f"socket.create_connection(('{hostname}', {port})); sys.exit(0)"
+    )
+    return host.run(f'python3 -c "{probe}"').rc == 0
+
+
 def _pypi_reachable(host):
     """Best-effort probe: can the image reach PyPI to fetch a wheel?
 
@@ -287,13 +302,7 @@ def _pypi_reachable(host):
     suite runs offline (e.g. a hermetic build sandbox) those tests skip rather
     than fail. Refs #736.
     """
-    return (
-        host.run(
-            'python3 -c "import socket,sys; socket.setdefaulttimeout(5); '
-            "socket.create_connection(('pypi.org', 443)); sys.exit(0)\""
-        ).rc
-        == 0
-    )
+    return _host_can_reach(host, "pypi.org")
 
 
 class TestManylinuxRuntime:
@@ -519,6 +528,8 @@ class TestPythonEnvironment:
 
     def test_uv_venv_workflow(self, host):
         """Test that uv sync creates venv and manages project dependencies correctly."""
+        if not _pypi_reachable(host):
+            pytest.skip("PyPI unreachable; uv add/sync cannot fetch packages offline")
         # Use /tmp for test project to avoid conflicts
         test_dir = "/tmp/uv_test_project"
         pyproject_path = f"{test_dir}/pyproject.toml"
@@ -766,6 +777,8 @@ class TestNodeEnvironment:
         the ``#!/usr/bin/env`` shebang interpreter, which #727 provides — this
         test deliberately does not depend on that.
         """
+        if not _host_can_reach(host, "registry.npmjs.org"):
+            pytest.skip("npm registry unreachable; cannot npm install -g offline")
         try:
             install = host.run("npm install -g tsx")
             assert install.rc == 0, f"npm install -g tsx failed: {install.stderr}"
