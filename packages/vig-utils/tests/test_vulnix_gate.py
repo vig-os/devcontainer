@@ -97,9 +97,20 @@ class TestBlockingFindings:
         result = blocking_findings([HIGH], excepted={"CVE-2026-3805"})
         assert result == []
 
-    def test_low_and_unscored_are_not_blocking(self):
-        # < threshold and unknown-severity CVEs are awareness-only, never gate.
-        result = blocking_findings([LOW, UNSCORED], excepted=set())
+    def test_low_is_not_blocking(self):
+        # Sub-threshold CVEs are awareness-only and never gate.
+        result = blocking_findings([LOW], excepted=set())
+        assert result == []
+
+    def test_unscored_is_blocking(self):
+        # An unscored CVE has unknown severity: fail loud, do not silently skip.
+        result = blocking_findings([UNSCORED], excepted=set())
+        assert {f["cve"] for f in result} == {"CVE-2026-30892"}
+        assert result[0]["score"] is None
+
+    def test_excepted_unscored_is_not_blocking(self):
+        # A non-expired exception still covers an unscored CVE.
+        result = blocking_findings([UNSCORED], excepted={"CVE-2026-30892"})
         assert result == []
 
     def test_threshold_is_configurable(self):
@@ -124,7 +135,7 @@ class TestMain:
     def test_passes_when_no_blocking_findings(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ):
-        findings = self._write_findings(tmp_path, [LOW, UNSCORED])
+        findings = self._write_findings(tmp_path, [LOW])
         register = tmp_path / ".vulnixignore"
         register.write_text("# none\n", encoding="utf-8")
         code = self._run(
@@ -132,6 +143,18 @@ class TestMain:
         )
         assert code == 0
         assert "No unexcepted HIGH/CRITICAL" in capsys.readouterr().out
+
+    def test_fails_on_unscored(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ):
+        findings = self._write_findings(tmp_path, [UNSCORED])
+        register = tmp_path / ".vulnixignore"
+        register.write_text("# none\n", encoding="utf-8")
+        code = self._run(
+            [str(findings), "--register", str(register)], date(2026, 6, 23)
+        )
+        assert code == 1
+        assert "CVE-2026-30892" in capsys.readouterr().err
 
     def test_fails_on_unexcepted_high(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
