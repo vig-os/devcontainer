@@ -55,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Offline skip-guard for network-dependent image tests** ([#761](https://github.com/vig-os/devcontainer/issues/761))
+  - The image tests that fetch over the network — `test_uv_venv_workflow` (`uv add`/`uv sync` from PyPI) and `test_npm_global_install_resolves_on_path` (`npm install -g tsx` from the npm registry) — now `pytest.skip(...)` when the host cannot reach the relevant registry instead of failing on an offline/air-gapped runner. A reusable `_host_can_reach(host, hostname)` probe (generalizing the existing `_pypi_reachable` PyPI check) backs the guards; online runs still execute the tests unchanged
 - **Applied the still-relevant Renovate dependency updates** ([#625](https://github.com/vig-os/devcontainer/issues/625))
   - Folded the open Renovate PRs that still apply post-migration onto the epic: `actions/cache` → v6.1.0 (the v6 service, superseding the v5.x bumps), `actions/attest`/`actions/attest-build-provenance` → v4.1.1, `actions/setup-python` and `taiki-e/install-action` (just) digest refreshes, and `pandas` 3.0.3 → 3.0.4 in the workspace template. Stale ones were dropped: the `python:3.14-slim-bookworm` Docker digest (the `Containerfile` is gone) and the `ruff` pip pin (sourced from the flake now, #697); the `uv` 0.11.23 → 0.11.25 bump is deferred to the flake↔setup-env version sync (#720)
 - **`SECURITY.md` describes the Nix image security posture** ([#642](https://github.com/vig-os/devcontainer/issues/642))
