@@ -111,6 +111,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **release.yml publish retags the loaded Nix image tag** ([#752](https://github.com/vig-os/devcontainer/issues/752))
+- **install.sh `--skip-pull` works under docker; ci.yml runs safety via `uv run`** ([#757](https://github.com/vig-os/devcontainer/issues/757))
+  - `install.sh` checked for a present local image with the podman-only `$RUNTIME image exists`, which docker lacks, so `--skip-pull` always failed under docker; it now uses `$RUNTIME image inspect`, which works on both runtimes
+  - The CI `safety` dependency scan was invoked bare instead of via `uv run`, so it ran outside the uv env (unlike the adjacent `uv run bandit`); it now runs via `uv run safety`
 - **Dev-shell exposes `python3` + `pre-commit` (image parity), CI-safely** ([#729](https://github.com/vig-os/devcontainer/issues/729))
   - `mkProjectShell` now ships a bare `python3`/`pre-commit` on PATH so the downstream flake-input/direnv dev-shell matches the image. `setup-env` filters the Nix `python3-<ver>` (and `pre-commit`) out of the forwarded CI runner PATH so `uv` keeps building the project venv from the downloaded managed CPython. No new `LD_LIBRARY_PATH`, so the #703 FHS leak-guard is intact. A `nix develop --ignore-environment` parity test (and the FHS leak-guard) now run in the Project Checks job
 - **Nix image runs pre-compiled PyPI (manylinux) wheels at runtime (arch-aware FHS loader + baked `LD_LIBRARY_PATH`)** ([#736](https://github.com/vig-os/devcontainer/issues/736))

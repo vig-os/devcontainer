@@ -517,7 +517,7 @@ if [ "$SKIP_PULL" = false ]; then
     fi
 else
     # Verify image exists locally when skipping pull
-    if ! $RUNTIME image exists "$IMAGE" 2>/dev/null; then
+    if ! $RUNTIME image inspect "$IMAGE" >/dev/null 2>&1; then
         err "Image $IMAGE not found locally (--skip-pull was specified)"
         exit 1
     fi

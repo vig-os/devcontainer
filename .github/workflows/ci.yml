@@ -240,7 +240,7 @@ jobs:
       - name: Run Safety (dependency vulnerability check)
         id: safety
         run: |
-          safety check --json > safety-report.json || true
+          uv run safety check --json > safety-report.json || true
           echo "Safety scan completed"
 
       - name: Upload security reports as artifacts
