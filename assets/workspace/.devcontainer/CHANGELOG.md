@@ -110,6 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Restore arm64 image-testing coverage post-merge** ([#760](https://github.com/vig-os/devcontainer/issues/760))
+  - `nix-image.yml` (the only lane that builds + runs the portable testinfra suite natively on arm64) was push-filtered to the migration epic branch only, so once it merges the arm64 image would no longer be exercised on the integration branch — PR CI (`ci.yml`) builds and tests amd64 only. Added `dev` to the workflow's `push:` branch filter (keeping the existing `flake.nix`/`flake.lock`/workflow `paths:` guard) so the native amd64 + arm64 build/test matrix keeps running on `dev` post-merge
 - **release.yml publish retags the loaded Nix image tag** ([#752](https://github.com/vig-os/devcontainer/issues/752))
 - **install.sh `--skip-pull` works under docker; ci.yml runs safety via `uv run`** ([#757](https://github.com/vig-os/devcontainer/issues/757))
   - `install.sh` checked for a present local image with the podman-only `$RUNTIME image exists`, which docker lacks, so `--skip-pull` always failed under docker; it now uses `$RUNTIME image inspect`, which works on both runtimes

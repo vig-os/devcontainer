@@ -26,7 +26,10 @@
 # with `docker buildx imagetools create`, mirroring the proven release.yml flow.
 #
 # Triggers:
-#   - Push to the migration epic branch when the flake or this workflow changes.
+#   - Push to the migration epic branch OR the integration branch (`dev`) when
+#     the flake or this workflow changes. `dev` keeps the native arm64 build+test
+#     lane alive post-merge — PR CI (ci.yml) builds/tests amd64 only, so without
+#     this the arm64 image coverage would be stranded once the epic merges (#760).
 #   - workflow_dispatch (so it can be triggered later from the default branch).
 
 name: Nix Image (discovery)
@@ -35,6 +38,7 @@ on:  # yamllint disable-line rule:truthy
   push:
     branches:
       - 'feature/625-nix-claude-migration'
+      - 'dev'
     paths:
       - 'flake.nix'
       - 'flake.lock'
