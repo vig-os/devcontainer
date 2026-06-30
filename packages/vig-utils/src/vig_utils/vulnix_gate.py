@@ -5,12 +5,13 @@
 target) and emits JSON findings. This gate fails (exit 1) when any HIGH/CRITICAL
 CVE — CVSS v3 base score >= threshold (default 7.0) — is *not* covered by a
 non-expired entry in the exception register (`.vulnixignore`, the same
-`Expiration: YYYY-MM-DD` format as `.trivyignore`).
+`Expiration: YYYY-MM-DD` format as `.trivyignore`). An *unscored* CVE (no CVSS
+v3 base score) is also gated — its unknown severity is failed loud rather than
+silently skipped.
 
 Register-entry expiry is enforced separately by `check-expirations` (pre-commit
 + CI); this gate additionally refuses to mask a finding with an already-expired
-exception. Sub-threshold and unscored CVEs are awareness-only and never gate,
-mirroring the Trivy `ignore-unfixed` posture.
+exception. Only sub-threshold *scored* CVEs are awareness-only and never gate.
 
 This is the objective go/no-go input for the publish-cutover (#637 → #639).
 
@@ -55,19 +56,21 @@ def blocking_findings(
     excepted: set[str],
     threshold: float = DEFAULT_THRESHOLD,
 ) -> list[dict]:
-    """Return the unexcepted HIGH/CRITICAL findings in vulnix JSON *items*.
+    """Return the unexcepted blocking findings in vulnix JSON *items*.
 
-    Each returned dict is ``{pname, version, cve, score}``. A CVE blocks only
-    when its CVSS v3 base score is known and ``>= threshold`` and it is not in
-    *excepted*; sub-threshold and unscored CVEs are skipped (awareness only).
+    Each returned dict is ``{pname, version, cve, score}`` (``score`` is ``None``
+    for unscored CVEs). A CVE blocks when it is not in *excepted* and either its
+    CVSS v3 base score is ``>= threshold`` or it is unscored: an unknown severity
+    is failed loud rather than silently skipped. Only sub-threshold scored CVEs
+    are awareness-only and never gate.
     """
     blocking: list[dict] = []
     for item in items:
         scores = item.get("cvssv3_basescore") or {}
         for cve in item.get("affected_by") or []:
             score = scores.get(cve)
-            if score is None or score < threshold:
-                continue  # unscored or sub-threshold: awareness only
+            if score is not None and score < threshold:
+                continue  # sub-threshold scored: awareness only
             if cve in excepted:
                 continue
             blocking.append(
@@ -130,13 +133,22 @@ def main(today: date | None = None) -> int:
 
     if blocking:
         print(
-            f"::error::{len(blocking)} unexcepted HIGH/CRITICAL vulnix finding(s) "
-            f"(CVSS >= {args.threshold}):",
+            f"::error::{len(blocking)} unexcepted HIGH/CRITICAL or unscored vulnix "
+            f"finding(s) (CVSS >= {args.threshold} or no score):",
             file=sys.stderr,
         )
-        for finding in sorted(blocking, key=lambda f: (-f["score"], f["cve"])):
+        # Unscored findings (score None) sort first: unknown severity is most urgent.
+        for finding in sorted(
+            blocking,
+            key=lambda f: (
+                -(f["score"] if f["score"] is not None else float("inf")),
+                f["cve"],
+            ),
+        ):
+            score = finding["score"]
+            severity = f"CVSS {score}" if score is not None else "unscored"
             print(
-                f"::error::  - {finding['cve']} (CVSS {finding['score']}) "
+                f"::error::  - {finding['cve']} ({severity}) "
                 f"in {finding['pname']} {finding['version']}",
                 file=sys.stderr,
             )
