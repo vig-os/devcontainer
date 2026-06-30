@@ -114,6 +114,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Review-nit batch: dry-run/scaffold-guard, summary cancel handling, help/message fixes** ([#759](https://github.com/vig-os/devcontainer/issues/759))
+  - `install.sh` `--dry-run` now derives the shown command from the real `CMD` array via `printf '%q'` (no hand-maintained duplicate string), and the automatic "initial project scaffold" commit is guarded so it only runs for a freshly scaffolded (empty) target instead of sweeping a pre-populated directory
+  - `release.yml` now treats a `cancelled` required job as not-green (it triggers rollback like a failure), so a cancellation can no longer leave a partial release un-rolled-back
+  - `version-check.sh` help text corrected (`And (days)` → `Nd (days)`), and `init.sh` now reports "Pre-commit hook environments installed" (the `install-hooks` step only fetches hook environments)
 - **Restore arm64 image-testing coverage post-merge** ([#760](https://github.com/vig-os/devcontainer/issues/760))
   - `nix-image.yml` (the only lane that builds + runs the portable testinfra suite natively on arm64) was push-filtered to the migration epic branch only, so once it merges the arm64 image would no longer be exercised on the integration branch — PR CI (`ci.yml`) builds and tests amd64 only. Added `dev` to the workflow's `push:` branch filter (keeping the existing `flake.nix`/`flake.lock`/workflow `paths:` guard) so the native amd64 + arm64 build/test matrix keeps running on `dev` post-merge
 - **release.yml publish retags the loaded Nix image tag** ([#752](https://github.com/vig-os/devcontainer/issues/752))
@@ -181,8 +185,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- **Per-CVE rationale and shorter expiry for `.vulnixignore` Class-2 excepts** ([#762](https://github.com/vig-os/devcontainer/issues/762))
-  - Replaced the single blanket Class-2 rationale and long uniform expiry (2026-09-23) over ~22 HIGH/CRITICAL CVEs with a per-CVE note (package, what pulls it into the runtime closure, honest reachability) and short, staggered expiries (openssl 2026-07-31, glibc 2026-08-15, the rest 2026-08-31) so each suppression is individually justified and re-reviewed near-term. Provenance was confirmed against the real image closure (`nix path-info -r .#devcontainerImageEnv` + `nix why-depends`); 2026 CVE specifics were not verified offline, so the notes state this plainly and the short expiries force re-review rather than asserting an all-clear
 - **Drop the piscina CVE ignore tied to `cursor-agent`** ([#628](https://github.com/vig-os/devcontainer/issues/628))
   - Removed the `CVE-2026-55388` (piscina) `.trivyignore` entry, which only existed for the now-removed `cursor-agent` CLI
 - **vulnix gate fails loud on unscored CVEs and scanner crashes** ([#755](https://github.com/vig-os/devcontainer/issues/755))
