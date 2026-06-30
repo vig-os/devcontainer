@@ -318,6 +318,18 @@ setup() {
     assert_success
 }
 
+@test "install.sh checks local image with docker-compatible 'image inspect'" {
+    # shellcheck disable=SC2016
+    run grep '\$RUNTIME image inspect "\$IMAGE"' "$INSTALL_SH"
+    assert_success
+}
+
+@test "install.sh does not use podman-only '\$RUNTIME image exists'" {
+    # shellcheck disable=SC2016
+    run grep '\$RUNTIME image exists' "$INSTALL_SH"
+    assert_failure
+}
+
 # ── error handling ────────────────────────────────────────────────────────────
 
 @test "install.sh validates container runtime availability" {
