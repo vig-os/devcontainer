@@ -55,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Image-closure Cachix push is now first-class and blocking on the trusted paths** ([#776](https://github.com/vig-os/devcontainer/issues/776))
+  - Published images are now guaranteed **cache-backed**: on the trusted paths (push to `dev` and releases) the built image closure is pushed to the `vig-os` Cachix cache as a **blocking** step (`nix path-info --recursive ./result | cachix push`), so consumers substitute the exact pinned closure instead of rebuilding it from source. Previously the image closure only reached the cache incidentally (a non-blocking, discovery-only side effect of `cachix-action`)
+  - `.github/actions/build-image` gained an opt-in `push-image-closure` input (default `false`) that performs the blocking push, guarded on a non-empty auth token — so per-PR CI stays **pull-only** and fork PRs (which lack `CACHIX_AUTH_TOKEN`) never fail. The release `build-and-test` job opts in; the `Nix Image (discovery)` workflow pushes each per-arch image closure on `dev` as the same blocking step (distinct from the still-non-blocking GHCR discovery *tag* push)
+  - The release CVE gate (`vulnix-gate`) now also pushes the `devcontainerImageEnv` scan-target closure, so the vulnix scan surface is cache-backed too. Documented the guarantee in `docs/NIX.md` and `docs/CONTAINER_SECURITY.md`
 - **Flake cheap-fix batch: darwin-guarded image outputs, single nixpkgs-unstable eval, uv downloads URL derived from version, Renovate wheel-hash rule, nixfmt over all `*.nix`** ([#774](https://github.com/vig-os/devcontainer/issues/774))
   - The Linux-only `packages` (`devcontainerImage` plus its `devcontainerImageEnv`/`vulnix` scan targets) are now exposed only on `*-linux` systems, so `nix flake check --all-systems` no longer aborts during the darwin `dockerTools` evaluation; the dev-shell stays cross-platform
   - `nixpkgs-unstable` is imported once per system and threaded into the fast-mover overlay, instead of being re-imported inside the overlay fixpoint on each application
