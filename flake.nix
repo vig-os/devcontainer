@@ -897,6 +897,13 @@
           # vulnix — pinned CVE scanner (#637) from the locked nixpkgs so the
           # nightly scan is reproducible rather than tracking a rolling channel.
           inherit (pkgs) vulnix;
+
+          # nix-fast-build — the Tier-0 CI driver that evaluates and builds every
+          # `checks.<system>` derivation in parallel with an eval cache (#779).
+          # Exposed as a package (NOT devTools) so CI runs it reproducibly via
+          # `nix run .#nix-fast-build` from the pinned nixpkgs, without baking a
+          # CI-only tool into the dev-shell or the image closure. Refs #779.
+          inherit (pkgs) nix-fast-build;
         };
 
         # ------------------------------------------------------------------

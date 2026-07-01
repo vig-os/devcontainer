@@ -184,12 +184,23 @@ jobs:
           cachix-cache: ${{ vars.CACHIX_CACHE }}
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      # Gate the flake itself: `test-project` provisions Nix + the flake
-      # dev-shell, so nix is on PATH here. `nix flake check` runs the flake's
-      # lightweight checks (nixfmt --check, dev-shell build, devShellTools
-      # eval). The richer pytest parity test stays in `test-project`. Refs #674.
-      - name: Check flake quality gates
-        run: nix flake check --accept-flake-config
+      # Tier 0 (#779): evaluate + build every `checks.<system>` derivation in
+      # parallel with an eval cache via nix-fast-build — the pure formatting
+      # (treefmt), deadnix/statix, dev-shell build, devShellTools eval, and the
+      # git-hooks.nix `pre-commit` gate. Faster than serial `nix flake check`;
+      # nix-fast-build evaluates through nix-eval-jobs, so eval/type errors still
+      # surface. The runner is amd64, so target x86_64-linux explicitly. The
+      # effectful checks (image testinfra, integration, vulnix CVE-DB, the impure
+      # pre-commit hooks) stay GH-orchestrated in their own jobs. Refs #674, #779.
+      - name: Check flake quality gates (Tier 0 — nix-fast-build)
+        run: nix run .#nix-fast-build -- --skip-cached --no-nom --flake ".#checks.x86_64-linux"
+
+      # Validate the flake OUTPUT SCHEMA that nix-fast-build (which only builds
+      # `checks`) does not exercise: the treefmt formatter, the checks attrset
+      # names, the `install` app, and the nixos/homeManager modules. Cheap evals;
+      # the slow `nix flake check` build is covered by nix-fast-build above. #779.
+      - name: Validate flake output schema
+        run: uv run pytest tests/test_flake_checks.py -k "not flake_check_succeeds" -v
 
       # Guard the dev-shell <-> image parity: the dev-shell must expose
       # `python3` (#729), carry the `prek` hook runner in the devTools SSoT
