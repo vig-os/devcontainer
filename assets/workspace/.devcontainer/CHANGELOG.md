@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Flake polish: treefmt-nix, deadnix/statix gates, NixOS/home-manager modules, `nix run .#install`** ([#777](https://github.com/vig-os/devcontainer/issues/777))
+  - `nix fmt` now runs [`treefmt`](https://github.com/numtide/treefmt-nix) across every supported language in one pass (`nixfmt-rfc-style` for `*.nix`, `ruff format` for `*.py`, `taplo` for `*.toml`), wrapping the same formatters the pre-commit hooks already run so the editor, hooks, and CI agree on one formatting
+  - Added `checks.deadnix` and `checks.statix` (dead-Nix-code + anti-pattern linters), scoped to the authored `flake.nix`; `deadnix` and `statix` also join `devTools`
+  - Added `nixosModules.default` and `homeManagerModules.default` that install the shared `devTools` toolchain into a NixOS / home-manager configuration via `programs.vigos-devtools.enable = true`
+  - Added `apps.install` so `nix run github:vig-os/devcontainer#install` bootstraps a consumer project straight from the flake (wrapping `install.sh`, which stays the behavior SSoT)
 - **In-container `.#devShellTools` parity test** ([#754](https://github.com/vig-os/devcontainer/issues/754))
   - `tests/test_image.py` now reads the `devTools` toolchain SSoT straight from the flake (`nix eval --json .#devShellTools.<system>`, never a hardcoded list) and asserts every entry resolves on PATH inside the running image via `command -v`, parametrized per tool. Previously the SSoT was exercised only on the dev-shell side (`tests/test_flake_devshell.py`, skipped where the host lacks nix) while the image had a hand-curated check covering ~10 of the 27 tools — so adding a tool to `devTools` but not shipping it in the image went uncaught. This turns the SSoT into an actual image-side gate
 - **Bake `/etc/nix/nix.conf` enabling `nix-command`/`flakes` and on-demand local builds** ([#739](https://github.com/vig-os/devcontainer/issues/739), [#749](https://github.com/vig-os/devcontainer/issues/749))
@@ -55,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`nix fmt` and the flake format gate now run treefmt (superseding the nixfmt-only formatter)** ([#777](https://github.com/vig-os/devcontainer/issues/777))
+  - The `formatter` output is the treefmt wrapper (was `nixfmt-rfc-style` directly, #674) and the flake `checks.format` gate is replaced by `checks.formatting` (a `treefmt --fail-on-change` check covering nix, python, and toml — superseding the former `nixfmt --check`-over-`*.nix` gate from #774)
 - **Flake cheap-fix batch: darwin-guarded image outputs, single nixpkgs-unstable eval, uv downloads URL derived from version, Renovate wheel-hash rule, nixfmt over all `*.nix`** ([#774](https://github.com/vig-os/devcontainer/issues/774))
   - The Linux-only `packages` (`devcontainerImage` plus its `devcontainerImageEnv`/`vulnix` scan targets) are now exposed only on `*-linux` systems, so `nix flake check --all-systems` no longer aborts during the darwin `dockerTools` evaluation; the dev-shell stays cross-platform
   - `nixpkgs-unstable` is imported once per system and threaded into the fast-mover overlay, instead of being re-imported inside the overlay fixpoint on each application

@@ -23,6 +23,34 @@ everywhere — the dev-shell now and the image's `imageTools` set.
   `assets/workspace/flake.nix`).
 - **`overlays.default`** and **`lib.{mkProjectShell,devTools}`** are exported as
   system-independent outputs so consumers can follow the same pinned `nixpkgs`.
+- **`nixosModules.default`** / **`homeManagerModules.default`** install the same
+  `devTools` set into a NixOS or home-manager configuration — flip
+  `programs.vigos-devtools.enable = true`. `claude-code` is unfree, so the
+  consumer must allow it (`nixpkgs.config.allowUnfree`). The NixOS module applies
+  `overlays.default` for the fast-movers; a home-manager consumer that passes its
+  own `pkgs` should apply the overlay itself (home-manager rejects a module-set
+  `nixpkgs.overlays` in that case).
+- **`apps.install`** wraps the host installer, so `nix run github:vig-os/devcontainer#install -- --help`
+  bootstraps a consumer project straight from the flake — no prior `curl | bash`.
+  `install.sh` remains the behavior SSoT; the app just wraps it.
+
+### Formatting, linting, and flake quality gates
+
+`nix fmt` runs [`treefmt`](https://github.com/numtide/treefmt-nix) over every
+supported language in one pass — `nixfmt-rfc-style` for `*.nix`, `ruff format` for
+`*.py`, `taplo` for `*.toml`. It wraps the same formatters the pre-commit hooks
+run, so the editor `nix fmt`, the hooks, and CI all agree on one formatting.
+
+`nix flake check` runs the lightweight gates the sandbox can (recursive `nix`
+access is unavailable, so the dev-shell/image parity test stays a CI pytest):
+
+- **`formatting`** — the tree is `treefmt`-clean (the `nix fmt` idempotency gate).
+- **`deadnix`** / **`statix`** — `flake.nix` carries no dead Nix code or lint
+  anti-patterns. Scoped to the authored flake; the downstream scaffold
+  (`assets/workspace/flake.nix`) and example keep their idiomatic `{ self, … }`
+  signatures whose intentionally-unused args those linters would otherwise flag.
+- **`devShell`** — the dev-shell closure builds.
+- **`devShellTools`** — the parity-test SSoT evaluates to a non-empty list.
 
 ### Dev-shell ↔ image parity guard
 
