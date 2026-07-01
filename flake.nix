@@ -12,6 +12,12 @@
     # hooks already run. Follows the pinned nixpkgs for reproducibility. Refs #777.
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+    # git-hooks.nix: the Nix SSoT for the pre-commit hooks. Its `run` builds a
+    # sandbox-pure `checks.pre-commit`, driven by the `prek` runner (Rust, faster
+    # than the Python `pre-commit`). Follows the pinned nixpkgs so the hook
+    # toolchain matches the dev-shell/image. Refs #778 (supersedes #40).
+    git-hooks-nix.url = "github:cachix/git-hooks.nix";
+    git-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -21,6 +27,7 @@
       nixpkgs-unstable,
       flake-utils,
       treefmt-nix,
+      git-hooks-nix,
     }:
     let
       # ---------------------------------------------------------------------
@@ -91,6 +98,11 @@
         pkgs: with pkgs; [
           # Build automation
           just
+
+          # Git-hook runner: prek (Rust drop-in for the Python pre-commit,
+          # faster and one fewer manylinux/FHS consumer). The SSoT runner for
+          # the `.githooks` hooks and the flake's `checks.pre-commit`. Refs #778.
+          prek
 
           # Version control & GitHub (gh from unstable via overlay)
           git
@@ -227,22 +239,23 @@
           '';
         in
         pkgs.mkShell {
-          # The toolchain SSoT, plus a bare Python interpreter and pre-commit so
-          # the downstream dev-shell matches the image's PATH (`python`/`python3`
-          # + `pre-commit`). These are not in `devTools`: the image already
-          # provides them via `pythonEnv` + `pre-commit` in `imageTools`, and a
-          # bare interpreter in the SSoT would collide with `pythonEnv` there.
+          # The toolchain SSoT, plus a bare Python interpreter so the downstream
+          # dev-shell matches the image's PATH (`python`/`python3`). The bare
+          # interpreter is not in `devTools`: the image already provides it via
+          # `pythonEnv` in `imageTools`, and a bare interpreter in the SSoT would
+          # collide with `pythonEnv` there. The hook runner (`prek`) lives in
+          # `devTools`, so it reaches both the dev-shell and the image from one
+          # place — the former standalone `pre-commit` here is dropped (#778).
           # Safe for CI despite the FHS pymarkdown/manylinux constraint: the
           # dev-shell pins `UV_PYTHON` (below) to this same store CPython, and
           # the CI PATH-forwarding (setup-env) filters this interpreter out so
           # `uv` still builds the runner venv from a downloaded managed CPython.
           # No new LD_LIBRARY_PATH, so the #703 FHS leak-guard is unaffected.
-          # Refs #729.
+          # Refs #729, #778.
           packages =
             (devTools pkgs)
             ++ [
               python
-              pkgs.pre-commit
             ]
             ++ extraPackages;
           shellHook = ldLibraryPathHook + "\n" + nvimIsolationHook + "\n" + shellHook;
@@ -332,6 +345,138 @@
           pipLicenses
         ]);
 
+        # ------------------------------------------------------------------
+        # preCommitCheck — the sandbox-pure subset of the committed
+        # `.pre-commit-config.yaml`, run by the `prek` runner as
+        # `checks.pre-commit` under `nix flake check`. Refs #778 (supersedes #40).
+        #
+        # `checks.pre-commit` builds in the Nix sandbox: NO network, NO project
+        # venv. Only hooks that are pure under those constraints are enabled
+        # here. Impure / generator / stage-gated hooks stay RUNNER-ONLY in the
+        # committed config (which prek runs from the toolchain PATH): generate-docs
+        # + sync-manifest (repo scripts needing python+repo), pip-licenses (reads
+        # uv.lock), pymarkdown (not in nixpkgs), no-commit-to-branch +
+        # check-agent-identity (inspect git state/identity, absent in the
+        # sandbox), and the commit-msg / prepare-commit-msg stage hooks (never run
+        # by `--all-files`).
+        #
+        # The committed `.pre-commit-config.yaml` stays the hand-maintained,
+        # PATH-based runner SSoT (it must stay portable to the downstream scaffold,
+        # which has no flake). This check is the Nix-verified guarantee that the
+        # pure hooks agree with it. See docs/NIX.md for the two-artifact model.
+        preCommitCheck = git-hooks-nix.lib.${system}.run {
+          src = ./.;
+          # Run the hooks with prek (Rust) instead of the Python pre-commit.
+          package = pkgs.prek;
+          # Mirror the committed config's top-level `exclude`.
+          excludes = [
+            "^\\.github_data/"
+            "^docs/issues/"
+            "^docs/pull-requests/"
+          ];
+          hooks = {
+            # Formatting: ONE treefmt hook (nixfmt-rfc-style + ruff-format +
+            # taplo) reusing the flake's treefmtEval — the same wrapper `nix fmt`
+            # and `checks.formatting` use. Replaces the individual nixfmt /
+            # ruff-format / taplo-format hooks with the same formatters. #777,#778.
+            treefmt = {
+              enable = true;
+              packageOverrides.treefmt = treefmtEval.config.build.wrapper;
+            };
+
+            # Pure linters, resolved from nix-provided tools (no venv).
+            ruff.enable = true;
+            shellcheck = {
+              enable = true;
+              args = [ "-x" ];
+              excludes = [ "(^|/)\\.envrc$" ];
+            };
+            yamllint = {
+              enable = true;
+              args = [
+                "--format"
+                "parsable"
+                "--strict"
+              ];
+            };
+            typos.enable = true;
+
+            # taplo semantic lint (formatting is covered by treefmt above). The
+            # built-in `taplo` hook formats, so define lint explicitly to mirror
+            # the committed `taplo-lint` hook.
+            taplo-lint = {
+              enable = true;
+              name = "taplo-lint";
+              entry = "${pkgs.taplo}/bin/taplo lint --config .taplo.toml";
+              language = "system";
+              types = [ "toml" ];
+            };
+
+            # pre-commit-hooks meta hooks (git-hooks.nix built-ins, sandbox-pure).
+            # Attr names follow git-hooks.nix (some pluralised vs the raw
+            # pre-commit-hooks ids). `destroyed-symlinks` has no git-hooks.nix
+            # built-in and is git-state-dependent, so it stays runner-only in the
+            # committed config (like no-commit-to-branch).
+            check-added-large-files.enable = true;
+            check-case-conflicts.enable = true;
+            check-json.enable = true;
+            check-merge-conflicts.enable = true;
+            check-symlinks.enable = true;
+            check-toml.enable = true;
+            check-yaml.enable = true;
+            # debug-statements parses the file's Python AST, so it must run under
+            # the project's interpreter (3.14): nixpkgs' default pre-commit-hooks
+            # is built for 3.13, which rejects the parenthesis-free multi-type
+            # `except A, B:` (PEP 758, valid in 3.14) the repo uses. Pin the hook's
+            # package to the 3.14 build so it matches the committed-config runner
+            # (which runs under the image/dev-shell 3.14). Refs #778.
+            python-debug-statements = {
+              enable = true;
+              package = python.pkgs.pre-commit-hooks;
+            };
+            detect-private-keys.enable = true;
+            end-of-file-fixer.enable = true;
+            mixed-line-endings.enable = true;
+            trim-trailing-whitespace.enable = true;
+
+            # vig-utils / bandit hooks wired to the hermetic Nix binaries
+            # (${vigUtils}/bin/… + ${pkgs.bandit}/bin/bandit) — sandbox-pure, no
+            # `uv run`. They mirror the committed config's file filters/args.
+            check-action-pins = {
+              enable = true;
+              name = "check-action-pins";
+              entry = "${vigUtils}/bin/check-action-pins";
+              language = "system";
+              files = "^\\.github/(workflows/.*\\.ya?ml|actions/.*/action\\.ya?ml)$";
+              pass_filenames = false;
+            };
+            check-skill-names = {
+              enable = true;
+              name = "check-skill-names";
+              entry = "${vigUtils}/bin/check-skill-names .claude/skills";
+              language = "system";
+              files = "^\\.claude/skills/";
+              pass_filenames = false;
+            };
+            check-expirations = {
+              enable = true;
+              name = "check-expirations";
+              entry = "${vigUtils}/bin/check-expirations .trivyignore .vulnixignore";
+              language = "system";
+              files = "^\\.(trivyignore|vulnixignore)$";
+              pass_filenames = false;
+            };
+            bandit = {
+              enable = true;
+              name = "bandit";
+              entry = "${pkgs.bandit}/bin/bandit -r packages/vig-utils/src/ assets/workspace/ -ll";
+              language = "system";
+              types = [ "python" ];
+              pass_filenames = false;
+            };
+          };
+        };
+
         # The toolchain SSoT plus the runtime substrate a bare layered image
         # lacks (an FHS base distro would provide these; here we add them
         # explicitly — this is the discovery surface for FHS gaps). Shared by
@@ -351,8 +496,9 @@
             # Python (with vig-utils baked) + the project Python toolchain.
             # The Debian image installed these via `uv pip install` at build;
             # the hermetic Nix build takes them from nixpkgs instead (#666).
+            # The git-hook runner is `prek` (via devTools); the standalone
+            # Python `pre-commit` that used to sit here is dropped (#778).
             pythonEnv
-            pre-commit
             bandit
 
             # Rust/cargo + just LSP/formatter tools. The Debian image installed
@@ -443,6 +589,10 @@
             touch "$out"
           '';
 
+          # The sandbox-pure subset of the pre-commit hooks, run by the prek
+          # runner via git-hooks.nix (see preCommitCheck above). Refs #778.
+          pre-commit = preCommitCheck;
+
           # The dev-shell evaluates and its closure builds.
           devShell = self.devShells.${system}.default;
 
@@ -476,10 +626,11 @@
           # is a one-line change. `pkgs.lix` is left out for now to keep the
           # closure smaller.
           #
-          # pre-commit vs prek (#40): this image bakes upstream `pre-commit`
-          # (matches the Debian build and the pinned pyproject version).
-          # Migrating the cache layer to `prek` is deferred to #40; both are in
-          # nixpkgs, so it is a drop-in swap once that issue lands.
+          # pre-commit -> prek (#778, closes #40): the image ships the `prek`
+          # runner (Rust, via devTools) and no longer bakes the Python
+          # `pre-commit` — one fewer manylinux/FHS consumer. prek runs the
+          # committed `.pre-commit-config.yaml`; the flake's `checks.pre-commit`
+          # runs the sandbox-pure subset under `nix flake check`.
           devcontainerImage =
             let
               # Nix C++/compression runtime exposed on the loader path so
@@ -542,10 +693,10 @@
                     dcver="$(sed -n 's/^DEVCONTAINER_VERSION=//p' ${./.vig-os})"
                     sed -i "s/{{IMAGE_TAG}}/$dcver/g" "$out/root/assets/workspace/.vig-os"
 
-                    # /root/.bashrc with carried aliases: precommit (Debian
-                    # build) plus cc/cld (#545).
+                    # /root/.bashrc with carried aliases: precommit (now the prek
+                    # runner, #778) plus cc/cld (#545).
                     cat > "$out/root/.bashrc" <<'BASHRC'
-                    alias precommit="pre-commit run"
+                    alias precommit="prek run"
                     alias cc="claude"
                     alias cld="claude --dangerously-skip-permissions"
                     BASHRC
@@ -577,7 +728,7 @@
                     sed -i -E 's/^([[:space:]]*VIRTUAL_ENV_PROMPT=).*/\1"template-project"/' \
                       "$venvdir/bin/activate"
 
-                    mkdir -p "$out/opt/pre-commit-cache"
+                    mkdir -p "$out/opt/prek-cache"
                     mkdir -p "$out/workspace"
 
                     # Writable global-install prefix for npm. npm's default
@@ -710,7 +861,7 @@
                   # #545: the container is the trust boundary; bypass the uid-0
                   # check for `claude --dangerously-skip-permissions`.
                   "IS_SANDBOX=1"
-                  "PRE_COMMIT_HOME=/opt/pre-commit-cache"
+                  "PREK_HOME=/opt/prek-cache"
                   "UV_PROJECT_ENVIRONMENT=/root/assets/workspace/.venv"
                   "VIRTUAL_ENV=/root/assets/workspace/.venv"
                   # Point npm's global prefix at the writable, on-PATH
