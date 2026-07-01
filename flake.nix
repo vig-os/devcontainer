@@ -7,6 +7,11 @@
     # Secondary channel, overlaid only for fast-moving tools (uv, gh, claude).
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    # treefmt-nix: one multi-language `nix fmt` entrypoint + a formatting check,
+    # unifying the per-language formatters (nixfmt, ruff, taplo) the pre-commit
+    # hooks already run. Follows the pinned nixpkgs for reproducibility. Refs #777.
+    treefmt-nix.url = "github:numtide/treefmt-nix";
+    treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -15,6 +20,7 @@
       nixpkgs,
       nixpkgs-unstable,
       flake-utils,
+      treefmt-nix,
     }:
     let
       # ---------------------------------------------------------------------
@@ -60,7 +66,7 @@
       # so the unstable import is hoisted out of the overlay closure (see
       # importUnstable above).
       mkFastMoverOverlay =
-        unstable: final: prev:
+        unstable: _final: _prev:
         builtins.listToAttrs (
           map (name: {
             inherit name;
@@ -110,9 +116,11 @@
           # Linting
           hadolint
           taplo
-          nixfmt-rfc-style # nix file formatter (flake `formatter`, pre-commit hook)
+          nixfmt-rfc-style # nix file formatter (treefmt `nix fmt`, pre-commit hook)
           ruff # python linter/formatter (pre-commit ruff/ruff-format hooks)
           typos # source typo checker (pre-commit typos hook)
+          deadnix # dead-Nix-code linter (flake `checks.deadnix`)
+          statix # nix anti-pattern linter (flake `checks.statix`)
 
           # Container runtime
           podman
@@ -265,6 +273,23 @@
           config.allowUnfree = true;
         };
 
+        # treefmt-nix: one `nix fmt` entrypoint + a `checks.formatting` gate over
+        # the whole repo. The enabled programs mirror the pre-commit formatters —
+        # nixfmt-rfc-style (same package as devTools/the hook), ruff-format, and
+        # taplo — so the editor `nix fmt`, the hooks, and the flake check all
+        # agree on one formatting. Refs #777.
+        treefmtEval = treefmt-nix.lib.evalModule pkgs {
+          projectRootFile = "flake.nix";
+          programs = {
+            nixfmt = {
+              enable = true;
+              package = pkgs.nixfmt-rfc-style;
+            };
+            ruff-format.enable = true;
+            taplo.enable = true;
+          };
+        };
+
         python = pkgs.python314;
 
         # vig-utils packaged for the image (T2.4, #666): a pure-Python hatchling
@@ -375,13 +400,14 @@
         devShellTools = devShellToolNames pkgs;
 
         # ------------------------------------------------------------------
-        # formatter — `nix fmt` formats every *.nix file with nixfmt-rfc-style.
+        # formatter — `nix fmt` runs treefmt over every supported language
+        # (nixfmt-rfc-style for *.nix, ruff-format for *.py, taplo for *.toml).
         #
-        # Same package as the `nixfmt` pre-commit hook (sourced from devTools)
-        # so editor `nix fmt`, the hook, and the `checks.format` gate below all
-        # agree on one formatting. Refs #674.
+        # treefmt wraps the same underlying formatters the pre-commit hooks use,
+        # so editor `nix fmt`, the hooks, and the `checks.formatting` gate below
+        # all agree on one formatting. Refs #674, #777.
         # ------------------------------------------------------------------
-        formatter = pkgs.nixfmt-rfc-style;
+        formatter = treefmtEval.config.build.wrapper;
 
         # ------------------------------------------------------------------
         # checks — lightweight flake quality gates run by `nix flake check`.
@@ -394,20 +420,28 @@
         # flake checks cover what a sandbox can: the flake formats cleanly, the
         # dev-shell builds, and devShellTools evaluates. Refs #674.
         checks = {
-          # Every *.nix file is nixfmt-clean (the `nix fmt` idempotency gate).
-          # Source filtered to `.nix` files so the check only depends on (and
-          # reruns for) those, while still covering every *.nix in the repo —
-          # not just flake.nix. Refs #674, #774.
-          format =
-            pkgs.runCommand "nixfmt-check"
-              {
-                nativeBuildInputs = [ pkgs.nixfmt-rfc-style ];
-                src = pkgs.lib.sources.sourceFilesBySuffices ./. [ ".nix" ];
-              }
-              ''
-                find "$src" -name '*.nix' -exec nixfmt --check {} +
-                touch "$out"
-              '';
+          # The tree is treefmt-clean (nixfmt + ruff-format + taplo). Supersedes
+          # the former nixfmt-only `format` gate: treefmt covers every language
+          # its enabled programs handle across the repo, not just *.nix, and is
+          # the same wrapper `nix fmt` runs. Refs #674, #774, #777.
+          formatting = treefmtEval.config.build.check self;
+
+          # flake.nix carries no dead Nix code. Scoped to the authored flake (the
+          # toolchain SSoT): the downstream scaffold (assets/workspace/flake.nix)
+          # and the example (examples/…/flake.nix) keep the idiomatic
+          # `{ self, … }` output signature, whose intentionally-unused args
+          # deadnix would otherwise flag. Refs #777.
+          deadnix = pkgs.runCommand "deadnix-check" { nativeBuildInputs = [ pkgs.deadnix ]; } ''
+            deadnix --fail ${./flake.nix}
+            touch "$out"
+          '';
+
+          # flake.nix is free of the anti-patterns statix lints (e.g. manual
+          # `inherit`). Same authored-flake scoping rationale as deadnix. Refs #777.
+          statix = pkgs.runCommand "statix-check" { nativeBuildInputs = [ pkgs.statix ]; } ''
+            statix check ${./flake.nix}
+            touch "$out"
+          '';
 
           # The dev-shell evaluates and its closure builds.
           devShell = self.devShells.${system}.default;
@@ -711,7 +745,24 @@
 
           # vulnix — pinned CVE scanner (#637) from the locked nixpkgs so the
           # nightly scan is reproducible rather than tracking a rolling channel.
-          vulnix = pkgs.vulnix;
+          inherit (pkgs) vulnix;
+        };
+
+        # ------------------------------------------------------------------
+        # apps — `nix run .#install` bootstraps a consumer project.
+        #
+        # Wraps the host-level install.sh (the behavior SSoT: pulls the published
+        # image and scaffolds a workspace) so consumers can run it straight from
+        # the flake without a prior `curl | bash`. writeShellScriptBin (not
+        # writeShellApplication) preserves install.sh's own shebang, `set` flags,
+        # and ambient-PATH tool resolution (curl/git/docker) unchanged. Refs #777.
+        # ------------------------------------------------------------------
+        apps = {
+          install = flake-utils.lib.mkApp {
+            drv = pkgs.writeShellScriptBin "install" (builtins.readFile ./install.sh);
+            name = "install";
+          };
+          default = self.apps.${system}.install;
         };
       }
     )
@@ -719,5 +770,48 @@
       # System-independent reusable outputs.
       lib = { inherit mkProjectShell devTools; };
       overlays.default = overlay;
+
+      # ----------------------------------------------------------------------
+      # nixosModules / homeManagerModules — install the shared toolchain as
+      # importable NixOS or home-manager config.
+      #
+      # A consumer imports the module and flips one option to get exactly the
+      # `devTools` set the dev-shell and image ship — the same SSoT, no drift.
+      # The fast-mover overlay (uv/gh/claude-code from unstable) is applied so
+      # those resolve to the intended versions; claude-code is unfree, so the
+      # consumer must allow it (documented in docs/NIX.md). Refs #777.
+      # ----------------------------------------------------------------------
+      nixosModules.default =
+        {
+          config,
+          lib,
+          pkgs,
+          ...
+        }:
+        {
+          options.programs.vigos-devtools.enable = lib.mkEnableOption "the vigOS devcontainer toolchain (devTools)";
+          config = lib.mkIf config.programs.vigos-devtools.enable {
+            nixpkgs.overlays = [ overlay ];
+            environment.systemPackages = devTools pkgs;
+          };
+        };
+
+      # No `nixpkgs.overlays` here: home-manager rejects setting it when the
+      # consumer supplies an external `pkgs` (the common flake case). Fast-movers
+      # then track the consumer's channel unless they apply `overlays.default`
+      # themselves — documented in docs/NIX.md. Refs #777.
+      homeManagerModules.default =
+        {
+          config,
+          lib,
+          pkgs,
+          ...
+        }:
+        {
+          options.programs.vigos-devtools.enable = lib.mkEnableOption "the vigOS devcontainer toolchain (devTools)";
+          config = lib.mkIf config.programs.vigos-devtools.enable {
+            home.packages = devTools pkgs;
+          };
+        };
     };
 }
