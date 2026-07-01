@@ -300,6 +300,10 @@ is the go/no-go signal for it.
 
 ## See also
 
+- [`docs/rfcs/ADR-nix-devenv-strategy.md`](rfcs/ADR-nix-devenv-strategy.md) — why
+  the org uses `pkgs.mkShell` + `nix-direnv` (not `devenv`/`devshell`), the
+  three-axis framing (activation / shell definition / local services), and the
+  `process-compose` + `services-flake` decision for local dev services.
 - [`CONTRIBUTE.md`](../CONTRIBUTE.md) — onboarding fast path (clone → `direnv allow`).
 - [`docs/NIX2CONTAINER.md`](NIX2CONTAINER.md) — the downstream production-image
   pattern with `nix2container` (distinct from this image's `buildLayeredImage`).
