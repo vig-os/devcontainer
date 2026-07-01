@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`checks.pre-commit` flake gate via git-hooks.nix + prek** ([#778](https://github.com/vig-os/devcontainer/issues/778))
+  - Added the [`cachix/git-hooks.nix`](https://github.com/cachix/git-hooks.nix) input and a `checks.pre-commit` output that runs the **sandbox-pure subset** of the pre-commit hooks under `nix flake check`, driven by the `prek` runner (`package = pkgs.prek`) — no network, no project venv. It reuses the `treefmt` wrapper for the single formatting hook (nixfmt + ruff-format + taplo), the nix-provided pure linters (`ruff`, `shellcheck`, `yamllint`, `typos`, `taplo lint`), the `pre-commit-hooks` meta hooks, and the `vig-utils`/`bandit` hooks wired to hermetic Nix binaries — so the flake is a Nix-verified guarantee that the committed config's pure hooks stay correct
+  - Impure/generator/stage-gated hooks (`generate-docs`, `sync-manifest`, `pip-licenses`, `pymarkdown`, `no-commit-to-branch`, `destroyed-symlinks`, `check-agent-identity`, and the `commit-msg`/`prepare-commit-msg` hooks) stay runner-only in the committed `.pre-commit-config.yaml`; the two-artifact model is documented in `docs/NIX.md`
 - **Flake polish: treefmt-nix, deadnix/statix gates, NixOS/home-manager modules, `nix run .#install`** ([#777](https://github.com/vig-os/devcontainer/issues/777))
   - `nix fmt` now runs [`treefmt`](https://github.com/numtide/treefmt-nix) across every supported language in one pass (`nixfmt-rfc-style` for `*.nix`, `ruff format` for `*.py`, `taplo` for `*.toml`), wrapping the same formatters the pre-commit hooks already run so the editor, hooks, and CI agree on one formatting
   - Added `checks.deadnix` and `checks.statix` (dead-Nix-code + anti-pattern linters), scoped to the authored `flake.nix`; `deadnix` and `statix` also join `devTools`
@@ -62,6 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Git-hook runner migrated from `pre-commit` to `prek`** ([#778](https://github.com/vig-os/devcontainer/issues/778), closes [#40](https://github.com/vig-os/devcontainer/issues/40))
+  - The Rust [`prek`](https://github.com/j178/prek) (a faster, drop-in `pre-commit` replacement) is now the hook runner and joins the shared `devTools` SSoT, so it ships in both the dev-shell and the image; the standalone Python `pre-commit` is dropped from both — one fewer manylinux/FHS consumer in the image closure
+  - The `.githooks` shims, `scripts/init.sh` (`prek prepare-hooks`), `just precommit` (`prek run --all-files`), the worktree setup, and the downstream scaffold now invoke `prek`; the baked hook cache is renamed `PREK_HOME=/opt/prek-cache` and the `precommit` shell alias runs `prek run`. The committed `.pre-commit-config.yaml` (root + scaffold) is unchanged and prek runs it as-is
 - **`nix fmt` and the flake format gate now run treefmt (superseding the nixfmt-only formatter)** ([#777](https://github.com/vig-os/devcontainer/issues/777))
   - The `formatter` output is the treefmt wrapper (was `nixfmt-rfc-style` directly, #674) and the flake `checks.format` gate is replaced by `checks.formatting` (a `treefmt --fail-on-change` check covering nix, python, and toml — superseding the former `nixfmt --check`-over-`*.nix` gate from #774)
 - **Image-closure Cachix push is now first-class and blocking on the trusted paths** ([#776](https://github.com/vig-os/devcontainer/issues/776))
