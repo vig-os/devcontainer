@@ -44,6 +44,10 @@ VERSION_FLAG_OVERRIDES: dict[str, list[str]] = {
     "expect": ["-v"],
     # tmux uses -V (uppercase) to print its version.
     "tmux": ["-V"],
+    # statix has no top-level version flag (`--version` exits 2 with "unexpected
+    # argument"); it is a subcommand CLI. `--help` exits 0 and proves the binary
+    # is runnable in the dev-shell, which is what this parity check asserts.
+    "statix": ["--help"],
 }
 
 pytestmark = pytest.mark.skipif(
