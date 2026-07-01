@@ -1605,7 +1605,7 @@ class TestDevContainerCLI:
             "podman",
             "bash",
             "-c",
-            "cd /workspace/test_project && pre-commit run --files test_file.py",
+            "cd /workspace/test_project && prek run --files test_file.py",
         ]
 
         result = subprocess.run(
@@ -1614,24 +1614,22 @@ class TestDevContainerCLI:
             text=True,
             cwd=str(workspace_path),
             env=os.environ.copy(),
-            timeout=120,  # Pre-commit can take a while on first run
+            timeout=120,  # prek can take a while on first run
         )
 
-        # Pre-commit should succeed (exit code 0) or pass with warnings
+        # prek should succeed (exit code 0) or pass with warnings
         # Exit code 1 means hooks failed, which is also acceptable for testing
-        # We just want to verify pre-commit runs
+        # We just want to verify the hook runner (prek, #778) runs
         assert result.returncode in [0, 1], (
-            f"Pre-commit failed unexpectedly\n"
+            f"prek failed unexpectedly\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}\n"
             f"command: {' '.join(exec_cmd)}"
         )
 
-        # Verify pre-commit actually ran (check for pre-commit output)
-        assert (
-            "pre-commit" in result.stdout.lower() or "ruff" in result.stdout.lower()
-        ), (
-            f"Pre-commit doesn't appear to have run\n"
+        # Verify the hook runner actually ran (check for prek/hook output)
+        assert "prek" in result.stdout.lower() or "ruff" in result.stdout.lower(), (
+            f"prek doesn't appear to have run\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}"
         )
@@ -1856,7 +1854,7 @@ class TestDevContainerCLI:
 
         # Test valid branch names
         for branch_name in valid_branch_names:
-            # Create branch and run pre-commit hook
+            # Create branch and run the prek hook runner
             exec_cmd = [
                 "devcontainer",
                 "exec",
@@ -1873,7 +1871,7 @@ class TestDevContainerCLI:
                     " && printf 'dummy\\n' > dummy.txt"
                     f" && git checkout -b '{branch_name}'"
                     " && git add dummy.txt"
-                    " && pre-commit run -a"
+                    " && prek run -a"
                 ),
             ]
             result = subprocess.run(
@@ -1886,7 +1884,7 @@ class TestDevContainerCLI:
             )
 
             assert result.returncode == 0, (
-                f"pre-commit on valid branch '{branch_name}' should succeed\n"
+                f"prek on valid branch '{branch_name}' should succeed\n"
                 f"stdout: {result.stdout}\n"
                 f"stderr: {result.stderr}\n"
                 f"command: {' '.join(exec_cmd)}"
@@ -1924,7 +1922,7 @@ class TestDevContainerCLI:
                     " && printf 'dummy\\n' > dummy.txt"
                     f" && git checkout -b '{branch_name}'"
                     " && git add dummy.txt"
-                    " && pre-commit run -a"
+                    " && prek run -a"
                 ),
             ]
             result = subprocess.run(
@@ -1937,7 +1935,7 @@ class TestDevContainerCLI:
             )
 
             assert result.returncode != 0, (
-                f"pre-commit on invalid branch '{branch_name}' should fail\n"
+                f"prek on invalid branch '{branch_name}' should fail\n"
                 f"stdout: {result.stdout}\n"
                 f"stderr: {result.stderr}\n"
                 f"command: {' '.join(exec_cmd)}"
