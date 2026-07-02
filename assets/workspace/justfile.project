@@ -83,10 +83,6 @@ clean-artifacts:
 # [group('app')]
 # run *args:
 #     uv run python -m {{project}} {{args}}
-# # Run database migrations (if using sidecar)
-# [group('app')]
-# migrate:
-#     just sidecar postgres migrate
 #
 # # Prepare release branch (manual workflow dispatch helper)
 # [group('release')]
