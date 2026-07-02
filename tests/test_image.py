@@ -33,7 +33,6 @@ EXPECTED_VERSIONS = {
     "ruff": "0.15.",  # nixpkgs-26.05
     "bandit": "1.9.",  # nixpkgs-26.05
     "pip_licenses": "5.",  # PyPI wheel pinned in flake.nix
-    "hadolint": "2.14.",  # nixpkgs-26.05
     "taplo": "0.10.",  # nixpkgs-26.05
     "vig_utils": "0.1.",  # our package version
 }
@@ -425,19 +424,6 @@ class TestSystemTools:
         result = host.run("just --version")
         assert result.rc == 0, "just --version failed"
         assert "just" in result.stdout.lower()
-
-    def test_hadolint_installed(self, host):
-        """Test that hadolint is installed (path-agnostic)."""
-        assert_tool_on_path(host, "hadolint")
-
-    def test_hadolint_version(self, host):
-        """Test that hadolint version is correct."""
-        result = host.run("hadolint --version")
-        assert result.rc == 0, "hadolint --version failed"
-        expected = EXPECTED_VERSIONS["hadolint"]
-        assert expected in result.stdout, (
-            f"Expected hadolint {expected}, got: {result.stdout}"
-        )
 
     def test_taplo_installed(self, host):
         """Test that taplo (TOML formatter/linter) is installed (path-agnostic)."""

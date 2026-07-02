@@ -251,16 +251,9 @@ clean-test-containers:
     echo "Cleaning up lingering test containers..."
     FMT=$(printf '\x7b\x7b.ID\x7d\x7d')
     DEVCONTAINERS=$(podman ps -a --filter "name=workspace-devcontainer" --format "$FMT" 2>/dev/null)
-    SIDECARS=$(podman ps -a --filter "name=test-sidecar" --format "$FMT" 2>/dev/null)
-    if [ -n "$DEVCONTAINERS" ] || [ -n "$SIDECARS" ]; then
-        if [ -n "$DEVCONTAINERS" ]; then
-            echo "  Removing workspace devcontainers..."
-            echo "$DEVCONTAINERS" | xargs -r podman rm -f
-        fi
-        if [ -n "$SIDECARS" ]; then
-            echo "  Removing test sidecars..."
-            echo "$SIDECARS" | xargs -r podman rm -f
-        fi
+    if [ -n "$DEVCONTAINERS" ]; then
+        echo "  Removing workspace devcontainers..."
+        echo "$DEVCONTAINERS" | xargs -r podman rm -f
         echo "[OK] Cleanup complete"
     else
         echo "[*] No lingering test containers found"
