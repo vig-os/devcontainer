@@ -412,6 +412,21 @@
               types = [ "toml" ];
             };
 
+            # just formats justfiles; `just` is in devTools so this pure hook can
+            # run in the sandbox. The committed `just-fmt` runner hook rewrites in
+            # place (`just --fmt --unstable`); the Nix check must not mutate the
+            # source, so mirror it in check mode (`--check`) — justfile-format
+            # drift is thus caught by `checks.pre-commit` like every other pure
+            # hook. Refs #778.
+            just-fmt = {
+              enable = true;
+              name = "just-fmt";
+              entry = "${pkgs.just}/bin/just --fmt --check --unstable";
+              language = "system";
+              files = "^justfile(\\..*)?$";
+              pass_filenames = false;
+            };
+
             # pre-commit-hooks meta hooks (git-hooks.nix built-ins, sandbox-pure).
             # Attr names follow git-hooks.nix (some pluralised vs the raw
             # pre-commit-hooks ids). `destroyed-symlinks` has no git-hooks.nix

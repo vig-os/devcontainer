@@ -1,7 +1,7 @@
 {
   "setup-worktree-unix": [
     "uv sync",
-    "pre-commit install --install-hooks",
+    "prek install --prepare-hooks",
     "git config commit.template .gitmessage",
     "test -f \"$ROOT_WORKTREE_PATH/.env\" && cp \"$ROOT_WORKTREE_PATH/.env\" .env || true"
   ]

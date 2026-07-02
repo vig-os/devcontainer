@@ -44,8 +44,8 @@ move to a hosted evaluator unchanged:
 - `devShell` — the dev-shell closure builds.
 - `devShellTools` — the parity-test SSoT evaluates non-empty.
 - `pre-commit` — the **sandbox-pure** hook subset (treefmt, ruff, shellcheck,
-  yamllint, typos, taplo-lint, the `pre-commit-hooks` meta hooks, and the
-  `vig-utils`/`bandit` hooks wired to hermetic Nix binaries), via git-hooks.nix
+  yamllint, typos, taplo-lint, just-fmt, the `pre-commit-hooks` meta hooks, and
+  the `vig-utils`/`bandit` hooks wired to hermetic Nix binaries), via git-hooks.nix
   driven by prek (#778).
 
 `nix-fast-build` evaluates through `nix-eval-jobs`, so eval/type errors still fail

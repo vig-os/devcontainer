@@ -200,6 +200,8 @@ These are decided inline in `flake.nix`; summarized here.
      `nix flake check` — no network, no project venv. It reuses `treefmtEval` for
      the single formatting hook (nixfmt + ruff-format + taplo), the nix-provided
      pure linters (ruff, shellcheck, yamllint, typos, `taplo lint`), the
+     `just --fmt --check` justfile-format check (the committed `just-fmt` hook,
+     mirrored in check mode since the sandbox is read-only), the
      `pre-commit-hooks` meta hooks, and the `vig-utils`/`bandit` hooks wired to
      hermetic Nix binaries (`${vigUtils}/bin/…`, `${pkgs.bandit}/bin/bandit`).
 

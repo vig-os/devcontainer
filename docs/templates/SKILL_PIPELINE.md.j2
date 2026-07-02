@@ -169,7 +169,7 @@ The autonomous pipeline doesn't run inside your current editor session. It runs 
 
 | Recipe | What it does |
 |--------|-------------|
-| `just worktree-start <issue> "<prompt>"` | Creates a worktree, resolves (or creates) the linked branch, sets up the environment (`uv sync`, `pre-commit install`, `.env` copy), then launches a `tmux` session running `claude --dangerously-skip-permissions` with the given prompt. If the worktree already exists, it reuses it. |
+| `just worktree-start <issue> "<prompt>"` | Creates a worktree, resolves (or creates) the linked branch, sets up the environment (`uv sync`, `prek install`, `.env` copy), then launches a `tmux` session running `claude --dangerously-skip-permissions` with the given prompt. If the worktree already exists, it reuses it. |
 | `just worktree-attach <issue>` | Attaches to the running `tmux` session so you can watch or intervene. |
 | `just worktree-list` | Lists all worktrees with their branch, issue number, and tmux status (`[RUNNING]` / `[STOPPED]`). |
 | `just worktree-stop <issue>` | Kills the tmux session, removes the worktree directory, and deletes the local branch. |
@@ -185,7 +185,7 @@ The autonomous pipeline doesn't run inside your current editor session. It runs 
    - Determines the base branch (parent issue's branch, or `dev`).
    - Creates and links the branch via `gh issue develop`.
    - Assigns the issue to `@me`.
-4. **Worktree setup** — `git worktree add`, then inside the worktree: `uv sync`, `pre-commit install`, copies `.env` from the main worktree.
+4. **Worktree setup** — `git worktree add`, then inside the worktree: `uv sync`, `prek install`, copies `.env` from the main worktree.
 5. **Launch** — starts `tmux new-session` running `claude --dangerously-skip-permissions "<prompt>"`.
 
 The `--dangerously-skip-permissions` flag means the agent auto-approves all shell commands — appropriate because there's no human at this terminal (the container is the trust boundary; `IS_SANDBOX=1` is set in the image).
