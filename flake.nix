@@ -114,7 +114,6 @@
           shellcheck
 
           # Linting
-          hadolint
           taplo
           nixfmt-rfc-style # nix file formatter (treefmt `nix fmt`, pre-commit hook)
           ruff # python linter/formatter (pre-commit ruff/ruff-format hooks)

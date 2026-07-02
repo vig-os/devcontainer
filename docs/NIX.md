@@ -13,7 +13,7 @@ see [`docs/NIX2CONTAINER.md`](NIX2CONTAINER.md).
 The flake exposes one list, `devTools`, that enumerates every CLI in the
 environment (`just`, `git`, `gh`, `uv`, `nodejs`, `jq`, `tmux`, `ripgrep`, `fd`,
 `bat`, `eza`, `delta`, `lazygit`, `zoxide`, `starship`, `neovim`, `claude-code`,
-`podman`, `hadolint`, `taplo`, `shellcheck`, …). Adding a tool there adds it
+`podman`, `taplo`, `shellcheck`, …). Adding a tool there adds it
 everywhere — the dev-shell now and the image's `imageTools` set.
 
 - **`devShells.default`** is built from `devTools` via `mkProjectShell`, so
