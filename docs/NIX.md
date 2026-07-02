@@ -114,12 +114,13 @@ pin wins and no download happens; the URL matters only on the CI runner.
   bare layered image lacks (an FHS base distro would otherwise supply it): the
   Nix evaluator (`nix`, `direnv`, `nix-direnv`), `glibcLocales` for locale
   support, the project Python env (`vig-utils` + `pip-licenses` baked via
-  `python314.withPackages`), `pre-commit`/`ruff`/`bandit`, Rust/just tooling
+  `python314.withPackages`), the `prek` hook runner (via `devTools`) + `bandit`,
+  Rust/just tooling
   (`cargo-binstall`, `just-lsp`, `typstyle`), core GNU utilities, `cacert`,
   `openssh`, and `dockerTools.fakeNss` (a root uid-0 user database, without which
   `ssh`/`tmux`/`git` fail with "No user exists for uid 0").
 
-A `bootstrap` layer bakes the workspace assets, the pre-commit cache dir, the
+A `bootstrap` layer bakes the workspace assets, the prek cache dir, the
 template `.venv` scaffold, a sticky `/tmp`, and the `precommit`/`cc`/`cld`
 aliases. The image's interpreter is pinned via `UV_PYTHON=<nix python3.14>` and
 `UV_PYTHON_DOWNLOADS=never`.
@@ -175,10 +176,50 @@ These are decided inline in `flake.nix`; summarized here.
   the in-container evaluator. It is the channel default, needs no overlay, and the
   flake is installer-agnostic, so swapping to `pkgs.lix` later is a one-line
   change. `pkgs.lix` is left out for now to keep the closure smaller.
-- **`pre-commit` vs `prek` (#40).** The image bakes upstream **`pre-commit`** to
-  match the prior Debian build and the pinned `pyproject` version. Migrating the
-  cache layer to `prek` is deferred to #40; both are in nixpkgs, so it is a
-  drop-in swap once that issue lands.
+- **`pre-commit` → `prek` (#778, closes #40).** The git-hook runner is now the
+  Rust **`prek`** (a drop-in for the Python `pre-commit`, faster and one fewer
+  manylinux/FHS consumer). `prek` lives in the `devTools` SSoT, so it ships in
+  both the dev-shell and the image; the standalone Python `pre-commit` is dropped
+  from both. The `.githooks` shims (wired via `core.hooksPath`) call `prek run`,
+  `just precommit` runs `prek run --all-files`, and the baked hook cache is
+  `PREK_HOME=/opt/prek-cache`.
+
+  **Two hook artifacts, kept in agreement.** The flake is the SSoT for the hook
+  *toolchain* and exposes a Nix-verified gate, but the runner still reads a
+  committed config, so there are two artifacts that must agree:
+
+  1. The committed **`.pre-commit-config.yaml`** is the hand-maintained,
+     PATH-based **runner** config that `prek` executes locally, in the image, and
+     in the downstream scaffold (`assets/workspace/`, which has no flake and whose
+     `language: system` hooks resolve from the image toolchain). It is *not*
+     generated from Nix: a store-path-bound generated file would not be portable
+     to the scaffold and would churn on every nixpkgs bump. The scaffold copy is
+     mirrored from it by the `sync-manifest` hook.
+  2. The flake's **`checks.pre-commit`** (built by `git-hooks.nix` with
+     `package = pkgs.prek`) runs the **sandbox-pure subset** of those hooks under
+     `nix flake check` — no network, no project venv. It reuses `treefmtEval` for
+     the single formatting hook (nixfmt + ruff-format + taplo), the nix-provided
+     pure linters (ruff, shellcheck, yamllint, typos, `taplo lint`), the
+     `just --fmt --check` justfile-format check (the committed `just-fmt` hook,
+     mirrored in check mode since the sandbox is read-only), the
+     `pre-commit-hooks` meta hooks, and the `vig-utils`/`bandit` hooks wired to
+     hermetic Nix binaries (`${vigUtils}/bin/…`, `${pkgs.bandit}/bin/bandit`).
+
+  Hooks that cannot run in the sandbox stay **runner-only** in the committed
+  config and are deliberately excluded from `checks.pre-commit`: the generators
+  `generate-docs`/`sync-manifest`, `pip-licenses` (reads `uv.lock`), `pymarkdown`
+  (not in nixpkgs), `no-commit-to-branch` and `destroyed-symlinks`
+  (git-state-dependent), `check-agent-identity` (inspects the commit
+  author/committer), and the `commit-msg`/`prepare-commit-msg`-stage hooks (never
+  run by `--all-files`). `checks.pre-commit` is thus a Nix-verified guarantee that
+  the pure hooks in the committed config stay correct; the impure ones remain
+  covered by CI's `prek run --all-files`. One fidelity note: the meta
+  `debug-statements` hook parses the file's Python AST, so its `git-hooks.nix`
+  package is pinned to the 3.14 `pre-commit-hooks` build to match the runner
+  interpreter (PEP 758 parenthesis-free `except A, B:`), and `check-yaml` runs
+  with `--allow-multiple-documents` in **both** the Nix check (git-hooks.nix'
+  built-in hardcodes `--multi`) and the committed runner, so the two agree on
+  multi-document YAML instead of the gate being more lenient than the runner.
 
 ### `libstdc++` for C-extension pre-commit hooks (#698)
 

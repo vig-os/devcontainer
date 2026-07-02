@@ -27,7 +27,7 @@ This command:
 
 - Creates (or reuses) a git worktree for the issue
 - Resolves or creates the linked branch
-- Sets up the environment (`uv sync`, `pre-commit install`)
+- Sets up the environment (`uv sync`, `prek install`)
 - Captures the local gh user as the reviewer (`gh api user --jq '.login'`)
 - Launches a tmux session running `claude --dangerously-skip-permissions`
 - Passes `/worktree-solve-and-pr` as the initial prompt
