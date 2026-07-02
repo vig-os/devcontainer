@@ -23,14 +23,6 @@ services:
     profiles:
       - debug
 
-  # Test sidecar service
-  test-sidecar:
-    image: localhost/test-sidecar:latest
-    container_name: test-sidecar
-    volumes:
-      - test-workspace:/workspace
-    command: sleep infinity
-
 volumes:
   # Named volume for test workspace - compose manages this, no host path needed
   test-workspace:

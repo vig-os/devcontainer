@@ -28,8 +28,8 @@ This matters for the `devcontainer up` tests: the scaffolded
 `ghcr.io/vig-os/devcontainer:${DEVCONTAINER_VERSION:-latest}`, and
 `initialize.sh` writes the scaffolded `.vig-os` version (a *published* release)
 into `.devcontainer/.env`. To keep the suite validating the image under test
-rather than a stale published image, the `devcontainer_up` and
-`devcontainer_with_sidecar` fixtures export `DEVCONTAINER_VERSION=TEST_CONTAINER_TAG`.
+rather than a stale published image, the `devcontainer_up` fixture exports
+`DEVCONTAINER_VERSION=TEST_CONTAINER_TAG`.
 Compose resolves shell environment variables ahead of `.env`, so the
 freshly-built tag wins; `devcontainer exec` calls inherit the same environment.
 To point the suite at a different build, set `TEST_CONTAINER_TAG` to that tag
