@@ -72,13 +72,16 @@ jobs:
         # the scan, decides pass/fail). Any code > 2 (e.g. 3 usage error, 127
         # not-found, 137 OOM-kill) means the scan itself failed — fail the job
         # instead of masking the crash as an empty, clean-looking result.
+        # The runner's default shell is `bash -e {0}`, so a bare vulnix call dies
+        # on exit 2 before the tolerant rc check runs — capture the status via
+        # `|| rc=$?` (errexit-safe) instead of a follow-up `rc=$?`.
         run: |
           set -uo pipefail
-          nix run .#vulnix -- --closure ./result --json > vulnix-findings.json
-          rc=$?
+          rc=0
+          nix run .#vulnix -- --closure ./result --json > vulnix-findings.json || rc=$?
           [ "$rc" -le 2 ] || { echo "::error::vulnix scan failed (exit $rc)"; exit "$rc"; }
-          nix run .#vulnix -- --closure ./result | tee vulnix-report.txt
-          rc=${PIPESTATUS[0]}
+          rc=0
+          nix run .#vulnix -- --closure ./result | tee vulnix-report.txt || rc=$?
           [ "$rc" -le 2 ] || { echo "::error::vulnix report failed (exit $rc)"; exit "$rc"; }
 
       - name: Gate on unexcepted HIGH/CRITICAL vulnix findings
@@ -114,6 +117,8 @@ jobs:
           exit-code: '0'
 
       - name: Upload vulnix findings + SBOM (Trivy-vs-vulnix overlap evidence)
+        # always(): a red vulnix-gate is exactly when the findings are needed
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: nix-image-cve-scan
