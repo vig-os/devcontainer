@@ -18,6 +18,12 @@
     # toolchain matches the dev-shell/image. Refs #778 (supersedes #40).
     git-hooks-nix.url = "github:cachix/git-hooks.nix";
     git-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";
+    # process-compose-flake + services-flake: daemonless local dev services
+    # (ADR-nix-devenv-strategy, axis 3). Both are dependency-free flakes (no
+    # inputs of their own), so there is nothing to `follows` and the lock gains
+    # exactly two leaf entries. Consumed by mkProjectServices. Refs #795.
+    process-compose-flake.url = "github:Platonic-Systems/process-compose-flake";
+    services-flake.url = "github:juspay/services-flake";
   };
 
   outputs =
@@ -28,6 +34,8 @@
       flake-utils,
       treefmt-nix,
       git-hooks-nix,
+      process-compose-flake,
+      services-flake,
     }:
     let
       # ---------------------------------------------------------------------
@@ -273,6 +281,34 @@
           # which a Nix-store interpreter cannot load there. Refs #632, #683.
           UV_PYTHON_DOWNLOADS_JSON_URL = uvPythonDownloadsJsonUrl;
         };
+
+      # ---------------------------------------------------------------------
+      # mkProjectServices — reusable local dev-services builder (#795).
+      #
+      # Boots declared services (Postgres, SeaweedFS, Redis, …) as native processes via
+      # process-compose + services-flake — no Docker/Podman daemon — with the
+      # service versions coming from the caller's `pkgs` (the pinned nixpkgs
+      # lock, never out-of-lock image tags). services-flake is consumed through
+      # process-compose-flake's standalone `evalModules` (its documented
+      # no-flake-parts path), so this flake stays on flake-utils; see
+      # docs/NIX.md for the recorded decision. Consumers need NO extra flake
+      # inputs — both service flakes resolve from THIS flake's lock:
+      #   packages.services = inputs.devcontainer.lib.mkProjectServices {
+      #     inherit pkgs;
+      #     modules = [ { services.postgres."db".enable = true; } ];
+      #   };
+      # Run with `nix run .#services` (add `--tui=false` for headless); state
+      # lands under ./data in the invocation cwd — gitignore it.
+      mkProjectServices =
+        {
+          pkgs,
+          modules ? [ ],
+          name ? "services",
+        }:
+        ((import process-compose-flake.lib { inherit pkgs; }).evalModules {
+          inherit name;
+          modules = [ services-flake.processComposeModules.default ] ++ modules;
+        }).config.outputs.package;
     in
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -552,6 +588,37 @@
             # the minimal shim an FHS base distro would have supplied. #727.
             dockerTools.usrBinEnv
           ]);
+
+        # servicesPoC — the #795 validating PoC: SeaweedFS (S3) + Postgres via
+        # mkProjectServices, exposed as `nix run .#services`. The issue named
+        # MinIO for the S3 half, but nixpkgs marks minio abandoned upstream
+        # with unfixed CVEs (knownVulnerabilities) on both channels, so the
+        # blessed PoC uses the maintained, S3-compatible SeaweedFS instead —
+        # recorded in docs/NIX.md and on #795. Non-default ports so a CI
+        # runner's own postgres (5432) or process-compose's API default (8080,
+        # the seaweedfs volume default) cannot collide; postgres must opt into
+        # TCP (listen_addresses defaults to "" = unix-socket-only). Booted
+        # end-to-end — no container daemon — by tests/test_flake_services.py.
+        servicesPoC = mkProjectServices {
+          inherit pkgs;
+          modules = [
+            {
+              services.postgres."pg" = {
+                enable = true;
+                listen_addresses = "127.0.0.1";
+                port = 5433;
+              };
+              services.seaweedfs."s3" = {
+                enable = true;
+                volume.port = 8380;
+                filer.enable = true;
+                filer.port = 8388;
+                s3.enable = true;
+                s3.port = 8333;
+              };
+            }
+          ];
+        };
       in
       {
         devShells.default = mkProjectShell { inherit pkgs; };
@@ -617,13 +684,21 @@
             touch "$out"
           '';
         };
-      }
-      # The image and its scan targets are Linux-only (dockerTools.* fails to
-      # even evaluate on darwin), so expose `packages` only on *-linux systems.
-      # Without this guard `nix flake check --all-systems` aborts during the
-      # darwin eval. The dev-shell stays cross-platform. Refs #774.
-      // pkgs.lib.optionalAttrs (pkgs.lib.hasSuffix "-linux" system) {
+
+        # ------------------------------------------------------------------
+        # packages — the cross-platform services PoC plus the Linux-only
+        # image set.
+        # ------------------------------------------------------------------
         packages = {
+          # The #795 SeaweedFS+Postgres local-services PoC (servicesPoC above):
+          # `nix run .#services` — pure module eval, cross-platform.
+          services = servicesPoC;
+        }
+        # The image and its scan targets are Linux-only (dockerTools.* fails to
+        # even evaluate on darwin), so expose them only on *-linux systems.
+        # Without this guard `nix flake check --all-systems` aborts during the
+        # darwin eval. The dev-shell and services stay cross-platform. Refs #774.
+        // pkgs.lib.optionalAttrs (pkgs.lib.hasSuffix "-linux" system) {
           # -----------------------------------------------------------------
           # devcontainerImage — Nix-built devcontainer image (T2.1, #634).
           #
@@ -939,7 +1014,8 @@
         };
 
         # ------------------------------------------------------------------
-        # apps — `nix run .#install` bootstraps a consumer project.
+        # apps — `nix run .#install` bootstraps a consumer project;
+        # `nix run .#services` boots the #795 local-services PoC.
         #
         # Wraps the host-level install.sh (the behavior SSoT: pulls the published
         # image and scaffolds a workspace) so consumers can run it straight from
@@ -952,13 +1028,23 @@
             drv = pkgs.writeShellScriptBin "install" (builtins.readFile ./install.sh);
             name = "install";
           };
+          services = flake-utils.lib.mkApp {
+            drv = servicesPoC;
+            name = "services";
+          };
           default = self.apps.${system}.install;
         };
       }
     )
     // {
       # System-independent reusable outputs.
-      lib = { inherit mkProjectShell devTools; };
+      lib = {
+        inherit
+          mkProjectShell
+          mkProjectServices
+          devTools
+          ;
+      };
       overlays.default = overlay;
 
       # ----------------------------------------------------------------------

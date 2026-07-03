@@ -147,6 +147,9 @@ rabbitmq-data/
 # ActiveMQ
 activemq-data/
 
+# process-compose / services-flake local services state (#795)
+data/
+
 # SageMath parsed files
 *.sage.py
 
