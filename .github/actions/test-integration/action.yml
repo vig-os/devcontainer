@@ -6,8 +6,8 @@
 # - Runs devcontainer integration tests
 #
 # Unlike test-image which tests the image properties, this tests the full
-# devcontainer lifecycle including initialization, git configuration, SSH setup,
-# and sidecar containers.
+# devcontainer lifecycle including initialization, git configuration, and SSH
+# setup.
 #
 # Inputs:
 #   image-tag: Image tag to test (e.g., 1.0.0-amd64)
@@ -255,7 +255,6 @@ runs:
 
         # Stop all devcontainers created during tests
         podman ps -a --filter "name=workspace-devcontainer" -q | xargs -r podman rm -f || true
-        podman ps -a --filter "name=test-sidecar" -q | xargs -r podman rm -f || true
 
         # Stop SSH agent
         if [ -n "${SSH_AGENT_PID:-}" ]; then
