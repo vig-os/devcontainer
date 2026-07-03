@@ -43,7 +43,7 @@ podman-ps *args:
         echo "==============================================================="
         echo "  Project-Related Containers"
         echo "==============================================================="
-        PATTERNS="devcontainer|test-sidecar|init-workspace|workspace-inspector|vig-os"
+        PATTERNS="devcontainer|init-workspace|workspace-inspector|vig-os"
         CONTAINERS=$(podman ps -a --format "$FMT_NAMES|$FMT_IMAGE|$FMT_STATUS" 2>/dev/null | grep -iE "$PATTERNS" || true)
         if [ -n "$CONTAINERS" ]; then
             echo "  NAME                          IMAGE                           STATUS"
@@ -57,7 +57,7 @@ podman-ps *args:
         echo "==============================================================="
         echo "  Project-Related Images"
         echo "==============================================================="
-        IMAGES=$(podman images --format "$FMT_REPO|$FMT_TAG|$FMT_SIZE" 2>/dev/null | grep -iE "devcontainer|test-sidecar|vig-os" || true)
+        IMAGES=$(podman images --format "$FMT_REPO|$FMT_TAG|$FMT_SIZE" 2>/dev/null | grep -iE "devcontainer|vig-os" || true)
         if [ -n "$IMAGES" ]; then
             echo "  REPOSITORY                    TAG        SIZE"
             echo "$IMAGES" | while IFS='|' read -r repo tag size; do
@@ -103,7 +103,7 @@ podman-kill-project:
     #!/usr/bin/env bash
     echo "Removing project-related containers..."
     FMT=$(printf '\x7b\x7b.ID\x7d\x7d')
-    CONTAINERS=$(podman ps -a --filter "name=devcontainer" --filter "name=test-sidecar" --filter "name=init-workspace" --filter "name=workspace-inspector" --format "$FMT" 2>/dev/null || true)
+    CONTAINERS=$(podman ps -a --filter "name=devcontainer" --filter "name=init-workspace" --filter "name=workspace-inspector" --format "$FMT" 2>/dev/null || true)
     if [ -n "$CONTAINERS" ]; then
         echo "$CONTAINERS" | xargs podman rm -f
         echo "[OK] Project containers removed"
@@ -143,7 +143,7 @@ podman-rmi-project:
     #!/usr/bin/env bash
     echo "Removing  Removing project-related images..."
     FMT=$(printf '\x7b\x7b.ID\x7d\x7d')
-    IMAGES=$(podman images --format "$FMT\t%(printf '\x7b\x7b.Repository\x7d\x7d')" 2>/dev/null | grep -iE "devcontainer|test-sidecar|vig-os" | cut -f1 || true)
+    IMAGES=$(podman images --format "$FMT\t%(printf '\x7b\x7b.Repository\x7d\x7d')" 2>/dev/null | grep -iE "devcontainer|vig-os" | cut -f1 || true)
     if [ -n "$IMAGES" ]; then
         echo "$IMAGES" | xargs podman rmi -f
         echo "[OK] Project images removed"

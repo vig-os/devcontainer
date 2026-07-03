@@ -13,7 +13,7 @@ see [`docs/NIX2CONTAINER.md`](NIX2CONTAINER.md).
 The flake exposes one list, `devTools`, that enumerates every CLI in the
 environment (`just`, `git`, `gh`, `uv`, `nodejs`, `jq`, `tmux`, `ripgrep`, `fd`,
 `bat`, `eza`, `delta`, `lazygit`, `zoxide`, `starship`, `neovim`, `claude-code`,
-`podman`, `hadolint`, `taplo`, `shellcheck`, …). Adding a tool there adds it
+`podman`, `taplo`, `shellcheck`, …). Adding a tool there adds it
 everywhere — the dev-shell now and the image's `imageTools` set.
 
 - **`devShells.default`** is built from `devTools` via `mkProjectShell`, so
@@ -89,7 +89,7 @@ there (#683). A store interpreter is patched to the store loader and runs in the
 dev-shell on both NixOS and FHS hosts. The **image** path uses the same two
 variables, baking the interpreter and toolchain from nixpkgs.
 
-**CI is the exception.** The `provision-via-flake` jobs (#632) run *outside*
+**CI is the exception.** The `setup-env` CI jobs (#632, #720) run *outside*
 `nix develop` — they only prepend the dev-shell's tool `PATH` — on an FHS runner,
 where a Nix store interpreter cannot load pre-commit's manylinux-wheel C
 extensions (`libstdc++.so.6`). So the dev-shell also keeps

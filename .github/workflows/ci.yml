@@ -237,6 +237,8 @@ jobs:
         uses: ./.github/actions/setup-env
         with:
           sync-dependencies: 'true'
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Install safety
         run: |
@@ -299,6 +301,8 @@ jobs:
         uses: ./.github/actions/setup-env
         with:
           sync-dependencies: 'true'
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Validate .trivyignore/.vulnixignore exception expirations
         run: uv run check-expirations .trivyignore .vulnixignore
@@ -363,6 +367,8 @@ jobs:
         uses: ./.github/actions/setup-env
         with:
           sync-dependencies: 'true'
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Validate dependency-review exceptions
         id: exceptions
