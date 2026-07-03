@@ -33,19 +33,17 @@ If these are missing, run the devcontainer post-create/bootstrap flow to install
 
 ## Mounts and multi-root workspaces
 
-This devcontainer supports mounting additional folders/projects using Docker Compose override files.
+This devcontainer supports mounting additional folders/projects through the
+layered Docker Compose files that ship with the scaffold:
 
-1. **Copy the example file:**
+- `docker-compose.project.yaml` — team-shared overrides (git-tracked, preserved
+  on upgrade)
+- `docker-compose.local.yaml` — personal overrides (git-ignored, preserved on
+  upgrade)
 
-   ```bash
-   cp docker-compose.override.yml.example docker-compose.override.yml
-   ```
-
-2. **Edit the file and uncomment the mounts you need:**
+1. **Edit the appropriate override file and add the mounts you need:**
 
    ```yaml
-   version: '3.8'
-
    services:
      devcontainer:
        volumes:
@@ -53,9 +51,10 @@ This devcontainer supports mounting additional folders/projects using Docker Com
          - ~/shared-libs:/workspace/shared:cached
    ```
 
-Paths to other mounts can be absolute or relative to the main project folder.
-   You can also specify read-only mount with `ro` instead of `cached`.
-   Your settings will remain local since `docker-compose.override.yml` is git-ignored.
+   Paths to other mounts can be absolute or relative to the main project folder.
+   You can also specify a read-only mount with `ro` instead of `cached`. Put
+   team-wide mounts in `docker-compose.project.yaml` and machine-specific ones
+   in `docker-compose.local.yaml` (which stays local since it is git-ignored).
 
 1. **Rebuild the devcontainer:**
    In VS Code: `Cmd/Ctrl+Shift+P` → "Dev Containers: Rebuild Container"
