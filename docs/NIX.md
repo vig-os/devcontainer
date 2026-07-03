@@ -21,8 +21,13 @@ everywhere — the dev-shell now and the image's `imageTools` set.
 - **`mkProjectShell`** is also a reusable `lib` output: downstream repos build
   their own shell as `devTools ++ extraPackages` (see the scaffolded
   `assets/workspace/flake.nix`).
-- **`overlays.default`** and **`lib.{mkProjectShell,devTools}`** are exported as
-  system-independent outputs so consumers can follow the same pinned `nixpkgs`.
+- **`mkProjectServices`** is the local-dev-services counterpart (#795): a `lib`
+  builder that turns declared [services-flake](https://github.com/juspay/services-flake)
+  modules into a daemonless `process-compose` stack (`nix run .#services`) —
+  see [Local dev services](#local-dev-services-mkprojectservices) below.
+- **`overlays.default`** and **`lib.{mkProjectShell,mkProjectServices,devTools}`**
+  are exported as system-independent outputs so consumers can follow the same
+  pinned `nixpkgs`.
 - **`nixosModules.default`** / **`homeManagerModules.default`** install the same
   `devTools` set into a NixOS or home-manager configuration — flip
   `programs.vigos-devtools.enable = true`. `claude-code` is unfree, so the
@@ -61,6 +66,77 @@ straight from the flake (`nix eval .#devShellTools`, derived from each package's
 asserting it exits 0. The test list is generated *from* the SSoT, so it can never
 drift from the tool list it guards. It is skipped automatically when `nix` is not
 on `PATH` (e.g. the podman image CI lane).
+
+## Local dev services (`mkProjectServices`)
+
+[ADR-nix-devenv-strategy](rfcs/ADR-nix-devenv-strategy.md) (#794) rejects
+`cachix/devenv` as the shared shell builder but adopts the one capability it
+bundled that plain `mkShell` lacks: `devenv up`-style orchestration of local
+dev services. `mkProjectServices` (#795) is that replacement —
+[`process-compose`](https://github.com/F1bonacc1/process-compose) (a single Go
+binary: no daemon, no root) driving service definitions from
+[`services-flake`](https://github.com/juspay/services-flake) (postgres,
+seaweedfs, redis, mysql, grafana, kafka, …).
+
+A consuming repo needs **no extra flake inputs** — both service flakes resolve
+from this flake's lock — and wires it exactly like `mkProjectShell`:
+
+```nix
+packages.services = vigos.lib.mkProjectServices {
+  inherit pkgs;
+  modules = [ { services.postgres."db".enable = true; } ];
+};
+```
+
+Then `nix run .#services` boots the stack (add `--tui=false` for headless use;
+Ctrl-C tears everything down). The scaffolded `justfile.project` carries a
+commented opt-in `services` recipe wrapping exactly that. Properties worth
+knowing:
+
+- **No container daemon.** Services run as native processes; the light
+  direnv-mode promise ("no Docker on the host") is preserved.
+- **Versions from the pinned `nixpkgs`.** Service binaries come from the
+  caller's `pkgs` — the same lock, Renovate flow, and vulnix scanning as the
+  toolchain; there are no out-of-lock image tags.
+- **State lands in `./data/<name>`** relative to the invocation cwd — add
+  `data/` to the repo's `.gitignore` (the scaffold ships this).
+- **GC-rooted with the flake** (via direnv's GC root, like the dev-shell) and
+  **zero import-from-derivation** — none of devenv's ~165 s cold-eval tax.
+- **macOS:** evaluation is cross-platform (guarded by
+  `tests/test_flake_services.py` against the darwin eval), but booting is only
+  CI-exercised on Linux.
+
+This repo's own flake carries the validating PoC: `nix run .#services` boots
+**SeaweedFS (S3 gateway on `:8333`) + Postgres (`:5433`)**, asserted end-to-end
+by `tests/test_flake_services.py` with no podman/docker anywhere in the test.
+
+### Decision: standalone `evalModules`, not flake-parts
+
+`services-flake` is idiomatically consumed via `flake-parts`, while this flake
+(and the consumer stub) are `flake-utils`/`eachDefaultSystem`. The ADR left the
+adopt-vs-manual question to #795; the resolution: **neither** — services-flake
+documents a first-class no-flake-parts path
+([`example/without-flake-parts`](https://github.com/juspay/services-flake/tree/main/example/without-flake-parts)),
+where `process-compose-flake`'s `lib.evalModules` evaluates the same modules
+standalone. `mkProjectServices` wraps that, so the flake structure is untouched
+and consumers see a plain derivation. Both new inputs are dependency-free leaf
+flakes: `flake.lock` gained exactly two entries and nothing to `follows`.
+
+Measured cost (x86_64-linux, warm store): flake eval of the services app
+~0.8 s, PoC closure build/substitute ~3 s, `process-compose` boot-to-healthy
+(both services) ~3 s. For comparison, the devenv path this replaces paid ~165 s
+of IFD on a cold eval (exo-pet/exo-fleet#76).
+
+### PoC S3 service: SeaweedFS, not MinIO
+
+Issue #795 originally named MinIO, but `nixpkgs` marks `minio` **abandoned
+upstream** with six unfixed CVEs (`meta.knownVulnerabilities`, both channels) —
+building it requires a `permittedInsecurePackages` exception, the wrong default
+for the org's blessed PoC. The PoC therefore ships the maintained,
+S3-compatible **SeaweedFS** (`services.seaweedfs` with `filer.enable` +
+`s3.enable`). A repo that truly needs MinIO for prod parity can still declare
+`services.minio` and scope the insecure-package exception into the `pkgs` it
+passes — consciously, per repo, never in the shared helper.
 
 ## Stable / unstable channel split and the fast-mover overlay
 

@@ -84,6 +84,12 @@ clean-artifacts:
 # run *args:
 #     uv run python -m {{project}} {{args}}
 #
+# # Boot the local dev services declared in flake.nix (mkProjectServices,
+# # #795): daemonless process-compose stack, state in ./data (gitignore it).
+# [group('services')]
+# services *args:
+#     nix run .#services -- {{args}}
+#
 # # Prepare release branch (manual workflow dispatch helper)
 # [group('release')]
 # prepare-release version:

@@ -72,6 +72,35 @@ setup() {
     assert_success
 }
 
+# ── opt-in local dev services (#795) ─────────────────────────────────────────
+# mkProjectServices (process-compose + services-flake) is opt-in for consumers:
+# the flake stub documents the wiring in a commented block, and justfile.project
+# ships a commented `services` recipe. Both files are preserved on upgrade, so
+# existing consumers are untouched by construction.
+
+@test "downstream flake stub documents the opt-in mkProjectServices block (#795)" {
+    run grep -q 'vigos.lib.mkProjectServices' "$TEMPLATE_DIR/flake.nix"
+    assert_success
+    run grep -q 'nix run .#services' "$TEMPLATE_DIR/flake.nix"
+    assert_success
+}
+
+@test "justfile.project ships the commented opt-in services recipe (#795)" {
+    run grep -q 'nix run .#services' "$TEMPLATE_DIR/justfile.project"
+    assert_success
+}
+
+@test "devcontainer verbs carry the devc- prefix, freeing generic names (#795)" {
+    # The compose-stack verbs are namespaced devc-* so a services verb (and
+    # future generic verbs) cannot collide with them. Guard both directions:
+    # devc-up exists, bare `up:`/`down:` recipes do not.
+    run grep -qE '^devc-up:' "$TEMPLATE_DIR/.devcontainer/justfile.devc"
+    assert_success
+    run grep -qE '^(up|down|status|logs|shell|restart|open) *[a-z*]*:' \
+        "$TEMPLATE_DIR/.devcontainer/justfile.devc"
+    assert_failure
+}
+
 # ── delivery-mode picker (#641) ───────────────────────────────────────────────
 # init-workspace.sh scaffolds the template, then prunes to the chosen mode:
 #   devcontainer -> .devcontainer/ only (no flake.nix/.envrc)

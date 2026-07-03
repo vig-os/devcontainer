@@ -223,3 +223,6 @@ justfile.local
 
 # Pre-commit cache
 .pre-commit-cache/
+
+# process-compose / services-flake local dev services state (#795)
+data/
