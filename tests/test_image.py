@@ -904,9 +904,11 @@ class TestFileStructure:
             "/root/assets/workspace/.githooks/pre-commit",
         ]
 
-        # Define files and folders that should be gitignored (user-specific, not in image)
+        # Define files and folders that should be gitignored (user-specific, not
+        # in image). Note: docker-compose.local.yaml is NOT in this list — the
+        # scaffold ships it as a services:{} template (expected_files above);
+        # a stale ".yml" spelling that matched nothing was dropped in #806.
         gitignored_content = [
-            "/root/assets/workspace/.devcontainer/docker-compose.local.yml",
             "/root/assets/workspace/.devcontainer/.conf",
             "/root/assets/workspace/.devcontainer/workspace.code-workspace",
         ]

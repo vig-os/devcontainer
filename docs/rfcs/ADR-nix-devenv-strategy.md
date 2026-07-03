@@ -184,7 +184,8 @@ verb — already the mechanism the devcontainer mode uses.
 is a single Go binary (TUI + declarative config, **no daemon, no root**) —
 "compose for native processes." `services-flake` generates process-compose configs
 for common services (postgres, minio, redis, mysql, …) from Nix. Exposed as `nix
-run .#services` (or a `just up` verb) from inside a plain `pkgs.mkShell`.
+run .#services` (or a `just services` verb, as shipped by #795) from inside a
+plain `pkgs.mkShell`.
 
 - **Pros:** Native processes, **no container daemon** — preserves the light "no
   Docker" promise. Service versions come from the **same nixpkgs lock/SSoT** as
