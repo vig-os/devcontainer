@@ -107,9 +107,47 @@ def test_checks_output_exposes_quality_gates() -> None:
     if result.returncode != 0:
         pytest.fail("Failed to read checks.<system> attr names:\n" + result.stderr)
     names = set(json.loads(result.stdout))
-    required = {"formatting", "deadnix", "statix", "devShell", "devShellTools"}
+    required = {
+        "formatting",
+        "deadnix",
+        "statix",
+        "devShell",
+        "devShellTools",
+        # git-hooks.nix runs the sandbox-pure subset of the pre-commit hooks as
+        # a flake check, driven by the prek runner (#778).
+        "pre-commit",
+    }
     missing = required - names
     assert not missing, f"checks output is missing gates: {sorted(missing)}"
+
+
+def test_nix_fast_build_driver_is_exposed() -> None:
+    """``packages.<system>.nix-fast-build`` must stay exposed (the Tier-0 driver).
+
+    CI runs ``nix run .#nix-fast-build`` to build every ``checks.<system>``
+    derivation in parallel (the Tier-0 gate, #779). Guard the package so removing
+    it is caught here rather than as a cryptic failure of the CI check step.
+    """
+    system = _current_system()
+    result = subprocess.run(
+        [
+            "nix",
+            "eval",
+            "--raw",
+            f"{REPO_ROOT}#packages.{system}.nix-fast-build.meta.mainProgram",
+        ],
+        capture_output=True,
+        text=True,
+        env=_nix_env(),
+        timeout=600,
+    )
+    if result.returncode != 0:
+        pytest.fail(
+            "Failed to read packages.<system>.nix-fast-build:\n" + result.stderr
+        )
+    assert result.stdout.strip() == "nix-fast-build", (
+        f"nix-fast-build package main program is unexpected: {result.stdout.strip()!r}"
+    )
 
 
 def test_install_app_is_runnable() -> None:
