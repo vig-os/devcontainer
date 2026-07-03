@@ -975,21 +975,19 @@ class TestFileStructure:
         """
         manifest = host.file("/root/assets/.placeholder-manifest.txt")
         assert manifest.exists, (
-            "placeholder manifest not found at "
-            "/root/assets/.placeholder-manifest.txt"
+            "placeholder manifest not found at /root/assets/.placeholder-manifest.txt"
         )
         assert manifest.is_file, "placeholder manifest is not a regular file"
 
         lines = [ln for ln in manifest.content_string.splitlines() if ln.strip()]
         assert lines, "placeholder manifest is empty"
-        assert all(
-            ln.startswith("/root/assets/workspace/") for ln in lines
-        ), "placeholder manifest contains non-workspace paths"
+        assert all(ln.startswith("/root/assets/workspace/") for ln in lines), (
+            "placeholder manifest contains non-workspace paths"
+        )
         # A known placeholder-bearing scaffold file must be listed so the fast
         # path actually substitutes it (guards against an empty/degenerate list).
         assert "/root/assets/workspace/pyproject.toml" in lines, (
-            "placeholder manifest missing known placeholder-bearing file "
-            "pyproject.toml"
+            "placeholder manifest missing known placeholder-bearing file pyproject.toml"
         )
 
     def test_manifest_files(self, host, parse_manifest):
