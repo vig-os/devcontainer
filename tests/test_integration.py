@@ -3042,7 +3042,7 @@ class TestVersionCheckJustIntegration:
     """Test integration of version check with just commands."""
 
     def test_just_check_command_exists(self, initialized_workspace):
-        """Test that 'just check' command is available."""
+        """Test that 'just devc-check' command is available."""
         # Check if .devcontainer/justfile.devc has the check recipe
         justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
@@ -3068,7 +3068,7 @@ class TestVersionCheckJustIntegration:
         assert "update" in content, "update recipe not found in justfile.project"
 
     def test_just_check_calls_script(self, initialized_workspace):
-        """Test that 'just check config' executes successfully."""
+        """Test that 'just devc-check config' executes successfully."""
         # First verify the script exists
         script_path = (
             initialized_workspace / ".devcontainer" / "scripts" / "version-check.sh"
@@ -3102,7 +3102,7 @@ class TestVersionCheckJustIntegration:
         assert "Configuration" in result.stdout or "Enabled:" in result.stdout
 
     def test_just_check_recipe_calls_version_check_script(self, initialized_workspace):
-        """Test that 'just check' recipe properly calls version-check.sh."""
+        """Test that 'just devc-check' recipe properly calls version-check.sh."""
         justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
@@ -3119,7 +3119,7 @@ class TestVersionCheckJustIntegration:
         lines = content.split("\n")
         check_recipe_idx = None
         for i, line in enumerate(lines):
-            if line.startswith("check "):
+            if line.startswith("devc-check "):
                 check_recipe_idx = i
                 break
 
@@ -3133,7 +3133,7 @@ class TestVersionCheckJustIntegration:
             pytest.fail("check recipe not in 'info' group")
 
     def test_just_check_verbose_mode(self, initialized_workspace):
-        """Test that 'just check' runs in verbose mode (check subcommand)."""
+        """Test that 'just devc-check' runs in verbose mode (check subcommand)."""
         justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
@@ -3150,7 +3150,7 @@ class TestVersionCheckJustIntegration:
         )
 
     def test_just_check_accepts_subcommands(self, initialized_workspace):
-        """Test that 'just check' recipe accepts and passes through subcommands."""
+        """Test that 'just devc-check' recipe accepts and passes through subcommands."""
         justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
@@ -3164,7 +3164,7 @@ class TestVersionCheckJustIntegration:
         lines = content.split("\n")
         check_line = None
         for line in lines:
-            if line.startswith("check "):
+            if line.startswith("devc-check "):
                 check_line = line
                 break
 
@@ -3172,7 +3172,7 @@ class TestVersionCheckJustIntegration:
         assert "*args" in check_line, "check recipe doesn't accept variadic arguments"
 
     def test_just_check_config_shows_configuration(self, initialized_workspace):
-        """Test that 'just check config' shows version check configuration."""
+        """Test that 'just devc-check config' shows version check configuration."""
         script_path = (
             initialized_workspace / ".devcontainer" / "scripts" / "version-check.sh"
         )
@@ -3194,7 +3194,7 @@ class TestVersionCheckJustIntegration:
         assert "interval:" in result.stdout.lower()
 
     def test_just_check_config_via_just_command(self, initialized_workspace):
-        """Regression: 'just check config' resolves path correctly (issue #187)."""
+        """Regression: 'just devc-check config' resolves path correctly (issue #187)."""
         justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
         if not justfile_base.exists():
             pytest.skip("justfile.devc not found")
@@ -3202,7 +3202,7 @@ class TestVersionCheckJustIntegration:
             pytest.skip("check recipe not found")
 
         result = subprocess.run(
-            ["just", "check", "config"],
+            ["just", "devc-check", "config"],
             capture_output=True,
             text=True,
             cwd=str(initialized_workspace),
@@ -3210,7 +3210,7 @@ class TestVersionCheckJustIntegration:
         )
 
         assert result.returncode == 0, (
-            f"just check config failed (path resolution bug #187): {result.stderr}"
+            f"just devc-check config failed (path resolution bug #187): {result.stderr}"
         )
         assert "Could not locate .devcontainer/scripts directory" not in (
             result.stdout + result.stderr
@@ -3260,7 +3260,7 @@ class TestVersionCheckJustIntegration:
         assert "import '.devcontainer/justfile.base'" not in content
 
     def test_just_check_mute_functionality(self, initialized_workspace):
-        """Test that 'just check 7d' mutes notifications."""
+        """Test that 'just devc-check 7d' mutes notifications."""
         script_path = (
             initialized_workspace / ".devcontainer" / "scripts" / "version-check.sh"
         )
@@ -3285,7 +3285,7 @@ class TestVersionCheckJustIntegration:
         assert muted_file.exists()
 
     def test_just_check_enable_disable(self, initialized_workspace):
-        """Test that 'just check on/off' enables/disables notifications."""
+        """Test that 'just devc-check on/off' enables/disables notifications."""
         script_path = (
             initialized_workspace / ".devcontainer" / "scripts" / "version-check.sh"
         )
@@ -3474,16 +3474,16 @@ class TestVersionCheckNotificationMessage:
     def test_notification_shows_devcontainer_upgrade_command(
         self, version_check_script
     ):
-        """Test that notification message shows 'just devcontainer-upgrade'."""
+        """Test that notification message shows 'just devc-upgrade'."""
         content = version_check_script.read_text()
 
         # Find the notify_update function
         assert "notify_update" in content, "notify_update function not found"
 
         # Check if it mentions the correct upgrade command
-        assert (
-            "just devcontainer-upgrade" in content or "devcontainer-upgrade" in content
-        ), "Notification should mention 'just devcontainer-upgrade' command"
+        assert "just devc-upgrade" in content or "devc-upgrade" in content, (
+            "Notification should mention 'just devc-upgrade' command"
+        )
 
     def test_notification_does_not_show_just_update(self, version_check_script):
         """Test that notification doesn't show misleading 'just update' command."""
@@ -3546,20 +3546,20 @@ class TestVersionCheckNotificationMessage:
         # Should show mute and disable options
         notify_section = content[content.find("notify_update") :]
 
-        assert "just check" in notify_section and "off" in notify_section, (
-            "Notification should show how to disable ('just check off')"
+        assert "just devc-check" in notify_section and "off" in notify_section, (
+            "Notification should show how to disable ('just devc-check off')"
         )
 
         assert "7d" in notify_section or "mute" in notify_section.lower(), (
-            "Notification should show how to mute (e.g., 'just check 7d')"
+            "Notification should show how to mute (e.g., 'just devc-check 7d')"
         )
 
 
 class TestDevcontainerUpgradeRecipe:
-    """Test the host-side 'just devcontainer-upgrade' recipe."""
+    """Test the host-side 'just devc-upgrade' recipe."""
 
     def test_devcontainer_upgrade_recipe_exists(self, initialized_workspace):
-        """Test that 'just devcontainer-upgrade' recipe exists in justfile.devc."""
+        """Test that 'just devc-upgrade' recipe exists in justfile.devc."""
         justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
@@ -3568,8 +3568,8 @@ class TestDevcontainerUpgradeRecipe:
         content = justfile_base.read_text()
 
         # Recipe should exist
-        assert "devcontainer-upgrade" in content, (
-            "devcontainer-upgrade recipe not found in justfile.devc"
+        assert "devc-upgrade" in content, (
+            "devc-upgrade recipe not found in justfile.devc"
         )
 
     def test_devcontainer_upgrade_detects_container_environment(
@@ -3585,7 +3585,7 @@ class TestDevcontainerUpgradeRecipe:
 
         # Should check for container indicators
         assert "/.dockerenv" in content or "container" in content, (
-            "devcontainer-upgrade recipe should detect container environment"
+            "devc-upgrade recipe should detect container environment"
         )
 
     def test_devcontainer_upgrade_shows_error_in_container(self, initialized_workspace):
@@ -3597,13 +3597,13 @@ class TestDevcontainerUpgradeRecipe:
 
         content = justfile_base.read_text()
 
-        # Find the devcontainer-upgrade recipe
+        # Find the devc-upgrade recipe
         lines = content.split("\n")
         recipe_start = None
         recipe_end = None
 
         for i, line in enumerate(lines):
-            if "devcontainer-upgrade" in line and ":" in line:
+            if "devc-upgrade" in line and ":" in line:
                 recipe_start = i
                 # Find the end (next recipe or end of file)
                 for j in range(i + 1, len(lines)):
@@ -3617,7 +3617,7 @@ class TestDevcontainerUpgradeRecipe:
                 break
 
         if recipe_start is None:
-            pytest.skip("devcontainer-upgrade recipe not found")
+            pytest.skip("devc-upgrade recipe not found")
 
         recipe_content = "\n".join(
             lines[recipe_start : recipe_end if recipe_end else len(lines)]
@@ -3657,15 +3657,15 @@ class TestDevcontainerUpgradeRecipe:
 
         content = justfile_base.read_text()
 
-        # Find the devcontainer-upgrade recipe section
-        if "devcontainer-upgrade" in content:
+        # Find the devc-upgrade recipe section
+        if "devc-upgrade" in content:
             # Should call the install script
             assert "install.sh" in content, "Recipe should call install.sh"
 
             assert "--force" in content, "Recipe should use --force flag for upgrades"
 
     def test_devcontainer_upgrade_in_info_group(self, initialized_workspace):
-        """Test that devcontainer-upgrade recipe is in the 'info' group."""
+        """Test that devc-upgrade recipe is in the 'info' group."""
         justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
@@ -3674,22 +3674,22 @@ class TestDevcontainerUpgradeRecipe:
         content = justfile_base.read_text()
         lines = content.split("\n")
 
-        # Find the devcontainer-upgrade recipe
+        # Find the devc-upgrade recipe
         recipe_idx = None
         for i, line in enumerate(lines):
-            if "devcontainer-upgrade:" in line:
+            if "devc-upgrade:" in line:
                 recipe_idx = i
                 break
 
         if recipe_idx is None:
-            pytest.skip("devcontainer-upgrade recipe not found")
+            pytest.skip("devc-upgrade recipe not found")
 
         # Look backwards for group annotation
         for i in range(recipe_idx - 1, max(0, recipe_idx - 5), -1):
             if "[group('info')]" in lines[i]:
                 return  # Found it
 
-        pytest.fail("devcontainer-upgrade recipe not in 'info' group")
+        pytest.fail("devc-upgrade recipe not in 'info' group")
 
 
 class TestVersionCheckGracefulFailure:

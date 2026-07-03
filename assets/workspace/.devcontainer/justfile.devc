@@ -10,10 +10,10 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 # -------------------------------------------------------------------------------
 
 # Check for devcontainer updates (verbose)
-# Usage: just check [config|on|off|<duration>]
-# Examples: just check, just check config, just check off, just check 7d
+# Usage: just devc-check [config|on|off|<duration>]
+# Examples: just devc-check, just devc-check config, just devc-check off, just devc-check 7d
 [group('info')]
-check *args:
+devc-check *args:
     #!/usr/bin/env bash
     SCRIPT_DIR="$(cd "{{source_directory()}}/scripts" && pwd)" || {
         echo "Error: Could not locate .devcontainer/scripts directory"
@@ -32,7 +32,7 @@ check *args:
 # Upgrade devcontainer to latest version (host-side only)
 # This recipe MUST be run from a host terminal, not inside the container
 [group('info')]
-devcontainer-upgrade:
+devc-upgrade:
     #!/usr/bin/env bash
     # Detect if running inside a container
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
@@ -43,7 +43,7 @@ devcontainer-upgrade:
         echo "Open a new terminal on your host machine and run:"
         echo ""
         echo "    cd $(pwd)"
-        echo "    just devcontainer-upgrade"
+        echo "    just devc-upgrade"
         echo ""
         echo "Or use the curl method:"
         echo ""

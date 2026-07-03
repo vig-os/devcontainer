@@ -280,7 +280,7 @@ notify_update() {
     echo ""
     echo -e "  Run from a ${BOLD}host terminal${NC} (not inside the container):"
     echo ""
-    echo -e "    ${BOLD}just devcontainer-upgrade${NC}"
+    echo -e "    ${BOLD}just devc-upgrade${NC}"
     echo ""
     echo -e "  Or without just:"
     echo ""
@@ -288,7 +288,7 @@ notify_update() {
     echo ""
     echo -e "  After upgrading, rebuild the container in VS Code."
     echo ""
-    echo -e "  Mute: ${BOLD}just check 7d${NC}    Disable: ${BOLD}just check off${NC}"
+    echo -e "  Mute: ${BOLD}just devc-check 7d${NC}    Disable: ${BOLD}just devc-check off${NC}"
     echo ""
 }
 
