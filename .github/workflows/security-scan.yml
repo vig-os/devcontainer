@@ -110,8 +110,10 @@ jobs:
             rc=0
             nix run .#vulnix -- --closure ./result --json > vulnix-findings.json || rc=$?
             [ "$rc" -le 2 ] && jq -e . vulnix-findings.json > /dev/null 2>&1 && break
-            echo "::warning::vulnix scan attempt ${attempt} failed (exit ${rc}); retrying in $((60 * attempt))s"
-            sleep $((60 * attempt))
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::vulnix scan attempt ${attempt} failed (exit ${rc}); retrying in $((60 * attempt))s"
+              sleep $((60 * attempt))
+            fi
           done
           [ "$rc" -le 2 ] && jq -e . vulnix-findings.json > /dev/null 2>&1 \
             || { echo "::error::vulnix scan failed after 3 attempts (exit $rc)"; exit 1; }
