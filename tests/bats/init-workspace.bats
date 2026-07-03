@@ -101,6 +101,35 @@ setup() {
     assert_failure
 }
 
+# ── justfile audit (#806) ─────────────────────────────────────────────────────
+# Post-#795 completion of the devc-* namespacing, and the worktree recipes are
+# reachable in consumers (the scaffold ships justfile.worktree AND .claude
+# skills that invoke `just worktree-start`, so the root justfile must import it).
+
+@test "remaining devcontainer verbs are devc-namespaced: check + upgrade (#806)" {
+    run grep -qE '^devc-check' "$TEMPLATE_DIR/.devcontainer/justfile.devc"
+    assert_success
+    run grep -qE '^devc-upgrade:' "$TEMPLATE_DIR/.devcontainer/justfile.devc"
+    assert_success
+    run grep -qE '^(check|devcontainer-upgrade) *[a-z*]*:' \
+        "$TEMPLATE_DIR/.devcontainer/justfile.devc"
+    assert_failure
+}
+
+@test "scaffold justfile imports the shipped worktree recipes (#806)" {
+    run grep -qF "import? '.devcontainer/justfile.worktree'" "$TEMPLATE_DIR/justfile"
+    assert_success
+}
+
+@test "scaffold devcontainer README documents the live compose layering (#806)" {
+    # The override-file workflow was replaced by docker-compose.project.yaml /
+    # docker-compose.local.yaml; the shipped README must not resurrect it.
+    run grep -q 'docker-compose.override' "$TEMPLATE_DIR/.devcontainer/README.md"
+    assert_failure
+    run grep -q 'docker-compose.project.yaml' "$TEMPLATE_DIR/.devcontainer/README.md"
+    assert_success
+}
+
 # ── delivery-mode picker (#641) ───────────────────────────────────────────────
 # init-workspace.sh scaffolds the template, then prunes to the chosen mode:
 #   devcontainer -> .devcontainer/ only (no flake.nix/.envrc)
