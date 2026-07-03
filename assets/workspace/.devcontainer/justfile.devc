@@ -84,10 +84,10 @@ devcontainer-upgrade:
 
 # Start the devcontainer via compose
 [group('devcontainer')]
-up:
+devc-up:
     #!/usr/bin/env bash
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
-        echo "[ERROR] Run this from the host: just up"
+        echo "[ERROR] Run this from the host: just devc-up"
         exit 1
     fi
     cd .devcontainer || exit 1
@@ -104,10 +104,10 @@ up:
 
 # Stop and remove containers
 [group('devcontainer')]
-down:
+devc-down:
     #!/usr/bin/env bash
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
-        echo "[ERROR] Run this from the host: just down"
+        echo "[ERROR] Run this from the host: just devc-down"
         exit 1
     fi
     cd .devcontainer || exit 1
@@ -124,10 +124,10 @@ down:
 
 # Show container status
 [group('devcontainer')]
-status:
+devc-status:
     #!/usr/bin/env bash
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
-        echo "[ERROR] Run this from the host: just status"
+        echo "[ERROR] Run this from the host: just devc-status"
         exit 1
     fi
     cd .devcontainer || exit 1
@@ -144,10 +144,10 @@ status:
 
 # Tail container logs
 [group('devcontainer')]
-logs *args:
+devc-logs *args:
     #!/usr/bin/env bash
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
-        echo "[ERROR] Run this from the host: just logs"
+        echo "[ERROR] Run this from the host: just devc-logs"
         exit 1
     fi
     cd .devcontainer || exit 1
@@ -164,10 +164,10 @@ logs *args:
 
 # Open bash in running devcontainer
 [group('devcontainer')]
-shell:
+devc-shell:
     #!/usr/bin/env bash
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
-        echo "[ERROR] Run this from the host: just shell"
+        echo "[ERROR] Run this from the host: just devc-shell"
         exit 1
     fi
     cd .devcontainer || exit 1
@@ -184,10 +184,10 @@ shell:
 
 # Restart service(s)
 [group('devcontainer')]
-restart *args:
+devc-restart *args:
     #!/usr/bin/env bash
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
-        echo "[ERROR] Run this from the host: just restart"
+        echo "[ERROR] Run this from the host: just devc-restart"
         exit 1
     fi
     cd .devcontainer || exit 1
@@ -204,10 +204,10 @@ restart *args:
 
 # Open VS Code attached to the running container
 [group('devcontainer')]
-open:
+devc-open:
     #!/usr/bin/env bash
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
-        echo "[ERROR] Run this from the host: just open"
+        echo "[ERROR] Run this from the host: just devc-open"
         exit 1
     fi
     if command -v code &>/dev/null; then

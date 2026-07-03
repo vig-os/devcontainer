@@ -51,6 +51,18 @@
           extraPackages = extraPackages pkgs;
         };
 
+        # Opt-in local dev services (#795): a daemonless process-compose stack
+        # (Postgres, SeaweedFS/S3, Redis, …) with service versions from the
+        # pinned vigos nixpkgs — no Docker/Podman daemon, no extra flake
+        # inputs. Uncomment, then `nix run .#services` (or enable the
+        # `services` recipe in justfile.project); service state lands in
+        # ./data — add it to .gitignore.
+        #
+        #   packages.services = vigos.lib.mkProjectServices {
+        #     inherit pkgs;
+        #     modules = [ { services.postgres."db".enable = true; } ];
+        #   };
+
         # Future (upstream, opt-in): vigos may expose modular language shells —
         # e.g. `vigos.devShells.${system}.{cpp,geant4,dataAnalysis}` — that you
         # select without changing this scaffold. Out of scope today.
