@@ -3119,7 +3119,7 @@ class TestVersionCheckJustIntegration:
         lines = content.split("\n")
         check_recipe_idx = None
         for i, line in enumerate(lines):
-            if line.startswith("check "):
+            if line.startswith("devc-check "):
                 check_recipe_idx = i
                 break
 
@@ -3164,7 +3164,7 @@ class TestVersionCheckJustIntegration:
         lines = content.split("\n")
         check_line = None
         for line in lines:
-            if line.startswith("check "):
+            if line.startswith("devc-check "):
                 check_line = line
                 break
 
