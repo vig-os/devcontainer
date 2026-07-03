@@ -9,7 +9,7 @@ services:
       # Path is set by initialize.sh in .env, falls back to Docker default
       - "${CONTAINER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock"
     environment:
-      # PRE_COMMIT_HOME, UV_PROJECT_ENVIRONMENT, VIRTUAL_ENV are set in the image (Containerfile)
+      # PRE_COMMIT_HOME, UV_PROJECT_ENVIRONMENT, VIRTUAL_ENV are set in the image (flake.nix)
       # Tell Podman/Docker to use the mounted socket (for container builds)
       - CONTAINER_HOST=unix:///var/run/docker.sock
       - DOCKER_HOST=unix:///var/run/docker.sock
