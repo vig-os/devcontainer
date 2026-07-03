@@ -3481,9 +3481,9 @@ class TestVersionCheckNotificationMessage:
         assert "notify_update" in content, "notify_update function not found"
 
         # Check if it mentions the correct upgrade command
-        assert (
-            "just devc-upgrade" in content or "devc-upgrade" in content
-        ), "Notification should mention 'just devc-upgrade' command"
+        assert "just devc-upgrade" in content or "devc-upgrade" in content, (
+            "Notification should mention 'just devc-upgrade' command"
+        )
 
     def test_notification_does_not_show_just_update(self, version_check_script):
         """Test that notification doesn't show misleading 'just update' command."""

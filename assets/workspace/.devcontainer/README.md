@@ -59,7 +59,7 @@ layered Docker Compose files that ship with the scaffold:
 1. **Rebuild the devcontainer:**
    In VS Code: `Cmd/Ctrl+Shift+P` → "Dev Containers: Rebuild Container"
 
-2. **Accessing mounted folders:**
+1. **Accessing mounted folders:**
    Mounted folders are accessible from the terminal in `/workspace/`:
 
    ```bash
@@ -70,7 +70,7 @@ layered Docker Compose files that ship with the scaffold:
    cd /workspace/other-project
    ```
 
-3. **Configure VS Code workspace (optional):**
+1. **Configure VS Code workspace (optional):**
    To browse and edit mounted folders from VS Code's Explorer, copy the workspace example:
 
    ```bash
