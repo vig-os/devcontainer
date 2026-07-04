@@ -24,6 +24,12 @@
     # exactly two leaf entries. Consumed by mkProjectServices. Refs #795.
     process-compose-flake.url = "github:Platonic-Systems/process-compose-flake";
     services-flake.url = "github:juspay/services-flake";
+    # home-manager powers the vigos.* home environment — the ONLY input the
+    # module product adds (ADR-home-environment-modules axis 3). The release
+    # branch matches the nixos-26.05 pin; follows keeps one resolved nixpkgs.
+    # Refs #819.
+    home-manager.url = "github:nix-community/home-manager/release-26.05";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -36,6 +42,7 @@
       git-hooks-nix,
       process-compose-flake,
       services-flake,
+      home-manager,
     }:
     let
       # ---------------------------------------------------------------------
@@ -58,13 +65,7 @@
       # (tests/bats/test_helper.bash) resolves them from the Nix store — the
       # flake SSoT — replacing the npm (node_modules) / Debian (/usr/lib)
       # resolution that does not exist on the Nix toolchain. Refs #695.
-      batsWithLibs =
-        pkgs:
-        pkgs.bats.withLibraries (p: [
-          p.bats-support
-          p.bats-assert
-          p.bats-file
-        ]);
+      batsWithLibs = import ./nix/bats.nix;
 
       # Import nixpkgs-unstable for a given system (allowUnfree covers
       # claude-code). Evaluated once per system in the per-system `let` below and
@@ -93,6 +94,73 @@
       # No concrete system is known here, so it imports unstable inside the
       # fixpoint; the in-flake path below uses the hoisted importUnstable.
       overlay = final: prev: mkFastMoverOverlay (importUnstable final.system) final prev;
+
+      # ---------------------------------------------------------------------
+      # vigos home environment (#819): self-pkgs + the ci homeConfigurations.
+      # ---------------------------------------------------------------------
+      # pkgs for the flake's own homeConfigurations (self-pkgs): the same
+      # stable base + fast-mover overlay + allowUnfree combination as the
+      # per-system dev-shell pkgs, so claude-code and friends resolve to the
+      # very same versions across dev-shell, image, and home modules.
+      mkHomePkgs =
+        system:
+        import nixpkgs {
+          inherit system;
+          overlays = [ (mkFastMoverOverlay (importUnstable system)) ];
+          config.allowUnfree = true;
+        };
+
+      # Every system the home modules target. x86_64-darwin evaluates but is
+      # never built in CI (best-effort tier, ADR platform table).
+      hmSystems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
+        "x86_64-darwin"
+      ];
+
+      # The two CI profiles: minimal exercises one module, full exercises the
+      # whole option surface. Kept in lockstep with nix/home/.
+      hmProfiles = {
+        minimal = {
+          vigos.shell.enable = true;
+        };
+        full = {
+          vigos = {
+            packages.enable = true;
+            shell.enable = true;
+            multiplexer.enable = true;
+            cli.enable = true;
+            direnv.enable = true;
+            git.enable = true;
+          };
+        };
+      };
+
+      # ci-<profile>-<system> homeConfigurations: synthetic user, pinned
+      # stateVersion — schema-asserted by tests/test_flake_checks.py.
+      ciHomeConfigurations = nixpkgs.lib.listToAttrs (
+        nixpkgs.lib.concatMap (
+          system:
+          map (profile: {
+            name = "ci-${profile}-${system}";
+            value = home-manager.lib.homeManagerConfiguration {
+              pkgs = mkHomePkgs system;
+              modules = [
+                ./nix/home/default.nix
+                {
+                  home = {
+                    username = "ci";
+                    homeDirectory = if nixpkgs.lib.hasSuffix "-darwin" system then "/Users/ci" else "/home/ci";
+                    stateVersion = "26.05";
+                  };
+                }
+                hmProfiles.${profile}
+              ];
+            };
+          }) (builtins.attrNames hmProfiles)
+        ) hmSystems
+      );
 
       # ---------------------------------------------------------------------
       # devTools — the single source of truth for the toolchain.
@@ -631,6 +699,13 @@
             test "$count" -gt 0
             touch "$out"
           '';
+        }
+        # The ci homeConfigurations build as Tier-0 checks. x86_64-darwin is
+        # the eval-only best-effort tier (ADR platform table): it exists as a
+        # homeConfiguration but gets no build leg. Refs #819.
+        // pkgs.lib.optionalAttrs (system != "x86_64-darwin") {
+          hm-minimal = self.homeConfigurations."ci-minimal-${system}".activationPackage;
+          hm-full = self.homeConfigurations."ci-full-${system}".activationPackage;
         };
 
         # ------------------------------------------------------------------
@@ -1049,5 +1124,8 @@
         git = ./nix/home/git.nix;
       };
       homeModules = self.homeManagerModules;
+
+      # The ci matrix (+ demo later, #827). Built as per-system checks below.
+      homeConfigurations = ciHomeConfigurations;
     };
 }

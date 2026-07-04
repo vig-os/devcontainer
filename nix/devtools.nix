@@ -2,7 +2,12 @@
 # the Nix-built image, and the vigos.packages home module. Lives outside
 # flake.nix so the vigos.* path modules (nix/home/) can share it without
 # duplicating the list. Refs #818.
-pkgs: with pkgs; [
+pkgs:
+let
+  batsWithLibs = import ./bats.nix;
+in
+with pkgs;
+[
   # Build automation
   just
 
