@@ -24,3 +24,15 @@ CVE-2026-42504
 # - Tracking: https://github.com/vig-os/devcontainer/issues/512
 Expiration: 2026-09-01
 jwt-token
+
+# CVE-2026-32316, CVE-2026-40164: jq DoS / potential arbitrary code execution
+# Risk Assessment: LOW (devcontainer context)
+# - HIGH severity in Debian jq/libjq1 1.6-2.1+deb12u1; fixed in 1.6-2.1+deb12u2
+# - :latest is frozen pending the Nix publish-cutover (#639); the Debian rebuild
+#   path was decommissioned (#642), so :latest cannot be rebuilt to pull deb12u2.
+#   Time-box the ignore until the Nix image ships.
+# - jq processes trusted local JSON in devcontainer workflows, not untrusted input
+# - Tracking: https://github.com/vig-os/devcontainer/issues/805, #512
+Expiration: 2026-09-01
+CVE-2026-32316
+CVE-2026-40164
