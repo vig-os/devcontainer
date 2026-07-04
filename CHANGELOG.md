@@ -182,6 +182,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`setup-env` no longer flakes on a SIGPIPE race when listing the provisioned dev-shell PATH** ([#847](https://github.com/vig-os/devcontainer/issues/847))
+  - The provisioning step's `grep '^/nix/store' | head -50` summary runs under the runner's `pipefail` shell; once the dev-shell PATH topped 50 nix-store entries, `head` exiting early could SIGPIPE `grep` (exit 2) and fail the step — a scheduling race that killed a release build-and-test leg. `sed -n '1,50p'` consumes the whole stream and prints the same summary
 - **Release lane fixed for the Nix stack: current runners + tolerated vulnix findings exit** ([#842](https://github.com/vig-os/devcontainer/issues/842))
   - `release.yml`'s build-and-test matrix still pinned Debian-era `ubuntu-22.04`/`ubuntu-22.04-arm` runners, whose podman 3.4.4 breaks rootless volume UID mapping — `init-workspace.sh`'s in-container rsync failed to chmod the `/workspace` scaffold (`Operation not permitted`), killing the integration tests that pass everywhere else on `ubuntu-24.04` (podman 4.9.3). The matrix now uses the same `ubuntu-24.04`/`ubuntu-24.04-arm` expression as `nix-image.yml`
   - The release `Run vulnix` step missed `security-scan.yml`'s `|| rc=$?` capture, so under the runner's `bash -e` a normal exit 2 (findings present, to be judged against `.vulnixignore`) aborted the step before the vulnix-gate ran. The step now uses the nightly's capture/retry pattern (crashes with exit > 2 or invalid JSON still fail loudly)
