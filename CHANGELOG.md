@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **ADR: terminal home environment as devkit home-manager modules** ([#815](https://github.com/vig-os/devcontainer/issues/815))
+  - Accepted `docs/rfcs/ADR-home-environment-modules.md`: parameterized `vigos.*` home-manager modules as a second product of this repo (epic [#814](https://github.com/vig-os/devcontainer/issues/814)).
+
 ### Changed
 
 ### Deprecated
