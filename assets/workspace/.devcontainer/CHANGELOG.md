@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Scheduled nixpkgs-unstable lock bump** ([#817](https://github.com/vig-os/devcontainer/issues/817))
   - Weekly workflow refreshing the fast-movers pin (uv, gh, claude-code) via a chore PR to dev, gated by full CI.
 
+- **vigos.* home module set + homeConfigurations matrix** ([#818](https://github.com/vig-os/devcontainer/issues/818), [#819](https://github.com/vig-os/devcontainer/issues/819))
+  - `homeManagerModules.{default,packages,shell,multiplexer,cli,direnv,git}` exported as path modules (+ `homeModules` alias); `home-manager` flake input (release-26.05, nixpkgs follows); `ci-{minimal,full}` homeConfigurations across 4 systems built as Tier-0 `hm-*` checks (x86_64-darwin eval-only).
+
 - **Home Matrix CI workflow** ([#820](https://github.com/vig-os/devcontainer/issues/820))
   - Builds the ci homeConfigurations on aarch64-darwin (macos-latest) and aarch64-linux and pushes closures to Cachix; separate non-required workflow (fail-soft by status).
 
@@ -42,7 +45,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+#### Modules
+
+- **homeManagerModules.default is now the umbrella** importing every `vigos.*` module, each disabled by default ([#818](https://github.com/vig-os/devcontainer/issues/818)); existing imports keep working unchanged.
+
 ### Deprecated
+
+#### Modules
+
+- **`programs.vigos-devtools.enable`** → `vigos.packages.enable` ([#818](https://github.com/vig-os/devcontainer/issues/818)); a `mkRenamedOptionModule` shim keeps the old option working for one release (docs/NIX.md policy).
 
 ### Removed
 
