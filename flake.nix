@@ -128,6 +128,7 @@
         full = {
           vigos = {
             packages.enable = true;
+            claude.enable = true;
             shell.enable = true;
             multiplexer.enable = true;
             cli.enable = true;
@@ -1122,6 +1123,7 @@
         cli = ./nix/home/cli.nix;
         direnv = ./nix/home/direnv.nix;
         git = ./nix/home/git.nix;
+        claude = ./nix/home/claude.nix;
       };
       homeModules = self.homeManagerModules;
 
