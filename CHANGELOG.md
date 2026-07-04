@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CLAUDE.md hierarchy templates** ([#828](https://github.com/vig-os/devcontainer/issues/828))
   - docs/home/claude-md/: user-global, workspace-root, and workspace layer templates + the directory-layout convention that makes the cascade work. Guidelines, not enforcement.
 
+- **vigos.claude module + container secrets path** ([#823](https://github.com/vig-os/devcontainer/issues/823), absorbs [#546](https://github.com/vig-os/devcontainer/issues/546))
+  - ~/.claude policy per the ADR: settings.json seeded copy-if-absent (org seed pre-authorizes nothing, includeCoAuthoredBy=false), managed vigos.md fragment (checksum-overwrite + .bak), @vigos.md import line seeded into the user-owned CLAUDE.md, DISABLE_AUTOUPDATER via sessionVariables, optional workspace-CLAUDE.md management (empty by default).
+  - Devcontainer scaffold mounts ~/.config/vigos/secrets read-only and exports the files as env vars at shell startup — the slim token path replacing setup-claude.sh forwarding.
+
 ### Changed
 
 #### Modules

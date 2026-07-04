@@ -9,5 +9,6 @@
     ./cli.nix
     ./direnv.nix
     ./git.nix
+    ./claude.nix
   ];
 }

@@ -43,7 +43,6 @@ in
       git = lib.mkMerge [
         {
           enable = lib.mkDefault true;
-          delta.enable = lib.mkDefault true;
         }
         (lib.mkIf (cfg.userName != null) { userName = lib.mkDefault cfg.userName; })
         (lib.mkIf (cfg.userEmail != null) { userEmail = lib.mkDefault cfg.userEmail; })
@@ -55,6 +54,11 @@ in
           };
         })
       ];
+
+      delta = {
+        enable = lib.mkDefault true;
+        enableGitIntegration = lib.mkDefault true;
+      };
 
       gh = {
         enable = lib.mkDefault true;
