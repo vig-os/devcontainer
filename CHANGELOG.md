@@ -182,6 +182,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`install.sh --version` now pins the scaffolded `.vig-os` to the requested version** ([#852](https://github.com/vig-os/devcontainer/issues/852))
+  - The Nix image bakes the release it was built from into the scaffolded `.vig-os` (correct for finals, where the repo pin is bumped at finalize — but stale for release candidates), and `install.sh` never wrote its `--version` into the scaffold. An RC install therefore pinned the previous release: the 0.4.0-rc1 smoke test scaffolded the new prek-era workspace pinned to the Debian 0.3.9 image and its CI lint failed with `prek: command not found`. `install.sh` now forwards an explicit `--version` as `VIG_OS_VERSION` and `init-workspace.sh` pins it in `.vig-os` post-scaffold; plain `latest` installs keep the baked pin
 - **Release-lane Trivy scan aligned with the ratified awareness-only posture** ([#849](https://github.com/vig-os/devcontainer/issues/849))
   - `release.yml`'s build-and-test Trivy step was the last Debian-era blocking scanner (`exit-code: 1` with only `.trivyignore`), failing the candidate on embedded language-ecosystem HIGHs already triaged into `.vulnixignore`. Per the #637 decision the Nix image's blocking CVE control is the vulnix-gate; the step is now non-blocking (`exit-code: 0`, `continue-on-error`) with its table kept in the log as awareness signal, mirroring `security-scan.yml` and `ci.yml`
 - **`setup-env` no longer flakes on a SIGPIPE race when listing the provisioned dev-shell PATH** ([#847](https://github.com/vig-os/devcontainer/issues/847))

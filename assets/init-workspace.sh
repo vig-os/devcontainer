@@ -17,6 +17,8 @@
 #   SHORT_NAME           - Project short name (required)
 #   ORG_NAME             - Organization name (optional, defaults to "vigOS/devc")
 #   GITHUB_REPOSITORY    - owner/repo for Renovate preset extends (optional if origin is github.com)
+#   VIG_OS_VERSION       - Override the DEVCONTAINER_VERSION pinned in the scaffolded
+#                          .vig-os (optional; install.sh forwards its --version, #852)
 
 set -euo pipefail
 
@@ -366,6 +368,20 @@ case "$MODE" in
         : # keep everything
         ;;
 esac
+
+# Pin the explicitly requested devcontainer version (#852). The image bakes
+# the release it was built from into the scaffolded .vig-os (flake bootstrap),
+# which is correct for finals but stale for release candidates: the repo-root
+# pin only advances at finalize. install.sh forwards its --version here so the
+# scaffold pins the image actually installed.
+if [[ -n "${VIG_OS_VERSION:-}" && -f "$WORKSPACE_DIR/.vig-os" ]]; then
+    if [[ ! "$VIG_OS_VERSION" =~ ^[A-Za-z0-9._-]+$ ]]; then
+        echo "Error: invalid VIG_OS_VERSION: $VIG_OS_VERSION" >&2
+        exit 1
+    fi
+    echo "Pinning DEVCONTAINER_VERSION=${VIG_OS_VERSION} in .vig-os..."
+    sed -i "s/^DEVCONTAINER_VERSION=.*/DEVCONTAINER_VERSION=${VIG_OS_VERSION}/" "$WORKSPACE_DIR/.vig-os"
+fi
 
 resolve_github_repository
 
