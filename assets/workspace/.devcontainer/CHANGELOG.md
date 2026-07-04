@@ -182,6 +182,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Shipped consumer `prepare-release.yml` caps its PR body under GitHub's 65,536-char limit** ([#857](https://github.com/vig-os/devcontainer/issues/857))
+  - #812 capped the PR body only in this repo's own workflow; the scaffolded consumer copy still interpolated the full frozen changelog section uncapped, so a consumer with a large release (the 0.4.0-rc3 smoke test seeds this repo's ~67k-char section) failed `Create draft PR to main` with `GraphQL: Body is too long`. The shipped workflow now applies the same line-boundary truncation with a pointer to the release branch's full `CHANGELOG.md`
 - **Scaffold ships `.typos.toml` so the shipped typos hook passes out of the box** ([#855](https://github.com/vig-os/devcontainer/issues/855))
   - The scaffolded `.pre-commit-config.yaml` runs the `typos` hook, but the exception config stayed repo-local — consumers linted scaffold-shipped content (`version-check.sh`'s `Nd` duration syntax, the synced changelog's "unexcepted" CVE-policy term) with zero exceptions and failed immediately, as the 0.4.0-rc2 smoke test showed. `.typos.toml` now syncs into the workspace template via `scripts/manifest.toml`, same as `.yamllint`/`.pymarkdown`
 - **`install.sh --version` now pins the scaffolded `.vig-os` to the requested version** ([#852](https://github.com/vig-os/devcontainer/issues/852))
