@@ -399,7 +399,7 @@ def test_personal_template_is_exposed() -> None:
             "--json",
             f"{REPO_ROOT}#templates.personal",
             "--apply",
-            "t: { hasPath = t ? path; hasDescription = (t.description or \"\") != \"\"; }",
+            't: { hasPath = t ? path; hasDescription = (t.description or "") != ""; }',
         ],
         capture_output=True,
         text=True,
