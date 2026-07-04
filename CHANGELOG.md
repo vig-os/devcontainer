@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Home Matrix CI workflow** ([#820](https://github.com/vig-os/devcontainer/issues/820))
   - Builds the ci homeConfigurations on aarch64-darwin (macos-latest) and aarch64-linux and pushes closures to Cachix; separate non-required workflow (fail-soft by status).
 
+- **vigos.shell module** ([#821](https://github.com/vig-os/devcontainer/issues/821))
+  - Bash + zsh, starship, atuin, zoxide under one enable flag; opt-in secretsEnv hook exporting ~/.config/vigos/secrets/<NAME> per the ADR credentials interface.
+
 ### Changed
 
 ### Deprecated
