@@ -37,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Home environment docs** ([#825](https://github.com/vig-os/devcontainer/issues/825), [#826](https://github.com/vig-os/devcontainer/issues/826))
   - docs/home/: bootstrap guide (installer, macOS trusted-users trap, first activation), override cookbook, rollback table, best-effort Intel meaning, credential-hygiene runbook.
 
+- **CLAUDE.md hierarchy templates** ([#828](https://github.com/vig-os/devcontainer/issues/828))
+  - docs/home/claude-md/: user-global, workspace-root, and workspace layer templates + the directory-layout convention that makes the cascade work. Guidelines, not enforcement.
+
 ### Changed
 
 ### Deprecated
