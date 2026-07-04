@@ -182,6 +182,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Scaffold ships `.typos.toml` so the shipped typos hook passes out of the box** ([#855](https://github.com/vig-os/devcontainer/issues/855))
+  - The scaffolded `.pre-commit-config.yaml` runs the `typos` hook, but the exception config stayed repo-local — consumers linted scaffold-shipped content (`version-check.sh`'s `Nd` duration syntax, the synced changelog's "unexcepted" CVE-policy term) with zero exceptions and failed immediately, as the 0.4.0-rc2 smoke test showed. `.typos.toml` now syncs into the workspace template via `scripts/manifest.toml`, same as `.yamllint`/`.pymarkdown`
 - **`install.sh --version` now pins the scaffolded `.vig-os` to the requested version** ([#852](https://github.com/vig-os/devcontainer/issues/852))
   - The Nix image bakes the release it was built from into the scaffolded `.vig-os` (correct for finals, where the repo pin is bumped at finalize — but stale for release candidates), and `install.sh` never wrote its `--version` into the scaffold. An RC install therefore pinned the previous release: the 0.4.0-rc1 smoke test scaffolded the new prek-era workspace pinned to the Debian 0.3.9 image and its CI lint failed with `prek: command not found`. `install.sh` now forwards an explicit `--version` as `VIG_OS_VERSION` and `init-workspace.sh` pins it in `.vig-os` post-scaffold; plain `latest` installs keep the baked pin
 - **Release-lane Trivy scan aligned with the ratified awareness-only posture** ([#849](https://github.com/vig-os/devcontainer/issues/849))

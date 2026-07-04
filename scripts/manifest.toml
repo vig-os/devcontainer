@@ -30,6 +30,9 @@ src = ".gitmessage"
 src = ".yamllint"
 
 [[entries]]
+src = ".typos.toml"
+
+[[entries]]
 src = ".pymarkdown"
 
 [[entries]]
