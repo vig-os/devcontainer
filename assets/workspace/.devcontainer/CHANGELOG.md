@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ADR: terminal home environment as devkit home-manager modules** ([#815](https://github.com/vig-os/devcontainer/issues/815))
   - Accepted `docs/rfcs/ADR-home-environment-modules.md`: parameterized `vigos.*` home-manager modules as a second product of this repo (epic [#814](https://github.com/vig-os/devcontainer/issues/814)).
 
+- **Home-manager module release/versioning policy** ([#816](https://github.com/vig-os/devcontainer/issues/816))
+  - `docs/NIX.md`: modules ride the existing release train (consumers pin tags), `mkRenamedOptionModule` deprecation shims, dogfood-canary exception, and the `#### Modules` changelog sub-heading convention.
+  - Workspace scaffold `vigos.url` float is now documented as deliberate, with the pin recipe.
+
 ### Changed
 
 ### Deprecated

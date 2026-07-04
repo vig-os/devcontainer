@@ -67,6 +67,32 @@ asserting it exits 0. The test list is generated *from* the SSoT, so it can neve
 drift from the tool list it guards. It is skipped automatically when `nix` is not
 on `PATH` (e.g. the podman image CI lane).
 
+## Home-manager modules — versioning & release policy
+
+The `vigos.*` home-manager modules ([ADR](rfcs/ADR-home-environment-modules.md),
+epic #814) are a **second product** of this flake with a consumer-facing API
+(their options). Policy:
+
+- **One release train.** Modules ship with the repo's existing tagged releases —
+  there is no separate module release cycle. Consumers pin a tag:
+  `vigos.url = "github:vig-os/devcontainer?ref=<tag>";` and bump deliberately
+  (`nix flake update vigos`). Tracking `main`/`dev` is not a documented
+  consumption mode.
+- **Scaffold exception.** The workspace scaffold (`assets/workspace/flake.nix`)
+  deliberately floats on the default branch so freshly scaffolded projects work
+  before their first pin; the comment there points consumers at this policy for
+  pinning once they depend on module stability.
+- **Dogfood-canary exception.** The maintainer's personal configuration tracks
+  `dev` during a module wave's dogfood phase (pre-release canary); the pin-tags
+  policy applies to everyone else, and to it once the first module-bearing tag
+  ships.
+- **Deprecation.** Option renames keep a `lib.mkRenamedOptionModule` shim for
+  one release and get a changelog entry. Removals are announced one release
+  ahead.
+- **Changelog.** Module-facing changes are grouped under a `#### Modules`
+  sub-heading inside the relevant Keep-a-Changelog category of `## Unreleased`,
+  so consumers can scan API changes without reading image/CI noise.
+
 ## Local dev services (`mkProjectServices`)
 
 [ADR-nix-devenv-strategy](rfcs/ADR-nix-devenv-strategy.md) (#794) rejects
