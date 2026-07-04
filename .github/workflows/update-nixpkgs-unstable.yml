@@ -49,26 +49,56 @@ jobs:
       - name: Update the nixpkgs-unstable input
         run: nix flake update nixpkgs-unstable
 
-      - name: Open PR if the lock changed
+      - name: Detect lock change
+        id: detect
+        run: |
+          set -euo pipefail
+          if git diff --quiet flake.lock; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "flake.lock unchanged - nothing to do."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or reset the chore branch at dev HEAD
+        if: steps.detect.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
           set -euo pipefail
-          if git diff --quiet flake.lock; then
-            echo "flake.lock unchanged — nothing to do."
-            exit 0
+          sha=$(git rev-parse HEAD)
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/chore/update-nixpkgs-unstable" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/git/refs/heads/chore/update-nixpkgs-unstable" \
+              -f sha="$sha" -F force=true >/dev/null
+          else
+            gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/heads/chore/update-nixpkgs-unstable" -f sha="$sha" >/dev/null
           fi
-          branch="chore/update-nixpkgs-unstable"
-          git config user.name "vigos-commit-app[bot]"
-          git config user.email "vigos-commit-app[bot]@users.noreply.github.com"
-          git switch -c "$branch"
-          git add flake.lock
-          git commit -m "chore(nix): bump nixpkgs-unstable (fast-movers refresh)"
-          git push --force origin "$branch"
-          # Reuse an open PR for the branch if one exists; otherwise create it.
-          if ! gh pr list --head "$branch" --base dev --state open --json number --jq '.[0].number' | grep -q .; then
+
+      # Commit via the GitHub API (vig-os/commit-action) so the commit carries
+      # GitHub's verified signature - the repo rules reject unsigned git-CLI
+      # pushes. Same mechanism as renovate-changelog-commit.yml.
+      - name: Commit the lock bump via API
+        if: steps.detect.outputs.changed == 'true'
+        uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TARGET_BRANCH: refs/heads/chore/update-nixpkgs-unstable
+          MAX_ATTEMPTS: "3"
+          COMMIT_MESSAGE: "chore(nix): bump nixpkgs-unstable (fast-movers refresh)"
+          FILE_PATHS: flake.lock
+
+      - name: Open PR if none exists
+        if: steps.detect.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          if ! gh pr list --head chore/update-nixpkgs-unstable --base dev --state open \
+              --json number --jq '.[0].number' | grep -q .; then
             body="$(printf 'Scheduled refresh of the nixpkgs-unstable pin (uv, gh, claude-code via the fastMovers overlay). Full CI on this PR is the merge gate.\n\nRefs: #817\n')"
-            gh pr create --base dev --head "$branch" \
+            gh pr create --base dev --head chore/update-nixpkgs-unstable \
               --title "chore(nix): bump nixpkgs-unstable (fast-movers refresh)" \
               --body "$body"
           fi
