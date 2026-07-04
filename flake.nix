@@ -24,6 +24,12 @@
     # exactly two leaf entries. Consumed by mkProjectServices. Refs #795.
     process-compose-flake.url = "github:Platonic-Systems/process-compose-flake";
     services-flake.url = "github:juspay/services-flake";
+    # home-manager powers the vigos.* home environment — the ONLY input the
+    # module product adds (ADR-home-environment-modules axis 3). The release
+    # branch matches the nixos-26.05 pin; follows keeps one resolved nixpkgs.
+    # Refs #819.
+    home-manager.url = "github:nix-community/home-manager/release-26.05";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -36,6 +42,7 @@
       git-hooks-nix,
       process-compose-flake,
       services-flake,
+      home-manager,
     }:
     let
       # ---------------------------------------------------------------------
@@ -58,13 +65,7 @@
       # (tests/bats/test_helper.bash) resolves them from the Nix store — the
       # flake SSoT — replacing the npm (node_modules) / Debian (/usr/lib)
       # resolution that does not exist on the Nix toolchain. Refs #695.
-      batsWithLibs =
-        pkgs:
-        pkgs.bats.withLibraries (p: [
-          p.bats-support
-          p.bats-assert
-          p.bats-file
-        ]);
+      batsWithLibs = import ./nix/bats.nix;
 
       # Import nixpkgs-unstable for a given system (allowUnfree covers
       # claude-code). Evaluated once per system in the per-system `let` below and
@@ -95,6 +96,73 @@
       overlay = final: prev: mkFastMoverOverlay (importUnstable final.system) final prev;
 
       # ---------------------------------------------------------------------
+      # vigos home environment (#819): self-pkgs + the ci homeConfigurations.
+      # ---------------------------------------------------------------------
+      # pkgs for the flake's own homeConfigurations (self-pkgs): the same
+      # stable base + fast-mover overlay + allowUnfree combination as the
+      # per-system dev-shell pkgs, so claude-code and friends resolve to the
+      # very same versions across dev-shell, image, and home modules.
+      mkHomePkgs =
+        system:
+        import nixpkgs {
+          inherit system;
+          overlays = [ (mkFastMoverOverlay (importUnstable system)) ];
+          config.allowUnfree = true;
+        };
+
+      # Every system the home modules target. x86_64-darwin evaluates but is
+      # never built in CI (best-effort tier, ADR platform table).
+      hmSystems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
+        "x86_64-darwin"
+      ];
+
+      # The two CI profiles: minimal exercises one module, full exercises the
+      # whole option surface. Kept in lockstep with nix/home/.
+      hmProfiles = {
+        minimal = {
+          vigos.shell.enable = true;
+        };
+        full = {
+          vigos = {
+            packages.enable = true;
+            shell.enable = true;
+            multiplexer.enable = true;
+            cli.enable = true;
+            direnv.enable = true;
+            git.enable = true;
+          };
+        };
+      };
+
+      # ci-<profile>-<system> homeConfigurations: synthetic user, pinned
+      # stateVersion — schema-asserted by tests/test_flake_checks.py.
+      ciHomeConfigurations = nixpkgs.lib.listToAttrs (
+        nixpkgs.lib.concatMap (
+          system:
+          map (profile: {
+            name = "ci-${profile}-${system}";
+            value = home-manager.lib.homeManagerConfiguration {
+              pkgs = mkHomePkgs system;
+              modules = [
+                ./nix/home/default.nix
+                {
+                  home = {
+                    username = "ci";
+                    homeDirectory = if nixpkgs.lib.hasSuffix "-darwin" system then "/Users/ci" else "/home/ci";
+                    stateVersion = "26.05";
+                  };
+                }
+                hmProfiles.${profile}
+              ];
+            };
+          }) (builtins.attrNames hmProfiles)
+        ) hmSystems
+      );
+
+      # ---------------------------------------------------------------------
       # devTools — the single source of truth for the toolchain.
       #
       # This list is the shared basis for the dev-shell now and the image later
@@ -102,60 +170,7 @@
       # (tests/test_flake_devshell.py) reads `devShellTools` so it can never
       # drift from this list.
       # ---------------------------------------------------------------------
-      devTools =
-        pkgs: with pkgs; [
-          # Build automation
-          just
-
-          # Git-hook runner: prek (Rust drop-in for the Python pre-commit,
-          # faster and one fewer manylinux/FHS consumer). The SSoT runner for
-          # the `.githooks` hooks and the flake's `checks.pre-commit`. Refs #778.
-          prek
-
-          # Version control & GitHub (gh from unstable via overlay)
-          git
-          gh
-          lazygit
-          delta
-
-          # Python tooling (uv from unstable via overlay)
-          uv
-
-          # Node.js (devcontainer CLI via npm)
-          nodejs
-
-          # Shell testing: bats core + helper libraries (support/assert/file).
-          # Wrapped so BATS_LIB_PATH is exported for bats_load_library. Refs #695.
-          (batsWithLibs pkgs)
-
-          # Shell & JSON utilities
-          jq
-          tmux
-          shellcheck
-
-          # Linting
-          taplo
-          nixfmt-rfc-style # nix file formatter (treefmt `nix fmt`, pre-commit hook)
-          ruff # python linter/formatter (pre-commit ruff/ruff-format hooks)
-          typos # source typo checker (pre-commit typos hook)
-          deadnix # dead-Nix-code linter (flake `checks.deadnix`)
-          statix # nix anti-pattern linter (flake `checks.statix`)
-
-          # Container runtime
-          podman
-
-          # Agent / terminal toolkit (absorbed from #545)
-          ripgrep # rg
-          fd
-          bat
-          eza
-          zoxide
-          starship
-          charm-freeze # freeze (charmbracelet terminal screenshots)
-          expect
-          neovim # nvim
-          claude-code # claude
-        ];
+      devTools = import ./nix/devtools.nix;
 
       # Binary names exposed for the parity test. Prefer the package's declared
       # `meta.mainProgram` (the canonical executable name, e.g. ripgrep -> rg,
@@ -659,7 +674,7 @@
           # `{ self, … }` output signature, whose intentionally-unused args
           # deadnix would otherwise flag. Refs #777.
           deadnix = pkgs.runCommand "deadnix-check" { nativeBuildInputs = [ pkgs.deadnix ]; } ''
-            deadnix --fail ${./flake.nix}
+            deadnix --fail ${./flake.nix} ${./nix}
             touch "$out"
           '';
 
@@ -667,6 +682,7 @@
           # `inherit`). Same authored-flake scoping rationale as deadnix. Refs #777.
           statix = pkgs.runCommand "statix-check" { nativeBuildInputs = [ pkgs.statix ]; } ''
             statix check ${./flake.nix}
+            statix check ${./nix}
             touch "$out"
           '';
 
@@ -683,6 +699,13 @@
             test "$count" -gt 0
             touch "$out"
           '';
+        }
+        # The ci homeConfigurations build as Tier-0 checks. x86_64-darwin is
+        # the eval-only best-effort tier (ADR platform table): it exists as a
+        # homeConfiguration but gets no build leg. Refs #819.
+        // pkgs.lib.optionalAttrs (system != "x86_64-darwin") {
+          hm-minimal = self.homeConfigurations."ci-minimal-${system}".activationPackage;
+          hm-full = self.homeConfigurations."ci-full-${system}".activationPackage;
         };
 
         # ------------------------------------------------------------------
@@ -1081,22 +1104,53 @@
           };
         };
 
-      # No `nixpkgs.overlays` here: home-manager rejects setting it when the
-      # consumer supplies an external `pkgs` (the common flake case). Fast-movers
-      # then track the consumer's channel unless they apply `overlays.default`
-      # themselves — documented in docs/NIX.md. Refs #777.
-      homeManagerModules.default =
-        {
-          config,
-          lib,
-          pkgs,
-          ...
-        }:
-        {
-          options.programs.vigos-devtools.enable = lib.mkEnableOption "the vigOS devcontainer toolchain (devTools)";
-          config = lib.mkIf config.programs.vigos-devtools.enable {
-            home.packages = devTools pkgs;
-          };
+      # ----------------------------------------------------------------------
+      # vigos.* home modules (#818) - the terminal home environment as
+      # per-concern home-manager modules (ADR-home-environment-modules).
+      # Exported as PATHS, not imported functions: the module system dedups
+      # path imports, so importing the `default` umbrella plus an individual
+      # module never double-declares options. The legacy
+      # `programs.vigos-devtools.enable` is shimmed in packages.nix
+      # (mkRenamedOptionModule, one release - docs/NIX.md policy).
+      # `homeModules` is the newer-convention alias of the same set.
+      # ----------------------------------------------------------------------
+      homeManagerModules = {
+        default = ./nix/home/default.nix;
+        packages = ./nix/home/packages.nix;
+        shell = ./nix/home/shell.nix;
+        multiplexer = ./nix/home/multiplexer.nix;
+        cli = ./nix/home/cli.nix;
+        direnv = ./nix/home/direnv.nix;
+        git = ./nix/home/git.nix;
+      };
+      homeModules = self.homeManagerModules;
+
+      # The ci matrix plus `demo` — onboarding sugar built from the same
+      # modules (full profile, synthetic user). Refs #827.
+      homeConfigurations = ciHomeConfigurations // {
+        demo = home-manager.lib.homeManagerConfiguration {
+          pkgs = mkHomePkgs "x86_64-linux";
+          modules = [
+            ./nix/home/default.nix
+            {
+              home = {
+                username = "demo";
+                homeDirectory = "/home/demo";
+                stateVersion = "26.05";
+              };
+            }
+            hmProfiles.full
+          ];
         };
+      };
+
+      # `nix flake init -t github:vig-os/devcontainer#personal` scaffolds a
+      # ~40-line personal flake importing the vigos.* modules. NOT in the
+      # deadnix/statix scope: like the workspace scaffold, the template keeps
+      # idiomatic possibly-unused args. Refs #827.
+      templates.personal = {
+        path = ./templates/personal;
+        description = "Personal home-manager flake importing the vigOS home modules";
+      };
     };
 }

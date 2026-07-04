@@ -9,9 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **ADR: terminal home environment as devkit home-manager modules** ([#815](https://github.com/vig-os/devcontainer/issues/815))
+  - Accepted `docs/rfcs/ADR-home-environment-modules.md`: parameterized `vigos.*` home-manager modules as a second product of this repo (epic [#814](https://github.com/vig-os/devcontainer/issues/814)).
+
+- **Home-manager module release/versioning policy** ([#816](https://github.com/vig-os/devcontainer/issues/816))
+  - `docs/NIX.md`: modules ride the existing release train (consumers pin tags), `mkRenamedOptionModule` deprecation shims, dogfood-canary exception, and the `#### Modules` changelog sub-heading convention.
+  - Workspace scaffold `vigos.url` float is now documented as deliberate, with the pin recipe.
+
+- **Scheduled nixpkgs-unstable lock bump** ([#817](https://github.com/vig-os/devcontainer/issues/817))
+  - Weekly workflow refreshing the fast-movers pin (uv, gh, claude-code) via a chore PR to dev, gated by full CI.
+
+- **vigos.* home module set + homeConfigurations matrix** ([#818](https://github.com/vig-os/devcontainer/issues/818), [#819](https://github.com/vig-os/devcontainer/issues/819))
+  - `homeManagerModules.{default,packages,shell,multiplexer,cli,direnv,git}` exported as path modules (+ `homeModules` alias); `home-manager` flake input (release-26.05, nixpkgs follows); `ci-{minimal,full}` homeConfigurations across 4 systems built as Tier-0 `hm-*` checks (x86_64-darwin eval-only).
+
+- **Home Matrix CI workflow** ([#820](https://github.com/vig-os/devcontainer/issues/820))
+  - Builds the ci homeConfigurations on aarch64-darwin (macos-latest) and aarch64-linux and pushes closures to Cachix; separate non-required workflow (fail-soft by status).
+
+- **vigos.shell module** ([#821](https://github.com/vig-os/devcontainer/issues/821))
+  - Bash + zsh, starship, atuin, zoxide under one enable flag; opt-in secretsEnv hook exporting ~/.config/vigos/secrets/<NAME> per the ADR credentials interface.
+
+- **vigos.multiplexer, vigos.cli, vigos.direnv modules** ([#821](https://github.com/vig-os/devcontainer/issues/821))
+  - tmux org defaults (vi keys, sane scrollback), modern-unix config (bat/eza/fzf/ripgrep/fd — configuration only, packages stay in vigos.packages), direnv + nix-direnv.
+
+- **vigos.git module** ([#821](https://github.com/vig-os/devcontainer/issues/821))
+  - git + delta, gh (ssh protocol), lazygit; identity and per-user-x-host SSH signing are null-default options — nothing is written unless set, so fresh hosts never fail their first commit.
+
+- **templates.personal + homeConfigurations.demo** ([#827](https://github.com/vig-os/devcontainer/issues/827))
+  - `nix flake init -t github:vig-os/devcontainer#personal` scaffolds a personal home-manager flake on the vigos.* modules; `demo` is the full-profile reference configuration.
+
+- **Home environment docs** ([#825](https://github.com/vig-os/devcontainer/issues/825), [#826](https://github.com/vig-os/devcontainer/issues/826))
+  - docs/home/: bootstrap guide (installer, macOS trusted-users trap, first activation), override cookbook, rollback table, best-effort Intel meaning, credential-hygiene runbook.
+
+- **CLAUDE.md hierarchy templates** ([#828](https://github.com/vig-os/devcontainer/issues/828))
+  - docs/home/claude-md/: user-global, workspace-root, and workspace layer templates + the directory-layout convention that makes the cascade work. Guidelines, not enforcement.
+
 ### Changed
 
+#### Modules
+
+- **homeManagerModules.default is now the umbrella** importing every `vigos.*` module, each disabled by default ([#818](https://github.com/vig-os/devcontainer/issues/818)); existing imports keep working unchanged.
+
 ### Deprecated
+
+#### Modules
+
+- **`programs.vigos-devtools.enable`** → `vigos.packages.enable` ([#818](https://github.com/vig-os/devcontainer/issues/818)); a `mkRenamedOptionModule` shim keeps the old option working for one release (docs/NIX.md policy).
 
 ### Removed
 
