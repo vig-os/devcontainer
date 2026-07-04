@@ -22,6 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Home Matrix CI workflow** ([#820](https://github.com/vig-os/devcontainer/issues/820))
   - Builds the ci homeConfigurations on aarch64-darwin (macos-latest) and aarch64-linux and pushes closures to Cachix; separate non-required workflow (fail-soft by status).
 
+- **vigos.shell module** ([#821](https://github.com/vig-os/devcontainer/issues/821))
+  - Bash + zsh, starship, atuin, zoxide under one enable flag; opt-in secretsEnv hook exporting ~/.config/vigos/secrets/<NAME> per the ADR credentials interface.
+
+- **vigos.multiplexer, vigos.cli, vigos.direnv modules** ([#821](https://github.com/vig-os/devcontainer/issues/821))
+  - tmux org defaults (vi keys, sane scrollback), modern-unix config (bat/eza/fzf/ripgrep/fd — configuration only, packages stay in vigos.packages), direnv + nix-direnv.
+
+- **vigos.git module** ([#821](https://github.com/vig-os/devcontainer/issues/821))
+  - git + delta, gh (ssh protocol), lazygit; identity and per-user-x-host SSH signing are null-default options — nothing is written unless set, so fresh hosts never fail their first commit.
+
 ### Changed
 
 ### Deprecated
