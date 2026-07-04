@@ -57,6 +57,9 @@ with pkgs;
   starship
   charm-freeze # freeze (charmbracelet terminal screenshots)
   expect
-  neovim # nvim
+  # lowPrio: when vigos.editor also installs a configured (wrapped) neovim
+  # in the same profile, the bare editor yields instead of colliding in
+  # buildEnv. Refs #824.
+  (pkgs.lib.lowPrio neovim) # nvim
   claude-code # claude
 ]

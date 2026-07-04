@@ -469,7 +469,7 @@ def test_wave3_full_profile_config() -> None:
             "c: { "
             "ghdash = c.programs.gh-dash.enable; "
             "neovim = c.programs.neovim.enable; "
-            "seshToml = c.home.file ? \".config/sesh/sesh.toml\"; "
+            'seshToml = c.home.file ? ".config/sesh/sesh.toml"; '
             "seshSessions = c.vigos.sesh.sessions; "
             "}",
         ],
