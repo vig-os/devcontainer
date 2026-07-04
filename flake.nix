@@ -1003,7 +1003,16 @@
 
           # vulnix — pinned CVE scanner (#637) from the locked nixpkgs so the
           # nightly scan is reproducible rather than tracking a rolling channel.
-          inherit (pkgs) vulnix;
+          # The upstream-hardcoded 10 s connect/read timeout on the NVD feed
+          # downloads dies on nvd.nist.gov's throttling stalls
+          # (nix-community/vulnix#171); bump it to 60 s until upstream grows
+          # retry/timeout options.
+          vulnix = pkgs.vulnix.overrideAttrs (old: {
+            postPatch = (old.postPatch or "") + ''
+              substituteInPlace src/vulnix/nvd.py \
+                --replace-fail "timeout=10" "timeout=60"
+            '';
+          });
 
           # nix-fast-build — the Tier-0 CI driver that evaluates and builds every
           # `checks.<system>` derivation in parallel with an eval cache (#779).

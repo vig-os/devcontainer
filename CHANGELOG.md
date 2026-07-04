@@ -79,6 +79,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING for consumers — this release is the Nix publish-cutover** ([#639](https://github.com/vig-os/devcontainer/issues/639), [#625](https://github.com/vig-os/devcontainer/issues/625))
+  - From this release on, the published image (`:latest` and every versioned tag) is the Nix-built image: pure-Nix userland with **no `apt`/`dpkg`**, a `docker → podman` shim (no Docker engine), and uv-managed CPython 3.14 (pin `requires-python` as a range, never an exact patch). See `docs/MIGRATION.md` for the full consumer contract
+  - The final Debian-built release is **0.3.9**; it stays pullable indefinitely but frozen (no CVE fixes). Rollback/stay-behind: pin `DEVCONTAINER_VERSION=0.3.9` in the repo-root `.vig-os`
+  - Heads-up: the next release cycle renames the project `devcontainer` → `devkit`, moving the image to a new GHCR package `ghcr.io/vig-os/devkit` ([#781](https://github.com/vig-os/devcontainer/issues/781))
 - **Scaffolded devcontainer verbs renamed `up`/`down`/… → `devc-up`/`devc-down`/…** ([#795](https://github.com/vig-os/devcontainer/issues/795), completed by [#806](https://github.com/vig-os/devcontainer/issues/806))
   - The managed `.devcontainer/justfile.devc` namespaces its compose-stack verbs — `devc-up`, `devc-down`, `devc-status`, `devc-logs`, `devc-shell`, `devc-restart`, `devc-open` — so generic verb names stay free for project use (the new opt-in `services` recipe was the trigger: `up` was squatted by the devcontainer stack). The file is managed (replaced on upgrade), so consumers pick the rename up automatically on their next upgrade; muscle memory is the only breakage
   - The audit follow-up (#806) completes the namespacing: `check` → `devc-check` and `devcontainer-upgrade` → `devc-upgrade` (recipes, their hint strings, and the `version-check.sh` notification text), freeing the generic `check` name for project use
@@ -241,6 +245,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Nightly vulnix scan hardened against NVD instability; 2026-07 CVE batch triaged** ([#639](https://github.com/vig-os/devcontainer/issues/639))
+  - The scan step now survives vulnix's advisory exit codes under the runner's default errexit shell, caches the ~122 MB NVD database on a weekly `actions/cache` key (warm runs fetch only the ~3 MB `modified` feed), retries throttled fetches with backoff, accepts a run only when the findings JSON is valid (a scanner crash previously masqueraded as "whitelisted findings"), and uploads the findings artifact `if: always()`. The pinned `packages.vulnix` patches upstream's hardcoded 10 s NVD fetch timeout to 60 s ([nix-community/vulnix#171](https://github.com/nix-community/vulnix/issues/171))
+  - Eight HIGH/CRITICAL CVEs published after the 2026-06-23 baseline (libssh2, socat, libxml2, gzip, fzf, jq) were triaged online against NVD/upstream/nixpkgs branch state and accepted into `.vulnixignore` with staggered 30–60-day expiries: none is fixable by a rev advance today (fixes sit in nixpkgs staging or are unreleased upstream) and none has a realistic attack path in a single-user interactive dev container (details per entry in the register)
 - **Bake explicit `substituters`/`trusted-public-keys` instead of `accept-flake-config = true`** ([#773](https://github.com/vig-os/devcontainer/issues/773))
   - The baked `/etc/nix/nix.conf` no longer sets `accept-flake-config = true`, which made any in-container `nix run github:attacker/flake` silently accept that flake's `substituters`/`trusted-public-keys` — a cache-redirection supply-chain trapdoor. The trusted caches are now pinned explicitly (`substituters = https://cache.nixos.org https://vig-os.cachix.org` with their public `trusted-public-keys`) so normal builds still substitute from them, while a foreign flake's `nixConfig` requires a per-invocation `--accept-flake-config`
 - **Drop the piscina CVE ignore tied to `cursor-agent`** ([#628](https://github.com/vig-os/devcontainer/issues/628))
