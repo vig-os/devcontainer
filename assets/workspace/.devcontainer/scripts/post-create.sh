@@ -48,3 +48,22 @@ fi
 # Add your custom setup commands here to install any dependencies or tools needed for your project
 
 echo "Post-create setup complete"
+
+# --- vigOS resident credentials (vig-os/devcontainer#546, #823) ------------
+# Export ~/.config/vigos/secrets/<NAME> files (mounted ro from the host) as
+# env vars at shell startup. Same semantics as vigos.shell.secretsEnv.
+if [ -d /root/.config/vigos/secrets ] && ! grep -q VIGOS_SECRETS_LOADED /root/.bashrc 2>/dev/null; then
+  cat >> /root/.bashrc <<'VIGOS_SECRETS'
+if [ -z "${VIGOS_SECRETS_LOADED:-}" ] && [ -d "$HOME/.config/vigos/secrets" ]; then
+  for _vigos_secret in "$HOME/.config/vigos/secrets"/*; do
+    [ -f "$_vigos_secret" ] || continue
+    _vigos_name="$(basename "$_vigos_secret")"
+    if printf '%s' "$_vigos_name" | grep -Eq '^[A-Z_][A-Z0-9_]*$'; then
+      export "$_vigos_name=$(cat "$_vigos_secret")"
+    fi
+  done
+  unset _vigos_secret _vigos_name
+  export VIGOS_SECRETS_LOADED=1
+fi
+VIGOS_SECRETS
+fi

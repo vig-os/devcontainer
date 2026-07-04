@@ -9,5 +9,9 @@
     ./cli.nix
     ./direnv.nix
     ./git.nix
+    ./claude.nix
+    ./sesh.nix
+    ./ghdash.nix
+    ./editor.nix
   ];
 }
