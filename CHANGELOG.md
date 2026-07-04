@@ -47,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ~/.claude policy per the ADR: settings.json seeded copy-if-absent (org seed pre-authorizes nothing, includeCoAuthoredBy=false), managed vigos.md fragment (checksum-overwrite + .bak), @vigos.md import line seeded into the user-owned CLAUDE.md, DISABLE_AUTOUPDATER via sessionVariables, optional workspace-CLAUDE.md management (empty by default).
   - Devcontainer scaffold mounts ~/.config/vigos/secrets read-only and exports the files as env vars at shell startup — the slim token path replacing setup-claude.sh forwarding.
 
+- **vigos.sesh, vigos.ghdash, vigos.editor modules** ([#824](https://github.com/vig-os/devcontainer/issues/824))
+  - sesh project sessions with a parameterized standard tmux layout (sessions + layout.windows options, no hardcoded paths), gh-dash with scoped lean sections via repoFilters, neovim with the claudecode.nvim bridge (plain programs.neovim, no nixvim input).
+
 ### Changed
 
 #### Modules
