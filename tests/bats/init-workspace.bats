@@ -202,12 +202,15 @@ prune_mode() {
 }
 
 @test "init-workspace.sh prunes the scaffold by delivery mode (#641)" {
-    # devcontainer drops the flake stub; direnv drops the devcontainer scaffold.
+    # devcontainer drops the flake stub (unless pre-existing, #859); direnv
+    # drops the devcontainer scaffold.
     # shellcheck disable=SC2016
-    run grep -A12 'case "\$MODE" in' "$INIT_WORKSPACE_SH"
+    run grep -A28 'case "\$MODE" in' "$INIT_WORKSPACE_SH"
     assert_success
     # shellcheck disable=SC2016
-    assert_output --partial 'rm -f "$WORKSPACE_DIR/flake.nix" "$WORKSPACE_DIR/.envrc"'
+    assert_output --partial 'rm -f "$WORKSPACE_DIR/flake.nix"'
+    # shellcheck disable=SC2016
+    assert_output --partial 'rm -f "$WORKSPACE_DIR/.envrc"'
     # shellcheck disable=SC2016
     assert_output --partial 'rm -rf "$WORKSPACE_DIR/.devcontainer"'
 }
