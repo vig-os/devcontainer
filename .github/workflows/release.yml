@@ -882,11 +882,11 @@ jobs:
         # the step before the vulnix-gate ever evaluates .vulnixignore.
         run: |
           set -uo pipefail
-          # Fetch NVD data from our self-hosted mirror (nvd-mirror-refresh.yml,
-          # #870), not the throttled nvd.nist.gov, so the publish gate cannot be
-          # blocked by an NVD outage. Retry loop now guards only rare GitHub-CDN
-          # blips; the || rc=$? exit capture stays load-bearing (#842).
-          NVD_MIRROR="${{ github.server_url }}/${{ github.repository }}/releases/download/nvd-mirror/"
+          # Fetch NVD data from the vig-os/nvd-mirror Pages mirror (#870), not the
+          # throttled nvd.nist.gov, so the publish gate cannot be blocked by an
+          # NVD outage. Retry loop now guards only rare CDN blips; the || rc=$?
+          # exit capture stays load-bearing (#842).
+          NVD_MIRROR="https://vig-os.github.io/nvd-mirror/"
           rc=0
           for attempt in 1 2 3; do
             rc=0
