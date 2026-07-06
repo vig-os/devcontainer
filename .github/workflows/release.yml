@@ -623,13 +623,27 @@ jobs:
             exit 1
           fi
 
-          cat > /tmp/release-pr-body.md <<EOF
-          # [Release $VERSION](https://github.com/${GITHUB_REPOSITORY}/releases/tag/$VERSION) - $RELEASE_DATE
+          # GitHub caps PR bodies at 65536 chars; a large finalized release
+          # changelog can overflow it (#810). Truncate at a line boundary and
+          # point to the full CHANGELOG.md on the release branch when it does.
+          MAX_BODY=65000
+          RELEASE_BRANCH="release/$VERSION"
+          HEADER="# [Release $VERSION](https://github.com/${GITHUB_REPOSITORY}/releases/tag/$VERSION) - $RELEASE_DATE
 
           This PR prepares release $VERSION for merge to main.
 
-          $CHANGELOG_CONTENT
-          EOF
+          "
+          PR_BODY="${HEADER}${CHANGELOG_CONTENT}"$'\n'
+
+          if [ "${#PR_BODY}" -gt "$MAX_BODY" ]; then
+            NOTE=$(printf '\n\n_Changelog truncated to fit GitHub'"'"'s %s-char PR-body limit; see `CHANGELOG.md` on `%s` for the full entry._' "$MAX_BODY" "$RELEASE_BRANCH")
+            budget=$(( MAX_BODY - ${#HEADER} - ${#NOTE} ))
+            TRUNCATED="${CHANGELOG_CONTENT:0:budget}"
+            TRUNCATED="${TRUNCATED%$'\n'*}"
+            PR_BODY="${HEADER}${TRUNCATED}${NOTE}"
+          fi
+
+          printf '%s' "$PR_BODY" > /tmp/release-pr-body.md
 
           retry --retries 3 --backoff 5 --max-backoff 30 -- \
             gh pr edit "$PR_NUMBER" --body-file /tmp/release-pr-body.md
@@ -743,7 +757,7 @@ jobs:
   build-and-test:
     name: Build and Test (${{ matrix.arch }})
     needs: [validate, finalize]
-    runs-on: ${{ matrix.arch == 'amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
+    runs-on: ${{ matrix.arch == 'amd64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
     timeout-minutes: 60
     strategy:
       matrix: ${{ fromJson(needs.validate.outputs.matrix) }}
@@ -786,14 +800,20 @@ jobs:
           image-tag: ${{ needs.validate.outputs.publish_version }}-${{ matrix.arch }}
           ref: ${{ needs.finalize.outputs.finalize_sha }}
 
-      - name: Scan image for vulnerabilities
+      - name: Scan image for vulnerabilities (defense in depth, awareness only)
+        # Non-blocking per the #637 posture: the Nix image's blocking CVE
+        # control is the vulnix-gate job + .vulnixignore (#639). Trivy sees
+        # language-ecosystem packages embedded in shipped binaries that vulnix
+        # cannot, so its table stays in the log as awareness signal — mirrors
+        # security-scan.yml and ci.yml (exit-code 0). Refs #849.
+        continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           version: 'v0.71.2'
           input: /tmp/image.tar
           format: 'table'
           severity: 'HIGH,CRITICAL'
-          exit-code: '1'
+          exit-code: '0'
           ignore-unfixed: true
           trivyignores: '.trivyignore'
 
@@ -857,11 +877,28 @@ jobs:
         # whitelisted (needs -s), 2=reportable advisories (the gate, not the
         # scan, decides pass/fail). Any code > 2 means the scan itself failed —
         # fail the job instead of masking the crash as an empty, clean result.
+        # The || rc=$? capture is load-bearing (#842): the runner shell is
+        # `bash -e`, so an uncaptured exit 2 (findings present) would abort
+        # the step before the vulnix-gate ever evaluates .vulnixignore.
         run: |
           set -uo pipefail
-          nix run .#vulnix -- --closure ./result --json > vulnix-findings.json
-          rc=$?
-          [ "$rc" -le 2 ] || { echo "::error::vulnix scan failed (exit $rc)"; exit "$rc"; }
+          # Fetch NVD data from the vig-os/nvd-mirror Pages mirror (#870), not the
+          # throttled nvd.nist.gov, so the publish gate cannot be blocked by an
+          # NVD outage. Retry loop now guards only rare CDN blips; the || rc=$?
+          # exit capture stays load-bearing (#842).
+          NVD_MIRROR="https://vig-os.github.io/nvd-mirror/"
+          rc=0
+          for attempt in 1 2 3; do
+            rc=0
+            nix run .#vulnix -- --mirror "$NVD_MIRROR" --closure ./result --json > vulnix-findings.json || rc=$?
+            [ "$rc" -le 2 ] && jq -e . vulnix-findings.json > /dev/null 2>&1 && break
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::vulnix scan attempt ${attempt} failed (exit ${rc}); retrying in $((60 * attempt))s"
+              sleep $((60 * attempt))
+            fi
+          done
+          [ "$rc" -le 2 ] && jq -e . vulnix-findings.json > /dev/null 2>&1 \
+            || { echo "::error::vulnix scan failed after 3 attempts (exit $rc)"; exit 1; }
 
       - name: Gate on unexcepted HIGH/CRITICAL vulnix findings
         id: vulnix-gate
@@ -1536,13 +1573,27 @@ jobs:
             exit 1
           fi
 
-          {
-            echo "# Release $VERSION"
-            echo ""
-            echo "This PR prepares release $VERSION for merge to main."
-            echo ""
-            echo "$CHANGELOG_CONTENT"
-          } > /tmp/release-pr-body.md
+          # GitHub caps PR bodies at 65536 chars; a large release changelog
+          # can overflow it (#810). Truncate at a line boundary and point to
+          # the full CHANGELOG.md on the release branch when it does.
+          MAX_BODY=65000
+          RELEASE_BRANCH="release/$VERSION"
+          HEADER="# Release $VERSION
+
+          This PR prepares release $VERSION for merge to main.
+
+          "
+          PR_BODY="${HEADER}${CHANGELOG_CONTENT}"$'\n'
+
+          if [ "${#PR_BODY}" -gt "$MAX_BODY" ]; then
+            NOTE=$(printf '\n\n_Changelog truncated to fit GitHub'"'"'s %s-char PR-body limit; see `CHANGELOG.md` on `%s` for the full entry._' "$MAX_BODY" "$RELEASE_BRANCH")
+            budget=$(( MAX_BODY - ${#HEADER} - ${#NOTE} ))
+            TRUNCATED="${CHANGELOG_CONTENT:0:budget}"
+            TRUNCATED="${TRUNCATED%$'\n'*}"
+            PR_BODY="${HEADER}${TRUNCATED}${NOTE}"
+          fi
+
+          printf '%s' "$PR_BODY" > /tmp/release-pr-body.md
 
           retry --retries 3 --backoff 5 --max-backoff 30 -- \
             gh pr edit "$PR_NUMBER" --body-file /tmp/release-pr-body.md

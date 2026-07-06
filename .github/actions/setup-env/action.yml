@@ -164,7 +164,9 @@ runs:
         fi
 
         echo "Flake dev-shell provisioned; tools added to PATH:"
-        printf '%s' "$SHELL_PATH" | tr ':' '\n' | grep '^/nix/store' | head -50
+        # sed, not head: head exiting early SIGPIPEs grep (exit 2) under the
+        # runner's pipefail shell once the list tops 50 entries (#847).
+        printf '%s' "$SHELL_PATH" | tr ':' '\n' | grep '^/nix/store' | sed -n '1,50p'
 
     # ── retry() shell helper ───────────────────────────────────────────
     - name: Export retry helper function

@@ -1,5 +1,7 @@
-# Append Keep-a-Changelog Unreleased entries for Renovate dependency PRs (Refs: #506, #562).
+# Append Keep-a-Changelog Unreleased entries for Renovate dependency PRs (Refs: #506, #562, #863).
 # Read-only build on pull_request; privileged commit runs via workflow_run from default branch.
+# The sender-login guard skips synchronize events raised by the changelog commit bot's own
+# push (which uses an app token that re-triggers workflows), breaking the self-commit loop.
 
 name: Renovate changelog build
 
@@ -14,6 +16,7 @@ jobs:
     name: Resolve image tag
     if: >-
       github.event.pull_request.user.login == 'renovate[bot]' &&
+      github.event.sender.login != 'commit-action-bot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 2
@@ -40,6 +43,7 @@ jobs:
     name: Build changelog artifact
     if: >-
       github.event.pull_request.user.login == 'renovate[bot]' &&
+      github.event.sender.login != 'commit-action-bot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository
     needs: [resolve-image]
     runs-on: ubuntu-24.04
@@ -73,6 +77,10 @@ jobs:
           if git diff --quiet CHANGELOG.md 2>/dev/null; then
             echo "modified=false" >> "$GITHUB_OUTPUT"
           else
+            # Keep the preserved-on-upgrade mirror in lockstep with root CHANGELOG.md
+            # so the sync-manifest gate stays green. The scripts/manifest.toml entry
+            # for CHANGELOG.md is a verbatim copy (no transform), so cp == sync output.
+            cp CHANGELOG.md assets/workspace/.devcontainer/CHANGELOG.md
             echo "modified=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -92,6 +100,9 @@ jobs:
           } > changelog-artifact/metadata.env
           if [[ "${MODIFIED}" == "true" ]]; then
             cp CHANGELOG.md changelog-artifact/
+            mkdir -p changelog-artifact/assets/workspace/.devcontainer
+            cp assets/workspace/.devcontainer/CHANGELOG.md \
+              changelog-artifact/assets/workspace/.devcontainer/CHANGELOG.md
           fi
 
       - name: Upload changelog artifact

@@ -450,6 +450,17 @@ info "Using $RUNTIME with image $IMAGE"
 info "Target directory: $PROJECT_PATH"
 info "Project name: $PROJECT_NAME"
 
+# Forward an explicitly requested version so init-workspace pins it in the
+# scaffolded .vig-os (#852). The image's baked pin is the release the image
+# was built from, which is stale for release candidates (the repo pin only
+# advances at finalize). "latest" is not a concrete tag: keep the baked pin.
+# (The ${arr[@]+...} idiom keeps empty-array expansion safe under set -u on
+# bash 3.2, e.g. macOS.)
+declare -a VERSION_ENV=()
+if [ "$VERSION" != "latest" ]; then
+    VERSION_ENV=(-e "VIG_OS_VERSION=$VERSION")
+fi
+
 # Build the command using an array for safe execution
 # Use --rm to cleanup container after run; no -it since we use --no-prompts (non-interactive)
 # Pass SHORT_NAME and ORG_NAME as environment variables to the container
@@ -458,6 +469,7 @@ declare -a CMD=(
     -e "SHORT_NAME=$PROJECT_NAME"
     -e "ORG_NAME=$ORG_NAME"
     -e "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
+    ${VERSION_ENV[@]+"${VERSION_ENV[@]}"}
     -v "$PROJECT_PATH:/workspace"
     "$IMAGE"
     /root/assets/init-workspace.sh --no-prompts
