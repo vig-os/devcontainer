@@ -10,10 +10,10 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 # -------------------------------------------------------------------------------
 
 # Check for devcontainer updates (verbose)
-# Usage: just check [config|on|off|<duration>]
-# Examples: just check, just check config, just check off, just check 7d
+# Usage: just devc-check [config|on|off|<duration>]
+# Examples: just devc-check, just devc-check config, just devc-check off, just devc-check 7d
 [group('info')]
-check *args:
+devc-check *args:
     #!/usr/bin/env bash
     SCRIPT_DIR="$(cd "{{source_directory()}}/scripts" && pwd)" || {
         echo "Error: Could not locate .devcontainer/scripts directory"
@@ -32,7 +32,7 @@ check *args:
 # Upgrade devcontainer to latest version (host-side only)
 # This recipe MUST be run from a host terminal, not inside the container
 [group('info')]
-devcontainer-upgrade:
+devc-upgrade:
     #!/usr/bin/env bash
     # Detect if running inside a container
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
@@ -43,7 +43,7 @@ devcontainer-upgrade:
         echo "Open a new terminal on your host machine and run:"
         echo ""
         echo "    cd $(pwd)"
-        echo "    just devcontainer-upgrade"
+        echo "    just devc-upgrade"
         echo ""
         echo "Or use the curl method:"
         echo ""
@@ -82,12 +82,12 @@ devcontainer-upgrade:
 # These recipes must be run from the host, not inside the container.
 # Compose command: podman compose preferred, fallback to docker compose.
 
-# Start devcontainer + sidecars via compose
+# Start the devcontainer via compose
 [group('devcontainer')]
-up:
+devc-up:
     #!/usr/bin/env bash
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
-        echo "[ERROR] Run this from the host: just up"
+        echo "[ERROR] Run this from the host: just devc-up"
         exit 1
     fi
     cd .devcontainer || exit 1
@@ -104,10 +104,10 @@ up:
 
 # Stop and remove containers
 [group('devcontainer')]
-down:
+devc-down:
     #!/usr/bin/env bash
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
-        echo "[ERROR] Run this from the host: just down"
+        echo "[ERROR] Run this from the host: just devc-down"
         exit 1
     fi
     cd .devcontainer || exit 1
@@ -124,10 +124,10 @@ down:
 
 # Show container status
 [group('devcontainer')]
-status:
+devc-status:
     #!/usr/bin/env bash
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
-        echo "[ERROR] Run this from the host: just status"
+        echo "[ERROR] Run this from the host: just devc-status"
         exit 1
     fi
     cd .devcontainer || exit 1
@@ -144,10 +144,10 @@ status:
 
 # Tail container logs
 [group('devcontainer')]
-logs *args:
+devc-logs *args:
     #!/usr/bin/env bash
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
-        echo "[ERROR] Run this from the host: just logs"
+        echo "[ERROR] Run this from the host: just devc-logs"
         exit 1
     fi
     cd .devcontainer || exit 1
@@ -164,10 +164,10 @@ logs *args:
 
 # Open bash in running devcontainer
 [group('devcontainer')]
-shell:
+devc-shell:
     #!/usr/bin/env bash
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
-        echo "[ERROR] Run this from the host: just shell"
+        echo "[ERROR] Run this from the host: just devc-shell"
         exit 1
     fi
     cd .devcontainer || exit 1
@@ -184,10 +184,10 @@ shell:
 
 # Restart service(s)
 [group('devcontainer')]
-restart *args:
+devc-restart *args:
     #!/usr/bin/env bash
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
-        echo "[ERROR] Run this from the host: just restart"
+        echo "[ERROR] Run this from the host: just devc-restart"
         exit 1
     fi
     cd .devcontainer || exit 1
@@ -202,104 +202,17 @@ restart *args:
         exit 1
     fi
 
-# Open Cursor/VS Code attached to the running container
+# Open VS Code attached to the running container
 [group('devcontainer')]
-open:
+devc-open:
     #!/usr/bin/env bash
     if [[ -f "/.dockerenv" ]] || [[ -n "${container:-}" ]]; then
-        echo "[ERROR] Run this from the host: just open"
+        echo "[ERROR] Run this from the host: just devc-open"
         exit 1
     fi
-    if command -v cursor &>/dev/null; then
-        cursor .
-    elif command -v code &>/dev/null; then
+    if command -v code &>/dev/null; then
         code .
     else
-        echo "[ERROR] Neither cursor nor code found. Install Cursor or VS Code."
+        echo "[ERROR] code not found. Install VS Code."
         exit 1
     fi
-
-# -------------------------------------------------------------------------------
-# SIDECAR
-# -------------------------------------------------------------------------------
-
-# List available sidecar containers
-[group('sidecar')]
-sidecars:
-    #!/usr/bin/env bash
-    if command -v podman &>/dev/null; then
-        RUNTIME="podman"
-    elif command -v docker &>/dev/null; then
-        RUNTIME="docker"
-    else
-        echo "[ERROR] Need podman or docker"
-        exit 1
-    fi
-    echo "Available sidecar containers:"
-    echo ""
-    # Get running sidecars (exclude devcontainer itself)
-    # Construct format string using printf to avoid just interpolation
-    FORMAT=$(printf '\x7b\x7b.Names\x7d\x7d')
-    RUNNING=$($RUNTIME ps --format "$FORMAT" 2>/dev/null | grep -v "^devcontainer$" || true)
-    if [ -n "$RUNNING" ]; then
-        echo "$RUNNING" | while read -r name; do
-            echo "  [OK] $name (running)"
-        done
-    else
-        echo "  (no sidecars currently running)"
-    fi
-    echo ""
-    echo "To use a sidecar: just sidecar <name> <recipe> [args...]"
-    echo "Example: just sidecar postgres migrate"
-
-# Execute a just recipe in a sidecar container
-# Usage: just sidecar <container-name> <recipe> [args...]
-
-# Example: just sidecar postgres migrate / just sidecar redis flush
-[group('sidecar')]
-sidecar name *args:
-    #!/usr/bin/env bash
-    if command -v podman &>/dev/null; then
-        RUNTIME="podman"
-    elif command -v docker &>/dev/null; then
-        RUNTIME="docker"
-    else
-        echo "[ERROR] Need podman or docker"
-        exit 1
-    fi
-    # Construct format string using printf to avoid just interpolation
-    FORMAT=$(printf '\x7b\x7b.Names\x7d\x7d')
-
-    # Check if container exists (running or stopped)
-    if ! $RUNTIME ps -a --format "$FORMAT" 2>/dev/null | grep -q "^{{ name }}$"; then
-        echo "[ERROR] Sidecar container '{{ name }}' not found"
-        echo ""
-        echo "Available sidecars:"
-        RUNNING=$($RUNTIME ps --format "$FORMAT" 2>/dev/null | grep -v "^devcontainer$" || true)
-        if [ -n "$RUNNING" ]; then
-            echo "$RUNNING" | while read -r n; do
-                echo "  - $n"
-            done
-        else
-            echo "  (no sidecars found)"
-        fi
-        echo ""
-        echo "Tip: Add sidecars to docker-compose.project.yaml or docker-compose.local.yaml"
-        echo "Then run: just sidecars"
-        exit 1
-    fi
-
-    # Check if container is running
-    if ! $RUNTIME ps --format "$FORMAT" 2>/dev/null | grep -q "^{{ name }}$"; then
-        echo "[!]  Sidecar container '{{ name }}' exists but is not running"
-        echo "Starting container..."
-        $RUNTIME start {{ name }} || {
-            echo "[ERROR] Failed to start container '{{ name }}'"
-            exit 1
-        }
-        # Wait a moment for container to be ready
-        sleep 1
-    fi
-
-    # Execute the recipe in the sidecar
-    $RUNTIME exec {{ name }} just {{ args }}

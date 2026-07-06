@@ -4,32 +4,45 @@
 #
 # Usage: derive-branch-summary.sh <TITLE> [NAMING_RULE] [MODEL_TIER]
 #   TITLE: issue title
-#   NAMING_RULE: path to branch-naming.mdc (default: .cursor/rules/branch-naming.mdc)
+#   NAMING_RULE: path to the branch-naming skill (default: .claude/skills/branch-naming/SKILL.md)
 #   MODEL_TIER: agent-models.toml tier (default: lightweight). Use standard for retry.
 #
 # Env: BRANCH_SUMMARY_CMD — override for tests (e.g. "echo test-summary")
-#      When set, runs instead of agent. Must output summary to stdout.
+#      When set, runs instead of the claude CLI. Must output summary to stdout.
 #      BRANCH_SUMMARY_MODEL — override model tier (e.g. "standard"). Ignored if BRANCH_SUMMARY_CMD set.
 #      DERIVE_BRANCH_TIMEOUT — timeout in seconds (default: 30). Use 2 for tests.
 set -euo pipefail
 
+case "${1:-}" in
+-h | --help)
+    cat <<'USAGE'
+Usage: derive-branch-summary <TITLE> [NAMING_RULE] [MODEL_TIER]
+  TITLE        issue title
+  NAMING_RULE  path to the branch-naming skill (default: .claude/skills/branch-naming/SKILL.md)
+  MODEL_TIER   agent-models.toml tier (default: lightweight; use standard for retry)
+USAGE
+    exit 0
+    ;;
+esac
+
 TITLE="${1:?Usage: derive-branch-summary.sh <TITLE> [NAMING_RULE] [MODEL_TIER]}"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-NAMING_RULE="${2:-${REPO_ROOT}/.cursor/rules/branch-naming.mdc}"
+NAMING_RULE="${2:-${REPO_ROOT}/.claude/skills/branch-naming/SKILL.md}"
 MODEL_TIER="${3:-${BRANCH_SUMMARY_MODEL:-lightweight}}"
 TIMEOUT="${DERIVE_BRANCH_TIMEOUT:-30}"
 
 if [ -n "${BRANCH_SUMMARY_CMD:-}" ]; then
     SUMMARY=$(timeout "$TIMEOUT" sh -c "$BRANCH_SUMMARY_CMD" 2>/dev/null | tail -1 | tr -d '[:space:]') || true
 else
-    MODEL=$(grep "^${MODEL_TIER}" "${REPO_ROOT}/.cursor/agent-models.toml" | sed 's/.*= *"//' | sed 's/".*//')
-    SUMMARY=$(timeout "$TIMEOUT" agent --print --yolo --trust --model "$MODEL" \
-        "Read the branch naming rules in ${NAMING_RULE}. " \
-        "The issue title is: ${TITLE} " \
-        "Output ONLY a kebab-case short summary suitable for a branch name (a few words). " \
-        "Omit prefixes like FEATURE, BUG, Add, Implement, Support. " \
-        "Example: 'Standardize and Enforce Commit Message Format' -> 'standardize-commit-messages'. " \
-        "No explanation. No quotes. Just the summary." 2>/dev/null | tail -1 | tr -d '[:space:]') || true
+    MODEL=$(grep "^${MODEL_TIER}" "${REPO_ROOT}/.claude/agent-models.toml" | sed 's/.*= *"//' | sed 's/".*//')
+    PROMPT="Read the branch naming rules in ${NAMING_RULE}. \
+The issue title is: ${TITLE}. \
+Output ONLY a kebab-case short summary suitable for a branch name (a few words). \
+Omit prefixes like FEATURE, BUG, Add, Implement, Support. \
+Example: 'Standardize and Enforce Commit Message Format' -> 'standardize-commit-messages'. \
+No explanation. No quotes. Just the summary."
+    SUMMARY=$(timeout "$TIMEOUT" claude --print --dangerously-skip-permissions --model "$MODEL" \
+        "$PROMPT" 2>/dev/null | tail -1 | tr -d '[:space:]') || true
 fi
 
 if [ -z "$SUMMARY" ]; then

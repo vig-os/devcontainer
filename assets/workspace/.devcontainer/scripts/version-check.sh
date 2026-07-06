@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ###############################################################################
 # version-check.sh - Devcontainer Update Checker
 #
@@ -14,7 +14,7 @@
 #   ./version-check.sh interval <dur>   # Set check interval
 #   ./version-check.sh config           # Display current configuration
 #
-# DURATIONS: And (days), Nw (weeks), Nh (hours), Nm (minutes)
+# DURATIONS: Nd (days), Nw (weeks), Nh (hours), Nm (minutes)
 #
 # CONFIGURATION:
 #   Stored in .devcontainer/.local/version-check.conf (gitignored)
@@ -26,7 +26,7 @@ set -euo pipefail
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 DEVCONTAINER_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Local config directory (gitignored)
@@ -280,7 +280,7 @@ notify_update() {
     echo ""
     echo -e "  Run from a ${BOLD}host terminal${NC} (not inside the container):"
     echo ""
-    echo -e "    ${BOLD}just devcontainer-upgrade${NC}"
+    echo -e "    ${BOLD}just devc-upgrade${NC}"
     echo ""
     echo -e "  Or without just:"
     echo ""
@@ -288,7 +288,7 @@ notify_update() {
     echo ""
     echo -e "  After upgrading, rebuild the container in VS Code."
     echo ""
-    echo -e "  Mute: ${BOLD}just check 7d${NC}    Disable: ${BOLD}just check off${NC}"
+    echo -e "  Mute: ${BOLD}just devc-check 7d${NC}    Disable: ${BOLD}just devc-check off${NC}"
     echo ""
 }
 
@@ -359,7 +359,7 @@ cmd_mute() {
     local seconds
     seconds=$(parse_duration "$duration") || {
         echo "Invalid duration format: $duration"
-        echo "Use: And (days), Nw (weeks), Nh (hours), Nm (minutes)"
+        echo "Use: Nd (days), Nw (weeks), Nh (hours), Nm (minutes)"
         echo "Examples: 7d, 1w, 12h, 30m"
         return 1
     }
@@ -392,7 +392,7 @@ cmd_set_interval() {
     local seconds
     seconds=$(parse_duration "$duration") || {
         echo "Invalid duration format: $duration"
-        echo "Use: And (days), Nw (weeks), Nh (hours), Nm (minutes)"
+        echo "Use: Nd (days), Nw (weeks), Nh (hours), Nm (minutes)"
         return 1
     }
 

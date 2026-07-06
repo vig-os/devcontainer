@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Set error handling, fail on any error during script execution
 set -euo pipefail
 
 # Run pre-commit hooks
-uv run pre-commit run
+prek run

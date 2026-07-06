@@ -6,8 +6,8 @@
 # - Runs devcontainer integration tests
 #
 # Unlike test-image which tests the image properties, this tests the full
-# devcontainer lifecycle including initialization, git configuration, SSH setup,
-# and sidecar containers.
+# devcontainer lifecycle including initialization, git configuration, and SSH
+# setup.
 #
 # Inputs:
 #   image-tag: Image tag to test (e.g., 1.0.0-amd64)
@@ -36,6 +36,14 @@ inputs:
     description: 'Git ref to checkout (e.g., commit SHA, branch, tag)'
     required: false
     default: ''
+  cachix-cache:
+    description: 'Cachix binary cache name (passed to flake provisioning)'
+    required: false
+    default: ''
+  cachix-auth-token:
+    description: 'Cachix auth token (optional; pulls need no token)'
+    required: false
+    default: ''
 
 outputs:
   test-result:
@@ -54,8 +62,13 @@ runs:
       uses: ./.github/actions/setup-env
       with:
         sync-dependencies: 'true'
+        # podman and the devcontainer CLI keep their dedicated install paths
+        # (host integration / npm-global); uv and the rest come from the flake
+        # (SSoT). Refs #632.
         install-podman: 'true'
         install-devcontainer-cli: 'true'
+        cachix-cache: ${{ inputs.cachix-cache }}
+        cachix-auth-token: ${{ inputs.cachix-auth-token }}
 
     - name: Load image from tar
       shell: bash
@@ -242,7 +255,6 @@ runs:
 
         # Stop all devcontainers created during tests
         podman ps -a --filter "name=workspace-devcontainer" -q | xargs -r podman rm -f || true
-        podman ps -a --filter "name=test-sidecar" -q | xargs -r podman rm -f || true
 
         # Stop SSH agent
         if [ -n "${SSH_AGENT_PID:-}" ]; then

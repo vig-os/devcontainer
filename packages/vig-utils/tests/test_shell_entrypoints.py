@@ -69,16 +69,16 @@ def test_check_skill_names_reports_all_invalid_names(tmp_path: Path) -> None:
 
 
 def test_check_skill_names_passes_for_repo_skills_dir() -> None:
-    result = _run(["check-skill-names", ".cursor/skills"])
+    result = _run(["check-skill-names", ".claude/skills"])
 
     assert result.returncode == 0, result.stderr
 
 
 def test_check_skill_names_canary_invalid_repo_skill_is_detected() -> None:
-    canary_dir = REPO_ROOT / ".cursor/skills/bad:canary"
+    canary_dir = REPO_ROOT / ".claude/skills/bad:canary"
     canary_dir.mkdir(parents=True)
     try:
-        result = _run(["check-skill-names", ".cursor/skills"])
+        result = _run(["check-skill-names", ".claude/skills"])
     finally:
         canary_dir.rmdir()
 
@@ -158,3 +158,11 @@ def test_derive_branch_summary_accepts_optional_model_tier_arg() -> None:
 
     assert result.returncode == 0
     assert result.stdout.strip() == "retry-summary"
+
+
+@pytest.mark.parametrize("flag", ["-h", "--help"])
+def test_derive_branch_summary_help_exits_zero(flag: str) -> None:
+    result = _run(["derive-branch-summary", flag])
+
+    assert result.returncode == 0, result.stderr
+    assert "Usage" in result.stdout

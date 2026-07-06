@@ -2,12 +2,14 @@
 name = "devcontainer"
 version = "0.1.1"
 description = "vigOS development environment"
-requires-python = "==3.14.6"
+# Range, not an exact pin: the Nix toolchain pins the exact interpreter via
+# flake.lock (nixos-26.05 ships CPython 3.14.x), so an `==` pin is both
+# redundant and unsatisfiable against nixpkgs. Refs #666.
+requires-python = ">=3.14,<3.15"
 dependencies = [
   "github-backup==0.63.0",
   "jinja2==3.1.6",
   "pexpect==4.9.0",
-  "pre-commit==4.6.0",
   "pytest==9.1.1",
   "pyyaml==6.0.3",
   "testinfra==6.0.0",
@@ -20,19 +22,8 @@ dev = [
   { include-group = "lint" },
   { include-group = "test" },
 ]
-devcontainer = [
-  "rich==15.0.0",
-  "pre-commit==4.6.0",
-  "ruff==0.15.18",
-  "pip-licenses==5.5.5",
-  "bandit[toml]==1.9.4",
-]
-lint = [
-  "pre-commit==4.6.0",
-  "ruff==0.15.18",
-  "pip-licenses==5.5.5",
-  "bandit[toml]==1.9.4",
-]
+devcontainer = ["rich==15.0.0", "pip-licenses==5.5.5", "bandit[toml]==1.9.4"]
+lint = ["pip-licenses==5.5.5", "bandit[toml]==1.9.4"]
 test = [
   "pytest==9.1.1",
   "pytest-cov==7.1.0",
@@ -57,8 +48,8 @@ vig-utils = { path = "packages/vig-utils", editable = true }
 # Black-compatible line length
 line-length = 88
 
-# Target Python 3.12
-target-version = "py312"
+# Target Python 3.14
+target-version = "py314"
 
 [tool.ruff.lint]
 

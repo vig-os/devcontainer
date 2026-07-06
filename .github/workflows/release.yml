@@ -86,8 +86,8 @@ jobs:
       - name: Set up environment
         uses: ./.github/actions/setup-env
         with:
-          install-python: 'false'
-          install-just: 'false'
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Validate and prepare variables
         id: vars
@@ -502,6 +502,8 @@ jobs:
         uses: ./.github/actions/setup-env
         with:
           sync-dependencies: 'true'
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Set release date in CHANGELOG
         if: needs.validate.outputs.release_kind == 'final'
@@ -621,13 +623,27 @@ jobs:
             exit 1
           fi
 
-          cat > /tmp/release-pr-body.md <<EOF
-          # [Release $VERSION](https://github.com/${GITHUB_REPOSITORY}/releases/tag/$VERSION) - $RELEASE_DATE
+          # GitHub caps PR bodies at 65536 chars; a large finalized release
+          # changelog can overflow it (#810). Truncate at a line boundary and
+          # point to the full CHANGELOG.md on the release branch when it does.
+          MAX_BODY=65000
+          RELEASE_BRANCH="release/$VERSION"
+          HEADER="# [Release $VERSION](https://github.com/${GITHUB_REPOSITORY}/releases/tag/$VERSION) - $RELEASE_DATE
 
           This PR prepares release $VERSION for merge to main.
 
-          $CHANGELOG_CONTENT
-          EOF
+          "
+          PR_BODY="${HEADER}${CHANGELOG_CONTENT}"$'\n'
+
+          if [ "${#PR_BODY}" -gt "$MAX_BODY" ]; then
+            NOTE=$(printf '\n\n_Changelog truncated to fit GitHub'"'"'s %s-char PR-body limit; see `CHANGELOG.md` on `%s` for the full entry._' "$MAX_BODY" "$RELEASE_BRANCH")
+            budget=$(( MAX_BODY - ${#HEADER} - ${#NOTE} ))
+            TRUNCATED="${CHANGELOG_CONTENT:0:budget}"
+            TRUNCATED="${TRUNCATED%$'\n'*}"
+            PR_BODY="${HEADER}${TRUNCATED}${NOTE}"
+          fi
+
+          printf '%s' "$PR_BODY" > /tmp/release-pr-body.md
 
           retry --retries 3 --backoff 5 --max-backoff 30 -- \
             gh pr edit "$PR_NUMBER" --body-file /tmp/release-pr-body.md
@@ -741,7 +757,7 @@ jobs:
   build-and-test:
     name: Build and Test (${{ matrix.arch }})
     needs: [validate, finalize]
-    runs-on: ${{ matrix.arch == 'amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
+    runs-on: ${{ matrix.arch == 'amd64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
     timeout-minutes: 60
     strategy:
       matrix: ${{ fromJson(needs.validate.outputs.matrix) }}
@@ -763,10 +779,12 @@ jobs:
           release-url: ${{ needs.validate.outputs.release_url }}
           build-timestamp: ${{ needs.validate.outputs.build_timestamp }}
           vcs-ref: ${{ github.sha }}
-          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
-          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
-          output-type: tar
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           output-file: /tmp/image.tar
+          # Trusted publish path: BLOCKING push of the image closure to Cachix so
+          # released images are cache-backed (consumers substitute, not rebuild).
+          push-image-closure: 'true'
 
       - name: Run image tests
         uses: ./.github/actions/test-image
@@ -782,14 +800,20 @@ jobs:
           image-tag: ${{ needs.validate.outputs.publish_version }}-${{ matrix.arch }}
           ref: ${{ needs.finalize.outputs.finalize_sha }}
 
-      - name: Scan image for vulnerabilities
+      - name: Scan image for vulnerabilities (defense in depth, awareness only)
+        # Non-blocking per the #637 posture: the Nix image's blocking CVE
+        # control is the vulnix-gate job + .vulnixignore (#639). Trivy sees
+        # language-ecosystem packages embedded in shipped binaries that vulnix
+        # cannot, so its table stays in the log as awareness signal — mirrors
+        # security-scan.yml and ci.yml (exit-code 0). Refs #849.
+        continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           version: 'v0.71.2'
           input: /tmp/image.tar
           format: 'table'
           severity: 'HIGH,CRITICAL'
-          exit-code: '1'
+          exit-code: '0'
           ignore-unfixed: true
           trivyignores: '.trivyignore'
 
@@ -805,9 +829,88 @@ jobs:
         run: |
           echo "✓ Build, tests, and security scan passed for ${{ matrix.arch }}"
 
+  vulnix-gate:
+    name: Vulnix CVE Gate
+    needs: [validate, finalize]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          ref: ${{ needs.finalize.outputs.finalize_sha }}
+
+      - name: Set up environment (Nix flake + uv for the gate)
+        uses: ./.github/actions/setup-env
+        with:
+          sync-dependencies: 'true'
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Validate .vulnixignore exception expirations
+        run: uv run check-expirations .vulnixignore
+
+      - name: Build the vulnix scan target (image package closure)
+        run: |
+          set -euo pipefail
+          nix build .#devcontainerImageEnv --print-build-logs
+
+      # First-class, BLOCKING push of the scan-target closure to Cachix (#776) so
+      # the CVE-scan closure is cache-backed too (nightly + re-runs substitute it
+      # instead of rebuilding). setup-env already ran cachix-action, installing
+      # `cachix` and configuring push auth. Guarded on
+      # the cache being set; the release path always carries the auth token.
+      - name: Push scan-target closure to Cachix (blocking)
+        if: vars.CACHIX_CACHE != ''
+        env:
+          CACHIX_CACHE: ${{ vars.CACHIX_CACHE }}
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          nix path-info --recursive ./result | cachix push "$CACHIX_CACHE"
+
+      - name: Run vulnix (primary CVE scanner)
+        # Mirrors security-scan.yml: vulnix exit codes 0=clean, 1=only
+        # whitelisted (needs -s), 2=reportable advisories (the gate, not the
+        # scan, decides pass/fail). Any code > 2 means the scan itself failed —
+        # fail the job instead of masking the crash as an empty, clean result.
+        # The || rc=$? capture is load-bearing (#842): the runner shell is
+        # `bash -e`, so an uncaptured exit 2 (findings present) would abort
+        # the step before the vulnix-gate ever evaluates .vulnixignore.
+        run: |
+          set -uo pipefail
+          # Fetch NVD data from the vig-os/nvd-mirror Pages mirror (#870), not the
+          # throttled nvd.nist.gov, so the publish gate cannot be blocked by an
+          # NVD outage. Retry loop now guards only rare CDN blips; the || rc=$?
+          # exit capture stays load-bearing (#842).
+          NVD_MIRROR="https://vig-os.github.io/nvd-mirror/"
+          rc=0
+          for attempt in 1 2 3; do
+            rc=0
+            nix run .#vulnix -- --mirror "$NVD_MIRROR" --closure ./result --json > vulnix-findings.json || rc=$?
+            [ "$rc" -le 2 ] && jq -e . vulnix-findings.json > /dev/null 2>&1 && break
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::vulnix scan attempt ${attempt} failed (exit ${rc}); retrying in $((60 * attempt))s"
+              sleep $((60 * attempt))
+            fi
+          done
+          [ "$rc" -le 2 ] && jq -e . vulnix-findings.json > /dev/null 2>&1 \
+            || { echo "::error::vulnix scan failed after 3 attempts (exit $rc)"; exit 1; }
+
+      - name: Gate on unexcepted HIGH/CRITICAL vulnix findings
+        id: vulnix-gate
+        # BLOCKING (#639): fails on any HIGH/CRITICAL not covered by a
+        # non-expired entry in .vulnixignore. Reuses vig_utils.vulnix_gate (the
+        # same gate the nightly security-scan runs) so the publish job below
+        # cannot proceed on a CVE the nightly would have blocked.
+        run: uv run vulnix-gate vulnix-findings.json --register .vulnixignore
+
   publish:
     name: Publish Release
-    needs: [validate, finalize, build-and-test]
+    needs: [validate, finalize, build-and-test, vulnix-gate]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -835,8 +938,8 @@ jobs:
       - name: Set up environment
         uses: ./.github/actions/setup-env
         with:
-          install-python: 'false'
-          install-just: 'false'
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Configure git
         env:
@@ -950,9 +1053,12 @@ jobs:
             fi
 
             echo "Loading $arch image..."
-            docker load < "$ARTIFACT_PATH/image.tar"
-
-            SOURCE_IMAGE_TAG="$REPO:$BUILD_VERSION-$arch"
+            # Read back whatever tag the flake stamped (e.g. `nix-dev`) rather
+            # than assuming `$BUILD_VERSION-$arch`; the Nix image is saved
+            # verbatim and never carries the versioned tag.
+            SOURCE_IMAGE_TAG="$(docker load < "$ARTIFACT_PATH/image.tar" \
+              | sed -n 's/^Loaded image: //p' | head -n1)"
+            echo "Loaded: $SOURCE_IMAGE_TAG"
             IMAGE_TAG="$REPO:$PUBLISH_VERSION-$arch"
             docker tag "$SOURCE_IMAGE_TAG" "$IMAGE_TAG"
             echo "Pushing $arch image: $IMAGE_TAG"
@@ -1073,7 +1179,7 @@ jobs:
       - name: Attest build provenance (attempt 1)
         id: attest_provenance
         continue-on-error: true
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32  # v4.1.0
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4.1.1
         with:
           subject-name: ghcr.io/vig-os/devcontainer
           subject-digest: ${{ steps.digest.outputs.digest }}
@@ -1085,7 +1191,7 @@ jobs:
 
       - name: Attest build provenance (retry)
         if: steps.attest_provenance.outcome == 'failure'
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32  # v4.1.0
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4.1.1
         with:
           subject-name: ghcr.io/vig-os/devcontainer
           subject-digest: ${{ steps.digest.outputs.digest }}
@@ -1094,7 +1200,7 @@ jobs:
       - name: Attest SBOM (attempt 1)
         id: attest_sbom
         continue-on-error: true
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26  # v4.1.0
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763  # v4.1.1
         with:
           subject-name: ghcr.io/vig-os/devcontainer
           subject-digest: ${{ steps.digest.outputs.digest }}
@@ -1107,7 +1213,7 @@ jobs:
 
       - name: Attest SBOM (retry)
         if: steps.attest_sbom.outcome == 'failure'
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26  # v4.1.0
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763  # v4.1.1
         with:
           subject-name: ghcr.io/vig-os/devcontainer
           subject-digest: ${{ steps.digest.outputs.digest }}
@@ -1286,8 +1392,8 @@ jobs:
       - name: Set up environment
         uses: ./.github/actions/setup-env
         with:
-          install-python: 'false'
-          install-just: 'false'
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Trigger smoke-test repository dispatch
         env:
@@ -1367,10 +1473,11 @@ jobs:
     name: Rollback on Failure
     # Rollback is intentionally scoped to pre-publish/publish failures.
     # Dispatch-only smoke-test failures happen after publish; automation does not delete tags or reset branches (forward-fix policy).
-    needs: [validate, finalize, build-and-test, publish]
+    needs: [validate, finalize, build-and-test, vulnix-gate, publish]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    if: ${{ always() && (needs.validate.result == 'failure' || needs.finalize.result == 'failure' || needs.build-and-test.result == 'failure' || needs.publish.result == 'failure') }}
+    # A cancelled required job is treated as not-green (same as failure): roll back rather than leave a partial release.
+    if: ${{ always() && (contains(fromJSON('["failure", "cancelled"]'), needs.validate.result) || contains(fromJSON('["failure", "cancelled"]'), needs.finalize.result) || contains(fromJSON('["failure", "cancelled"]'), needs.build-and-test.result) || contains(fromJSON('["failure", "cancelled"]'), needs.vulnix-gate.result) || contains(fromJSON('["failure", "cancelled"]'), needs.publish.result)) }}
     permissions:
       contents: read        # required by actions/checkout in rollback job
       issues: write          # create failure issue
@@ -1399,8 +1506,8 @@ jobs:
       - name: Set up environment
         uses: ./.github/actions/setup-env
         with:
-          install-python: 'false'
-          install-just: 'false'
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Rollback release branch
         id: rollback-branch
@@ -1466,13 +1573,27 @@ jobs:
             exit 1
           fi
 
-          {
-            echo "# Release $VERSION"
-            echo ""
-            echo "This PR prepares release $VERSION for merge to main."
-            echo ""
-            echo "$CHANGELOG_CONTENT"
-          } > /tmp/release-pr-body.md
+          # GitHub caps PR bodies at 65536 chars; a large release changelog
+          # can overflow it (#810). Truncate at a line boundary and point to
+          # the full CHANGELOG.md on the release branch when it does.
+          MAX_BODY=65000
+          RELEASE_BRANCH="release/$VERSION"
+          HEADER="# Release $VERSION
+
+          This PR prepares release $VERSION for merge to main.
+
+          "
+          PR_BODY="${HEADER}${CHANGELOG_CONTENT}"$'\n'
+
+          if [ "${#PR_BODY}" -gt "$MAX_BODY" ]; then
+            NOTE=$(printf '\n\n_Changelog truncated to fit GitHub'"'"'s %s-char PR-body limit; see `CHANGELOG.md` on `%s` for the full entry._' "$MAX_BODY" "$RELEASE_BRANCH")
+            budget=$(( MAX_BODY - ${#HEADER} - ${#NOTE} ))
+            TRUNCATED="${CHANGELOG_CONTENT:0:budget}"
+            TRUNCATED="${TRUNCATED%$'\n'*}"
+            PR_BODY="${HEADER}${TRUNCATED}${NOTE}"
+          fi
+
+          printf '%s' "$PR_BODY" > /tmp/release-pr-body.md
 
           retry --retries 3 --backoff 5 --max-backoff 30 -- \
             gh pr edit "$PR_NUMBER" --body-file /tmp/release-pr-body.md
@@ -1490,6 +1611,7 @@ jobs:
             if ('${{ needs.validate.result }}' !== 'success') failedJobs.push('validate');
             if ('${{ needs.finalize.result }}' !== 'success') failedJobs.push('finalize');
             if ('${{ needs.build-and-test.result }}' !== 'success') failedJobs.push('build-and-test');
+            if ('${{ needs.vulnix-gate.result }}' !== 'success') failedJobs.push('vulnix-gate');
             if ('${{ needs.publish.result }}' !== 'success') failedJobs.push('publish');
 
             const rollbackBranch = '${{ steps.rollback-branch.outcome }}';

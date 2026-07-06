@@ -1,11 +1,17 @@
 # Composite action to set up the CI environment
 #
-# Installs Python, uv, and optionally syncs project dependencies and installs:
-# - Podman (for container operations)
-# - Node.js (for JS tooling)
-# - Devcontainer CLI + docker-compose wrapper (for integration tests)
-# - hadolint (for Containerfile linting in pre-commit)
-# - BATS + helper libraries (for shell script testing)
+# Provisions the toolchain from the Nix flake (the SSoT): installs Nix + Cachix,
+# builds the flake dev-shell (a warm vig-os Cachix pull), and prepends its tool
+# bin dirs to PATH so every subsequent step runs as if inside `nix develop`.
+# uv, Python, just, taplo, ripgrep, BATS, and the rest of the toolchain all come
+# from the flake — there is a single provisioning path, identical to local dev.
+# Refs #632, #720.
+#
+# A few tools are NOT taken from the flake because they need host integration:
+# - Podman (rootless podman on GitHub runners needs the host's setuid
+#   newuidmap/newgidmap and container config; the nix-store podman does not see
+#   them). Kept on the apt path; the flake's podman is filtered off PATH below.
+# - Node.js + the devcontainer CLI (npm-global install needs an FHS Node).
 #
 # IMPORTANT:
 # - This action does NOT checkout code, allowing callers to control ref, token,
@@ -14,56 +20,44 @@
 #   (for example, sync-dependencies or devcontainer CLI version lookup).
 #
 # Inputs:
-#   install-python:           Install Python (default: true)
-#   python-version:           Python version fallback when pyproject.toml is unavailable (default: '3.12')
 #   sync-dependencies:        Run uv sync to install project deps (default: false)
 #   install-podman:           Install podman (default: false)
 #   install-node:             Install Node.js (default: false)
 #   node-version:             Node.js version (default: '24')
 #   install-devcontainer-cli: Install devcontainer CLI + docker-compose wrapper (default: false)
-#   install-hadolint:         Install hadolint binary (default: false)
-#   install-taplo:            Install taplo TOML linter/formatter (default: false)
-#   install-bats:             Install BATS + helper libraries (default: false)
-#
-# Outputs:
-#   uv-version: The version of uv that was installed
+#   cachix-cache:             Cachix binary cache name (warm dev-shell pull)
+#   cachix-auth-token:        Cachix auth token (optional; pulls need no token)
 #
 # Usage:
-#   # Default (Python + uv only)
+#   # Toolchain only (uv, Python, linters, … from the flake)
 #   - uses: actions/checkout@v4
 #   - uses: ./.github/actions/setup-env
-#
-#   # uv only (skip Python setup)
-#   - uses: ./.github/actions/setup-env
 #     with:
-#       install-python: 'false'
+#       cachix-cache: ${{ vars.CACHIX_CACHE }}
+#       cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 #
 #   # With project dependencies
 #   - uses: actions/checkout@v4
 #   - uses: ./.github/actions/setup-env
 #     with:
 #       sync-dependencies: 'true'
+#       cachix-cache: ${{ vars.CACHIX_CACHE }}
+#       cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 #
-#   # All tools
+#   # All tools (integration tests)
 #   - uses: actions/checkout@v4
 #   - uses: ./.github/actions/setup-env
 #     with:
 #       sync-dependencies: 'true'
 #       install-podman: 'true'
 #       install-devcontainer-cli: 'true'
+#       cachix-cache: ${{ vars.CACHIX_CACHE }}
+#       cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
 name: 'Setup Environment'
-description: 'Set up CI environment with Python, uv, and optional tools (podman, Node.js, devcontainer CLI, hadolint, BATS)'
+description: 'Provision the CI toolchain from the Nix flake (uv, Python, linters, BATS) plus host-integration tools (podman, Node.js, devcontainer CLI)'
 
 inputs:
-  install-python:
-    description: 'Install Python runtime'
-    required: false
-    default: 'true'
-  python-version:
-    description: 'Python version fallback when pyproject.toml is unavailable'
-    required: false
-    default: '3.12'
   sync-dependencies:
     description: 'Run uv sync to install project dependencies'
     required: false
@@ -84,67 +78,95 @@ inputs:
     description: 'Install @devcontainers/cli and docker-compose wrapper (requires Node.js)'
     required: false
     default: 'false'
-  install-hadolint:
-    description: 'Install hadolint binary for Containerfile linting'
+  cachix-cache:
+    description: 'Cachix binary cache name (warm dev-shell pull)'
     required: false
-    default: 'false'
-  install-just:
-    description: 'Install just command runner for Justfile support'
+    default: ''
+  cachix-auth-token:
+    description: 'Cachix auth token for pushing (optional; pulls need no token)'
     required: false
-    default: 'true'
-  install-taplo:
-    description: 'Install taplo TOML linter/formatter'
-    required: false
-    default: 'false'
-  install-bats:
-    description: 'Install BATS and helper libraries (support, assert, file) for shell testing'
-    required: false
-    default: 'false'
-
-outputs:
-  uv-version:
-    description: 'Version of uv installed'
-    value: ${{ steps.setup-uv-retry.outputs.uv-version || steps.setup-uv.outputs.uv-version }}
+    default: ''
 
 runs:
   using: composite
   steps:
-    # ── Python ───────────────────────────────────────────────────────────
-    - name: "Set up Python from pyproject"
-      if: inputs.install-python == 'true' && hashFiles('pyproject.toml') != ''
-      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
+    # ── Nix flake provisioning (toolchain SSoT) ─────────────────────────
+    # Install Nix + Cachix and build the flake dev-shell, then prepend its tool
+    # bin dirs to GITHUB_PATH so every subsequent step runs as if inside
+    # `nix develop`. The Nix installer is SHA-pinned to match nix-cachix.yml and
+    # the vig-os Cachix substituter makes the dev-shell a fast binary-cache pull.
+    # Refs #632, #720.
+    - name: Install Nix (upstream CppNix)
+      uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3  # v31.10.6
       with:
-        python-version-file: "pyproject.toml"
+        extra_nix_config: |
+          experimental-features = nix-command flakes
+          accept-flake-config = true
 
-    - name: "Set up Python fallback"
-      if: inputs.install-python == 'true' && hashFiles('pyproject.toml') == ''
-      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
+    - name: Configure Cachix
+      if: inputs.cachix-cache != ''
+      uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71  # v17
       with:
-        python-version: ${{ inputs.python-version }}
+        name: ${{ inputs.cachix-cache }}
+        authToken: ${{ inputs.cachix-auth-token }}
 
-    # ── uv ─────────────────────────────────────────────────────────────
-    - name: Install uv
-      id: setup-uv
-      continue-on-error: true
-      uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
-      with:
-        enable-cache: true
-        # Install a specific version of uv.
-        version: "0.11.23"
-
-    - name: Wait before retrying uv install
-      if: steps.setup-uv.outcome == 'failure'
+    - name: Build flake dev-shell and enter it
       shell: bash
-      run: sleep 15
+      run: |
+        set -euo pipefail
+        # Build the dev-shell into a gcroot profile (warm Cachix pull).
+        nix develop --profile "$RUNNER_TEMP/dev-profile" --command true
 
-    - name: Install uv (retry)
-      id: setup-uv-retry
-      if: steps.setup-uv.outcome == 'failure'
-      uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
-      with:
-        enable-cache: true
-        # Install a specific version of uv.
-        version: "0.11.23"
+        # Capture the dev-shell PATH and prepend its nix-store bin dirs to
+        # GITHUB_PATH so all following steps resolve the flake's tools first.
+        #
+        # Exclude the flake's podman: rootless podman on GitHub runners relies
+        # on the host's setuid newuidmap/newgidmap and container config, which
+        # the nix-store podman does not see, so `podman info` fails. The host's
+        # preinstalled podman is kept on PATH by NOT shadowing it here (matches
+        # the apt-podman intent documented on the install-podman input).
+        # Refs #632.
+        #
+        # Exclude the flake's bare CPython: the dev-shell ships `python3` on PATH
+        # for dev-shell<->image parity (#729), but CI must keep building the
+        # project venv from a DOWNLOADED manylinux-compatible CPython (the
+        # UV_PYTHON_DOWNLOADS_JSON_URL path below) so the impure manylinux hooks
+        # (pymarkdown -> pyjson5) resolve the runner's system libstdc++. If the
+        # Nix `python3.14` were on the runner PATH, `uv sync` would select it (it
+        # satisfies requires-python), rebuild the venv on the Nix loader, and
+        # reintroduce the #698/#703 `libstdc++` ImportError that forced the #729
+        # revert. The interpreter drv is `python3-<ver>` (library pkgs are
+        # `python3.14-<pkg>` and are unaffected). The git-hook runner `prek` is
+        # kept on PATH — CI runs the committed hooks via `prek run --all-files`
+        # (the standalone `pre-commit` was dropped from the flake, #778). Refs #729.
+        SHELL_PATH="$(nix develop --profile "$RUNNER_TEMP/dev-profile" \
+          --command bash -c 'printf "%s" "$PATH"')"
+
+        printf '%s' "$SHELL_PATH" | tr ':' '\n' \
+          | grep '^/nix/store' \
+          | grep -v '/nix/store/[^/]*-podman[^/]*/bin' \
+          | grep -Ev '/nix/store/[^/]*-python3-[0-9][^/]*/bin' >> "$GITHUB_PATH"
+
+        # Propagate the dev-shell's uv Python-download metadata URL to later
+        # steps. GITHUB_PATH only carries PATH, not env vars, so this var (set
+        # in the flake dev-shell, the SSoT) must be forwarded explicitly so
+        # `uv sync` can fetch the project's pinned CPython, which nixpkgs does
+        # not package and the nixpkgs uv cannot download on its own. Refs #632.
+        # The dev-shell's shellHook prints a banner to stdout, so capture the
+        # var on its own line and extract just that line (mirrors the PATH
+        # filtering above).
+        UV_DL_JSON_URL="$(nix develop --profile "$RUNNER_TEMP/dev-profile" \
+          --command bash -c 'printf "UV_PYTHON_DOWNLOADS_JSON_URL=%s\n" "${UV_PYTHON_DOWNLOADS_JSON_URL:-}"' \
+          | grep '^UV_PYTHON_DOWNLOADS_JSON_URL=' | tail -n1 | cut -d= -f2-)"
+        if [ -n "$UV_DL_JSON_URL" ]; then
+          echo "UV_PYTHON_DOWNLOADS_JSON_URL=$UV_DL_JSON_URL" >> "$GITHUB_ENV"
+          echo "Forwarded UV_PYTHON_DOWNLOADS_JSON_URL=$UV_DL_JSON_URL"
+        fi
+
+        echo "Flake dev-shell provisioned; tools added to PATH:"
+        # sed, not head: head exiting early SIGPIPEs grep (exit 2) under the
+        # runner's pipefail shell once the list tops 50 entries (#847).
+        printf '%s' "$SHELL_PATH" | tr ':' '\n' | grep '^/nix/store' | sed -n '1,50p'
 
     # ── retry() shell helper ───────────────────────────────────────────
     - name: Export retry helper function
@@ -214,80 +236,6 @@ runs:
       with:
         node-version: ${{ inputs.node-version }}
 
-    # ── Just (task runner) ──────────────────────────────────────────────
-    - name: Install just
-      if: inputs.install-just == 'true'
-      uses: taiki-e/install-action@ab08a3b50948bd57d91bd2980f025da7e0a88231  # just
-      with:
-        tool: just
-
-    # ── hadolint (Containerfile linter) ───────────────────────────────────
-    - name: Install hadolint
-      if: inputs.install-hadolint == 'true'
-      shell: bash
-      run: |
-        set -euo pipefail
-
-        case "$(uname -m)" in
-          x86_64) ARCH="linux-x86_64" ;;
-          aarch64|arm64) ARCH="linux-arm64" ;;
-          *)
-            echo "Unsupported architecture: $(uname -m)"
-            exit 1
-            ;;
-        esac
-
-        HADOLINT_VERSION="v2.14.0"
-        BASE_URL="https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}"
-        BIN_FILE="hadolint-${ARCH}"
-        SHA_FILE="${BIN_FILE}.sha256"
-
-        retry --retries 3 --backoff 5 --max-backoff 60 -- \
-          curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
-        retry --retries 3 --backoff 5 --max-backoff 60 -- \
-          curl -fsSL "${BASE_URL}/${SHA_FILE}" -o "${SHA_FILE}"
-
-        EXPECTED_SHA="$(awk '{print $1}' "${SHA_FILE}")"
-        echo "${EXPECTED_SHA}  ${BIN_FILE}" | sha256sum -c -
-
-        sudo install -m 0755 "${BIN_FILE}" /usr/local/bin/hadolint
-        rm -f "${BIN_FILE}" "${SHA_FILE}"
-
-        hadolint --version
-
-    # ── taplo (TOML linter/formatter) ──────────────────────────────────
-    - name: Install taplo
-      if: inputs.install-taplo == 'true'
-      shell: bash
-      run: |
-        set -euo pipefail
-
-        case "$(uname -m)" in
-          x86_64) ARCH="x86_64" ;;
-          aarch64|arm64) ARCH="aarch64" ;;
-          *)
-            echo "Unsupported architecture: $(uname -m)"
-            exit 1
-            ;;
-        esac
-
-        TAPLO_VERSION="$(retry --retries 3 --backoff 5 --max-backoff 60 -- \
-          curl -fsSL https://api.github.com/repos/tamasfe/taplo/releases/latest | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')"
-        if [ -z "${TAPLO_VERSION:-}" ]; then
-          echo "ERROR: Failed to resolve Taplo version from GitHub releases API"
-          exit 1
-        fi
-        BASE_URL="https://github.com/tamasfe/taplo/releases/download/${TAPLO_VERSION}"
-        BIN_FILE="taplo-linux-${ARCH}.gz"
-
-        retry --retries 3 --backoff 5 --max-backoff 60 -- \
-          curl -fsSL "${BASE_URL}/${BIN_FILE}" -o "${BIN_FILE}"
-        gunzip "${BIN_FILE}"
-        sudo install -m 0755 "taplo-linux-${ARCH}" /usr/local/bin/taplo
-        rm -f "taplo-linux-${ARCH}"
-
-        taplo --version
-
     # ── Devcontainer CLI + docker-compose wrapper ───────────────────────
     # Requires Node.js (automatically installed above when this flag is set)
     - name: Install devcontainer CLI
@@ -307,26 +255,3 @@ runs:
         echo "Installing @devcontainers/cli@${DEVCONTAINER_VERSION}..."
         npm install -g "@devcontainers/cli@${DEVCONTAINER_VERSION}"
         echo "devcontainer $(devcontainer --version)"
-
-    # ── BATS (shell testing) ─────────────────────────────────────────
-    # Installs BATS core and helper libraries via the official action.
-    # Versions match package.json to keep local and CI environments in sync.
-    - name: Setup BATS and libraries
-      id: bats
-      if: inputs.install-bats == 'true'
-      uses: bats-core/bats-action@77d6fb60505b4d0d1d73e48bd035b55074bbfb43  # v4.0.0
-      with:
-        support-version: '0.3.0'
-        assert-version: '2.1.0'
-        file-version: '0.4.0'
-        detik-install: 'false'
-
-    - name: Export BATS_LIB_PATH
-      if: inputs.install-bats == 'true'
-      shell: bash
-      run: |
-        # The bats-core/bats-action installs libraries to standard system paths
-        # Set BATS_LIB_PATH so bats_load_library can find them
-        BATS_LIB_PATH="/usr/lib/bats-support:/usr/lib/bats-assert:/usr/lib/bats-file"
-        echo "BATS_LIB_PATH=$BATS_LIB_PATH" >> "$GITHUB_ENV"
-        echo "Exported BATS_LIB_PATH=$BATS_LIB_PATH"

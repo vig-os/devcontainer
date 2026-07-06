@@ -173,7 +173,14 @@ class TestHostGitSignatureSetup:
         # Verify it has some content
         content = allowed_signers.read_text()
         assert len(content.strip()) > 0, "Allowed signers file is empty"
-        assert "ssh-ed25519" in content or "ssh-rsa" in content, (
+        key_types = (
+            "ssh-ed25519",
+            "ssh-rsa",
+            "ecdsa-sha2-nistp",
+            "sk-ssh-ed25519@openssh.com",
+            "sk-ecdsa-sha2-nistp256@openssh.com",
+        )
+        assert any(k in content for k in key_types), (
             "Allowed signers file doesn't appear to contain SSH public keys"
         )
 
@@ -675,6 +682,36 @@ class TestVigOsConfig:
         )
         assert "{{IMAGE_TAG}}" not in content, (
             "IMAGE_TAG placeholder should be replaced in .vig-os"
+        )
+
+    def test_init_workspace_pins_requested_version(self, container_image, tmp_path):
+        """VIG_OS_VERSION override pins the scaffolded .vig-os (#852).
+
+        The image bakes the release it was built from into the scaffolded
+        .vig-os, which is stale for release candidates (the repo pin only
+        advances at finalize). install.sh forwards the requested --version as
+        VIG_OS_VERSION; init-workspace must honor it over the baked value.
+        """
+        from .conftest import is_running_in_container
+
+        if is_running_in_container():
+            pytest.skip("host-path mount test; covered on the CI host runner")
+
+        workspace = tmp_path / "version-pin-ws"
+        workspace.mkdir()
+        cmd = _build_podman_cmd(
+            container_image,
+            f"{workspace}:/workspace",
+            smoke_test=True,
+            extra_env={"VIG_OS_VERSION": "9.9.9-rc9"},
+        )
+        _run_noninteractive_init(cmd)
+
+        vig_os_file = workspace / ".vig-os"
+        assert vig_os_file.exists(), ".vig-os not scaffolded"
+        content = vig_os_file.read_text(encoding="utf-8")
+        assert "DEVCONTAINER_VERSION=9.9.9-rc9" in content, (
+            f".vig-os does not pin the requested version:\n{content}"
         )
 
     def test_initialize_writes_devcontainer_version_to_env(self, initialized_workspace):
@@ -1434,6 +1471,48 @@ class TestDevContainerUserConf:
 class TestDevContainerCLI:
     """Tests for the devcontainer CLI environment."""
 
+    def test_devcontainer_runs_image_under_test(self, devcontainer_up, container_tag):
+        """The running devcontainer must use the freshly-built image under test.
+
+        The scaffolded docker-compose.yml pins the runtime image as
+        ``ghcr.io/vig-os/devcontainer:${DEVCONTAINER_VERSION:-latest}`` and
+        ``initialize.sh`` writes the pinned ``DEVCONTAINER_VERSION`` (from the
+        scaffolded ``.vig-os``) into ``.env``. Without an override the suite
+        would validate fresh scaffolding running inside an old *published*
+        image, not the image actually being built. The ``devcontainer_up``
+        fixture overrides ``DEVCONTAINER_VERSION`` to ``TEST_CONTAINER_TAG`` so
+        compose resolves the image to the build under test. Refs #701.
+        """
+        workspace_path = devcontainer_up.resolve()
+
+        result = subprocess.run(
+            [
+                "podman",
+                "ps",
+                "--filter",
+                f"name={workspace_path.name}",
+                "--format",
+                "{{.Image}}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0, (
+            f"Failed to list running devcontainer\nstderr: {result.stderr}"
+        )
+        images = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        assert images, (
+            f"No running devcontainer found for workspace {workspace_path.name}"
+        )
+
+        expected_image = f"ghcr.io/vig-os/devcontainer:{container_tag}"
+        assert any(expected_image in image for image in images), (
+            f"Devcontainer is running from {images}, but the suite must validate "
+            f"the image under test ({expected_image}). DEVCONTAINER_VERSION is not "
+            f"being overridden to TEST_CONTAINER_TAG."
+        )
+
     def test_ssh_github_authentication(self, devcontainer_up):
         """Test that SSH authentication to GitHub works in the devcontainer."""
         workspace_path = str(devcontainer_up.resolve())
@@ -1556,7 +1635,7 @@ class TestDevContainerCLI:
             "podman",
             "bash",
             "-c",
-            "cd /workspace/test_project && pre-commit run --files test_file.py",
+            "cd /workspace/test_project && prek run --files test_file.py",
         ]
 
         result = subprocess.run(
@@ -1565,24 +1644,22 @@ class TestDevContainerCLI:
             text=True,
             cwd=str(workspace_path),
             env=os.environ.copy(),
-            timeout=120,  # Pre-commit can take a while on first run
+            timeout=120,  # prek can take a while on first run
         )
 
-        # Pre-commit should succeed (exit code 0) or pass with warnings
+        # prek should succeed (exit code 0) or pass with warnings
         # Exit code 1 means hooks failed, which is also acceptable for testing
-        # We just want to verify pre-commit runs
+        # We just want to verify the hook runner (prek, #778) runs
         assert result.returncode in [0, 1], (
-            f"Pre-commit failed unexpectedly\n"
+            f"prek failed unexpectedly\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}\n"
             f"command: {' '.join(exec_cmd)}"
         )
 
-        # Verify pre-commit actually ran (check for pre-commit output)
-        assert (
-            "pre-commit" in result.stdout.lower() or "ruff" in result.stdout.lower()
-        ), (
-            f"Pre-commit doesn't appear to have run\n"
+        # Verify the hook runner actually ran (check for prek/hook output)
+        assert "prek" in result.stdout.lower() or "ruff" in result.stdout.lower(), (
+            f"prek doesn't appear to have run\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}"
         )
@@ -1807,7 +1884,7 @@ class TestDevContainerCLI:
 
         # Test valid branch names
         for branch_name in valid_branch_names:
-            # Create branch and run pre-commit hook
+            # Create branch and run the prek hook runner
             exec_cmd = [
                 "devcontainer",
                 "exec",
@@ -1824,7 +1901,7 @@ class TestDevContainerCLI:
                     " && printf 'dummy\\n' > dummy.txt"
                     f" && git checkout -b '{branch_name}'"
                     " && git add dummy.txt"
-                    " && pre-commit run -a"
+                    " && prek run -a"
                 ),
             ]
             result = subprocess.run(
@@ -1837,7 +1914,7 @@ class TestDevContainerCLI:
             )
 
             assert result.returncode == 0, (
-                f"pre-commit on valid branch '{branch_name}' should succeed\n"
+                f"prek on valid branch '{branch_name}' should succeed\n"
                 f"stdout: {result.stdout}\n"
                 f"stderr: {result.stderr}\n"
                 f"command: {' '.join(exec_cmd)}"
@@ -1875,7 +1952,7 @@ class TestDevContainerCLI:
                     " && printf 'dummy\\n' > dummy.txt"
                     f" && git checkout -b '{branch_name}'"
                     " && git add dummy.txt"
-                    " && pre-commit run -a"
+                    " && prek run -a"
                 ),
             ]
             result = subprocess.run(
@@ -1888,7 +1965,7 @@ class TestDevContainerCLI:
             )
 
             assert result.returncode != 0, (
-                f"pre-commit on invalid branch '{branch_name}' should fail\n"
+                f"prek on invalid branch '{branch_name}' should fail\n"
                 f"stdout: {result.stdout}\n"
                 f"stderr: {result.stderr}\n"
                 f"command: {' '.join(exec_cmd)}"
@@ -1912,7 +1989,6 @@ class TestJustRecipes:
         "    [test]",
         "    [quality]",
         "    [deps]",
-        "    [sidecar]",
     ]
 
     def _just_cmd(self, workspace_path: str, args: list[str]) -> list[str]:
@@ -2270,7 +2346,6 @@ class TestPodmanSocketAccess:
     These tests verify that container-in-container operations work correctly,
     which is essential for:
     - Building container images inside the devcontainer
-    - Running sidecar containers
     - Testing containerized applications
     """
 
@@ -2606,183 +2681,6 @@ class TestPodmanSocketAccess:
             cwd=workspace_path,
             env=os.environ.copy(),
             timeout=10,
-        )
-
-
-class TestSidecarConnectivity:
-    """Standalone tests for sidecar functionality using Approach 1 (podman exec).
-
-    These tests verify the real-world sidecar workflow:
-    - Sidecar containers can be started alongside the devcontainer
-    - Commands can be executed in sidecars via podman exec (Approach 1)
-    - Build workflows can be triggered in sidecar builders
-    - This is the ACTUAL workflow users will use for builder sidecars
-
-    Test Setup:
-    - Uses a custom test-sidecar image (alpine-based)
-    - Sidecar stays alive with 'sleep infinity'
-    - Commands are executed via: podman exec sidecar <command>
-
-    Communication Method:
-    - Uses Podman socket for container management (podman exec)
-    - NOT HTTP networking (that's tested separately)
-    - This is Approach 1: Direct command execution
-
-    Note on CI:
-    - In CI the host podman may be older than the podman client inside the
-      devcontainer image.  To avoid API-version mismatches (e.g. host 3.4.4
-      vs container client 4.0.0), these tests run podman commands directly
-      on the host rather than through ``devcontainer exec``.  The sidecar
-      container is managed by compose on the host, so the host's podman can
-      interact with it natively.
-    """
-
-    def test_sidecar_starts_with_devcontainer(self, devcontainer_with_sidecar):
-        """Test that sidecar container starts alongside devcontainer."""
-        workspace_path = str(devcontainer_with_sidecar.resolve())
-
-        # Check sidecar is running via host podman directly.
-        # We avoid `devcontainer exec ... podman ps` because the podman
-        # client inside the container may be newer than the host daemon,
-        # causing an API-version mismatch on the mounted socket.
-        check_cmd = [
-            "podman",
-            "ps",
-            "--filter",
-            "name=test-sidecar",
-            "--format",
-            "{{.Names}}",
-        ]
-
-        result = subprocess.run(
-            check_cmd,
-            capture_output=True,
-            text=True,
-            cwd=workspace_path,
-            env=os.environ.copy(),
-            timeout=10,
-        )
-
-        assert result.returncode == 0, (
-            f"Failed to check running containers\n"
-            f"stdout: {result.stdout}\n"
-            f"stderr: {result.stderr}"
-        )
-
-        # Verify sidecar is running
-        assert "test-sidecar" in result.stdout, (
-            f"Test sidecar container not found in running containers\n"
-            f"stdout: {result.stdout}"
-        )
-
-    def test_exec_simple_command_in_sidecar(self, devcontainer_with_sidecar):
-        """Test executing a script in sidecar via podman exec (Approach 1)."""
-        workspace_path = str(devcontainer_with_sidecar.resolve())
-
-        # Execute the test build script IN the sidecar directly from the
-        # host.  This is functionally equivalent to what a user would do
-        # from inside the devcontainer (podman exec test-sidecar ...), but
-        # avoids the DooD API-version constraint in CI.
-        exec_cmd = [
-            "podman",
-            "exec",
-            "test-sidecar",
-            "/usr/local/bin/test-build.sh",
-        ]
-
-        result = subprocess.run(
-            exec_cmd,
-            capture_output=True,
-            text=True,
-            cwd=workspace_path,
-            env=os.environ.copy(),
-            timeout=10,
-        )
-
-        assert result.returncode == 0, (
-            f"Failed to execute script in sidecar\n"
-            f"stdout: {result.stdout}\n"
-            f"stderr: {result.stderr}"
-        )
-
-        # Verify we got the expected output from the script
-        assert "Hello from sidecar test script" in result.stdout, (
-            f"Script did not execute correctly\nstdout: {result.stdout}"
-        )
-        assert "Communication verified!" in result.stdout, (
-            f"Script output incomplete\nstdout: {result.stdout}"
-        )
-
-    def test_exec_build_workflow_in_sidecar(self, devcontainer_with_sidecar):
-        """Test a realistic build workflow: exec into sidecar to create build artifacts."""
-        workspace_path = str(devcontainer_with_sidecar.resolve())
-
-        # Simulate a build process in the sidecar directly from the host.
-        build_cmd = [
-            "podman",
-            "exec",
-            "test-sidecar",
-            "sh",
-            "-c",
-            "echo 'Building project...' && "
-            "mkdir -p /workspace/build-output && "
-            "echo 'build artifacts' > /workspace/build-output/result.txt && "
-            "cat /workspace/build-output/result.txt",
-        ]
-
-        result = subprocess.run(
-            build_cmd,
-            capture_output=True,
-            text=True,
-            cwd=workspace_path,
-            env=os.environ.copy(),
-            timeout=10,
-        )
-
-        assert result.returncode == 0, (
-            f"Failed to execute build workflow in sidecar\n"
-            f"stdout: {result.stdout}\n"
-            f"stderr: {result.stderr}"
-        )
-
-        # Verify the build executed
-        assert "Building project" in result.stdout, (
-            f"Build workflow did not execute\nstdout: {result.stdout}"
-        )
-        assert "build artifacts" in result.stdout, (
-            f"Build artifacts not created\nstdout: {result.stdout}"
-        )
-
-    def test_sidecar_has_bash(self, devcontainer_with_sidecar):
-        """Test that sidecar has bash installed for complex build scripts."""
-        workspace_path = str(devcontainer_with_sidecar.resolve())
-
-        # Check bash is available in the sidecar directly from the host.
-        bash_cmd = [
-            "podman",
-            "exec",
-            "test-sidecar",
-            "bash",
-            "--version",
-        ]
-
-        result = subprocess.run(
-            bash_cmd,
-            capture_output=True,
-            text=True,
-            cwd=workspace_path,
-            env=os.environ.copy(),
-            timeout=10,
-        )
-
-        assert result.returncode == 0, (
-            f"Bash not available in sidecar\n"
-            f"stdout: {result.stdout}\n"
-            f"stderr: {result.stderr}"
-        )
-
-        assert "bash" in result.stdout.lower(), (
-            f"Unexpected bash version output\nstdout: {result.stdout}"
         )
 
 
@@ -3174,7 +3072,7 @@ class TestVersionCheckJustIntegration:
     """Test integration of version check with just commands."""
 
     def test_just_check_command_exists(self, initialized_workspace):
-        """Test that 'just check' command is available."""
+        """Test that 'just devc-check' command is available."""
         # Check if .devcontainer/justfile.devc has the check recipe
         justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
@@ -3200,7 +3098,7 @@ class TestVersionCheckJustIntegration:
         assert "update" in content, "update recipe not found in justfile.project"
 
     def test_just_check_calls_script(self, initialized_workspace):
-        """Test that 'just check config' executes successfully."""
+        """Test that 'just devc-check config' executes successfully."""
         # First verify the script exists
         script_path = (
             initialized_workspace / ".devcontainer" / "scripts" / "version-check.sh"
@@ -3234,7 +3132,7 @@ class TestVersionCheckJustIntegration:
         assert "Configuration" in result.stdout or "Enabled:" in result.stdout
 
     def test_just_check_recipe_calls_version_check_script(self, initialized_workspace):
-        """Test that 'just check' recipe properly calls version-check.sh."""
+        """Test that 'just devc-check' recipe properly calls version-check.sh."""
         justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
@@ -3251,7 +3149,7 @@ class TestVersionCheckJustIntegration:
         lines = content.split("\n")
         check_recipe_idx = None
         for i, line in enumerate(lines):
-            if line.startswith("check "):
+            if line.startswith("devc-check "):
                 check_recipe_idx = i
                 break
 
@@ -3265,7 +3163,7 @@ class TestVersionCheckJustIntegration:
             pytest.fail("check recipe not in 'info' group")
 
     def test_just_check_verbose_mode(self, initialized_workspace):
-        """Test that 'just check' runs in verbose mode (check subcommand)."""
+        """Test that 'just devc-check' runs in verbose mode (check subcommand)."""
         justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
@@ -3282,7 +3180,7 @@ class TestVersionCheckJustIntegration:
         )
 
     def test_just_check_accepts_subcommands(self, initialized_workspace):
-        """Test that 'just check' recipe accepts and passes through subcommands."""
+        """Test that 'just devc-check' recipe accepts and passes through subcommands."""
         justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
@@ -3296,7 +3194,7 @@ class TestVersionCheckJustIntegration:
         lines = content.split("\n")
         check_line = None
         for line in lines:
-            if line.startswith("check "):
+            if line.startswith("devc-check "):
                 check_line = line
                 break
 
@@ -3304,7 +3202,7 @@ class TestVersionCheckJustIntegration:
         assert "*args" in check_line, "check recipe doesn't accept variadic arguments"
 
     def test_just_check_config_shows_configuration(self, initialized_workspace):
-        """Test that 'just check config' shows version check configuration."""
+        """Test that 'just devc-check config' shows version check configuration."""
         script_path = (
             initialized_workspace / ".devcontainer" / "scripts" / "version-check.sh"
         )
@@ -3326,7 +3224,7 @@ class TestVersionCheckJustIntegration:
         assert "interval:" in result.stdout.lower()
 
     def test_just_check_config_via_just_command(self, initialized_workspace):
-        """Regression: 'just check config' resolves path correctly (issue #187)."""
+        """Regression: 'just devc-check config' resolves path correctly (issue #187)."""
         justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
         if not justfile_base.exists():
             pytest.skip("justfile.devc not found")
@@ -3334,7 +3232,7 @@ class TestVersionCheckJustIntegration:
             pytest.skip("check recipe not found")
 
         result = subprocess.run(
-            ["just", "check", "config"],
+            ["just", "devc-check", "config"],
             capture_output=True,
             text=True,
             cwd=str(initialized_workspace),
@@ -3342,7 +3240,7 @@ class TestVersionCheckJustIntegration:
         )
 
         assert result.returncode == 0, (
-            f"just check config failed (path resolution bug #187): {result.stderr}"
+            f"just devc-check config failed (path resolution bug #187): {result.stderr}"
         )
         assert "Could not locate .devcontainer/scripts directory" not in (
             result.stdout + result.stderr
@@ -3377,18 +3275,22 @@ class TestVersionCheckJustIntegration:
             )
 
     def test_workspace_justfile_imports_justfile_devc(self, initialized_workspace):
-        """Test that workspace justfile imports justfile.devc."""
+        """Test that workspace justfile optionally imports justfile.devc.
+
+        The import is optional (``import?``) so a ``direnv``-mode workspace, which
+        prunes ``.devcontainer/``, still loads `just` (#641).
+        """
         workspace_justfile = initialized_workspace / "justfile"
 
         if not workspace_justfile.exists():
             pytest.skip("workspace justfile not found")
 
         content = workspace_justfile.read_text()
-        assert "import '.devcontainer/justfile.devc'" in content
+        assert "import? '.devcontainer/justfile.devc'" in content
         assert "import '.devcontainer/justfile.base'" not in content
 
     def test_just_check_mute_functionality(self, initialized_workspace):
-        """Test that 'just check 7d' mutes notifications."""
+        """Test that 'just devc-check 7d' mutes notifications."""
         script_path = (
             initialized_workspace / ".devcontainer" / "scripts" / "version-check.sh"
         )
@@ -3413,7 +3315,7 @@ class TestVersionCheckJustIntegration:
         assert muted_file.exists()
 
     def test_just_check_enable_disable(self, initialized_workspace):
-        """Test that 'just check on/off' enables/disables notifications."""
+        """Test that 'just devc-check on/off' enables/disables notifications."""
         script_path = (
             initialized_workspace / ".devcontainer" / "scripts" / "version-check.sh"
         )
@@ -3602,16 +3504,16 @@ class TestVersionCheckNotificationMessage:
     def test_notification_shows_devcontainer_upgrade_command(
         self, version_check_script
     ):
-        """Test that notification message shows 'just devcontainer-upgrade'."""
+        """Test that notification message shows 'just devc-upgrade'."""
         content = version_check_script.read_text()
 
         # Find the notify_update function
         assert "notify_update" in content, "notify_update function not found"
 
         # Check if it mentions the correct upgrade command
-        assert (
-            "just devcontainer-upgrade" in content or "devcontainer-upgrade" in content
-        ), "Notification should mention 'just devcontainer-upgrade' command"
+        assert "just devc-upgrade" in content or "devc-upgrade" in content, (
+            "Notification should mention 'just devc-upgrade' command"
+        )
 
     def test_notification_does_not_show_just_update(self, version_check_script):
         """Test that notification doesn't show misleading 'just update' command."""
@@ -3674,20 +3576,20 @@ class TestVersionCheckNotificationMessage:
         # Should show mute and disable options
         notify_section = content[content.find("notify_update") :]
 
-        assert "just check" in notify_section and "off" in notify_section, (
-            "Notification should show how to disable ('just check off')"
+        assert "just devc-check" in notify_section and "off" in notify_section, (
+            "Notification should show how to disable ('just devc-check off')"
         )
 
         assert "7d" in notify_section or "mute" in notify_section.lower(), (
-            "Notification should show how to mute (e.g., 'just check 7d')"
+            "Notification should show how to mute (e.g., 'just devc-check 7d')"
         )
 
 
 class TestDevcontainerUpgradeRecipe:
-    """Test the host-side 'just devcontainer-upgrade' recipe."""
+    """Test the host-side 'just devc-upgrade' recipe."""
 
     def test_devcontainer_upgrade_recipe_exists(self, initialized_workspace):
-        """Test that 'just devcontainer-upgrade' recipe exists in justfile.devc."""
+        """Test that 'just devc-upgrade' recipe exists in justfile.devc."""
         justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
@@ -3696,8 +3598,8 @@ class TestDevcontainerUpgradeRecipe:
         content = justfile_base.read_text()
 
         # Recipe should exist
-        assert "devcontainer-upgrade" in content, (
-            "devcontainer-upgrade recipe not found in justfile.devc"
+        assert "devc-upgrade" in content, (
+            "devc-upgrade recipe not found in justfile.devc"
         )
 
     def test_devcontainer_upgrade_detects_container_environment(
@@ -3713,7 +3615,7 @@ class TestDevcontainerUpgradeRecipe:
 
         # Should check for container indicators
         assert "/.dockerenv" in content or "container" in content, (
-            "devcontainer-upgrade recipe should detect container environment"
+            "devc-upgrade recipe should detect container environment"
         )
 
     def test_devcontainer_upgrade_shows_error_in_container(self, initialized_workspace):
@@ -3725,13 +3627,13 @@ class TestDevcontainerUpgradeRecipe:
 
         content = justfile_base.read_text()
 
-        # Find the devcontainer-upgrade recipe
+        # Find the devc-upgrade recipe
         lines = content.split("\n")
         recipe_start = None
         recipe_end = None
 
         for i, line in enumerate(lines):
-            if "devcontainer-upgrade" in line and ":" in line:
+            if "devc-upgrade" in line and ":" in line:
                 recipe_start = i
                 # Find the end (next recipe or end of file)
                 for j in range(i + 1, len(lines)):
@@ -3745,7 +3647,7 @@ class TestDevcontainerUpgradeRecipe:
                 break
 
         if recipe_start is None:
-            pytest.skip("devcontainer-upgrade recipe not found")
+            pytest.skip("devc-upgrade recipe not found")
 
         recipe_content = "\n".join(
             lines[recipe_start : recipe_end if recipe_end else len(lines)]
@@ -3785,15 +3687,15 @@ class TestDevcontainerUpgradeRecipe:
 
         content = justfile_base.read_text()
 
-        # Find the devcontainer-upgrade recipe section
-        if "devcontainer-upgrade" in content:
+        # Find the devc-upgrade recipe section
+        if "devc-upgrade" in content:
             # Should call the install script
             assert "install.sh" in content, "Recipe should call install.sh"
 
             assert "--force" in content, "Recipe should use --force flag for upgrades"
 
     def test_devcontainer_upgrade_in_info_group(self, initialized_workspace):
-        """Test that devcontainer-upgrade recipe is in the 'info' group."""
+        """Test that devc-upgrade recipe is in the 'info' group."""
         justfile_base = initialized_workspace / ".devcontainer" / "justfile.devc"
 
         if not justfile_base.exists():
@@ -3802,22 +3704,22 @@ class TestDevcontainerUpgradeRecipe:
         content = justfile_base.read_text()
         lines = content.split("\n")
 
-        # Find the devcontainer-upgrade recipe
+        # Find the devc-upgrade recipe
         recipe_idx = None
         for i, line in enumerate(lines):
-            if "devcontainer-upgrade:" in line:
+            if "devc-upgrade:" in line:
                 recipe_idx = i
                 break
 
         if recipe_idx is None:
-            pytest.skip("devcontainer-upgrade recipe not found")
+            pytest.skip("devc-upgrade recipe not found")
 
         # Look backwards for group annotation
         for i in range(recipe_idx - 1, max(0, recipe_idx - 5), -1):
             if "[group('info')]" in lines[i]:
                 return  # Found it
 
-        pytest.fail("devcontainer-upgrade recipe not in 'info' group")
+        pytest.fail("devc-upgrade recipe not in 'info' group")
 
 
 class TestVersionCheckGracefulFailure:

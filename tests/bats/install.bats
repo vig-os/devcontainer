@@ -71,17 +71,27 @@ setup() {
     assert_output --partial "init-workspace.sh"
 }
 
+@test "dry-run command is derived from the CMD array via printf %q" {
+    # The shown command must be rendered from the real CMD array, not a
+    # hand-maintained duplicate string (#759).
+    # shellcheck disable=SC2016
+    run grep "printf '%q" "$INSTALL_SH"
+    assert_success
+}
+
 @test "dry-run includes image registry in command" {
     run bash "$INSTALL_SH" --dry-run .
     assert_success
     assert_output --partial "ghcr.io/vig-os/devcontainer"
 }
 
-@test "dry-run output quotes project path and image for safe copy-paste" {
+@test "dry-run output is shell-quoted for safe copy-paste" {
     run bash "$INSTALL_SH" --dry-run .
     assert_success
-    assert_output --regexp '"[^"]+":/workspace'
-    assert_output --regexp '"ghcr.io/vig-os/devcontainer:[^"]+"'
+    # The command is rendered from the real CMD array via printf '%q', so each
+    # argument is shell-safe (quoted only when it contains special characters).
+    assert_output --regexp '[^ ]+:/workspace'
+    assert_output --regexp 'ghcr\.io/vig-os/devcontainer:[^ ]+'
 }
 
 # ── version flag ──────────────────────────────────────────────────────────────
@@ -117,7 +127,7 @@ setup() {
 @test "default org is vigOS" {
     run bash "$INSTALL_SH" --dry-run .
     assert_success
-    assert_output --partial 'ORG_NAME="vigOS"'
+    assert_output --partial 'ORG_NAME=vigOS'
 }
 
 @test "default GITHUB_REPOSITORY is OWNER/REPO when no git origin" {
@@ -125,20 +135,20 @@ setup() {
     test_dir="$(mktemp -d)"
     run bash "$INSTALL_SH" --dry-run "$test_dir"
     assert_success
-    assert_output --partial 'GITHUB_REPOSITORY="OWNER/REPO"'
+    assert_output --partial 'GITHUB_REPOSITORY=OWNER/REPO'
     rm -rf "$test_dir"
 }
 
 @test "custom --repo is passed to container" {
     run bash "$INSTALL_SH" --dry-run --repo vig-os/myapp .
     assert_success
-    assert_output --partial 'GITHUB_REPOSITORY="vig-os/myapp"'
+    assert_output --partial 'GITHUB_REPOSITORY=vig-os/myapp'
 }
 
 @test "custom org is passed to container" {
     run bash "$INSTALL_SH" --dry-run --org MyOrg .
     assert_success
-    assert_output --partial 'ORG_NAME="MyOrg"'
+    assert_output --partial 'ORG_NAME=MyOrg'
 }
 
 # ── name flag / sanitization ─────────────────────────────────────────────────
@@ -150,7 +160,7 @@ setup() {
 
     run bash "$INSTALL_SH" --dry-run "$test_dir/My-Awesome-Project"
     assert_success
-    assert_output --partial 'SHORT_NAME="my_awesome_project"'
+    assert_output --partial 'SHORT_NAME=my_awesome_project'
 
     rm -rf "$test_dir"
 }
@@ -158,7 +168,7 @@ setup() {
 @test "custom name overrides directory name" {
     run bash "$INSTALL_SH" --dry-run --name custom_name .
     assert_success
-    assert_output --partial 'SHORT_NAME="custom_name"'
+    assert_output --partial 'SHORT_NAME=custom_name'
 }
 
 # ── invalid path ──────────────────────────────────────────────────────────────
@@ -269,6 +279,15 @@ setup() {
     assert_success
 }
 
+@test "install.sh guards the scaffold commit against a populated directory" {
+    # The automatic 'initial project scaffold' commit must only run for a
+    # freshly scaffolded (empty) target, gated by the TARGET_WAS_EMPTY flag,
+    # so it never sweeps a pre-populated directory into a misleading commit (#759).
+    # shellcheck disable=SC2016
+    run grep 'TARGET_WAS_EMPTY' "$INSTALL_SH"
+    assert_success
+}
+
 @test "install.sh verifies main branch exists" {
     run grep 'git rev-parse --verify main' "$INSTALL_SH"
     assert_success
@@ -318,6 +337,18 @@ setup() {
     assert_success
 }
 
+@test "install.sh checks local image with docker-compatible 'image inspect'" {
+    # shellcheck disable=SC2016
+    run grep '\$RUNTIME image inspect "\$IMAGE"' "$INSTALL_SH"
+    assert_success
+}
+
+@test "install.sh does not use podman-only '\$RUNTIME image exists'" {
+    # shellcheck disable=SC2016
+    run grep '\$RUNTIME image exists' "$INSTALL_SH"
+    assert_failure
+}
+
 # ── error handling ────────────────────────────────────────────────────────────
 
 @test "install.sh validates container runtime availability" {
@@ -349,5 +380,13 @@ setup() {
 
 @test "install.sh has shebang" {
     run head -1 "$INSTALL_SH"
-    assert_output "#!/bin/bash"
+    assert_output "#!/usr/bin/env bash"
+}
+
+# ── .vig-os version-pin override (#852) ───────────────────────────────────────
+
+@test "install.sh forwards --version to init-workspace as VIG_OS_VERSION (#852)" {
+    # shellcheck disable=SC2016
+    run grep -F 'VIG_OS_VERSION=$VERSION' "$INSTALL_SH"
+    assert_success
 }

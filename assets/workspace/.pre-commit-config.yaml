@@ -3,6 +3,11 @@
 
 exclude: ^.github_data/|^docs/issues/|^docs/pull-requests/
 
+# Build python-language hooks with the project interpreter (3.14) so PEP 758
+# syntax (bare except tuples) never false-flags under an older parser. Refs #803.
+default_language_version:
+  python: python3.14
+
 repos:
   # General Pre-commit Hooks (Fixes formatting issues)
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -27,6 +32,9 @@ repos:
       - id: check-symlinks
       - id: check-toml
       - id: check-yaml
+        # git-hooks.nix' check-yaml built-in hardcodes --multi, so match it here
+        # to keep the runner and the checks.pre-commit gate in agreement (#778).
+        args: [--allow-multiple-documents]
       - id: debug-statements
       - id: destroyed-symlinks
       - id: detect-private-key
@@ -34,13 +42,19 @@ repos:
       - id: mixed-line-ending
       - id: trailing-whitespace
 
-  # Python Linting and Formatting (Ruff)
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: aad66557af3b56ba6d4d69cd1b6cba87cef50cbb  # v0.14.3
+  # Python Linting and Formatting (Ruff, sourced from the flake dev-shell)
+  - repo: local
     hooks:
       - id: ruff
-        args: [--fix]
+        name: ruff (lint/fix python)
+        entry: ruff check --fix
+        language: system
+        types: [python]
       - id: ruff-format
+        name: ruff-format (format python)
+        entry: ruff format
+        language: system
+        types: [python]
 
   # YAML Linting
   - repo: https://github.com/adrienverge/yamllint
@@ -49,14 +63,23 @@ repos:
       - id: yamllint
         args: ["--format", "parsable", "--strict"]
 
-  # Shellcheck
-  - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: a23f6b85d0fdd5bb9d564e2579e678033debbdff  # v0.10.0.1
+  # Shellcheck (sourced from the flake dev-shell toolchain). The
+  # shellcheck-py wheel bundles a manylinux shellcheck binary that the Nix
+  # image's non-FHS userland cannot exec, and the prek/uv installer cannot
+  # build that wheel under Python 3.14 — so, like ruff/typos/nixfmt (#697,
+  # #701), shellcheck runs as a language:system hook resolved from the flake
+  # (devTools ships `shellcheck`). Refs #778.
+  - repo: local
     hooks:
       - id: shellcheck
         name: shellcheck
+        entry: shellcheck
+        language: system
+        types: [shell]
+        # .envrc files (root + the scaffolded template stub) are direnv stdlib
+        # scripts with no shebang; exclude them from SC2148 at any path.
         args: ["-x"]
-        exclude: ^\.envrc$
+        exclude: (^|/)\.envrc$
 
   # Markdown Linting (excludes auto-generated docs)
   - repo: https://github.com/jackdewinter/pymarkdown
@@ -77,18 +100,30 @@ repos:
         files: ^justfile(\..*)?$
         pass_filenames: false
 
-  # Typo Linting
-  - repo: https://github.com/crate-ci/typos
-    rev: 07d900b8fa1097806b8adb6391b0d3e0ac2fdea7  # v1.39.0
+  # Nix formatting (nixfmt-rfc-style from the flake dev-shell toolchain)
+  - repo: local
+    hooks:
+      - id: nixfmt
+        name: nixfmt (format/check nix files)
+        entry: nixfmt --check
+        language: system
+        files: \.nix$
+        types: [file]
+
+  # Typo Linting (typos sourced from the flake dev-shell)
+  - repo: local
     hooks:
       - id: typos
+        name: typos (source typo checker)
+        entry: typos --force-exclude
+        language: system
 
   # Security exception expiry enforcement (Refs: #566)
   - repo: local
     hooks:
       - id: check-expirations
-        name: check-expirations (.trivyignore expiry enforcement)
-        entry: uv run check-expirations .trivyignore
+        name: check-expirations (.trivyignore/.vulnixignore expiry enforcement)
+        entry: uv run check-expirations .trivyignore .vulnixignore
         language: system
-        files: ^\.trivyignore$
+        files: ^\.(trivyignore|vulnixignore)$
         pass_filenames: false

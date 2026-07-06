@@ -149,7 +149,10 @@ activemq-data/
 
 # Environments
 .env
-.envrc
+# .envrc (use flake) is committed for nix-direnv onboarding (#640); the local
+# evaluation cache and any per-user overrides are not.
+.direnv/
+.envrc.local
 .venv
 env/
 venv/
@@ -220,3 +223,6 @@ justfile.local
 
 # Pre-commit cache
 .pre-commit-cache/
+
+# process-compose / services-flake local dev services state (#795)
+data/

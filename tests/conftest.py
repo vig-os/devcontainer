@@ -29,6 +29,13 @@ import pytest
 import testinfra
 import yaml
 
+# Timeout (seconds) for `just sync` to finish during interactive init. The
+# test-project pulls heavy scientific extras (numpy, scipy, pandas, matplotlib,
+# jupyter) and the image ships no warm uv cache, so a cold/slow network can take
+# well over a minute to download them. Generous default, overridable via env for
+# fast-cache/CI tuning. Refs: #692.
+DEPS_SYNC_TIMEOUT = int(os.environ.get("INIT_DEPS_SYNC_TIMEOUT", "300"))
+
 
 def pytest_sessionstart(session):
     """
@@ -58,23 +65,6 @@ def pytest_sessionstart(session):
     if result.returncode == 0 and result.stdout.strip():
         containers = result.stdout.strip().split("\n")
 
-        # Also check for test-sidecar containers
-        sidecar_check_cmd = [
-            "podman",
-            "ps",
-            "-a",
-            "--filter",
-            "name=test-sidecar",
-            "--format",
-            "{{.ID}}\t{{.Names}}\t{{.Status}}\t{{.CreatedAt}}",
-        ]
-        sidecar_result = subprocess.run(
-            sidecar_check_cmd, capture_output=True, text=True
-        )
-
-        if sidecar_result.returncode == 0 and sidecar_result.stdout.strip():
-            containers.extend(sidecar_result.stdout.strip().split("\n"))
-
         # Format the error message
         container_list = "\n".join(f"  - {c}" for c in containers)
 
@@ -83,9 +73,6 @@ To clean up these containers, run:
 
     # Clean up workspace devcontainers
     podman ps -a --filter "name=workspace-devcontainer" --format "{{{{.ID}}}}" | xargs -r podman rm -f
-
-    # Clean up test sidecars
-    podman ps -a --filter "name=test-sidecar" --format "{{{{.ID}}}}" | xargs -r podman rm -f
 
     # Or use the justfile recipe:
     just clean-test-containers
@@ -119,25 +106,6 @@ Alternatively, set PYTEST_AUTO_CLEANUP=1 to automatically clean up before tests:
                         ["podman", "rm", "-f", container_id], capture_output=True
                     )
 
-            # Clean up test sidecars
-            cleanup_sidecar = [
-                "podman",
-                "ps",
-                "-a",
-                "--filter",
-                "name=test-sidecar",
-                "--format",
-                "{{.ID}}",
-            ]
-            sidecar_ids_result = subprocess.run(
-                cleanup_sidecar, capture_output=True, text=True
-            )
-            if sidecar_ids_result.stdout.strip():
-                for container_id in sidecar_ids_result.stdout.strip().split("\n"):
-                    subprocess.run(
-                        ["podman", "rm", "-f", container_id], capture_output=True
-                    )
-
             print("✅ Cleanup complete\n")
         else:
             # Fail with helpful error message
@@ -162,7 +130,7 @@ def is_running_in_container() -> bool:
     try:
         with Path("/proc/1/cgroup").open() as f:
             return "docker" in f.read() or "podman" in f.read()
-    except (FileNotFoundError, PermissionError):
+    except FileNotFoundError, PermissionError:
         pass
     return False
 
@@ -292,7 +260,7 @@ def host(test_container):
 # --- Helpers and fixtures for init-workspace.sh ---
 
 
-def _build_podman_cmd(container_image, workspace_mount, smoke_test):
+def _build_podman_cmd(container_image, workspace_mount, smoke_test, extra_env=None):
     """Build podman command for init-workspace script."""
     cmd = ["podman", "run", "--rm", "-v", workspace_mount]
     if smoke_test:
@@ -308,6 +276,8 @@ def _build_podman_cmd(container_image, workspace_mount, smoke_test):
         )
     else:
         cmd.append("-it")
+    for key, value in (extra_env or {}).items():
+        cmd.extend(["-e", f"{key}={value}"])
     cmd.extend([container_image, "/root/assets/init-workspace.sh"])
     if smoke_test:
         cmd.append("--smoke-test")
@@ -347,7 +317,9 @@ def _run_interactive_init(cmd, container_image):
         ("Replacing placeholders", "replacing_placeholders", 60),
         ("Setting executable permissions", "setting_permissions", 30),
         ("Syncing dependencies", "syncing_deps", 60),
-        ("Workspace initialized successfully", "completed", 30),
+        # `uv sync` downloads the heavy extras between this line and the success
+        # banner; allow a generous, env-overridable window. Refs: #692.
+        ("Workspace initialized successfully", "completed", DEPS_SYNC_TIMEOUT),
     ]
     renovate_repo_answer = "test-org/test-project"
 
@@ -362,6 +334,11 @@ def _run_interactive_init(cmd, container_image):
         stages["org_name_prompt"] = time.time()
         current_stage = "org_name_prompt"
         child.sendline(organization_name)
+
+        # Delivery-mode picker (#641): answer "both" to keep the full scaffold
+        # (prior behaviour) so the downstream structure assertions still hold.
+        child.expect("Delivery mode", timeout=30)
+        child.sendline("both")
 
         pattern = "Copying files from"
         stage_name = "copying_files"
@@ -633,7 +610,7 @@ def initialized_smoke_workspace(container_image):
     yield from _init_workspace(container_image, smoke_test=True)
 
 
-# --- Shared helpers for devcontainer_up and devcontainer_with_sidecar ---
+# --- Shared helpers for devcontainer_up ---
 
 
 def _resolve_devcontainer_cli_workspace(workspace_path):
@@ -763,39 +740,33 @@ def _run_devcontainer_up(
     )
 
 
-def _teardown_devcontainer_containers(
-    docker_path, workspace_path, extra_name_filters=None
-):
-    """List containers by name (workspace_path.name + extra_name_filters) and rm -f. Same as just clean-test-containers."""
-    filters = [workspace_path.name]
-    if extra_name_filters:
-        filters = list(extra_name_filters) + filters
-    for name_filter in filters:
-        list_result = subprocess.run(
-            [
-                docker_path,
-                "ps",
-                "-a",
-                "--filter",
-                f"name={name_filter}",
-                "--format",
-                "{{.ID}}",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if list_result.returncode == 0 and list_result.stdout.strip():
-            for cid in list_result.stdout.strip().splitlines():
-                subprocess.run(
-                    [docker_path, "rm", "-f", cid.strip()],
-                    capture_output=True,
-                    timeout=30,
-                )
+def _teardown_devcontainer_containers(docker_path, workspace_path):
+    """List containers by name (workspace_path.name) and rm -f. Same as just clean-test-containers."""
+    list_result = subprocess.run(
+        [
+            docker_path,
+            "ps",
+            "-a",
+            "--filter",
+            f"name={workspace_path.name}",
+            "--format",
+            "{{.ID}}",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    if list_result.returncode == 0 and list_result.stdout.strip():
+        for cid in list_result.stdout.strip().splitlines():
+            subprocess.run(
+                [docker_path, "rm", "-f", cid.strip()],
+                capture_output=True,
+                timeout=30,
+            )
 
 
 @pytest.fixture(scope="session")
-def devcontainer_up(initialized_workspace):
+def devcontainer_up(initialized_workspace, container_tag):
     """
     Set up a devcontainer using devcontainer CLI.
 
@@ -818,6 +789,15 @@ def devcontainer_up(initialized_workspace):
     bin_dir = str(Path("node_modules/.bin").resolve())
     if bin_dir not in os.environ.get("PATH", ""):
         os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")
+
+    # Run the devcontainer from the image *under test*, not the published
+    # DEVCONTAINER_VERSION baked into the scaffolded .vig-os/.env. The
+    # scaffolded docker-compose.yml resolves the runtime image as
+    # ghcr.io/vig-os/devcontainer:${DEVCONTAINER_VERSION:-latest}; compose reads
+    # the shell environment over the .env file, so exporting DEVCONTAINER_VERSION
+    # here pins compose -- and every `devcontainer exec` below, which inherits
+    # os.environ -- to TEST_CONTAINER_TAG. Refs #701.
+    os.environ["DEVCONTAINER_VERSION"] = container_tag
 
     docker_path = "podman"
     env, original_config = _prepare_devcontainer_env(
@@ -860,255 +840,6 @@ def devcontainer_up(initialized_workspace):
     print("\n[DEBUG] Cleaning up devcontainer...")
     _teardown_devcontainer_containers(docker_path, workspace_path)
     devcontainer_json_path = workspace_path / ".devcontainer" / "devcontainer.json"
-    if original_config:
-        with devcontainer_json_path.open("w") as f:
-            f.write(original_config)
-        print("[DEBUG] Restored original devcontainer.json")
-
-
-@pytest.fixture(scope="session")
-def sidecar_image():
-    """
-    Build the test sidecar image once for all sidecar tests.
-
-    This fixture:
-    - Builds the sidecar image using podman
-    - Image is stored in Podman VM where compose can access it
-    - Returns the image name for use in compose configuration
-    - Skips all sidecar tests if build fails
-    """
-
-    sidecar_dir = Path(__file__).parent / "fixtures"
-    image_name = "localhost/test-sidecar:latest"
-
-    print(f"\n[DEBUG] Building sidecar image: {image_name}")
-    print(f"[DEBUG] Sidecar directory: {sidecar_dir}")
-
-    # Build using podman (this runs in the VM where compose needs it)
-    build_cmd = [
-        "podman",
-        "build",
-        "-t",
-        image_name,
-        "-f",
-        str(sidecar_dir / "sidecar.Containerfile"),
-        str(sidecar_dir),
-    ]
-
-    result = subprocess.run(build_cmd, capture_output=True, text=True, timeout=120)
-
-    if result.returncode != 0:
-        pytest.skip(
-            f"Failed to build sidecar image: {result.stderr}\n"
-            f"Sidecar tests will be skipped."
-        )
-
-    print(f"[DEBUG] Sidecar image built successfully: {image_name}")
-    return image_name
-
-
-@pytest.fixture(scope="session")
-def devcontainer_with_sidecar(initialized_workspace, sidecar_image):
-    """
-    Set up a devcontainer WITH a sidecar for testing multi-container setups.
-
-    This fixture:
-    - Uses the pre-built sidecar image
-    - Configures docker-compose.project.yaml with sidecar service
-    - Starts both devcontainer and sidecar together
-    - Enables testing of Approach 1: command execution via podman exec
-    - Cleans up both containers after the test session (session scope, like devcontainer_up)
-
-    When running from inside a container (DooD), set HOST_WORKSPACE_PATH
-    environment variable to enable path translation for devcontainer CLI.
-
-    Note: This is separate from devcontainer_up to avoid breaking other tests.
-    """
-    workspace_path, workspace_path_for_cli, in_container = (
-        _resolve_devcontainer_cli_workspace(initialized_workspace)
-    )
-    if not _find_devcontainer_cli():
-        pytest.skip("devcontainer CLI not available. Install with: npm install")
-
-    docker_path = "podman"
-    env, _ = _prepare_devcontainer_env(
-        workspace_path, docker_path, enable_ssh_forwarding=False
-    )
-    devcontainer_json_path = workspace_path / ".devcontainer" / "devcontainer.json"
-    with devcontainer_json_path.open() as f:
-        original_config = json.dumps(json.load(f), indent=4)
-
-    project_yaml_path = workspace_path / ".devcontainer" / "docker-compose.project.yaml"
-    if project_yaml_path.exists():
-        with project_yaml_path.open() as f:
-            project_config = yaml.safe_load(f) or {}
-    else:
-        project_config = {}
-    if not project_config:
-        project_config = {"services": {"devcontainer": {"volumes": []}}}
-    _ensure_project_yaml_test_mount(project_config, workspace_path, in_container)
-    project_config["services"]["test-sidecar"] = {
-        "image": sidecar_image,
-        "container_name": "test-sidecar",
-        "command": "sleep infinity",
-        "volumes": [f"..:/workspace/{initialized_workspace.name}:cached"],
-    }
-    print(f"[DEBUG] Added test-sidecar service using image: {sidecar_image}")
-    with project_yaml_path.open("w") as f:
-        yaml.dump(project_config, f, default_flow_style=False, sort_keys=False)
-    print("[DEBUG] Updated docker-compose.project.yaml with sidecar")
-
-    up_result = _run_devcontainer_up(
-        workspace_path_for_cli=workspace_path_for_cli,
-        workspace_path=workspace_path,
-        env=env,
-        docker_path=docker_path,
-    )
-
-    if up_result.returncode != 0:
-        # Extract error details for better diagnostics
-        # Try to parse JSON error from stdout
-        error_message = "Unknown error"
-        podman_command = None
-        try:
-            stdout_json = json.loads(up_result.stdout)
-            if "message" in stdout_json:
-                error_message = stdout_json["message"]
-                # Extract the actual podman compose command from the error
-                if "Command failed:" in error_message:
-                    parts = error_message.split("Command failed:")
-                    if len(parts) > 1:
-                        podman_command = parts[1].strip()
-        except (json.JSONDecodeError, KeyError):
-            pass
-
-        # Extract actual podman error from stderr
-        # The devcontainer CLI swallows Podman errors, so we need to search carefully
-        podman_errors = []
-        stderr_lines = up_result.stderr.split("\n") if up_result.stderr else []
-
-        # Look for actual Podman compose errors (not just "Command failed")
-        # Podman errors often contain: "Error", "failed", "cannot", "unable", etc.
-        # But NOT from devcontainer CLI (which has timestamps like [2025-12-16T...])
-        podman_error_patterns = [
-            "Error creating",
-            "Error starting",
-            "Error:",
-            "failed to",
-            "cannot",
-            "unable to",
-            "invalid",
-            "not found",
-            "permission denied",
-            "connection refused",
-            "no such",
-        ]
-
-        # Search through all stderr lines for actual Podman errors
-        for i, line in enumerate(stderr_lines):
-            line_stripped = line.strip()
-            if not line_stripped:
-                continue
-
-            # Skip devcontainer CLI log lines (they have timestamps)
-            if line_stripped.startswith("[") and "Z]" in line_stripped:
-                continue
-            if line_stripped.startswith("Start:") or line_stripped.startswith("Stop:"):
-                continue
-            if "at " in line_stripped and (
-                "async" in line_stripped or "/node_modules/" in line_stripped
-            ):
-                continue  # Skip Node.js stack traces
-
-            # Check if this looks like a Podman error
-            line_lower = line_stripped.lower()
-            for pattern in podman_error_patterns:
-                if pattern.lower() in line_lower:
-                    # Get some context (2 lines before and after)
-                    context_start = max(0, i - 2)
-                    context_end = min(len(stderr_lines), i + 3)
-                    context = "\n".join(stderr_lines[context_start:context_end])
-                    podman_errors.append(context)
-                    break
-
-        # If we found Podman errors, use them; otherwise look at the end
-        podman_error = None
-        if podman_errors:
-            # Use the first substantial error found
-            podman_error = podman_errors[0]
-        else:
-            # Fallback: get last meaningful lines (not stack traces)
-            for line in reversed(stderr_lines[-30:]):
-                line_stripped = line.strip()
-                if not line_stripped:
-                    continue
-                # Skip stack traces and log prefixes
-                if (
-                    line_stripped.startswith("[")
-                    or line_stripped.startswith("Start:")
-                    or line_stripped.startswith("Stop:")
-                    or "at " in line_stripped
-                    or "/node_modules/" in line_stripped
-                ):
-                    continue
-                podman_error = line_stripped
-                break
-
-        # Build comprehensive error message
-        skip_msg = "❌ SKIPPED: devcontainer up with sidecar failed\n"
-        skip_msg += "\n"
-        skip_msg += "📋 Error Summary:\n"
-        skip_msg += f"   {error_message}\n"
-
-        if podman_errors:
-            skip_msg += "\n"
-            skip_msg += f"🔴 Podman Error(s) Found ({len(podman_errors)}):\n"
-            for i, err in enumerate(podman_errors[:3], 1):  # Show up to 3 errors
-                skip_msg += f"   [{i}] {err}\n"
-        elif podman_error:
-            skip_msg += "\n"
-            skip_msg += "🔴 Podman Error (extracted):\n"
-            skip_msg += f"   {podman_error}\n"
-        else:
-            skip_msg += "\n"
-            skip_msg += "⚠️  Could not extract Podman error from stderr\n"
-            skip_msg += "   (devcontainer CLI may be swallowing the actual error)\n"
-
-        if podman_command:
-            skip_msg += "\n"
-            skip_msg += "⚙️  Failed Command:\n"
-            skip_msg += f"   {podman_command[:200]}\n"
-        skip_msg += "\n"
-        skip_msg += "💡 Common causes:\n"
-        skip_msg += "   - Podman compose issues with multi-container setups\n"
-        skip_msg += "   - Socket mount configuration problems\n"
-        skip_msg += "   - SELinux labeling conflicts on macOS\n"
-        skip_msg += "   - Image pull/build failures\n"
-        skip_msg += "\n"
-        skip_msg += "🔍 Full Details:\n"
-        skip_msg += f"   Return code: {up_result.returncode}\n"
-        skip_msg += f"   Devcontainer command: devcontainer up --workspace-folder {workspace_path_for_cli} ...\n"
-        skip_msg += "\n"
-        skip_msg += "📤 stdout (last 1000 chars):\n"
-        skip_msg += f"{up_result.stdout[-1000:]}\n"
-        skip_msg += "\n"
-        skip_msg += "📤 stderr (last 1500 chars - where errors usually appear):\n"
-        skip_msg += f"{up_result.stderr[-1500:]}\n"
-        skip_msg += "\n"
-        skip_msg += (
-            "💭 Note: Socket tests already prove the underlying capability works."
-        )
-
-        pytest.skip(skip_msg)
-
-    print("[DEBUG] Devcontainer with sidecar is up and running")
-
-    yield workspace_path
-
-    print("[DEBUG] Cleaning up devcontainer with sidecar...")
-    _teardown_devcontainer_containers(
-        docker_path, workspace_path, extra_name_filters=["test-sidecar"]
-    )
     if original_config:
         with devcontainer_json_path.open("w") as f:
             f.write(original_config)

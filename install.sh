@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # vigOS devcontainer quick install script
 #
 # Usage:
@@ -13,6 +13,7 @@
 #   --name NAME       Override project name (SHORT_NAME)
 #   --org ORG         Override organization name (default: vigOS)
 #   --repo OWNER/REPO GitHub repo for Renovate preset (default: detect from origin or OWNER/REPO)
+#   --mode MODE       Delivery mode: devcontainer | direnv | both (default: prompt, both non-interactively)
 #   --smoke-test      Deploy smoke-test-specific assets
 #   --dry-run         Show what would be done without executing
 #   -h, --help        Show this help message
@@ -36,6 +37,7 @@ PROJECT_PATH=""
 PROJECT_NAME=""
 ORG_NAME="vigOS"
 GITHUB_REPO_OVERRIDE=""
+MODE=""
 SMOKE_TEST=""
 
 # Colors (disabled if not a tty)
@@ -70,6 +72,8 @@ OPTIONS:
     --name NAME       Override project name (SHORT_NAME, used for module name)
     --org ORG         Override organization name (default: vigOS)
     --repo OWNER/REPO GitHub repository for Renovate (default: git origin or OWNER/REPO)
+    --mode MODE       Delivery mode: devcontainer | direnv | both
+                      (default: prompt interactively; "both" non-interactively)
     --smoke-test      Deploy smoke-test-specific assets
     --dry-run         Show what would be done
     -h, --help        Show this help
@@ -92,6 +96,9 @@ EXAMPLES:
 
     # Use custom organization name
     curl -sSf ... | bash -s -- --org MyOrg ./my-project
+
+    # Scaffold only the Nix/direnv stub (no .devcontainer/)
+    curl -sSf ... | bash -s -- --mode direnv ./my-project
 EOF
 }
 
@@ -307,6 +314,14 @@ while [ $# -gt 0 ]; do
             GITHUB_REPO_OVERRIDE="$2"
             shift 2
             ;;
+        --mode)
+            MODE="$2"
+            shift 2
+            ;;
+        --mode=*)
+            MODE="${1#--mode=}"
+            shift
+            ;;
         --dry-run)
             DRY_RUN=true
             shift
@@ -334,6 +349,16 @@ while [ $# -gt 0 ]; do
             ;;
     esac
 done
+
+# Validate delivery mode (empty = let init-workspace.sh prompt / default to both)
+case "$MODE" in
+    ""|devcontainer|direnv|both) ;;
+    *)
+        err "Invalid --mode: $MODE (expected: devcontainer | direnv | both)"
+        usage
+        exit 1
+        ;;
+esac
 
 # Validate and set project path
 PROJECT_PATH="${PROJECT_PATH:-.}"
@@ -425,6 +450,17 @@ info "Using $RUNTIME with image $IMAGE"
 info "Target directory: $PROJECT_PATH"
 info "Project name: $PROJECT_NAME"
 
+# Forward an explicitly requested version so init-workspace pins it in the
+# scaffolded .vig-os (#852). The image's baked pin is the release the image
+# was built from, which is stale for release candidates (the repo pin only
+# advances at finalize). "latest" is not a concrete tag: keep the baked pin.
+# (The ${arr[@]+...} idiom keeps empty-array expansion safe under set -u on
+# bash 3.2, e.g. macOS.)
+declare -a VERSION_ENV=()
+if [ "$VERSION" != "latest" ]; then
+    VERSION_ENV=(-e "VIG_OS_VERSION=$VERSION")
+fi
+
 # Build the command using an array for safe execution
 # Use --rm to cleanup container after run; no -it since we use --no-prompts (non-interactive)
 # Pass SHORT_NAME and ORG_NAME as environment variables to the container
@@ -433,6 +469,7 @@ declare -a CMD=(
     -e "SHORT_NAME=$PROJECT_NAME"
     -e "ORG_NAME=$ORG_NAME"
     -e "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
+    ${VERSION_ENV[@]+"${VERSION_ENV[@]}"}
     -v "$PROJECT_PATH:/workspace"
     "$IMAGE"
     /root/assets/init-workspace.sh --no-prompts
@@ -446,17 +483,27 @@ if [ -n "$SMOKE_TEST" ]; then
     CMD+=(--smoke-test)
 fi
 
+if [ -n "$MODE" ]; then
+    CMD+=(--mode "$MODE")
+fi
+
 if [ "$DRY_RUN" = true ]; then
     info "Would execute:"
-    printf "  %s" "$RUNTIME run --rm -e SHORT_NAME=\"$PROJECT_NAME\" -e ORG_NAME=\"$ORG_NAME\" -e GITHUB_REPOSITORY=\"$GITHUB_REPOSITORY\" -v \"$PROJECT_PATH\":/workspace \"$IMAGE\" /root/assets/init-workspace.sh --no-prompts"
-    if [ -n "$FORCE" ]; then
-        printf " %s" "--force"
-    fi
-    if [ -n "$SMOKE_TEST" ]; then
-        printf " %s" "--smoke-test"
-    fi
-    printf "\n"
+    # Derive the shown command from the real CMD array (built above, including
+    # --force/--smoke-test/--mode) via printf '%q' so it is shell-safe and stays
+    # in sync with what would actually run — no hand-maintained duplicate string.
+    printf '  '
+    printf '%q ' "${CMD[@]}"
+    printf '\n'
     exit 0
+fi
+
+# Record whether the target was empty BEFORE the container scaffolds it. The git
+# step below only auto-commits a freshly scaffolded tree, so it never sweeps a
+# pre-populated directory into a misleading "initial scaffold" commit (#759).
+TARGET_WAS_EMPTY=false
+if [ -z "$(ls -A "$PROJECT_PATH" 2>/dev/null)" ]; then
+    TARGET_WAS_EMPTY=true
 fi
 
 # Check if terminal is interactive (needed for init-workspace.sh prompts)
@@ -485,7 +532,7 @@ if [ "$SKIP_PULL" = false ]; then
     fi
 else
     # Verify image exists locally when skipping pull
-    if ! $RUNTIME image exists "$IMAGE" 2>/dev/null; then
+    if ! $RUNTIME image inspect "$IMAGE" >/dev/null 2>&1; then
         err "Image $IMAGE not found locally (--skip-pull was specified)"
         exit 1
     fi
@@ -508,8 +555,15 @@ echo ""
 info "Running post-initialization setup..."
 
 # 1. Copy host user configuration (git, ssh, gh) into .devcontainer/.conf/
-# Non-fatal: warnings about missing SSH keys or GH CLI are expected on CI/fresh machines
-run_user_conf "$PROJECT_PATH" || true
+# Non-fatal: warnings about missing SSH keys or GH CLI are expected on CI/fresh machines.
+# direnv mode scaffolds no .devcontainer/, so the host-user-conf step (a
+# devcontainer-only concern) does not apply — skip it rather than emit a
+# misleading "script not found" warning (#738).
+if [ "$MODE" = "direnv" ]; then
+    info "direnv mode: skipping host user-conf copy (no .devcontainer/)"
+else
+    run_user_conf "$PROJECT_PATH" || true
+fi
 
 # 2. Git repository setup (init, initial commit, dev branch)
 # Runs on the host (not in container) so that SSH agent is available for commit signing
@@ -530,13 +584,22 @@ setup_git_repo() {
         echo "Git repository initialized with 'main' branch"
     fi
 
-    # Create initial commit if repo has no commits (enables branch creation)
+    # Create initial commit if repo has no commits (enables branch creation).
+    # Only auto-commit when we scaffolded an empty target; never sweep a
+    # pre-populated directory into a misleading "initial scaffold" commit (#759).
     if ! git rev-parse HEAD >/dev/null 2>&1; then
-        echo "Creating initial commit..."
-        git add -A
-        git commit -m "chore: initial project scaffold" --allow-empty
-        created_repo=true
-        echo "Initial commit created"
+        if [ "${TARGET_WAS_EMPTY:-false}" = true ]; then
+            echo "Creating initial commit..."
+            git add -A
+            git commit -m "chore: initial project scaffold" --allow-empty
+            created_repo=true
+            echo "Initial commit created"
+        else
+            echo "Existing files detected; skipping the automatic scaffold commit."
+            echo "  Review and commit your files yourself, e.g.:"
+            echo "    git add -A && git commit -m 'chore: initial commit'"
+            created_repo=false
+        fi
     fi
 
     # Verify or create branches

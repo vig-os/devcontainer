@@ -1,25 +1,21 @@
 # Scheduled Security Scan
 #
-# Nightly scan of the latest published container image from GHCR (covers main via
-# :latest) without rebuilding. This scan (category: container-image-latest) is the
-# single source of truth for the GitHub Security tab. Pull requests to
-# dev/release/main run full CI (ci.yml), where Trivy acts as a blocking GATE only
-# (fail on fixable HIGH/CRITICAL) and does NOT upload SARIF to the Security tab.
+# Nightly CVE scan of the Nix-built devcontainer image. vulnix (nixpkgs-native)
+# is the primary scanner — the image has no apt/dpkg DB — gated by `vulnix-gate`
+# against the `.vulnixignore` exception register; Trivy emits a CycloneDX SBOM +
+# an SBOM-mode view for defence in depth. (The Debian `:latest` Trivy job was
+# removed with the Debian path in #642.)
 #
 # Triggers:
 #   - Nightly schedule: 05:00 UTC
+#   - Manual dispatch (e.g. a pre-release run on dev — scheduled runs execute
+#     from the default branch, so this workflow never runs on dev otherwise)
 #
 # Jobs:
-#   1. scan-latest - Pull ghcr.io/vig-os/devcontainer:latest and Trivy + SBOM + SARIF
-#
-# When fixable HIGH/CRITICAL vulnerabilities are found (after .trivyignore):
-#   - Workflow fails (GitHub notifies watchers)
-#   - One open issue with label security-scan is created (deduplicated)
-#   - Step summary records verdict and links
+#   1. scan-nix-image - build the image closure, run vulnix (+ Trivy SBOM)
 #
 # Artifacts:
-#   - SBOM (CycloneDX) with all packages
-#   - SARIF report uploaded to GitHub Security tab (category: container-image-latest)
+#   - vulnix findings (JSON + table) and a CycloneDX SBOM (uploaded)
 
 name: Scheduled Security Scan
 
@@ -27,179 +23,165 @@ on:  # yamllint disable-line rule:truthy
   schedule:
     # Nightly (staggered after nightly CI at 04:00 UTC)
     - cron: '0 5 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  scan-latest:
-    name: Scan GHCR Latest Image
+  # vulnix CVE scan of the Nix-built image (T3.1, #637).
+  #
+  # A Nix image has no apt/dpkg DB, so Trivy's OS-package scanner goes dark.
+  # vulnix (nixpkgs-native) becomes the PRIMARY CVE signal here, scanning the
+  # image's package closure (flake `devcontainerImageEnv`); Trivy stays on for a
+  # CycloneDX SBOM + an SBOM-mode vuln view (defense in depth). The vulnix-gate
+  # step is BLOCKING (#639): the nixpkgs baseline was advanced to 26.05 and the
+  # residual findings triaged into .vulnixignore (see docs/security/
+  # nix-cutover-scan-overlap.md), so any new unexcepted HIGH/CRITICAL fails the
+  # scan. SARIF upload to the Security tab + a deduplicated issue can be added
+  # alongside the actual publish-cutover.
+  scan-nix-image:
+    name: Scan Nix image (vulnix + SBOM)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # Worst case is a cold NVD cache week plus retries against a throttled
+    # nvd.nist.gov (~25 min per attempt); warm-cache runs finish in minutes.
+    timeout-minutes: 90
     permissions:
       contents: read
-      issues: write               # create deduplicated security-scan issue on gate failure
-      security-events: write    # upload SARIF results to GitHub Security tab
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
-      - name: Set up environment
+      - name: Set up environment (Nix + flake toolchain for the gate utilities)
         uses: ./.github/actions/setup-env
         with:
           sync-dependencies: 'true'
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: Validate .trivyignore exception expirations
-        run: uv run check-expirations .trivyignore
+      - name: Validate .vulnixignore exception expirations
+        run: uv run check-expirations .vulnixignore
 
-      - name: Pull latest image and save as tar
-        id: pull
-        continue-on-error: true
+      # Weekly-keyed cache of vulnix's NVD database (~/.cache/vulnix). vulnix's
+      # freshness logic makes this cheap: a cache < 7 days old means only the
+      # ~3 MB `modified` feed is fetched; without it every run cold-fetches
+      # ~122 MB of year feeds from nvd.nist.gov, which is heavily throttled
+      # and currently unstable (nix-community/vulnix#171).
+      - name: Compute NVD cache key (ISO week)
+        id: nvd-week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the vulnix NVD database
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.cache/vulnix
+          key: vulnix-nvd-${{ steps.nvd-week.outputs.week }}
+          restore-keys: |
+            vulnix-nvd-
+
+      - name: Build the vulnix scan target (image package closure)
         run: |
           set -euo pipefail
-          IMAGE=ghcr.io/vig-os/devcontainer:latest
-          docker pull "$IMAGE"
-          docker save "$IMAGE" -o /tmp/image-latest.tar
-          RESOLVED=$(docker inspect --format '{{range .RepoDigests}}{{.}}{{"\n"}}{{end}}' "$IMAGE" | head -n1 | tr -d '\n')
-          if [ -z "$RESOLVED" ] || [ "$RESOLVED" = '<no value>' ]; then
-            RESOLVED=$(docker inspect --format='{{.Id}}' "$IMAGE")
-          fi
-          echo "image_ref=${RESOLVED}" >> "$GITHUB_OUTPUT"
+          nix build .#devcontainerImageEnv --print-build-logs
 
-      - name: Log when latest image is unavailable
-        if: steps.pull.outcome != 'success'
+      - name: Run vulnix (primary CVE scanner)
+        # NOTE: no blanket `|| true`. vulnix exit codes: 0 = clean, 1 = only
+        # whitelisted (needs -s), 2 = reportable advisories found (the gate, not
+        # the scan, decides pass/fail). Any code > 2 (e.g. 3 usage error, 127
+        # not-found, 137 OOM-kill) means the scan itself failed — fail the job
+        # instead of masking the crash as an empty, clean-looking result.
+        # The runner's default shell is `bash -e {0}`, so a bare vulnix call dies
+        # on exit 2 before the tolerant rc check runs — capture the status via
+        # `|| rc=$?` (errexit-safe) instead of a follow-up `rc=$?`.
+        #
+        # The first invocation triggers the NVD update, whose feed downloads
+        # time out when nvd.nist.gov is throttled (vulnix has no retry and
+        # crashes with exit 1 — indistinguishable from its documented
+        # "only whitelisted findings" exit 1). Retry with backoff and treat a
+        # run as successful only if the findings file is valid JSON; per-feed
+        # ETag caching means retries resume rather than restart. The second
+        # (table) invocation then runs against a < 2 h-old DB and fetches
+        # nothing.
         run: |
-          echo "::error::Scan skipped: GHCR devcontainer:latest pull failed"
-          exit 1
+          set -uo pipefail
+          # Fetch NVD data from the vig-os/nvd-mirror Pages mirror (#870), not
+          # nvd.nist.gov — the mirror is CDN-backed and stable, so the retry loop
+          # below now only guards rare CDN blips, not NVD outages. The
+          # --json/table exit-code handling is unchanged (#842).
+          NVD_MIRROR="https://vig-os.github.io/nvd-mirror/"
+          rc=0
+          for attempt in 1 2 3; do
+            rc=0
+            nix run .#vulnix -- --mirror "$NVD_MIRROR" --closure ./result --json > vulnix-findings.json || rc=$?
+            [ "$rc" -le 2 ] && jq -e . vulnix-findings.json > /dev/null 2>&1 && break
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::vulnix scan attempt ${attempt} failed (exit ${rc}); retrying in $((60 * attempt))s"
+              sleep $((60 * attempt))
+            fi
+          done
+          [ "$rc" -le 2 ] && jq -e . vulnix-findings.json > /dev/null 2>&1 \
+            || { echo "::error::vulnix scan failed after 3 attempts (exit $rc)"; exit 1; }
+          rc=0
+          nix run .#vulnix -- --mirror "$NVD_MIRROR" --closure ./result | tee vulnix-report.txt || rc=$?
+          [ "$rc" -le 2 ] || { echo "::error::vulnix report failed (exit $rc)"; exit "$rc"; }
 
-      - name: Scan latest image for all vulnerabilities
-        if: steps.pull.outcome == 'success'
+      - name: Gate on unexcepted HIGH/CRITICAL vulnix findings
+        id: vulnix-gate
+        # BLOCKING (#639): fails the nightly scan on any HIGH/CRITICAL not covered
+        # by a non-expired entry in .vulnixignore. This is the go/no-go gate for
+        # the publish-cutover.
+        run: uv run vulnix-gate vulnix-findings.json --register .vulnixignore
+
+      - name: Build the Nix image for SBOM generation
+        run: |
+          set -euo pipefail
+          nix build .#devcontainerImage --print-build-logs
+          cp -L result /tmp/nix-image.tar.gz
+
+      - name: Generate Nix image SBOM (CycloneDX)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           version: 'v0.71.2'
-          input: /tmp/image-latest.tar
-          format: 'table'
-          severity: 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL'
-          exit-code: '0'  # Non-blocking: for awareness only
-          trivyignores: '.trivyignore'
+          input: /tmp/nix-image.tar.gz
+          format: 'cyclonedx'
+          output: 'sbom-nix-cyclonedx.json'
 
-      - name: Gate on fixable HIGH/CRITICAL vulnerabilities
-        id: gate
-        if: steps.pull.outcome == 'success'
+      - name: Trivy SBOM-mode scan (defense in depth, awareness only)
         continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           version: 'v0.71.2'
-          input: /tmp/image-latest.tar
+          scan-type: 'sbom'
+          scan-ref: 'sbom-nix-cyclonedx.json'
           format: 'table'
           severity: 'HIGH,CRITICAL'
-          exit-code: '1'
-          ignore-unfixed: true
-          trivyignores: '.trivyignore'
+          exit-code: '0'
 
-      - name: Generate latest image SBOM (CycloneDX)
-        if: steps.pull.outcome == 'success'
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
-        with:
-          version: 'v0.71.2'
-          input: /tmp/image-latest.tar
-          format: 'cyclonedx'
-          output: 'sbom-latest-cyclonedx.json'
-
-      - name: Generate latest image SARIF report
-        if: steps.pull.outcome == 'success'
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
-        with:
-          version: 'v0.71.2'
-          input: /tmp/image-latest.tar
-          format: 'sarif'
-          output: 'trivy-latest-results.sarif'
-          severity: 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL'
-          trivyignores: '.trivyignore'
-
-      - name: Upload latest SBOM artifact
-        if: steps.pull.outcome == 'success'
+      - name: Upload vulnix findings + SBOM (Trivy-vs-vulnix overlap evidence)
+        # always(): a red vulnix-gate is exactly when the findings are needed
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: sbom-latest
-          path: sbom-latest-cyclonedx.json
+          name: nix-image-cve-scan
+          path: |
+            vulnix-findings.json
+            vulnix-report.txt
+            sbom-nix-cyclonedx.json
           retention-days: 90
 
-      - name: Upload latest SARIF to GitHub Security
-        if: steps.pull.outcome == 'success'
-        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e  # v4
-        with:
-          sarif_file: trivy-latest-results.sarif
-          category: 'container-image-latest'
-
-      - name: Write scan summary
-        if: steps.pull.outcome == 'success'
-        env:
-          IMAGE_REF: ${{ steps.pull.outputs.image_ref }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SECURITY_URL: ${{ github.server_url }}/${{ github.repository }}/security
+      - name: Write Nix image scan summary
+        if: always()
         run: |
           set -euo pipefail
           {
-            echo "## Scheduled security scan (:latest)"
+            echo "## Nix image CVE scan (vulnix + SBOM)"
             echo ""
-            echo "- **Image (resolved):** \`${IMAGE_REF}\`"
-            echo "- **Tag pulled:** \`ghcr.io/vig-os/devcontainer:latest\`"
+            echo "- **Scan target:** flake \`devcontainerImageEnv\` (image package closure)"
+            echo "- **Primary scanner:** vulnix (nixpkgs-native)"
             echo "- **Date (UTC):** $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "- **Workflow run:** [${{ github.run_id }}](${RUN_URL})"
+            echo "- **Gate:** ${{ steps.vulnix-gate.outcome }} (blocking: fails on unexcepted HIGH/CRITICAL findings)"
             echo ""
-            if [ "${{ steps.gate.outcome }}" = "failure" ]; then
-              echo "### Result"
-              echo ""
-              echo "**Fixable HIGH/CRITICAL vulnerabilities detected** (see Trivy table in job logs and [Security](${SECURITY_URL}))."
-            else
-              echo "### Result"
-              echo ""
-              echo "No fixable HIGH/CRITICAL vulnerabilities passed the gate (after \`.trivyignore\`)."
-            fi
-            echo ""
-            echo "Full dependency results: [Code security](${SECURITY_URL})."
+            echo "vulnix over-reports CVEs already patched in nixpkgs; triage findings"
+            echo "into \`.vulnixignore\` and advance the nixpkgs rev before #639."
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Create GitHub issue on gate failure
-        if: steps.pull.outcome == 'success' && steps.gate.outcome == 'failure'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          IMAGE_REF: ${{ steps.pull.outputs.image_ref }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SECURITY_URL: ${{ github.server_url }}/${{ github.repository }}/security
-        run: |
-          set -euo pipefail
-          gh label create security-scan \
-            --description 'Automated nightly security scan findings for :latest image' \
-            --color BFD4F2 2>/dev/null || true
-          EXISTING=$(gh issue list --label security-scan --state open --limit 1 --json number -q '.[0].number // empty')
-          if [ -n "$EXISTING" ]; then
-            echo "Open security-scan issue already exists: #$EXISTING -- skipping create"
-            exit 0
-          fi
-          BODY="$(cat <<EOF
-          Nightly scan found **fixable HIGH/CRITICAL** vulnerabilities in the resolved image below (after \`.trivyignore\`).
-
-          - **Image (resolved):** \`${IMAGE_REF}\`
-          - **Tag pulled:** \`ghcr.io/vig-os/devcontainer:latest\`
-          - **Scan date (UTC):** $(date -u +%Y-%m-%dT%H:%M:%SZ)
-          - **Workflow run:** ${RUN_URL}
-          - **Security tab:** ${SECURITY_URL}
-
-          Close this issue after the image is remediated and the next scheduled run passes the gate.
-          EOF
-          )"
-          gh issue create \
-            --title "Nightly security scan: HIGH/CRITICAL vulnerabilities in :latest" \
-            --label security-scan --label security \
-            --body "$BODY"
-
-      - name: Fail if fixable HIGH/CRITICAL vulnerabilities found
-        if: steps.pull.outcome == 'success' && steps.gate.outcome == 'failure'
-        env:
-          IMAGE_REF: ${{ steps.pull.outputs.image_ref }}
-        run: |
-          echo "::error::Fixable HIGH/CRITICAL vulnerabilities detected in ${IMAGE_REF} (pulled as ghcr.io/vig-os/devcontainer:latest)"
-          exit 1

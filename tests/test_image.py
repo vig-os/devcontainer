@@ -10,30 +10,31 @@ base functionality is preserved in their containers.
 """
 
 import hashlib
+import json
+import os
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
 
-# Expected versions for installed tools
-# These should be updated when the Containerfile is updated
+# Expected version prefixes for the few tools whose version we still assert.
+#
+# Under the Nix image the toolchain is pinned by flake.lock, so each tool's exact
+# version is determined by nixpkgs and intentionally changes on a nixpkgs bump.
+# Fast-movers (gh) and tools whose nixpkgs version simply differs from the old
+# Debian pin (just, prek, cargo-binstall, typstyle) are checked for
+# presence/run only, not a version prefix — otherwise they'd need updating on
+# every nixpkgs bump. System packages (git, curl, tmux, rsync) were already
+# presence-only. Refs #635, #666.
 EXPECTED_VERSIONS = {
-    "git": "2.",  # Major version check (from apt package)
-    "curl": "8.",  # Major version check (from apt package)
-    "gh": "2.95.",  # Minor version check (GitHub CLI, manually installed from latest release)
-    "uv": "0.11.",  # Minor version check (manually installed from latest release)
-    "python": "3.14",  # Python (from base image)
-    "pre_commit": "4.6.",  # Minor version check (installed via uv pip)
-    "ruff": "0.15.",  # Minor version check (installed via uv pip)
-    "bandit": "1.9.",  # Minor version check (installed via uv pip)
-    "pip_licenses": "5.",  # Major version check (installed via uv pip)
-    "just": "1.54.",  # Minor version check (manually installed from latest release)
-    "hadolint": "2.14.",  # Minor version check (manually installed from pinned release)
-    "taplo": "0.10.",  # Minor version check (manually installed from latest release)
-    "cargo-binstall": "1.20.",  # Minor version check (installed from latest release)
-    "typstyle": "0.15.",  # Minor version check (installed from latest release)
-    "vig_utils": "0.1.",  # Minor version check (installed via uv pip)
-    "tmux": "3.3",  # Major.minor version check (from apt package)
-    "rsync": "3.2",  # Major.minor version check (from apt package)
+    "uv": "0.11.",  # uv (fast-mover overlaid from nixpkgs-unstable)
+    "python": "3.14",  # interpreter major.minor (pinned to python314)
+    "ruff": "0.15.",  # nixpkgs-26.05
+    "bandit": "1.9.",  # nixpkgs-26.05
+    "pip_licenses": "5.",  # PyPI wheel pinned in flake.nix
+    "taplo": "0.10.",  # nixpkgs-26.05
+    "vig_utils": "0.1.",  # our package version
 }
 
 
@@ -74,98 +75,359 @@ def verify_file_identity(host, src_rel, dest_path):
     )
 
 
+def assert_tool_on_path(host, tool):
+    """
+    Assert that a tool is installed and resolvable on PATH.
+
+    Path-agnostic: works for both the Debian image (tools under /usr/bin,
+    /usr/local/bin) and the Nix image (tools under the Nix store), since it
+    relies on PATH resolution rather than a hardcoded FHS location.
+
+    Args:
+        host: testinfra host object
+        tool: executable name to resolve (e.g. "gh", "just")
+
+    Returns:
+        The resolved absolute path to the tool.
+    """
+    result = host.run(f"command -v {tool}")
+    assert result.rc == 0, f"{tool} not found on PATH: {result.stderr}"
+    resolved = result.stdout.strip()
+    assert resolved, f"{tool} resolved to an empty path"
+    return resolved
+
+
+def assert_tool_runs(host, *cmd):
+    """
+    Assert that a tool runs successfully (exit code 0), proving it is installed.
+
+    Path-agnostic replacement for distro-package checks (e.g. dpkg
+    `is_installed`): valid for both the Debian and Nix images.
+
+    Args:
+        host: testinfra host object
+        cmd: command and args to run (e.g. "git", "--version")
+
+    Returns:
+        The testinfra CommandResult.
+    """
+    command = " ".join(cmd)
+    result = host.run(command)
+    assert result.rc == 0, f"{command} failed (tool not installed?): {result.stderr}"
+    return result
+
+
+# ---------------------------------------------------------------------------
+# devShellTools <-> image parity gate (#754).
+#
+# tests/test_flake_devshell.py exercises the flake's ``devShellTools`` SSoT
+# only inside ``nix develop`` (the dev-shell side) and is skipped wherever the
+# host lacks nix, so the SSoT was never gated against the running image — only
+# a hand-curated ~10 of the 27 ``devTools`` had an image check. This closes the
+# gap: every tool name is read straight from the flake (``nix eval
+# .#devShellTools``, never hardcoded) and must resolve on PATH inside the
+# image, so a ``devTools`` entry absent from the image fails CI.
+#
+# The tool list is evaluated at collection time (pytest needs the parametrize
+# ids before fixtures run) against the checked-out flake — mirroring the
+# dev-shell fixtures in test_flake_devshell.py (which eval ``devShellTools``
+# from the repo root). Both image-test CI lanes provision nix on the host
+# (nix-image.yml installs it; ci.yml's test-image provisions via the flake), so
+# the eval resolves there and the gate never silently no-ops. The per-tool
+# presence assertion itself runs INSIDE the running container via ``command
+# -v`` (assert_tool_on_path), matching the existing image idiom.
+# ---------------------------------------------------------------------------
+def _image_devshell_tool_names() -> list[str]:
+    """Binary names of every tool in the flake's ``devTools`` SSoT.
+
+    Returns ``[]`` (so the parametrized gate skips rather than erroring
+    collection) when nix or the ``devShellTools`` output is unavailable.
+    """
+    if shutil.which("nix") is None:
+        return []
+    repo_root = Path(__file__).resolve().parent.parent
+    env = os.environ.copy()
+    env.setdefault("NIX_CONFIG", "experimental-features = nix-command flakes")
+    try:
+        system = subprocess.run(
+            ["nix", "eval", "--raw", "--impure", "--expr", "builtins.currentSystem"],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=120,
+        )
+        if system.returncode != 0 or not system.stdout.strip():
+            return []
+        result = subprocess.run(
+            [
+                "nix",
+                "eval",
+                "--json",
+                f"{repo_root}#devShellTools.{system.stdout.strip()}",
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=900,
+        )
+        if result.returncode != 0:
+            return []
+        names = json.loads(result.stdout)
+    except Exception:
+        # Best-effort, collection-time helper: any failure (nix missing, eval
+        # error, malformed JSON) yields an empty list so the parametrized gate
+        # skips rather than erroring collection of the whole module.
+        return []
+    return names if isinstance(names, list) else []
+
+
+_DEVSHELL_TOOL_NAMES = _image_devshell_tool_names()
+
+
+@pytest.mark.skipif(
+    not _DEVSHELL_TOOL_NAMES,
+    reason=(
+        "could not evaluate the flake's devShellTools SSoT (nix unavailable); "
+        "the image-side parity gate needs the flake's tool list"
+    ),
+)
+@pytest.mark.parametrize("tool", _DEVSHELL_TOOL_NAMES or ["<unavailable>"])
+def test_devshell_tool_resolves_on_image_path(host, tool):
+    """Every tool in the ``devTools`` SSoT resolves on PATH inside the image (#754).
+
+    Turns the ``devShellTools`` SSoT into an image-side gate (the dev-shell
+    side is covered by tests/test_flake_devshell.py). The tool list is read
+    from the flake, so it can never drift from the SSoT and needs no
+    hand-maintained copy of the tool names.
+    """
+    assert_tool_on_path(host, tool)
+
+
+def test_image_oci_config_declares_path(container_image):
+    """The image's OCI config.Env must declare PATH including the toolchain (#697).
+
+    ``buildLayeredImage`` symlinks every tool into ``/bin`` but sets no PATH in
+    the OCI config. ``podman run`` masks this by injecting a default PATH, but
+    docker-compose and ``devcontainer exec`` inherit ``config.Env`` verbatim — so
+    without a declared PATH the baked toolchain is off PATH there, and
+    pre-commit's ``language: system`` ruff/typos hooks fail with
+    ``Executable ... not found`` during an in-container ``git commit``. A
+    ``host.run`` check cannot catch this (its shell synthesises a default PATH),
+    so assert the declared config directly.
+    """
+    result = subprocess.run(
+        [
+            "podman",
+            "inspect",
+            container_image,
+            "--format",
+            "{{range .Config.Env}}{{println .}}{{end}}",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, f"podman inspect failed: {result.stderr}"
+    path_lines = [ln for ln in result.stdout.splitlines() if ln.startswith("PATH=")]
+    assert path_lines, (
+        "image OCI config declares no PATH; docker-compose / devcontainer exec "
+        "would run without the baked toolchain on PATH"
+    )
+    path_dirs = path_lines[0][len("PATH=") :].split(":")
+    assert "/bin" in path_dirs, (
+        f"image PATH must include /bin (the toolchain symlink dir): {path_lines[0]}"
+    )
+
+
+class TestFhsShims:
+    """Test the minimal FHS shims a bare layered image needs (#727)."""
+
+    def test_usr_bin_env_exists(self, host):
+        """``/usr/bin/env`` must exist (the universal shebang interpreter).
+
+        A bare ``buildLayeredImage`` has no ``/usr/bin`` at all, so the
+        ubiquitous ``#!/usr/bin/env <interp>`` shebang fails with
+        ``/usr/bin/env: bad interpreter`` — breaking essentially every
+        Node/Python/Ruby CLI (e.g. ``node_modules/.bin/tsc``) for image-mode
+        consumers. An FHS base distro would have supplied it. Refs #727.
+        """
+        env = host.file("/usr/bin/env")
+        assert env.exists, "/usr/bin/env not found (universal shebang interpreter)"
+
+    def test_usr_bin_env_shebang_runs(self, host):
+        """A ``#!/usr/bin/env <interp>`` script must execute via ``/usr/bin/env``.
+
+        Mirrors how a ``node_modules/.bin`` CLI is launched: the kernel reads the
+        shebang and execs ``/usr/bin/env <interp>``. Uses ``bash`` (always in the
+        image) as the interpreter so the test asserts the ``/usr/bin/env``
+        resolution path itself, not the presence of any one language runtime.
+        """
+        script = "/tmp/usr_bin_env_shebang_test"
+        host.run(f"rm -f {script}")
+        try:
+            result = host.run(
+                f"printf '#!/usr/bin/env bash\\necho shebang-ok\\n' > {script} "
+                f"&& chmod +x {script} && {script}"
+            )
+            assert result.rc == 0, (
+                f"#!/usr/bin/env bash script failed to run: {result.stderr}"
+            )
+            assert "shebang-ok" in result.stdout, (
+                f"unexpected shebang script output: {result.stdout!r}"
+            )
+        finally:
+            host.run(f"rm -f {script}")
+
+
+def _host_can_reach(host, hostname, port=443):
+    """Best-effort probe: can the image open a TCP connection to host:port?
+
+    Network-dependent image tests (PyPI wheel fetches, ``uv add``/``uv sync``,
+    ``npm install -g``) bake no warm cache, so on an offline/air-gapped runner
+    (e.g. a hermetic build sandbox) they must skip rather than fail. This single
+    socket probe backs every such guard. Refs #761.
+    """
+    probe = (
+        "import socket,sys; socket.setdefaulttimeout(5); "
+        f"socket.create_connection(('{hostname}', {port})); sys.exit(0)"
+    )
+    return host.run(f'python3 -c "{probe}"').rc == 0
+
+
+def _pypi_reachable(host):
+    """Best-effort probe: can the image reach PyPI to fetch a wheel?
+
+    The loader-existence assertion is unconditional, but the wheel-import
+    assertions need network and the image bakes no warm uv cache, so when the
+    suite runs offline (e.g. a hermetic build sandbox) those tests skip rather
+    than fail. Refs #736.
+    """
+    return _host_can_reach(host, "pypi.org")
+
+
+class TestManylinuxRuntime:
+    """Runtime support for pre-compiled PyPI (manylinux) wheels (#736).
+
+    The bare Nix layered image is Nix-but-not-NixOS: it shipped neither the FHS
+    dynamic loader (``/lib64/ld-linux-x86-64.so.2``) that every manylinux
+    x86_64 wheel hardcodes as its ``PT_INTERP``, nor the Nix C++/compression
+    runtime on the loader path. So runtime-installed PyPI binaries broke —
+    standalone tools (pre-commit's PyPI ruff/typos: ``cannot execute: required
+    file not found``) and C extensions dlopened by the baked CPython (numpy,
+    scipy, pre-commit's ``pyjson5``: ``ImportError: libstdc++.so.6``). This is
+    the image-scope analogue of the dev-shell's #698 fix.
+    """
+
+    def test_fhs_loader_exists(self, host):
+        """The FHS loader manylinux wheels exec must exist (arch-specific).
+
+        Unconditional (needs no network): a missing loader is the root cause of
+        ``cannot execute: required file not found`` for any PyPI-pinned
+        standalone tool. The path is arch-specific (the image builds natively
+        per arch): x86_64 -> ``/lib64/ld-linux-x86-64.so.2``,
+        aarch64 -> ``/lib/ld-linux-aarch64.so.1``. Refs #736.
+        """
+        arch = host.system_info.arch
+        loader_path = (
+            "/lib/ld-linux-aarch64.so.1"
+            if arch in ("aarch64", "arm64")
+            else "/lib64/ld-linux-x86-64.so.2"
+        )
+        loader = host.file(loader_path)
+        assert loader.exists, (
+            f"{loader_path} missing; manylinux wheel executables "
+            "(e.g. PyPI-pinned pre-commit ruff/typos) cannot exec"
+        )
+
+    @pytest.mark.parametrize(
+        ("install_spec", "import_name"),
+        [
+            ("numpy", "numpy"),  # heavy manylinux wheel (libstdc++ / libgcc_s)
+            ("pyjson5", "pyjson5"),  # pre-commit pymarkdown's C-extension dep
+        ],
+        ids=["numpy", "pyjson5"],
+    )
+    def test_manylinux_wheel_imports(self, host, install_spec, import_name):
+        """A runtime-installed manylinux wheel imports under the baked CPython.
+
+        Exercises the C-extension path the loader symlink alone cannot fix: the
+        ``.so`` is dlopened by the Nix-store CPython (which uses its own store
+        loader, not ``/lib64``), so its ``libstdc++``/``libgcc_s`` must resolve
+        via the baked ``LD_LIBRARY_PATH``. Network-guarded — the image ships no
+        warm cache. Refs #736.
+        """
+        if not _pypi_reachable(host):
+            pytest.skip("PyPI unreachable; cannot fetch manylinux wheel offline")
+        venv = f"/tmp/manylinux_{import_name}"
+        host.run(f"rm -rf {venv}")
+        try:
+            result = host.run(
+                f"uv venv {venv} "
+                f"&& uv pip install --python {venv}/bin/python {install_spec} "
+                f"&& {venv}/bin/python -c "
+                f"'import {import_name}; print({import_name}.__file__)'"
+            )
+            assert result.rc == 0, (
+                f"manylinux wheel {install_spec!r} failed to import: "
+                f"{result.stdout}\n{result.stderr}"
+            )
+        finally:
+            host.run(f"rm -rf {venv}")
+
+
 class TestSystemTools:
     """Test that system tools are installed with correct versions."""
 
     def test_git_installed(self, host):
-        """Test that git is installed."""
-        assert host.package("git").is_installed, "Git is not installed"
+        """Test that git is installed (path-agnostic, via --version)."""
+        assert_tool_runs(host, "git", "--version")
 
     def test_git_version(self, host):
-        """Test that git version is correct."""
+        """Test that git runs and reports a version."""
         result = host.run("git --version")
         assert result.rc == 0, "git --version failed"
         assert "git version" in result.stdout.lower()
-        expected = EXPECTED_VERSIONS["git"]
-        assert expected in result.stdout, (
-            f"Expected git {expected}x, got: {result.stdout}"
-        )
 
     def test_curl_installed(self, host):
-        """Test that curl is installed."""
-        assert host.package("curl").is_installed, "curl is not installed"
+        """Test that curl is installed (path-agnostic, via --version)."""
+        assert_tool_runs(host, "curl", "--version")
 
     def test_curl_version(self, host):
-        """Test that curl version is correct."""
+        """Test that curl runs and reports a version."""
         result = host.run("curl --version")
         assert result.rc == 0, "curl --version failed"
         assert "curl" in result.stdout.lower()
-        expected = EXPECTED_VERSIONS["curl"]
-        assert expected in result.stdout, (
-            f"Expected curl {expected}x, got: {result.stdout}"
-        )
 
     def test_openssh_client_installed(self, host):
-        """Test that openssh-client is installed."""
-        assert host.package("openssh-client").is_installed, (
-            "openssh-client is not installed"
-        )
+        """Test that the openssh client is installed (path-agnostic)."""
+        assert_tool_runs(host, "ssh", "-V")
 
     def test_nano_installed(self, host):
-        """Test that nano is installed."""
-        assert host.package("nano").is_installed, "nano is not installed"
+        """Test that nano is installed (path-agnostic, via --version)."""
+        assert_tool_runs(host, "nano", "--version")
 
     def test_gh_installed(self, host):
-        """Test that GitHub CLI (gh) is installed."""
-        # gh is manually installed, so check for the binary file
-        assert host.file("/usr/local/bin/gh").exists, "GitHub CLI (gh) binary not found"
-        assert host.file("/usr/local/bin/gh").is_file, "GitHub CLI (gh) is not a file"
+        """Test that GitHub CLI (gh) is installed (path-agnostic)."""
+        assert_tool_on_path(host, "gh")
 
     def test_gh_version(self, host):
-        """Test that gh version is correct."""
+        """Test that gh runs (version is nixpkgs-pinned via flake.lock, not asserted)."""
         result = host.run("gh --version")
         assert result.rc == 0, "gh --version failed"
         assert "gh version" in result.stdout.lower()
-        expected = EXPECTED_VERSIONS["gh"]
-        assert expected in result.stdout, (
-            f"Expected gh {expected}, got: {result.stdout}"
-        )
 
     def test_just_installed(self, host):
-        """Test that just is installed."""
-        # just is manually installed, so check for the binary file
-        assert host.file("/usr/local/bin/just").exists, "just binary not found"
-        assert host.file("/usr/local/bin/just").is_file, "just is not a file"
+        """Test that just is installed (path-agnostic)."""
+        assert_tool_on_path(host, "just")
 
     def test_just_version(self, host):
-        """Test that just version is correct."""
+        """Test that just runs (version is nixpkgs-pinned via flake.lock, not asserted)."""
         result = host.run("just --version")
         assert result.rc == 0, "just --version failed"
         assert "just" in result.stdout.lower()
-        expected = EXPECTED_VERSIONS["just"]
-        assert expected in result.stdout, (
-            f"Expected just {expected}, got: {result.stdout}"
-        )
-
-    def test_hadolint_installed(self, host):
-        """Test that hadolint is installed."""
-        # hadolint is manually installed, so check for the binary file
-        assert host.file("/usr/local/bin/hadolint").exists, "hadolint binary not found"
-        assert host.file("/usr/local/bin/hadolint").is_file, "hadolint is not a file"
-
-    def test_hadolint_version(self, host):
-        """Test that hadolint version is correct."""
-        result = host.run("hadolint --version")
-        assert result.rc == 0, "hadolint --version failed"
-        expected = EXPECTED_VERSIONS["hadolint"]
-        assert expected in result.stdout, (
-            f"Expected hadolint {expected}, got: {result.stdout}"
-        )
 
     def test_taplo_installed(self, host):
-        """Test that taplo (TOML formatter/linter) is installed."""
-        assert host.file("/usr/local/bin/taplo").exists, "taplo binary not found"
-        assert host.file("/usr/local/bin/taplo").is_file, "taplo is not a file"
+        """Test that taplo (TOML formatter/linter) is installed (path-agnostic)."""
+        assert_tool_on_path(host, "taplo")
 
     def test_taplo_version(self, host):
         """Test that taplo version is correct."""
@@ -176,29 +438,15 @@ class TestSystemTools:
             f"Expected taplo {expected}, got: {result.stdout}"
         )
 
-    def test_cursor_agent_installed(self, host):
-        """Test that cursor-agent CLI (agent) is installed."""
-        result = host.run("agent --version")
-        if result.rc != 0:
-            pytest.skip("cursor-agent not available (external CDN issue)")
-
     def test_cargo_binstall(self, host):
-        """Test that cargo-binstall is installed and right version."""
+        """Test that cargo-binstall runs (version nixpkgs-pinned, not asserted)."""
         result = host.run("cargo-binstall -V")
         assert result.rc == 0, "cargo-binstall -V failed"
-        expected = EXPECTED_VERSIONS["cargo-binstall"]
-        assert expected in result.stdout, (
-            f"Expected cargo-binstall {expected}, got: {result.stdout}"
-        )
 
     def test_typstyle(self, host):
-        """Test that typstyle is installed and right version."""
+        """Test that typstyle runs (version nixpkgs-pinned, not asserted)."""
         result = host.run("typstyle --version")
         assert result.rc == 0, "typstyle --version failed"
-        expected = EXPECTED_VERSIONS["typstyle"]
-        assert expected in result.stdout, (
-            f"Expected typstyle {expected}, got: {result.stdout}"
-        )
 
     def test_just_lsp_installed(self, host):
         """Test that just-lsp is installed."""
@@ -209,30 +457,14 @@ class TestSystemTools:
         )
 
     def test_tmux_installed(self, host):
-        """Test that tmux is installed."""
-        assert host.package("tmux").is_installed, "tmux is not installed"
-
-    def test_tmux_version(self, host):
-        """Test that tmux version is correct."""
-        result = host.run("tmux -V")
-        assert result.rc == 0, "tmux -V failed"
-        expected = EXPECTED_VERSIONS["tmux"]
-        assert expected in result.stdout, (
-            f"Expected tmux {expected}, got: {result.stdout}"
-        )
+        """Test that tmux is installed (path-agnostic, via -V)."""
+        result = assert_tool_runs(host, "tmux", "-V")
+        assert "tmux" in result.stdout.lower()
 
     def test_rsync_installed(self, host):
-        """Test that rsync is installed."""
-        assert host.package("rsync").is_installed, "rsync is not installed"
-
-    def test_rsync_version(self, host):
-        """Test that rsync version is correct."""
-        result = host.run("rsync --version")
-        assert result.rc == 0, "rsync --version failed"
-        expected = EXPECTED_VERSIONS["rsync"]
-        assert expected in result.stdout, (
-            f"Expected rsync {expected}, got: {result.stdout}"
-        )
+        """Test that rsync is installed (path-agnostic, via --version)."""
+        result = assert_tool_runs(host, "rsync", "--version")
+        assert "rsync" in result.stdout.lower()
 
     def test_tmux_detached_session_survives(self, host):
         """Test that tmux can create a detached session with a background process."""
@@ -282,6 +514,8 @@ class TestPythonEnvironment:
 
     def test_uv_venv_workflow(self, host):
         """Test that uv sync creates venv and manages project dependencies correctly."""
+        if not _pypi_reachable(host):
+            pytest.skip("PyPI unreachable; uv add/sync cannot fetch packages offline")
         # Use /tmp for test project to avoid conflicts
         test_dir = "/tmp/uv_test_project"
         pyproject_path = f"{test_dir}/pyproject.toml"
@@ -347,12 +581,10 @@ PYPROJECT_EOF"""
                 f"{package_name} should not be available system-wide, only in venv"
             )
 
-            # Step 5: Verify system packages (pre-commit, ruff) are still available
+            # Step 5: Verify system packages (prek, ruff) are still available
             # This confirms uv sync didn't remove them
-            result = host.run("pre-commit --version")
-            assert result.rc == 0, (
-                "pre-commit was removed by uv sync (should not happen)"
-            )
+            result = host.run("prek --version")
+            assert result.rc == 0, "prek was removed by uv sync (should not happen)"
             result = host.run("ruff --version")
             assert result.rc == 0, "ruff was removed by uv sync (should not happen)"
 
@@ -365,13 +597,13 @@ class TestDevelopmentTools:
     """Test that development tools are installed."""
 
     def test_pre_commit_installed(self, host):
-        """Test that pre-commit is installed."""
-        result = host.run("pre-commit --version")
-        assert result.rc == 0, "pre-commit --version failed"
-        assert "pre-commit" in result.stdout.lower()
-        expected = EXPECTED_VERSIONS["pre_commit"]
-        assert expected in result.stdout, (
-            f"Expected pre-commit {expected}, got: {result.stdout}"
+        """Test that the prek hook runner runs (nixpkgs-pinned via flake.lock, #778)."""
+        result = host.run("prek --version")
+        assert result.rc == 0, "prek --version failed"
+        assert "prek" in result.stdout.lower()
+        # The Python pre-commit is intentionally dropped from the image (#778).
+        assert host.run("command -v pre-commit").rc != 0, (
+            "pre-commit should be absent from the image (prek supersedes it, #778)"
         )
 
     def test_ruff_installed(self, host):
@@ -460,32 +692,117 @@ class TestDevelopmentTools:
         assert result.rc == 0, f"{name} command failed: {result.stderr}"
 
 
+class TestContainerRuntime:
+    """Test the container runtime tooling (#740)."""
+
+    def test_podman_installed(self, host):
+        """podman is installed (the image's container runtime)."""
+        result = assert_tool_runs(host, "podman", "--version")
+        assert "podman" in result.stdout.lower()
+
+    def test_docker_shim_on_path(self, host):
+        """A `docker` shim must resolve on PATH (#740).
+
+        The image ships `podman` but no `docker` binary. Docker-out-of-Docker
+        works because podman honors DOCKER_HOST, but any recipe/script that
+        invokes `docker` literally fails with "command not found" without a
+        shim. The image bakes a `docker -> podman` wrapper on /usr/local/bin.
+        """
+        assert_tool_on_path(host, "docker")
+
+    def test_docker_shim_runs_podman(self, host):
+        """The `docker` shim must run and report podman's version (#740).
+
+        Proves the wrapper execs podman rather than merely existing on PATH.
+        """
+        result = host.run("docker --version")
+        assert result.rc == 0, f"docker --version failed: {result.stderr}"
+        assert "podman" in result.stdout.lower(), (
+            f"docker shim did not exec podman: {result.stdout!r}"
+        )
+
+
+class TestNodeEnvironment:
+    """Test the Node.js / npm environment (#728)."""
+
+    def test_npm_installed(self, host):
+        """npm runs (ships with the nixpkgs nodejs)."""
+        result = host.run("npm --version")
+        assert result.rc == 0, f"npm --version failed: {result.stderr}"
+
+    def test_npm_global_prefix_bin_on_path(self, host):
+        """npm's global prefix bin/ must be writable and on PATH (#728).
+
+        In a bare Nix-built image npm's default prefix is the read-only nodejs
+        nix-store path, whose bin/ is not on PATH: ``npm install -g`` reports
+        success but the binary lands somewhere nothing can resolve. The image
+        bakes ``NPM_CONFIG_PREFIX`` to a writable, on-PATH dir to fix this.
+        """
+        prefix = host.run("npm config get prefix")
+        assert prefix.rc == 0, f"npm config get prefix failed: {prefix.stderr}"
+        prefix_dir = prefix.stdout.strip()
+        assert prefix_dir, "npm reported an empty global prefix"
+
+        path = host.run("printenv PATH")
+        assert f"{prefix_dir}/bin" in path.stdout.split(":"), (
+            f"npm global bin {prefix_dir}/bin is not on PATH: {path.stdout.strip()}"
+        )
+
+        probe = f"{prefix_dir}/bin/.npm_prefix_write_probe"
+        result = host.run(f"touch {probe} && rm {probe}")
+        assert result.rc == 0, (
+            f"npm global bin {prefix_dir}/bin is not writable: {result.stderr}"
+        )
+
+    def test_npm_global_install_resolves_on_path(self, host):
+        """A global ``npm install -g`` lands a resolvable binary on PATH (#728).
+
+        Faithful reproduction of the reported bug: install a CLI globally and
+        confirm it resolves on PATH afterwards (previously the binary landed in
+        the read-only nodejs store path, off PATH, so ``command -v`` failed).
+
+        Scoped to #728: only that the binary is on PATH. Executing it relies on
+        the ``#!/usr/bin/env`` shebang interpreter, which #727 provides — this
+        test deliberately does not depend on that.
+        """
+        if not _host_can_reach(host, "registry.npmjs.org"):
+            pytest.skip("npm registry unreachable; cannot npm install -g offline")
+        try:
+            install = host.run("npm install -g tsx")
+            assert install.rc == 0, f"npm install -g tsx failed: {install.stderr}"
+            assert_tool_on_path(host, "tsx")
+        finally:
+            host.run("npm uninstall -g tsx")
+
+
 class TestEnvironmentVariables:
     """Test that environment variables are set correctly."""
 
     @pytest.mark.parametrize(
         ("name", "expected"),
+        # DEBIAN_FRONTEND is intentionally omitted: it is a Debian/apt-specific
+        # build-time variable that is not meaningful on the Nix image.
         [
-            ("DEBIAN_FRONTEND", "noninteractive"),
             ("LANG", "en_US.UTF-8"),
             ("LANGUAGE", "en_US:en"),
             ("LC_ALL", "en_US.UTF-8"),
             ("PYTHONUNBUFFERED", "1"),
             ("IN_CONTAINER", "true"),
-            ("PRE_COMMIT_HOME", "/opt/pre-commit-cache"),
+            ("PREK_HOME", "/opt/prek-cache"),
             ("UV_PROJECT_ENVIRONMENT", "/root/assets/workspace/.venv"),
             ("VIRTUAL_ENV", "/root/assets/workspace/.venv"),
+            ("NPM_CONFIG_PREFIX", "/usr/local"),
         ],
         ids=[
-            "debian_frontend",
             "lang",
             "language",
             "lc_all",
             "pythonunbuffered",
             "in_container",
-            "pre_commit_home",
+            "prek_home",
             "uv_project_environment",
             "virtual_env",
+            "npm_config_prefix",
         ],
     )
     def test_env_vars_set(self, host, name, expected):
@@ -497,21 +814,22 @@ class TestEnvironmentVariables:
         )
 
     @pytest.mark.parametrize(
-        "path_entry",
+        "tool",
         [
-            "/root/.local/bin",
-            "/root/.cargo/bin",
+            "cargo-binstall",
+            "typstyle",
         ],
-        ids=["cursor_agent_path", "cargo_path"],
+        ids=["cargo_binstall_on_path", "cargo_tool_on_path"],
     )
-    def test_path_contains_required_entries(self, host, path_entry):
-        """Test that PATH includes required binary locations."""
-        result = host.run("printenv PATH")
-        assert result.rc == 0, "Failed to read PATH"
-        path_entries = result.stdout.strip().split(":")
-        assert path_entry in path_entries, (
-            f"Expected PATH to contain {path_entry}, got: {result.stdout.strip()}"
-        )
+    def test_path_resolves_required_tools(self, host, tool):
+        """Test that cargo-installed tools resolve on PATH.
+
+        Path-agnostic replacement for asserting hardcoded install dirs
+        (e.g. /root/.cargo/bin) are on PATH: we instead verify the tools
+        those dirs provide are reachable, which holds for both the Debian
+        and Nix images.
+        """
+        assert_tool_on_path(host, tool)
 
 
 class TestFileStructure:
@@ -520,6 +838,15 @@ class TestFileStructure:
     def test_workspace_directory_exists(self, host):
         """Test that workspace directory exists."""
         assert host.file("/workspace").is_directory, "Workspace directory not found"
+
+    def test_migration_guide_shipped(self, host):
+        """The migration guide ships in the image at /root/assets/MIGRATION.md (#625)."""
+        doc = host.file("/root/assets/MIGRATION.md")
+        assert doc.exists, "/root/assets/MIGRATION.md not found in image"
+        assert doc.is_file, "/root/assets/MIGRATION.md is not a regular file"
+        assert "Migrating to the Nix devcontainer" in doc.content_string, (
+            "MIGRATION.md does not contain its expected heading"
+        )
 
     def test_precommit_alias_in_bashrc(self, host):
         """Test that precommit alias is defined in .bashrc."""
@@ -577,9 +904,11 @@ class TestFileStructure:
             "/root/assets/workspace/.githooks/pre-commit",
         ]
 
-        # Define files and folders that should be gitignored (user-specific, not in image)
+        # Define files and folders that should be gitignored (user-specific, not
+        # in image). Note: docker-compose.local.yaml is NOT in this list — the
+        # scaffold ships it as a services:{} template (expected_files above);
+        # a stale ".yml" spelling that matched nothing was dropped in #806.
         gitignored_content = [
-            "/root/assets/workspace/.devcontainer/docker-compose.local.yml",
             "/root/assets/workspace/.devcontainer/.conf",
             "/root/assets/workspace/.devcontainer/workspace.code-workspace",
         ]
@@ -609,18 +938,58 @@ class TestFileStructure:
             )
 
     def test_workspace_template_pre_commit_hooks_initialized(self, host):
-        """Test that pre-commit hooks are pre-initialized at system cache location."""
-        # Pre-commit cache is built to /opt/pre-commit-cache (not in workspace assets)
-        # This allows init-workspace.sh to skip excluding it during copy
-        cache_dir = host.file("/opt/pre-commit-cache")
-        assert cache_dir.exists, (
-            "Pre-commit cache directory not found at /opt/pre-commit-cache"
+        """Test that the prek cache dir exists at the system cache location.
+
+        The dir is `PREK_HOME=/opt/prek-cache` (set in the image env, #778) so
+        init-workspace.sh need not exclude it during copy. Unlike the Debian
+        build, a hermetic Nix build cannot pre-fetch the hook repos (no network),
+        so we assert the cache *directory* is present; it populates on the first
+        `prek run` / `prek prepare-hooks`.
+        """
+        cache_dir = host.file("/opt/prek-cache")
+        assert cache_dir.exists, "prek cache directory not found at /opt/prek-cache"
+        assert cache_dir.is_directory, "prek cache is not a directory"
+
+    def test_template_venv_baked(self, host):
+        """Test that the project virtualenv is baked into the image.
+
+        The image advertises ``UV_PROJECT_ENVIRONMENT``/``VIRTUAL_ENV`` at
+        ``/root/assets/workspace/.venv``; the consumer post-create.sh runs
+        ``sed -i .../.venv/bin/activate`` and aborts under ``set -e`` if the
+        activate script is missing (#735). The flake bootstrap pre-creates the
+        venv from the baked CPython (no deps; ``just sync`` populates it).
+        """
+        activate = host.file("/root/assets/workspace/.venv/bin/activate")
+        assert activate.exists, (
+            "venv activate script not found at "
+            "/root/assets/workspace/.venv/bin/activate"
         )
-        assert cache_dir.is_directory, "Pre-commit cache is not a directory"
-        # Verify the cache directory is not empty (contains installed hooks)
-        result = host.run('test -n "$(ls -A /opt/pre-commit-cache 2>/dev/null)"')
-        assert result.rc == 0, (
-            "Pre-commit cache directory is empty - hooks were not initialized"
+        assert activate.is_file, "venv activate script is not a regular file"
+
+    def test_placeholder_manifest_baked(self, host):
+        """The build-time placeholder manifest is baked next to init-workspace.sh.
+
+        init-workspace.sh reads ``/root/assets/.placeholder-manifest.txt`` to
+        take its fast substitution path; without it, workspace init falls back
+        to a slow runtime ``find``+``grep`` over the whole scaffold (#718). The
+        manifest lists placeholder-bearing files at their in-image runtime
+        paths, one per line.
+        """
+        manifest = host.file("/root/assets/.placeholder-manifest.txt")
+        assert manifest.exists, (
+            "placeholder manifest not found at /root/assets/.placeholder-manifest.txt"
+        )
+        assert manifest.is_file, "placeholder manifest is not a regular file"
+
+        lines = [ln for ln in manifest.content_string.splitlines() if ln.strip()]
+        assert lines, "placeholder manifest is empty"
+        assert all(ln.startswith("/root/assets/workspace/") for ln in lines), (
+            "placeholder manifest contains non-workspace paths"
+        )
+        # A known placeholder-bearing scaffold file must be listed so the fast
+        # path actually substitutes it (guards against an empty/degenerate list).
+        assert "/root/assets/workspace/pyproject.toml" in lines, (
+            "placeholder manifest missing known placeholder-bearing file pyproject.toml"
         )
 
     def test_manifest_files(self, host, parse_manifest):
@@ -657,6 +1026,140 @@ class TestFileStructure:
                         )
                     else:
                         verify_file_identity(host, str(rel), dest_file_path)
+
+
+class TestNixConfiguration:
+    """Test that the baked /etc/nix/nix.conf enables the modern Nix CLI.
+
+    The image bakes CppNix but historically shipped no nix.conf, leaving
+    `nix-command`/`flakes` disabled by default so ad-hoc on-demand tooling
+    (`nix shell nixpkgs#<x>`, `nix run`, `nix eval`) failed without an explicit
+    `--extra-experimental-features` flag. Refs #739.
+    """
+
+    def test_nix_conf_exists(self, host):
+        """/etc/nix/nix.conf is present as a regular file."""
+        conf = host.file("/etc/nix/nix.conf")
+        assert conf.exists, "/etc/nix/nix.conf not found"
+        assert conf.is_file, "/etc/nix/nix.conf is not a regular file"
+
+    def test_nix_conf_enables_experimental_features(self, host):
+        """nix.conf turns on the nix-command and flakes experimental features."""
+        content = host.file("/etc/nix/nix.conf").content_string
+        feature_line = next(
+            (
+                line
+                for line in content.splitlines()
+                if line.strip().startswith("experimental-features")
+            ),
+            None,
+        )
+        assert feature_line is not None, (
+            "no experimental-features setting in /etc/nix/nix.conf"
+        )
+        assert "nix-command" in feature_line, (
+            "nix-command not enabled in /etc/nix/nix.conf"
+        )
+        assert "flakes" in feature_line, "flakes not enabled in /etc/nix/nix.conf"
+
+    def test_nix_command_works_without_flag(self, host):
+        """`nix eval` succeeds without an explicit experimental-features flag."""
+        result = host.run('nix eval --expr "1 + 1"')
+        assert result.rc == 0, (
+            f"nix eval failed without experimental-features flag: {result.stderr}"
+        )
+        assert result.stdout.strip() == "2", (
+            f"unexpected nix eval output: {result.stdout!r}"
+        )
+
+    def test_nix_conf_disables_build_users_group(self, host):
+        """nix.conf sets an empty ``build-users-group`` (#749).
+
+        The in-image nix runs as root, single-user, daemonless with no
+        ``nixbld`` group, so any on-demand ``nix shell``/``nix develop`` that
+        needs a local build (not a pure cache substitution) would abort with
+        "the group 'nixbld' ... does not exist". An empty ``build-users-group``
+        makes root build directly.
+        """
+        content = host.file("/etc/nix/nix.conf").content_string
+        group_lines = [
+            line.strip()
+            for line in content.splitlines()
+            if line.strip().startswith("build-users-group")
+        ]
+        assert group_lines, "no build-users-group setting in /etc/nix/nix.conf"
+        # Must be empty (everything after '=' is blank) so root builds directly.
+        value = group_lines[0].split("=", 1)[1].strip()
+        assert value == "", (
+            f"build-users-group must be empty for single-user in-image nix, got {value!r}"
+        )
+
+    def test_nix_conf_does_not_accept_flake_config(self, host):
+        """nix.conf must NOT bake ``accept-flake-config = true`` (#773).
+
+        Baking ``accept-flake-config = true`` makes any in-container
+        ``nix run github:attacker/flake`` silently accept that flake's
+        ``substituters``/``trusted-public-keys`` — a cache-redirection
+        supply-chain attack. Foreign-flake config must require an explicit
+        per-invocation ``--accept-flake-config`` instead.
+        """
+        content = host.file("/etc/nix/nix.conf").content_string
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("accept-flake-config"):
+                value = stripped.split("=", 1)[1].strip()
+                assert value != "true", (
+                    "accept-flake-config must not be 'true' in baked nix.conf "
+                    "(supply-chain trapdoor, #773)"
+                )
+
+    def test_nix_conf_bakes_explicit_substituters(self, host):
+        """nix.conf bakes explicit substituters so caches still resolve (#773).
+
+        With ``accept-flake-config`` dropped, the trusted caches must be set
+        explicitly or normal builds would no longer substitute from them.
+        """
+        content = host.file("/etc/nix/nix.conf").content_string
+        sub_line = next(
+            (
+                line
+                for line in content.splitlines()
+                if line.strip().startswith("substituters")
+            ),
+            None,
+        )
+        assert sub_line is not None, "no substituters setting in /etc/nix/nix.conf"
+        substituters = sub_line.split("=", 1)[1].split()
+        assert "https://cache.nixos.org" in substituters, (
+            "cache.nixos.org missing from substituters in /etc/nix/nix.conf"
+        )
+        assert "https://vig-os.cachix.org" in substituters, (
+            "vig-os.cachix.org missing from substituters in /etc/nix/nix.conf"
+        )
+
+    def test_nix_conf_bakes_trusted_public_keys(self, host):
+        """nix.conf bakes the trusted-public-keys for the explicit caches (#773)."""
+        content = host.file("/etc/nix/nix.conf").content_string
+        key_line = next(
+            (
+                line
+                for line in content.splitlines()
+                if line.strip().startswith("trusted-public-keys")
+            ),
+            None,
+        )
+        assert key_line is not None, (
+            "no trusted-public-keys setting in /etc/nix/nix.conf"
+        )
+        trusted_keys = key_line.split("=", 1)[1].split()
+        assert (
+            "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+            in trusted_keys
+        ), "cache.nixos.org public key missing from trusted-public-keys"
+        assert (
+            "vig-os.cachix.org-1:yoOYRi3bvnM6ThxO0joLt7vtzhTfkq3r6jykeUMg7Bk="
+            in trusted_keys
+        ), "vig-os.cachix.org public key missing from trusted-public-keys"
 
 
 class TestPlaceholders:

@@ -5,7 +5,7 @@
 # changes to matching files. Later rules take precedence over earlier ones.
 
 # agent workflows
-.cursor/skills/                 @gerchowl
+.claude/skills/                 @gerchowl
 justfile.worktree               @gerchowl
 
 
@@ -14,8 +14,6 @@ justfile.worktree               @gerchowl
 .github/actions/                @c-vigo
 
 # Build and release scripts
-scripts/build.sh                @c-vigo
-scripts/prepare-build.sh        @c-vigo
 scripts/clean.sh                @c-vigo
 scripts/sync_manifest.py        @c-vigo
 
@@ -28,11 +26,9 @@ packages/vig-utils/src/vig_utils/shell/resolve-branch.sh        @gerchowl
 
 # Dev environment setup
 scripts/init.sh                 @c-vigo
-scripts/requirements.yaml       @c-vigo
 
 # Security-sensitive configuration
 renovate.json                   @c-vigo
 assets/workspace/.github/renovate-default.json @c-vigo
 .github/CODEOWNERS              @c-vigo
 SECURITY.md                     @c-vigo
-Containerfile                   @c-vigo

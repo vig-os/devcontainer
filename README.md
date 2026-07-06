@@ -30,6 +30,14 @@ This will:
 - Pull the latest devcontainer image
 - Initialize your project with the devcontainer template
 
+**Delivery mode.** A workspace can run on a VS Code **devcontainer**, on a Nix
+flake + **direnv**, or **both**. Pass `--mode devcontainer|direnv|both` to choose
+(both forms `--mode X` and `--mode=X` work). The one-line install runs
+non-interactively and defaults to `both`; run `init-workspace.sh` directly (see
+Manual Setup) without `--mode` to be prompted, where the default selection is
+also `both`. `devcontainer` scaffolds `.devcontainer/` only; `direnv` scaffolds
+`flake.nix` + `.envrc` only; `both` scaffolds everything.
+
 **Options:**
 
 ```bash
@@ -44,6 +52,9 @@ curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh 
 
 # Override organization name (default: vigOS)
 curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --org MyOrg ~/my-project
+
+# Choose the delivery mode: devcontainer | direnv | both (default: both)
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --mode direnv ~/my-project
 
 # Preview without executing
 curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --dry-run ~/my-project
@@ -86,6 +97,11 @@ curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh 
 
    The script copies the devcontainer template (`.devcontainer/`), git hooks, README/CHANGELOG, and auth helpers into your project.
 
+   Run interactively (no `-it` dropped), the script prompts for the delivery mode
+   (`devcontainer`/`direnv`/`both`, default `both`). Pass `--mode <value>` to skip
+   the prompt; under `--no-prompts` (e.g. the one-line install) it defaults to
+   `both`.
+
 3. **Run with `--force` when overwriting or updating an existing project**
 
    ```bash
@@ -126,7 +142,7 @@ Available recipes:
     docs                                       # Generate documentation from templates
     help                                       # Show available commands
     info                                       # Show image information
-    init *args                                 # Install system dependencies and setup development environment
+    init *args                                 # Gate Nix prerequisites and bootstrap the project (venv, git hooks, pre-commit)
     login                                      # Test login to GHCR
     sync-workspace                             # Sync workspace templates from repo root to assets/workspace/
 
@@ -170,7 +186,7 @@ Available recipes:
     worktree-attach issue                      # before attaching. See tests/bats/worktree.bats for integration tests. [alias: wt-attach]
     worktree-clean mode=""                     # Default (no args): clean only stopped worktrees. Use 'all' to clean everything. [alias: wt-clean]
     worktree-list                              # List active worktrees and their tmux sessions [alias: wt-list]
-    worktree-start issue prompt="" reviewer="" # Create a worktree for an issue, open tmux session, launch cursor-agent [alias: wt-start]
+    worktree-start issue prompt="" reviewer="" # Create a worktree for an issue, open tmux session, launch the claude CLI [alias: wt-start]
     worktree-stop issue                        # Stop a worktree's tmux session and remove the worktree [alias: wt-stop]
 
 ```
@@ -179,18 +195,18 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 
 ## Image Details
 
-- **Base Image**: `python:3.12-slim-trixie`
+- **Build**: Nix flake via `dockerTools.buildLayeredImage` (no Debian/Docker base image); bit-reproducible
 - **Registry**: `ghcr.io/vig-os/devcontainer`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
-- **Latest Version**: [0.3.9](https://github.com/vig-os/devcontainer/releases/tag/0.3.9) - 2026-06-23
+- **Latest Version**: [0.4.0](https://github.com/vig-os/devcontainer/releases/tag/0.4.0) - 2026-07-06
 - **Image tags**: bare semver (`0.2.1`, `latest`) — git tags use `v` prefix (`v0.2.1`) but image tags do not
 
 ## Features
 
-### **Base Image**
+### **Build**
 
-- **python:3.12-slim-trixie** – Minimal Python base image (Debian Trixie) for lightweight and robust foundation
+- **Nix flake** – The image is assembled entirely by Nix via `dockerTools.buildLayeredImage` (no Debian/Docker base image). Python (CPython 3.14) and the whole toolchain come from a pinned `nixpkgs`, so the build is bit-reproducible
 
 ### **System Tools**
 
@@ -204,8 +220,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 
 ### **Python Environment**
 
-- **Python 3.12** - Latest stable Python version
-- **pip, setuptools, wheel** - Python packaging tools (included with base image)
+- **Python 3.14** - CPython from the pinned `nixpkgs`
 - **uv** - Fast Python package installer and resolver
 
 ### **Development Tools**
