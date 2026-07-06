@@ -50,11 +50,12 @@ scanner goes dark; `vulnix` matches the Nix store closure against the NVD feeds
 instead.
 
 > **NVD feed mirror.** `nvd.nist.gov` is chronically throttled/unstable
-> (`nix-community/vulnix#171`), so both scans fetch the NVD 2.0 feeds from a
-> **self-hosted mirror** (the `nvd-mirror` release, refreshed by
-> `.github/workflows/nvd-mirror-refresh.yml` — the only job that talks to NVD)
-> via `vulnix --mirror`. This insulates every scan and release from NVD outages
-> and localizes the NVD-format dependency to one refresh job.
+> (`nix-community/vulnix#171`), so both scans fetch the NVD 2.0 feeds via
+> `vulnix --mirror` from a dedicated public mirror,
+> [`vig-os/nvd-mirror`](https://github.com/vig-os/nvd-mirror), served on GitHub
+> Pages (`https://vig-os.github.io/nvd-mirror/`). That repo's workflow is the only
+> job that talks to NVD; refreshing it every 6 h. This insulates every scan and
+> release from NVD outages and localizes the NVD-format dependency to one place.
 
 - HIGH/CRITICAL findings (CVSS v3 ≥ 7.0) are gated by `vulnix-gate`
   (`packages/vig-utils`) against the `.vulnixignore` exception register; a

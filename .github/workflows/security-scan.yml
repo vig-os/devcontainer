@@ -105,11 +105,11 @@ jobs:
         # nothing.
         run: |
           set -uo pipefail
-          # Fetch NVD data from our self-hosted mirror (nvd-mirror-refresh.yml,
-          # #870), not nvd.nist.gov — the mirror is CDN-backed and stable, so
-          # the retry loop below now only guards rare GitHub-CDN blips, not NVD
-          # outages. The --json/table exit-code handling is unchanged (#842).
-          NVD_MIRROR="${{ github.server_url }}/${{ github.repository }}/releases/download/nvd-mirror/"
+          # Fetch NVD data from the vig-os/nvd-mirror Pages mirror (#870), not
+          # nvd.nist.gov — the mirror is CDN-backed and stable, so the retry loop
+          # below now only guards rare CDN blips, not NVD outages. The
+          # --json/table exit-code handling is unchanged (#842).
+          NVD_MIRROR="https://vig-os.github.io/nvd-mirror/"
           rc=0
           for attempt in 1 2 3; do
             rc=0
