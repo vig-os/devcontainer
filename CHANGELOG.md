@@ -66,6 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Renovate changelog entries land as plain `### Changed` bullets, not under `#### Modules`** ([#867](https://github.com/vig-os/devcontainer/issues/867))
+  - `renovate-changelog-pr` appended entries at the bottom of the `### Changed` block, so with the `#### Modules` sub-heading convention ([#816](https://github.com/vig-os/devcontainer/issues/816)) a dependency bump was filed beneath `#### Modules` and read as a module change. Entries now insert at the top of `### Changed`, above any `####` sub-heading, with Keep-a-Changelog spacing preserved.
+
 ### Security
 
 ## [0.4.0] - TBD
