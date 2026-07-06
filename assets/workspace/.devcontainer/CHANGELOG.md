@@ -182,6 +182,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Renovate changelog automation no longer self-triggers an empty-commit loop and keeps the workspace mirror in sync** ([#863](https://github.com/vig-os/devcontainer/issues/863))
+  - The changelog commit is pushed with a GitHub App token (which re-triggers workflows), but the build gated only on the PR author (permanently `renovate[bot]`) and never the pusher, and `commit-action` has no empty-diff guard — so the bot's own no-op commits fired fresh `synchronize` events without end (#862 accrued 150+ identical empty commits before the build was disabled by hand). The build now skips `synchronize` events raised by the changelog commit bot (`github.event.sender.login`), severing the loop
+  - The automation committed only root `CHANGELOG.md`, leaving the `scripts/manifest.toml` mirror `assets/workspace/.devcontainer/CHANGELOG.md` stale so the `sync-manifest` gate failed on every Renovate PR; the build now mirrors the verbatim copy and commits both files
 - **rc4 field-validation fix batch: direnv-mode commits, pipe-safe scripts, prune/typos/installer hardening** ([#859](https://github.com/vig-os/devcontainer/issues/859))
   - Scaffolded `.githooks/*` now use `#!/usr/bin/env bash` (hosts without `/bin/bash`, e.g. NixOS, could not run them) and accept the nix dev-shell (`IN_NIX_SHELL`) as a sanctioned commit environment — previously direnv-mode consumers could not commit at all (the guard demanded the container)
   - Restored the `${BASH_SOURCE[0]:-$0}` pipe-safety fallback in the scaffolded lifecycle scripts (`initialize`/`post-create`/`post-attach`/`version-check`) — a regression from the 0.3.x scaffold caught by a consumer's own regression tests
