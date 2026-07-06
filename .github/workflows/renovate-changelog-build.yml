@@ -93,10 +93,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p changelog-artifact
+          # %q-quote values: the commit workflow sources this file, and grouped
+          # Renovate branch names contain shell metacharacters (e.g. parentheses
+          # in renovate/python-(minor-and-patch)).
           {
-            echo "MODIFIED=${MODIFIED}"
-            echo "PR_NUMBER=${PR_NUMBER}"
-            echo "HEAD_REF=${HEAD_REF}"
+            printf 'MODIFIED=%q\n' "${MODIFIED}"
+            printf 'PR_NUMBER=%q\n' "${PR_NUMBER}"
+            printf 'HEAD_REF=%q\n' "${HEAD_REF}"
           } > changelog-artifact/metadata.env
           if [[ "${MODIFIED}" == "true" ]]; then
             cp CHANGELOG.md changelog-artifact/
@@ -110,4 +113,7 @@ jobs:
         with:
           name: renovate-changelog
           path: changelog-artifact/
+          # The workspace mirror lives under the hidden .devcontainer directory,
+          # which upload-artifact excludes by default.
+          include-hidden-files: true
           retention-days: 1

@@ -66,6 +66,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Renovate changelog artifact drops the workspace mirror; `metadata.env` breaks on parenthesized branches** ([#874](https://github.com/vig-os/devcontainer/issues/874))
+  - `upload-artifact` silently excluded the mirror under the hidden `.devcontainer` directory, so the bot commit updated only the root `CHANGELOG.md` and tripped the `sync-manifest` gate; now uploaded with `include-hidden-files: true`.
+  - `metadata.env` values are `%q`-quoted so grouped Renovate branch names (e.g. `renovate/python-(minor-and-patch)`) survive being `source`d by the commit workflow.
+
 - **Renovate changelog entries land as plain `### Changed` bullets, not under `#### Modules`** ([#867](https://github.com/vig-os/devcontainer/issues/867))
   - `renovate-changelog-pr` appended entries at the bottom of the `### Changed` block, so with the `#### Modules` sub-heading convention ([#816](https://github.com/vig-os/devcontainer/issues/816)) a dependency bump was filed beneath `#### Modules` and read as a module change. Entries now insert at the top of `### Changed`, above any `####` sub-heading, with Keep-a-Changelog spacing preserved.
 
