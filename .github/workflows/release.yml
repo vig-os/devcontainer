@@ -882,10 +882,15 @@ jobs:
         # the step before the vulnix-gate ever evaluates .vulnixignore.
         run: |
           set -uo pipefail
+          # Fetch NVD data from our self-hosted mirror (nvd-mirror-refresh.yml,
+          # #870), not the throttled nvd.nist.gov, so the publish gate cannot be
+          # blocked by an NVD outage. Retry loop now guards only rare GitHub-CDN
+          # blips; the || rc=$? exit capture stays load-bearing (#842).
+          NVD_MIRROR="${{ github.server_url }}/${{ github.repository }}/releases/download/nvd-mirror/"
           rc=0
           for attempt in 1 2 3; do
             rc=0
-            nix run .#vulnix -- --closure ./result --json > vulnix-findings.json || rc=$?
+            nix run .#vulnix -- --mirror "$NVD_MIRROR" --closure ./result --json > vulnix-findings.json || rc=$?
             [ "$rc" -le 2 ] && jq -e . vulnix-findings.json > /dev/null 2>&1 && break
             if [ "$attempt" -lt 3 ]; then
               echo "::warning::vulnix scan attempt ${attempt} failed (exit ${rc}); retrying in $((60 * attempt))s"

@@ -49,6 +49,13 @@ CVE scanner. A Nix image has no `apt`/`dpkg` database, so Trivy's OS-package
 scanner goes dark; `vulnix` matches the Nix store closure against the NVD feeds
 instead.
 
+> **NVD feed mirror.** `nvd.nist.gov` is chronically throttled/unstable
+> (`nix-community/vulnix#171`), so both scans fetch the NVD 2.0 feeds from a
+> **self-hosted mirror** (the `nvd-mirror` release, refreshed by
+> `.github/workflows/nvd-mirror-refresh.yml` — the only job that talks to NVD)
+> via `vulnix --mirror`. This insulates every scan and release from NVD outages
+> and localizes the NVD-format dependency to one refresh job.
+
 - HIGH/CRITICAL findings (CVSS v3 ≥ 7.0) are gated by `vulnix-gate`
   (`packages/vig-utils`) against the `.vulnixignore` exception register; a
   finding blocks only when it is **not** covered by a non-expired exception.
