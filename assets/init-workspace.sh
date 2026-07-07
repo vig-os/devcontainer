@@ -53,6 +53,13 @@ PRESERVE_FILES=(
     "pyproject.toml"
 )
 
+# Base recipes the shipped .github/workflows/ci.yml depends on (sync, precommit,
+# test) plus their template siblings. Since 0.4.0 they live in justfile.project,
+# which is preserved on upgrade — a pre-0.4.0 consumer never receives them and
+# in-container CI fails with "justfile does not contain recipe 'sync'" (#877).
+# The upgrade repair below appends the missing ones from the template.
+CI_CONTRACT_RECIPES=(lint format precommit test test-cov sync update)
+
 # Get script directory for manifest location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST_FILE="$SCRIPT_DIR/.placeholder-manifest.txt"
@@ -208,6 +215,21 @@ if [[ -z "$MODE" ]]; then
 fi
 echo "Delivery mode set to: $MODE"
 
+# Print one recipe block from the template justfile.project: the immediately
+# preceding comment/attribute lines, the recipe header, and the indented body.
+# Used to repair a preserved pre-0.4.0 justfile.project that lacks the
+# relocated base recipes (#877); the template stays the single source of truth.
+extract_template_recipe() {
+    local recipe="$1"
+    awk -v r="$recipe" '
+        found && /^[[:space:]]/ { print; next }
+        found { exit }
+        /^(#|\[)/ { buf = buf $0 ORS; next }
+        $0 ~ ("^" r "([[:space:]][^:]*)?:") { found = 1; printf "%s", buf; print; next }
+        { buf = "" }
+    ' "$TEMPLATE_DIR/justfile.project"
+}
+
 # Helper: check if a file is in the preserve list
 is_preserved_file() {
     local file="$1"
@@ -296,6 +318,11 @@ FLAKE_PREEXISTED=false
 [[ -f "$WORKSPACE_DIR/flake.nix" ]] && FLAKE_PREEXISTED=true
 ENVRC_PREEXISTED=false
 [[ -f "$WORKSPACE_DIR/.envrc" ]] && ENVRC_PREEXISTED=true
+
+# A preserved justfile.project may predate the 0.4.0 base-recipe relocation
+# (#877); record it so the post-scaffold repair can append what is missing.
+JUSTFILE_PROJECT_PREEXISTED=false
+[[ -f "$WORKSPACE_DIR/justfile.project" ]] && JUSTFILE_PROJECT_PREEXISTED=true
 
 # Copy template contents to workspace
 echo "Initializing workspace from template..."
@@ -390,6 +417,16 @@ case "$MODE" in
         ;;
 esac
 
+# 0.4.0 retired .devcontainer/justfile.base (recipes relocated to
+# justfile.project), so drop the stale copy an upgraded 0.3.x repo carries —
+# nothing imports it anymore (#877). Only when this scaffold manages
+# .devcontainer/: a direnv-mode consumer's own .devcontainer/ is never
+# touched (#738).
+if [[ "$MODE" != "direnv" && -f "$WORKSPACE_DIR/.devcontainer/justfile.base" ]]; then
+    echo "Removing retired .devcontainer/justfile.base (recipes live in justfile.project since 0.4.0)..."
+    rm -f "$WORKSPACE_DIR/.devcontainer/justfile.base"
+fi
+
 # Pin the explicitly requested devcontainer version (#852). The image bakes
 # the release it was built from into the scaffolded .vig-os (flake bootstrap),
 # which is correct for finals but stale for release candidates: the repo-root
@@ -456,6 +493,47 @@ fi
 echo "Setting executable permissions on shell scripts and hooks..."
 find "$WORKSPACE_DIR" -type f -name "*.sh" -exec chmod +x {} \;
 find "$WORKSPACE_DIR/.githooks" -type f -exec chmod +x {} \; 2>/dev/null || true
+
+# The root justfile is managed (rsync overwrites it on upgrade), so the
+# scaffold import block must be present at this point; without it every
+# layered recipe is unreachable, however complete justfile.project is
+# (#877, observed in the field). Warn loudly — this indicates a broken
+# scaffold or external interference.
+if [[ -f "$WORKSPACE_DIR/justfile" ]] \
+    && ! grep -qF "import? 'justfile.project'" "$WORKSPACE_DIR/justfile"; then
+    echo "Warning: root justfile lacks the scaffold import block (import? 'justfile.project')." >&2
+    echo "         Restore the imports from the template or layered recipes stay unreachable (see MIGRATION.md)." >&2
+fi
+
+# Repair a preserved pre-0.4.0 justfile.project (#877): the shipped ci.yml
+# calls `just sync` / `just precommit` / `just test`, so an upgrade must
+# deliver the CI-contract recipes. Append (from the template) only those that
+# do not resolve anywhere in the import graph — customized consumer recipes
+# always win, and re-running the upgrade is a no-op.
+if [[ "$JUSTFILE_PROJECT_PREEXISTED" == "true" && -f "$WORKSPACE_DIR/justfile.project" ]]; then
+    MISSING_RECIPES=()
+    for recipe in "${CI_CONTRACT_RECIPES[@]}"; do
+        if ! (cd "$WORKSPACE_DIR" && just --show "$recipe" > /dev/null 2>&1); then
+            MISSING_RECIPES+=("$recipe")
+        fi
+    done
+    if [[ ${#MISSING_RECIPES[@]} -gt 0 ]]; then
+        echo "Preserved justfile.project lacks base recipe(s): ${MISSING_RECIPES[*]}"
+        echo "Appending them from the template (review the marked block, fold into your own recipes as needed)..."
+        {
+            echo ""
+            echo "# ==============================================================================="
+            echo "# BASE RECIPES appended by init-workspace on upgrade (vig-os/devcontainer#877)."
+            echo "# Since 0.4.0 these live in justfile.project (preserved on upgrade); the shipped"
+            echo "# ci.yml requires sync/precommit/test. Review, keep, or fold into your own."
+            echo "# ==============================================================================="
+            for recipe in "${MISSING_RECIPES[@]}"; do
+                echo ""
+                extract_template_recipe "$recipe"
+            done
+        } >> "$WORKSPACE_DIR/justfile.project"
+    fi
+fi
 
 # Sync dependencies: resolves uv.lock for the new project name and installs the
 # project. Non-fatal (#859): a preserved old-generation justfile.project may not
