@@ -495,6 +495,15 @@ fi
 # which is correct for finals but stale for release candidates: the repo-root
 # pin only advances at finalize. install.sh forwards its --version here so the
 # scaffold pins the image actually installed.
+#
+# NOTE (#916): when VIG_OS_VERSION is unset (raw `podman run … init-workspace.sh`
+# outside install.sh), the scaffold keeps the baked pin. We cannot stamp the
+# true image version from the runtime here: the ONLY in-image version record is
+# this same baked template .vig-os (built from the repo-root pin), so reading it
+# back is a no-op and still stale for RC images. Stamping the actual built tag
+# for RCs requires a build-side change — bake the true tag into the image as an
+# authoritative record (an env var or VERSION file distinct from the repo-root
+# pin) that this block could read when VIG_OS_VERSION is unset.
 if [[ -n "${VIG_OS_VERSION:-}" && -f "$WORKSPACE_DIR/.vig-os" ]]; then
     if [[ ! "$VIG_OS_VERSION" =~ ^[A-Za-z0-9._-]+$ ]]; then
         echo "Error: invalid VIG_OS_VERSION: $VIG_OS_VERSION" >&2
