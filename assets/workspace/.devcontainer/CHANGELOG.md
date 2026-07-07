@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Nix-direct CI lane for direnv-mode consumers** ([#854](https://github.com/vig-os/devcontainer/issues/854))
+  - `direnv` mode now scaffolds a host-native `ci.yml` overlay (`assets/workspace-direnv/`, applied like the bare overlay and keyed off the persisted `DEVKIT_MODE`): no `resolve-image`, no in-container jobs — the runner installs Nix (with the vig-os Cachix substituter, SHA-pinned `install-nix`/`cachix` actions reused from this repo's own lane) and drives the same `just sync|precommit|test` contract inside the flake dev-shell via `nix develop -c`, dropping the container-only `PREK_HOME`/`UV_PROJECT_ENVIRONMENT` env.
+  - Documented boundary in `docs/MIGRATION.md` ("direnv-mode CI"): only `ci.yml` is converted for direnv mode; the other shipped workflows (`prepare-release`, `promote-release`, `release*`, `sync-issues`, `renovate-changelog-build`, `sync-main-to-dev`) stay container-based and devcontainer-mode-only until the full workflow audit rides the devkit rename ([#781](https://github.com/vig-os/devcontainer/issues/781)); the container-independent ones (`codeql`, `scorecard`, `renovate-changelog-commit`, `release-extension`) keep working in every mode.
+
 - **Opt-in capability modules for `mkProjectShell`** ([#884](https://github.com/vig-os/devcontainer/issues/884))
   - `modules = [ "native" ]` composes curated capability modules (packages + env vars + shellHook fragments) onto the project dev-shell; contract recorded in `docs/rfcs/ADR-capability-modules.md`.
   - Zero-module shells are byte-identical to the previous builder and the published image stays base-only; `extraPackages` remains the per-repo escape hatch and wins PATH lookup.
@@ -54,6 +58,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `solve-and-pr` skill now launches `/worktree_solve-and-pr` (underscore, matching the real skill name).
   - `worktree_pr` PR title format aligned with `pr_create`: no manual issue number in title.
   - Obsolete `.claude/commands/` wrappers deleted (superseded by skills providing `/X` directly).
+- **Version-skew hardening for the shipped CI glue** ([#854](https://github.com/vig-os/devcontainer/issues/854))
+  - **CI-wired skew guard:** the shipped container `ci.yml` and the new direnv `ci.yml` lint jobs now fail fast with an actionable `::error::` if the toolchain does not provide `prek`, turning an opaque `just precommit` exit 127 (old scaffold vs new image, or an image too old to ship the prek hook runner) into a one-line diagnosis.
+  - **`prepare-release.yml` resolver unified:** the scaffold's forked inline-awk image resolver with a silent `latest` fallback is replaced by the shared `resolve-image` action, which hard-fails on a missing/unreadable `DEVCONTAINER_VERSION` pin.
+  - **`devc-upgrade` honors the pin:** the recipe read `install.sh` from `main` regardless of the consumer's pin; it now reads `DEVCONTAINER_VERSION` from `.vig-os` and upgrades to that generation (script ref + `--version`), keeping `main`/`latest` only for unpinned repos.
+  - **pipefail in every mode:** `set shell := ["bash", "-euo", "pipefail", "-c"]` moved from the devc-only `justfile.devc` to the root `justfile` (the SSoT), so direnv/bare recipes get pipefail too.
+  - **`init-precommit.sh` derives its root** from the script location instead of a hard-coded `/workspace/{{SHORT_NAME}}`.
+  - **Stale doc fixed:** `docs/container-ci-quirks.md` no longer describes a removed `uv run bandit` `pre-commit` hook; the private-image (unauthenticated `resolve-image` probe + missing `credentials:`) limitation is documented, with the first-class fix tracked in [#920](https://github.com/vig-os/devcontainer/issues/920).
 
 ### Security
 
