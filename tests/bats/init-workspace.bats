@@ -1038,3 +1038,25 @@ EOF
     assert_success
     refute_output --partial "retired 'pre-commit' binary"
 }
+
+# ── origin must resolve before any filesystem mutation (#916) ─────────────────
+# Under --no-prompts, the GITHUB_REPOSITORY resolution ran AFTER the rsync copy,
+# so an abort left a half-scaffolded tree behind. Resolve (and validate) the
+# origin BEFORE the first filesystem mutation so a failure leaves the workspace
+# untouched.
+
+@test "no-prompts without a derivable origin aborts before mutating the workspace (#916)" {
+    ws="$BATS_TEST_TMPDIR/e2e-916-no-origin"
+    mkdir -p "$ws"
+    # no .git origin and GITHUB_REPOSITORY unset (cleared: CI may export it)
+    run env -u GITHUB_REPOSITORY \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=probe \
+        bash "$INIT_WORKSPACE_SH" --no-prompts --mode both
+    assert_failure
+    assert_output --partial 'GITHUB_REPOSITORY is required'
+    # the workspace was never scaffolded: still empty (no template files copied)
+    run bash -c "ls -A '$ws'"
+    assert_output ""
+}
