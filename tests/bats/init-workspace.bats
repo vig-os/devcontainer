@@ -906,3 +906,102 @@ EOF
     assert_success
     refute_output --partial "retired 'pre-commit' binary"
 }
+
+# ── --preview: report-only upgrade preview (#886) ─────────────────────────────
+# `--preview` runs the existing conflict-report machinery (OVERWRITTEN /
+# PRESERVED), extended with the mode-prune DELETED listing and the ADDED
+# listing, then exits 0 before mutating anything. install.sh forwards it; a
+# preview is by definition of an upgrade, so it must ride the --force report
+# path without requiring --force.
+
+# Run the real script in preview mode against workspace $1 (extra args pass
+# through, e.g. --mode). `uv` is stubbed like _upgrade for consistency; a
+# correct preview never reaches the `just sync` step anyway.
+_preview() {
+    local ws="$1"
+    shift
+    local stub="$BATS_TEST_TMPDIR/stub-uv-886"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/uv"
+    chmod +x "$stub/uv"
+    env PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=testproj \
+        GITHUB_REPOSITORY=test/repo \
+        bash "$INIT_WORKSPACE_SH" --preview --no-prompts "$@"
+}
+
+@test "init-workspace --preview exits 0 and prints the file report (#886)" {
+    ws="$BATS_TEST_TMPDIR/e2e-886-report"
+    mkdir -p "$ws"
+    _upgrade both "$ws"
+    run _preview "$ws" --mode both
+    assert_success
+    assert_output --partial "OVERWRITTEN"
+    assert_output --partial "PRESERVED"
+    assert_output --partial "Preview complete"
+}
+
+@test "init-workspace --preview leaves the tree byte-identical (#886)" {
+    ws="$BATS_TEST_TMPDIR/e2e-886-intact"
+    mkdir -p "$ws"
+    _upgrade both "$ws"
+    cp -a "$ws" "$ws.before"
+    run _preview "$ws" --mode both
+    assert_success
+    run diff -r "$ws" "$ws.before"
+    assert_success
+}
+
+@test "init-workspace --preview lists prune deletions without deleting (#886)" {
+    # The retired .devcontainer/justfile.base is removed on a real upgrade
+    # (#877); the preview must list it as DELETED and leave it in place.
+    ws="$BATS_TEST_TMPDIR/e2e-886-deletions"
+    mkdir -p "$ws/.devcontainer"
+    printf '# retired 0.3.x base recipes\n' >"$ws/.devcontainer/justfile.base"
+    run _preview "$ws" --mode both
+    assert_success
+    assert_output --partial "DELETED"
+    assert_output --partial ".devcontainer/justfile.base"
+    run test -f "$ws/.devcontainer/justfile.base"
+    assert_success
+}
+
+@test "init-workspace --preview lists the direnv-mode .devcontainer prune (#886)" {
+    # direnv mode prunes a .devcontainer/ that did not pre-exist with content
+    # (#738); the preview must list the removal and leave the dir in place.
+    ws="$BATS_TEST_TMPDIR/e2e-886-direnv-prune"
+    mkdir -p "$ws/.devcontainer"
+    run _preview "$ws" --mode direnv
+    assert_success
+    assert_output --partial "DELETED"
+    assert_output --partial ".devcontainer/"
+    run test -d "$ws/.devcontainer"
+    assert_success
+}
+
+@test "init-workspace --preview works without --force on a populated tree (#886)" {
+    # install.sh forwards --preview on its own; the preview must not trip the
+    # "Workspace is not empty" refusal nor require an explicit --force.
+    ws="$BATS_TEST_TMPDIR/e2e-886-no-force"
+    mkdir -p "$ws"
+    _upgrade both "$ws"
+    run _preview "$ws" --mode both
+    assert_success
+    refute_output --partial "Workspace is not empty"
+}
+
+@test "init-workspace --preview lists template files new to the tree as ADDED (#886)" {
+    ws="$BATS_TEST_TMPDIR/e2e-886-added"
+    mkdir -p "$ws"
+    _upgrade both "$ws"
+    rm "$ws/justfile"
+    run _preview "$ws" --mode both
+    assert_success
+    assert_output --partial "ADDED"
+    assert_output --partial "justfile"
+    # ...and the preview did not scaffold it back
+    run test -e "$ws/justfile"
+    assert_failure
+}
