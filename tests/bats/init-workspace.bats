@@ -1446,3 +1446,80 @@ _upgrade_legacy() {
     assert_success
     assert_output --partial ".devcontainer/ (pre-existing"
 }
+
+# ── direnv nix-direct CI lane (#854) ──────────────────────────────────────────
+# `direnv` ships the flake + .envrc but no .devcontainer/, so its CI cannot run
+# in the container. init-workspace overlays a nix-direct ci.yml variant (like the
+# bare overlay): no resolve-image, no container jobs — the runner installs Nix
+# and drives `nix develop -c just sync|precommit|test`.
+
+@test "direnv-mode ci.yml is nix-direct: no image resolution, no container jobs (#854)" {
+    ws="$BATS_TEST_TMPDIR/e2e-direnv-ci"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    # no container/resolve-image machinery (ignore explanatory comment lines)
+    run bash -c "grep -vE '^[[:space:]]*#' '$ws/.github/workflows/ci.yml' | grep -E 'resolve-image|container:'"
+    assert_failure
+    # nix-direct: install-nix + nix develop drive the just contract
+    run grep -q 'cachix/install-nix-action' "$ws/.github/workflows/ci.yml"
+    assert_success
+    run grep -q 'nix develop -c just' "$ws/.github/workflows/ci.yml"
+    assert_success
+    # scorecard-conform: every action reference is SHA-pinned
+    run bash -c "grep 'uses:' '$ws/.github/workflows/ci.yml' | grep -vE '@[0-9a-f]{40}'"
+    assert_failure
+}
+
+@test "direnv-mode ci.yml drops the container-only env (#854)" {
+    ws="$BATS_TEST_TMPDIR/e2e-direnv-ci-env"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    run bash -c "grep -vE '^[[:space:]]*#' '$ws/.github/workflows/ci.yml' | grep -E 'PREK_HOME|UV_PROJECT_ENVIRONMENT'"
+    assert_failure
+}
+
+@test "direnv-mode ci.yml wires the prek version-skew guard (#854)" {
+    ws="$BATS_TEST_TMPDIR/e2e-direnv-ci-guard"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    run grep -q 'command -v prek' "$ws/.github/workflows/ci.yml"
+    assert_success
+}
+
+@test "prepare-release.yml uses the shared resolve-image action, no latest fallback (#854)" {
+    wf="$TEMPLATE_DIR/.github/workflows/prepare-release.yml"
+    run grep -q 'uses: ./.github/actions/resolve-image' "$wf"
+    assert_success
+    # the forked inline awk resolver + silent `latest` fallback is gone
+    run grep -q 'TAG="latest"' "$wf"
+    assert_failure
+}
+
+@test "container-mode ci.yml wires the prek version-skew guard (#854)" {
+    # The devcontainer-mode lint job must fail fast with an actionable message
+    # when the pinned image predates prek, rather than an opaque exit 127.
+    ws="$BATS_TEST_TMPDIR/e2e-container-guard"
+    mkdir -p "$ws"
+    run _scaffold devcontainer "$ws"
+    assert_success
+    run grep -q 'command -v prek' "$ws/.github/workflows/ci.yml"
+    assert_success
+}
+
+@test "direnv overlay leaves devcontainer + bare + both modes container-based (#854)" {
+    # The overlay is direnv-only: the other modes keep the container ci.yml
+    # (devcontainer/both) or the bare host-native one.
+    for mode in devcontainer both; do
+        ws="$BATS_TEST_TMPDIR/e2e-direnv-neg-$mode"
+        mkdir -p "$ws"
+        run _scaffold "$mode" "$ws"
+        assert_success
+        run grep -q 'resolve-image' "$ws/.github/workflows/ci.yml"
+        assert_success
+        run grep -q 'nix develop -c just' "$ws/.github/workflows/ci.yml"
+        assert_failure
+    done
+}
