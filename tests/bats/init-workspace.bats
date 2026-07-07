@@ -687,6 +687,33 @@ EOF
     assert_output "1"
 }
 
+@test "repair skips with a warning when the justfile graph does not parse (#877)" {
+    # A syntax error in the preserved justfile.project makes `just --show`
+    # fail for EVERY recipe, so the probe would misread all of them as
+    # missing and append duplicates on each --force run — turning a fixable
+    # parse error into hard "recipe redefined" failures. The repair must
+    # detect the broken graph, warn, and skip all appends (non-fatally).
+    ws="$BATS_TEST_TMPDIR/e2e-877-broken"
+    mkdir -p "$ws"
+    cat > "$ws/justfile.project" <<'EOF'
+# SENTINEL-877 broken consumer file: defines sync but has a syntax error
+sync:
+    @echo "SENTINEL-877-consumer-sync"
+
+this line is not valid justfile syntax
+EOF
+    run _upgrade both "$ws"
+    assert_success
+    assert_output --partial 'skipping base-recipe repair'
+    run _upgrade both "$ws"
+    assert_success
+    # nothing was appended: sync still defined exactly once, no repair banner
+    run bash -c "grep -c '^sync:' '$ws/justfile.project'"
+    assert_output "1"
+    run grep -q 'BASE RECIPES appended' "$ws/justfile.project"
+    assert_failure
+}
+
 @test "upgrade removes the retired .devcontainer/justfile.base (#877)" {
     ws="$BATS_TEST_TMPDIR/e2e-877-stale"
     mkdir -p "$ws/.devcontainer"
