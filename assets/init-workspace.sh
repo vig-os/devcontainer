@@ -370,12 +370,14 @@ PRECOMMIT_CONFIG_PREEXISTED=false
 TYPOS_CONFIG_PREEXISTED=false
 [[ -f "$WORKSPACE_DIR/.typos.toml" ]] && TYPOS_CONFIG_PREEXISTED=true
 
-# Resolve (and validate) the GitHub origin for renovate.json BEFORE the first
-# filesystem mutation (#916): under --no-prompts a missing/underivable origin
-# must abort while the workspace is still pristine, not after rsync has left a
-# half-scaffolded tree. The resolved value feeds the placeholder substitution
-# below; nothing between here and the copy depends on files being present yet.
-resolve_github_repository
+# Under --no-prompts, resolve (and validate) the GitHub origin for renovate.json
+# BEFORE the first filesystem mutation (#916): a missing/underivable origin must
+# abort while the workspace is still pristine, not after rsync has left a
+# half-scaffolded tree. In interactive mode the resolution (which prompts) stays
+# after the copy, at its original call site below, to preserve prompt ordering.
+if [[ "$NO_PROMPTS" == "true" ]]; then
+    resolve_github_repository
+fi
 
 # Copy template contents to workspace
 echo "Initializing workspace from template..."
@@ -511,6 +513,14 @@ if [[ -n "${VIG_OS_VERSION:-}" && -f "$WORKSPACE_DIR/.vig-os" ]]; then
     fi
     echo "Pinning DEVCONTAINER_VERSION=${VIG_OS_VERSION} in .vig-os..."
     sed -i "s/^DEVCONTAINER_VERSION=.*/DEVCONTAINER_VERSION=${VIG_OS_VERSION}/" "$WORKSPACE_DIR/.vig-os"
+fi
+
+# Interactive origin resolution (the renovate.json owner/repo prompt) runs here,
+# after the copy, to keep the prompt ordering consumers and the integration
+# tests expect. Under --no-prompts this already resolved before the copy (#916),
+# so this call is a no-op then (GITHUB_REPOSITORY is set).
+if [[ "$NO_PROMPTS" != "true" ]]; then
+    resolve_github_repository
 fi
 
 # Replace placeholders in files (using pre-built manifest from image)
