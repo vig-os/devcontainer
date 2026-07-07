@@ -665,9 +665,7 @@ class TestDevelopmentTools:
         assert "deprecated" in result.stderr.lower(), (
             f"shim did not print the deprecation notice: {result.stderr}"
         )
-        assert "prek" in result.stderr.lower(), (
-            "deprecation notice must point at prek"
-        )
+        assert "prek" in result.stderr.lower(), "deprecation notice must point at prek"
         assert "deprecated" not in result.stdout.lower(), (
             "deprecation notice leaked to stdout"
         )
