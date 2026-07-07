@@ -114,13 +114,13 @@ graph TB
     G --> H{Issues found?}
     H -->|Yes| I["Fix via bugfix PRs"]
     I --> G
-    H -->|No| J["Mark PR ready<br/>Get approval"]
-    J --> K["just publish-candidate X.Y.Z"]
+    H -->|No| K["just publish-candidate X.Y.Z<br/>(CI-green only, PR still draft)"]
     K --> L["Workflow: build & test<br/>(no CHANGELOG changes)"]
     L --> M["Publish X.Y.Z-rcN"]
     M --> U{External gate pass?}
     U -->|No| I
-    U -->|Yes| N["just finalize-release X.Y.Z"]
+    U -->|Yes| J["Mark PR ready<br/>Get approval"]
+    J --> N["just finalize-release X.Y.Z"]
     N --> O["Workflow: set release date<br/>build & test"]
     O --> P{Tests pass?}
     P -->|No| Q["Automatic rollback<br/>+ issue creation"]
@@ -132,7 +132,7 @@ graph TB
 ### Release Phases
 
 1. **Preparation** (`prepare-release`): Freeze CHANGELOG on dev, create release branch, reset Unreleased on dev, open draft PR
-2. **Review & Testing**: CI validation, mark PR ready, fix issues, get approvals
+2. **Review & Testing**: CI validation, fix issues, publish candidates to verify; mark PR ready and get approvals last (this is the final-release gate, not the candidate gate)
 3. **Candidate Publish** (`publish-candidate`): Build/test/publish `X.Y.Z-rcN` and dispatch cross-repo validation workflow
 4. **Cross-Repo Validation**: Smoke-test runs asynchronously after candidate and final publish; see `docs/CROSS_REPO_RELEASE_GATE.md`. Before promotion, **`promote-release.yml`** requires a published **final** (non-draft, non-prerelease) GitHub Release for the version tag on `devcontainer-smoke-test` so human acceptance downstream is reflected before `:latest` and the draft release are published.
 5. **Finalization & Post-Release**: Publish final image/tag, open a **draft** GitHub Release for human review, then merge PR to `main` and let sync automation update `dev`
@@ -215,9 +215,9 @@ Next steps:
   1. Test release: git checkout release/1.0.0
   2. Review draft PR and monitor CI
   3. Fix any issues via bugfix PRs to release/1.0.0
-  4. Mark PR as ready for review (gh pr ready <PR_NUMBER>)
-  5. Get PR approval from reviewer
-  6. Publish candidate: just publish-candidate 1.0.0
+  4. Publish candidates to verify: just publish-candidate 1.0.0 (repeat as needed)
+  5. Mark PR as ready for review (gh pr ready <PR_NUMBER>)
+  6. Get PR approval from reviewer
   7. Final release: just finalize-release 1.0.0
 ```
 
@@ -263,19 +263,21 @@ This is the main quality gate. The release branch and draft PR serve as the coor
    gh workflow run ci.yml --ref release/1.0.0
    ```
 
-3. **Mark PR as Ready for Review**
+3. **Publish Candidates to Verify** (as needed)
 
-   Once initial CI passes and CHANGELOG is reviewed:
+   Release candidates are the verification vehicle. Publish one whenever you
+   want to exercise the actual built image:
 
    ```bash
-   # Mark PR as ready for review (removes draft status)
-   gh pr ready <PR_NUMBER>
-
-   # Or via GitHub UI:
-   # Navigate to PR → Click "Ready for review" button
+   # Infers the next X.Y.Z-rcN automatically
+   just publish-candidate 1.0.0
    ```
 
-   This signals to reviewers that the release is ready for formal review.
+   Candidate dispatch gates on **CI only** — the PR may stay a draft and need
+   not be approved yet ([#902](https://github.com/vig-os/devcontainer/issues/902)).
+   RCs are disposable: auto-incrementing `rcN` tags that never touch `:latest`,
+   create no GitHub Release, and are pruned at promote. Iterate freely until the
+   image behaves as intended.
 
 4. **Local Testing** (optional)
 
@@ -325,11 +327,27 @@ This is the main quality gate. The release branch and draft PR serve as the coor
    - Address feedback
    - Iterate until approved
 
-**Iteration:** Repeat steps 4-6 until all checks pass and reviewers approve.
+7. **Mark Ready for Review & Get Approval** (gate into finalization)
+
+   Once the candidate behaves correctly and the CHANGELOG is settled, promote
+   the PR out of draft and collect approval — this is the gate the **final**
+   release enforces (candidates do not):
+
+   ```bash
+   # Removes draft status (or use the "Ready for review" button in the UI)
+   gh pr ready <PR_NUMBER>
+   ```
+
+   Because this happens last, the approval lands on the exact diff that ships,
+   not an intermediate one.
+
+**Iteration:** Repeat steps 3-6 until the candidate is verified and reviewers
+approve, then do step 7 once before finalizing.
 
 ### Phase 3: Finalization (GitHub Actions Workflow)
 
-**Prerequisites:**
+**Prerequisites** (enforced for the **final** release only; candidates in
+Phase 2 require just the first bullet):
 - All CI checks passed on `release/X.Y.Z`
 - PR marked as ready for review (not draft)
 - PR has required approvals
@@ -338,10 +356,8 @@ This is the main quality gate. The release branch and draft PR serve as the coor
 **Execute:**
 
 ```bash
-# Publish next candidate (X.Y.Z-rcN inferred automatically)
-just publish-candidate X.Y.Z
-
 # Publish final release (X.Y.Z + latest)
+# Requires at least one candidate published during Phase 2.
 just finalize-release X.Y.Z
 
 # Monitor progress
@@ -357,7 +373,7 @@ The `release.yml` workflow performs the entire remaining release process. Behavi
    - Checks release branch exists
    - Verifies CHANGELOG has `## [X.Y.Z] - TBD`
    - For **final**: allows an existing **draft** GitHub Release for the publish tag (retry path); rejects a **published** (non-draft) release for the same tag
-   - Confirms PR exists, is not draft, is approved, and CI passed
+   - Confirms PR exists and CI passed; for **final** also requires it to be not draft and approved (candidates skip the draft/approval gate — [#902](https://github.com/vig-os/devcontainer/issues/902))
    - Records pre-finalization commit for rollback
 
 2. ✅ **Finalize** job (skipped if --dry-run)
@@ -619,7 +635,7 @@ gh workflow run prepare-release.yml --ref dev -f "version=1.0.0" -f "dry-run=tru
    - Verifies release branch exists
    - Checks CHANGELOG has `[X.Y.Z] - TBD`
    - For **final**: rejects a **published** GitHub Release for the publish tag; allows an existing **draft** (retry path)
-   - Verifies PR: not draft, approved, CI passed
+   - Verifies PR: CI passed (both kinds); for **final** also not draft and approved (candidates defer the draft/approval gate — [#902](https://github.com/vig-os/devcontainer/issues/902))
    - Records pre-finalization commit for rollback
    - Outputs: PR number, release date, pre-finalization SHA, publish tag metadata
 
@@ -820,7 +836,7 @@ just finalize-release X.Y.Z
 
 #### "PR is still in draft status"
 
-**Cause:** Release PR hasn't been marked as ready for review
+**Cause:** The **final** release PR hasn't been marked as ready for review. (Candidates don't hit this — they defer the draft/approval gate; see [#902](https://github.com/vig-os/devcontainer/issues/902).)
 
 **Solution:**
 
@@ -834,7 +850,7 @@ gh pr ready <PR_NUMBER>
 
 #### "PR has not been approved"
 
-**Cause:** PR needs at least one approval
+**Cause:** The **final** release PR needs at least one approval. (Candidates don't require approval; see [#902](https://github.com/vig-os/devcontainer/issues/902).)
 
 **Solution:**
 
