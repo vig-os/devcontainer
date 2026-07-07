@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Opt-in capability modules for `mkProjectShell`** ([#884](https://github.com/vig-os/devcontainer/issues/884))
+  - `modules = [ "native" ]` composes curated capability modules (packages + env vars + shellHook fragments) onto the project dev-shell; contract recorded in `docs/rfcs/ADR-capability-modules.md`.
+  - Zero-module shells are byte-identical to the previous builder and the published image stays base-only; `extraPackages` remains the per-repo escape hatch and wins PATH lookup.
+  - `native` module ships first (`stdenv.cc`, `cmake`, `gnumake`, `pkg-config`, generic `CC`/`CXX`) — the long-term [#879](https://github.com/vig-os/devcontainer/issues/879) answer; `geant4`/`rust`/`fortran`/`root` stay ask-gated candidates.
+  - Per-module flake checks (`checks.<system>.module-<name>`) plus a uv C-extension sdist smoke test (`tests/test_flake_modules.py`).
+
 - **Preflight guard and diff preview for scaffold upgrades** ([#886](https://github.com/vig-os/devcontainer/issues/886))
   - `install.sh --force` upgrades now refuse on `main`/`dev`/`release/*`/detached HEAD and on a dirty tree, so every upgrade lands as a reviewable, revertible diff on a dedicated branch; on a protected branch with a clean tree the installer offers to create and switch to `chore/devkit-upgrade-<version>`, and non-git directories get a warn-and-confirm path. A single `--skip-preflight` flag bypasses the guard; `--smoke-test` runs and fresh installs are exempt.
   - New `--preview` mode prints the add/overwrite/preserve/delete file report (including mode-prune deletions such as the retired `.devcontainer/justfile.base`) and exits without changing any files — unlike `--dry-run`, which only prints the container command.
@@ -18,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 
 ### Removed
+
+- **`pre-commit` compat shim removed from the image** ([#897](https://github.com/vig-os/devcontainer/issues/897))
+  - The one-release-cycle `pre-commit → prek` shim shipped in 0.4.x ([#881](https://github.com/vig-os/devcontainer/issues/881)) is gone; `pre-commit` invocations now fail with exit 127.
+  - Consumers had the 0.4.x cycle to rename invocations; the upgrade-time scan still warns with `file:line` on preserved surfaces — see `docs/MIGRATION.md` for the rename checklist (justfile recipes, repo-owned `.githooks/`, CI configs → `prek`).
 
 ### Fixed
 
