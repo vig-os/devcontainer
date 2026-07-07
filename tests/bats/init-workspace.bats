@@ -977,7 +977,7 @@ EOF
     # the template .typos.toml alongside it would give two active configs.
     ws="$BATS_TEST_TMPDIR/e2e-913-legacy"
     mkdir -p "$ws"
-    printf '# SENTINEL-913 legacy typos config\n[default.extend-words]\nteh = "teh"\n' \
+    printf '# SENTINEL-913 legacy typos config\n[default.extend-words]\nmyterm = "myterm"\n' \
         >"$ws/_typos.toml"
     run _upgrade both "$ws"
     assert_success
