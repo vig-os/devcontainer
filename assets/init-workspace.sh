@@ -1,12 +1,14 @@
 #!/bin/bash
 # Initialize workspace by copying template files
 #
-# Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--mode MODE]
+# Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--preview] [--mode MODE]
 #
 # Options:
 #   --force       Overwrite existing files (for upgrades)
 #   --no-prompts  Run non-interactively (requires SHORT_NAME env var)
 #   --smoke-test  Deploy smoke-test-specific assets
+#   --preview     Print the add/overwrite/preserve/delete report an upgrade
+#                 would produce, then exit 0 without touching the tree (#886)
 #   --mode MODE   Delivery mode: devcontainer | direnv | both
 #                 devcontainer  scaffold .devcontainer/ only (no flake.nix/.envrc)
 #                 direnv        scaffold flake.nix + .envrc only (no .devcontainer/)
@@ -29,6 +31,7 @@ WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace}"
 FORCE=false
 NO_PROMPTS=false
 SMOKE_TEST=false
+PREVIEW=false
 # Delivery mode: devcontainer | direnv | both. Empty = prompt (or "both" with --no-prompts).
 MODE=""
 
@@ -90,6 +93,10 @@ while [[ $# -gt 0 ]]; do
             SMOKE_TEST=true
             shift
             ;;
+        --preview)
+            PREVIEW=true
+            shift
+            ;;
         --mode)
             MODE="$2"
             shift 2
@@ -100,7 +107,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1" >&2
-            echo "Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--mode MODE]" >&2
+            echo "Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--preview] [--mode MODE]" >&2
             exit 1
             ;;
     esac
@@ -118,6 +125,14 @@ esac
 # Smoke mode must run unattended and allow overwriting existing content.
 if [[ "$SMOKE_TEST" == "true" ]]; then
     NO_PROMPTS=true
+    FORCE=true
+fi
+
+# A preview is by definition of an upgrade (#886): ride the --force report
+# path (and pass the "workspace not empty" check) without requiring an
+# explicit --force. The preview exits right after the report, before any
+# mutation.
+if [[ "$PREVIEW" == "true" ]]; then
     FORCE=true
 fi
 
@@ -248,18 +263,62 @@ is_preserved_file() {
     return 1
 }
 
+# Record whether the consumer already had a populated .devcontainer/ before the
+# scaffold (#738). In direnv mode we must neither overwrite nor delete it.
+# Recorded before the file report below so the DELETED listing (#886) can
+# mirror the prune guards; pure reads, nothing is mutated here.
+DEVCONTAINER_PREEXISTED=false
+if [[ -d "$WORKSPACE_DIR/.devcontainer" ]] \
+    && [[ -n "$(ls -A "$WORKSPACE_DIR/.devcontainer" 2>/dev/null)" ]]; then
+    DEVCONTAINER_PREEXISTED=true
+fi
+
+# Same guard for the consumer's own nix-direnv files (#859): the
+# devcontainer-mode prune may only remove the flake stub/`.envrc` that this
+# scaffold would create, never a pre-existing setup (they are PRESERVE_FILES,
+# so rsync never overwrites them either — the prune must match).
+FLAKE_PREEXISTED=false
+[[ -f "$WORKSPACE_DIR/flake.nix" ]] && FLAKE_PREEXISTED=true
+ENVRC_PREEXISTED=false
+[[ -f "$WORKSPACE_DIR/.envrc" ]] && ENVRC_PREEXISTED=true
+
+# A preserved justfile.project may predate the 0.4.0 base-recipe relocation
+# (#877); record it so the post-scaffold repair can append what is missing.
+JUSTFILE_PROJECT_PREEXISTED=false
+[[ -f "$WORKSPACE_DIR/justfile.project" ]] && JUSTFILE_PROJECT_PREEXISTED=true
+
+# A preserved .pre-commit-config.yaml may lag the template hook stack (#878);
+# record it so the post-scaffold guard can surface the divergence.
+PRECOMMIT_CONFIG_PREEXISTED=false
+[[ -f "$WORKSPACE_DIR/.pre-commit-config.yaml" ]] && PRECOMMIT_CONFIG_PREEXISTED=true
+
 # Warn if forcing (prompt user) - show which files would be overwritten
 if [[ "$FORCE" == "true" ]]; then
     echo ""
     echo "Checking for files that would be affected..."
 
-    # Find files that exist in both template and workspace
+    # Classify how each template file lands in the workspace
     CONFLICTS=()
     PRESERVED=()
+    ADDED=()
     while IFS= read -r -d '' template_file; do
         # Get relative path from template directory
         rel_path="${template_file#"$TEMPLATE_DIR"/}"
         workspace_file="$WORKSPACE_DIR/$rel_path"
+
+        # Mode filters (#886): skip template paths the chosen delivery mode
+        # never scaffolds. direnv mode excludes .devcontainer/ from the copy
+        # entirely (#738); devcontainer mode prunes the flake.nix/.envrc stubs
+        # it would itself create — unless they pre-exist (#859), in which case
+        # they fall through to the PRESERVED listing below.
+        if [[ "$MODE" == "direnv" && "$rel_path" == .devcontainer/* ]]; then
+            continue
+        fi
+        if [[ "$MODE" == "devcontainer" ]] \
+            && [[ "$rel_path" == "flake.nix" || "$rel_path" == ".envrc" ]] \
+            && [[ ! -e "$workspace_file" ]]; then
+            continue
+        fi
 
         if [[ -e "$workspace_file" ]]; then
             if is_preserved_file "$rel_path"; then
@@ -267,8 +326,25 @@ if [[ "$FORCE" == "true" ]]; then
             else
                 CONFLICTS+=("$rel_path")
             fi
+        else
+            ADDED+=("$rel_path")
         fi
     done < <(find "$TEMPLATE_DIR" -type f ! -path "*/.git/*" -print0)
+
+    # Mode-prune deletions (#886): paths that exist right now and the upgrade
+    # would remove. Mirrors the prune guards further down (#738/#859/#877).
+    DELETIONS=()
+    if [[ "$MODE" == "direnv" ]]; then
+        if [[ -e "$WORKSPACE_DIR/.devcontainer" && "$DEVCONTAINER_PREEXISTED" != "true" ]]; then
+            DELETIONS+=(".devcontainer/")
+        fi
+    else
+        # The devcontainer-mode flake.nix/.envrc prune only removes stubs this
+        # scaffold itself creates (#859), so it never deletes an existing file.
+        if [[ -f "$WORKSPACE_DIR/.devcontainer/justfile.base" ]]; then
+            DELETIONS+=(".devcontainer/justfile.base")
+        fi
+    fi
 
     # Show preserved files
     if [[ ${#PRESERVED[@]} -gt 0 ]]; then
@@ -296,6 +372,39 @@ if [[ "$FORCE" == "true" ]]; then
         echo ""
     fi
 
+    # Show paths the mode prune would delete (#886)
+    if [[ ${#DELETIONS[@]} -gt 0 ]]; then
+        echo ""
+        echo "The following ${#DELETIONS[@]} path(s) will be DELETED:"
+        echo "─────────────────────────────────────────────────────────────"
+        for deletion in "${DELETIONS[@]}"; do
+            echo "  ✗  $deletion"
+        done
+        echo "─────────────────────────────────────────────────────────────"
+        echo ""
+    fi
+
+    # Preview mode (#886): also list the files new to the tree, then stop
+    # before anything is mutated. The ADDED listing is preview-only so the
+    # interactive --force report stays compact.
+    if [[ "$PREVIEW" == "true" ]]; then
+        if [[ ${#ADDED[@]} -eq 0 ]]; then
+            echo ""
+            echo "No new files would be added."
+        else
+            echo ""
+            echo "The following ${#ADDED[@]} file(s) will be ADDED:"
+            echo "─────────────────────────────────────────────────────────────"
+            for added in "${ADDED[@]}"; do
+                echo "  +  $added"
+            done
+            echo "─────────────────────────────────────────────────────────────"
+        fi
+        echo ""
+        echo "Preview complete — no files were changed."
+        exit 0
+    fi
+
     # Only prompt for confirmation in interactive mode
     if [[ "$NO_PROMPTS" != "true" ]]; then
         read -rp "Continue with --force? (y/N): " -n 1 -r
@@ -308,33 +417,6 @@ if [[ "$FORCE" == "true" ]]; then
         echo "Proceeding with --force (non-interactive mode)"
     fi
 fi
-
-# Record whether the consumer already had a populated .devcontainer/ before the
-# scaffold (#738). In direnv mode we must neither overwrite nor delete it.
-DEVCONTAINER_PREEXISTED=false
-if [[ -d "$WORKSPACE_DIR/.devcontainer" ]] \
-    && [[ -n "$(ls -A "$WORKSPACE_DIR/.devcontainer" 2>/dev/null)" ]]; then
-    DEVCONTAINER_PREEXISTED=true
-fi
-
-# Same guard for the consumer's own nix-direnv files (#859): the
-# devcontainer-mode prune may only remove the flake stub/`.envrc` that this
-# scaffold would create, never a pre-existing setup (they are PRESERVE_FILES,
-# so rsync never overwrites them either — the prune must match).
-FLAKE_PREEXISTED=false
-[[ -f "$WORKSPACE_DIR/flake.nix" ]] && FLAKE_PREEXISTED=true
-ENVRC_PREEXISTED=false
-[[ -f "$WORKSPACE_DIR/.envrc" ]] && ENVRC_PREEXISTED=true
-
-# A preserved justfile.project may predate the 0.4.0 base-recipe relocation
-# (#877); record it so the post-scaffold repair can append what is missing.
-JUSTFILE_PROJECT_PREEXISTED=false
-[[ -f "$WORKSPACE_DIR/justfile.project" ]] && JUSTFILE_PROJECT_PREEXISTED=true
-
-# A preserved .pre-commit-config.yaml may lag the template hook stack (#878);
-# record it so the post-scaffold guard can surface the divergence.
-PRECOMMIT_CONFIG_PREEXISTED=false
-[[ -f "$WORKSPACE_DIR/.pre-commit-config.yaml" ]] && PRECOMMIT_CONFIG_PREEXISTED=true
 
 # Copy template contents to workspace
 echo "Initializing workspace from template..."
