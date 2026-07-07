@@ -988,3 +988,53 @@ EOF
     run test -e "$ws/.typos.toml"
     assert_failure
 }
+
+# ── pre-commit reference scan must cover preserved workflows (#916) ────────────
+# The #881 scan only looked at justfile.project and .githooks/, but a consumer
+# CI workflow that still invokes the retired `pre-commit` binary breaks the same
+# way. Extend the scan to preserved .github/workflows/*.yml. A YAML `name:` step
+# description or a comment mention must NOT be flagged; only real invocations.
+
+@test "pre-commit scan flags a real invocation in a consumer workflow (#916)" {
+    ws="$BATS_TEST_TMPDIR/e2e-916-workflow-hit"
+    mkdir -p "$ws/.github/workflows"
+    # consumer-owned workflow (not in the template set) survives the rsync
+    cat > "$ws/.github/workflows/consumer-ci.yml" <<'EOF'
+name: Consumer CI
+on: [push]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      # pre-commit MENTIONONLY: migrate to prek before 0.5
+      - name: Run pre-commit hooks
+        run: uv run pre-commit run --all-files
+EOF
+    run _upgrade both "$ws"
+    assert_success
+    assert_output --partial "retired 'pre-commit' binary"
+    # the real invocation line is flagged with file:line
+    assert_output --regexp '\.github/workflows/consumer-ci\.yml:[0-9]+'
+    # neither the comment mention nor the step `name:` description is flagged
+    refute_output --partial 'MENTIONONLY'
+    refute_output --partial 'Run pre-commit hooks'
+}
+
+@test "no pre-commit warning for a workflow that only mentions it (#916)" {
+    ws="$BATS_TEST_TMPDIR/e2e-916-workflow-clean"
+    mkdir -p "$ws/.github/workflows"
+    cat > "$ws/.github/workflows/consumer-clean.yml" <<'EOF'
+name: Consumer CI
+on: [push]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      # pre-commit was replaced by prek
+      - name: Run pre-commit hooks
+        run: uv run prek run --all-files
+EOF
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial "retired 'pre-commit' binary"
+}
