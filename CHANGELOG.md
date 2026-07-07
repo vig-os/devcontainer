@@ -75,6 +75,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Renovate changelog entries land as plain `### Changed` bullets, not under `#### Modules`** ([#867](https://github.com/vig-os/devcontainer/issues/867))
   - `renovate-changelog-pr` appended entries at the bottom of the `### Changed` block, so with the `#### Modules` sub-heading convention ([#816](https://github.com/vig-os/devcontainer/issues/816)) a dependency bump was filed beneath `#### Modules` and read as a module change. Entries now insert at the top of `### Changed`, above any `####` sub-heading, with Keep-a-Changelog spacing preserved.
 
+- **Image Python advertised the phantom Nix build toolchain (`gcc`/`g++`) in sysconfig** ([#879](https://github.com/vig-os/devcontainer/issues/879))
+  - The baked CPython recorded its nixpkgs build compilers in `sysconfig` (`CC`/`CXX`/`LINKCC`/`LDSHARED`/`BLDSHARED`/`LDCXXSHARED`), but the image ships no compiler — PEP 517 backends inherited the phantom names verbatim: scikit-build-core exports `CC`/`CXX`, so CMake hard-failed on the missing `g++` instead of discovering the project-flake toolchain on `PATH`, and setuptools invoked the literal `gcc`.
+  - The image build now sanitizes the baked `_sysconfigdata*.py` / `_sysconfig_vars*.json` / config `Makefile` first tokens to the generic POSIX `cc`/`c++`, restoring `PATH` compiler discovery. Implemented as a shadow copy in the final image layer — no CPython rebuild, dev-shell toolchain untouched, and the no-compiler-baked consumer contract stands (documented via [#882](https://github.com/vig-os/devcontainer/issues/882)).
+
 ### Security
 
 ## [0.4.0](https://github.com/vig-os/devcontainer/releases/tag/0.4.0) - 2026-07-06

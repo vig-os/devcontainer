@@ -964,6 +964,56 @@
 
               contents = imageTools ++ [ bootstrap ];
 
+              # Sanitize the baked CPython's sysconfig compiler records (#879).
+              # nixpkgs' python bakes its Nix build toolchain into sysconfig
+              # (`_sysconfigdata*.py` / `_sysconfig_vars*.json` / config Makefile):
+              # CC='gcc', CXX='g++', and link commands starting with those names.
+              # The image deliberately ships no compiler (consumer contract:
+              # toolchains come from the project flake — documented via #882),
+              # so those are phantom names: PEP 517 backends inherit them
+              # verbatim — scikit-build-core exports CC/CXX into the
+              # environment, making CMake hard-fail on the missing 'g++'
+              # instead of doing PATH discovery, and setuptools invokes the
+              # literal 'gcc'. Rewriting the first tokens to the generic POSIX
+              # 'cc'/'c++' restores PATH discovery against whatever toolchain
+              # the project provides (and yields an honest "no compiler found"
+              # when none does).
+              #
+              # Mechanism: a last-layer shadow copy, not a CPython rebuild.
+              # fakeRootCommands runs in the image-root staging dir, so files
+              # created under ./nix/store/<python>/... are tarred into the
+              # customisation layer (ordered last) and override the python
+              # layer's copies at container runtime; the dev-shell toolchain
+              # and every python-dependent derivation stay fully cached. The
+              # python layer's stale `_sysconfigdata*.pyc` are hash-based
+              # (CHECKED_HASH), so the interpreter detects the changed source
+              # and recompiles instead of serving the old values. Note
+              # `enableFakechroot` can NOT do this: its layer tar excludes
+              # ./nix/store. Deterministic (fixed sed over fixed input), so
+              # digest reproducibility is preserved.
+              fakeRootCommands = ''
+                pylib=${python}/lib/python${python.pythonVersion}
+                shadow=.$pylib
+                mkdir -p "$shadow"
+                cp "$pylib"/_sysconfigdata__*.py "$pylib"/_sysconfig_vars__*.json "$shadow/"
+                cfg="$(basename "$pylib"/config-*)"
+                mkdir -p "$shadow/$cfg"
+                cp "$pylib/$cfg/Makefile" "$shadow/$cfg/"
+                chmod -R u+w "$shadow"
+                sed -i -E \
+                  -e "s/'(CC|LINKCC|LDSHARED|BLDSHARED)': 'gcc(['[:space:]])/'\1': 'cc\2/" \
+                  -e "s/'(CXX|LDCXXSHARED)': 'g\+\+(['[:space:]])/'\1': 'c++\2/" \
+                  "$shadow"/_sysconfigdata__*.py
+                sed -i -E \
+                  -e 's/"(CC|LINKCC|LDSHARED|BLDSHARED)": "gcc(["[:space:]])/"\1": "cc\2/' \
+                  -e 's/"(CXX|LDCXXSHARED)": "g\+\+(["[:space:]])/"\1": "c++\2/' \
+                  "$shadow"/_sysconfig_vars__*.json
+                sed -i -E \
+                  -e 's/^(CC=[[:space:]]*)gcc$/\1cc/' \
+                  -e 's/^(CXX=[[:space:]]*)g\+\+$/\1c++/' \
+                  "$shadow/$cfg/Makefile"
+              '';
+
               # Deterministic epoch timestamp keeps the digest reproducible.
               created = "1970-01-01T00:00:00Z";
 
