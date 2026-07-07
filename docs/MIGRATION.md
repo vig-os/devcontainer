@@ -39,6 +39,12 @@ one of four modes:
 - **`direnv`** — a minimal `flake.nix` + `.envrc` stub. `direnv allow` (or
   `nix develop`) drops you into the shared toolchain on the host, no container.
   The stub is never overwritten on re-scaffold; update with `nix flake update`.
+  The shipped `ci.yml` is a **nix-direct** variant
+  ([#854](https://github.com/vig-os/devcontainer/issues/854)): no image
+  resolution and no in-container jobs — the runner installs Nix (with the vig-os
+  Cachix substituter) and drives the same `just sync` / `just precommit` /
+  `just test` contract inside the flake dev-shell via `nix develop -c`. See
+  [direnv-mode CI](#direnv-mode-ci) for the supported boundary.
 - **`both`** — everything above (the default).
 - **`bare`** — the standards layer only
   ([#885](https://github.com/vig-os/devcontainer/issues/885)): justfiles,
@@ -51,6 +57,30 @@ one of four modes:
 
 The chosen mode is persisted as `DEVKIT_MODE` in the `.vig-os` manifest (below),
 so upgrades never need `--mode` again.
+
+### direnv-mode CI
+
+`direnv` (and `bare`) consumers cannot run the container-based CI: with no
+`.devcontainer/`, a `.vig-os`-driven `resolve-image` job hard-fails and bricks
+every workflow that runs `container: ghcr.io/vig-os/devcontainer:<pin>`. To keep
+the main lane working, `direnv` mode ships a **nix-direct `ci.yml`** overlay
+([#854](https://github.com/vig-os/devcontainer/issues/854)) that runs on the host
+runner (`install-nix` + Cachix → `nix develop -c just sync|precommit|test`),
+mirroring this repo's own project-checks job.
+
+**Supported boundary (until the devkit rename cycle,
+[#781](https://github.com/vig-os/devcontainer/issues/781), completes the full
+workflow audit):** only `ci.yml` is converted for direnv mode. These shipped
+workflows stay **container-based and devcontainer-mode-only**, so a direnv-only
+consumer should delete or disable them (they still work unchanged in
+`both`/`devcontainer` mode):
+
+- `prepare-release.yml`, `promote-release.yml`, `release*.yml`,
+  `sync-issues.yml`, `renovate-changelog-build.yml`, `sync-main-to-dev.yml`
+  — all resolve/consume the pinned image via `.vig-os`.
+
+Container-independent workflows keep working in every mode: `codeql.yml`,
+`scorecard.yml`, `renovate-changelog-commit.yml`, `release-extension.yml`.
 
 ## The `.vig-os` project manifest
 
@@ -392,7 +422,12 @@ re-scaffold:
    scan warnings before committing. While editing old `.githooks`
    scripts, also change `#!/bin/bash` shebangs to `#!/usr/bin/env bash`:
    `/bin/bash` does not exist on NixOS hosts, so those hooks fail outside
-   the container even after the rename.
+   the container even after the rename. In CI, the reverse skew (an old scaffold
+   still calling `pre-commit` against a new image, or a new scaffold on an image
+   too old to ship `prek`) now surfaces as a one-line `::error::` from the
+   `Verify toolchain (prek present)` guard step in the shipped `ci.yml` lint job
+   ([#854](https://github.com/vig-os/devcontainer/issues/854)), instead of an
+   opaque `exit 127` deep in the `just precommit` log.
 4. **Recipe renames** — the managed base recipes are now `devc-*`-namespaced
    and the template test recipe is `just test` (formerly `just test-pytest`).
    Run `just --list` once and update any scripts/muscle memory.
