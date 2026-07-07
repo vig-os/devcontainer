@@ -73,7 +73,10 @@ How it behaves:
 - **Precedence:** explicit flag/env > `.vig-os` value > prompt/default. The
   resolved values are written back on every (re)scaffold, so a manifest-bearing
   repo upgrades with `install.sh --force` and **no mode/identity flags** while
-  keeping its shape and names.
+  keeping its shape and names. Note the behavior change: environment variables
+  such as `SHORT_NAME` and `ORG_NAME` now suppress the corresponding
+  interactive prompts entirely — the prompt only appears when neither a
+  flag/env value nor a manifest value resolves the key.
 - **Legacy consumers** (version-only `.vig-os`, or none) get their mode
   inferred conservatively on upgrade from the tree shape: a populated
   `.devcontainer/` plus `flake.nix`/`.envrc` widens to `both` (ambiguity always
