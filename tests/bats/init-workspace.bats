@@ -906,3 +906,29 @@ EOF
     assert_success
     refute_output --partial "retired 'pre-commit' binary"
 }
+
+# ── preserved-file diff preview must use git, not diff(1) (#916) ──────────────
+# The image ships git but no diff(1)/cmp(1); the #878 preview called `diff`,
+# which prints "diff: command not found" and an empty box in-container. Render
+# the divergence with `git diff --no-index` (its --quiet form gates the block;
+# --no-index exits 1 when files differ, which is the expected signal).
+
+@test "preserved-file diff preview uses git diff --no-index, not diff(1)/cmp(1) (#916)" {
+    run grep -nE 'git diff --no-index' "$INIT_WORKSPACE_SH"
+    assert_success
+    # no bare diff(1) or cmp(1) invocation survives (both absent from the image)
+    run grep -nE '(^|[[:space:]])(diff|cmp)[[:space:]]+-' "$INIT_WORKSPACE_SH"
+    assert_failure
+}
+
+@test "preserved .pre-commit-config.yaml diff preview renders real content, not 'command not found' (#916)" {
+    ws="$BATS_TEST_TMPDIR/e2e-916-gitdiff"
+    mkdir -p "$ws"
+    _custom_precommit_config "$ws"
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial 'command not found'
+    assert_output --partial 'Preserved .pre-commit-config.yaml differs from the template'
+    # a real hunk line from the template the preserved file lacks
+    assert_output --partial 'default_language_version'
+}
