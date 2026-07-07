@@ -70,13 +70,21 @@ def _run_nix(args: list[str], timeout: int = 600) -> subprocess.CompletedProcess
     )
 
 
+# The only top-level keys the flake render emits. Anything else in a
+# committed YAML (e.g. a hand-added ``fail_fast: true``) is drift the
+# per-hook comparison would silently miss, so _normalize surfaces it.
+KNOWN_TOP_LEVEL_KEYS = frozenset({"exclude", "default_language_version", "repos"})
+
+
 def _normalize(config: dict[str, Any]) -> dict[str, Any]:
     """Flatten a pre-commit config into comparable, order-independent data.
 
-    Returns ``{"exclude", "default_language_version", "hooks"}`` where
-    ``hooks`` maps each hook id to its full dict (plus the owning ``repo`` and
-    ``rev``), so repo-block grouping and ordering differences between the
-    committed YAML and the flake render never mask (or fake) a real drift.
+    Returns ``{"exclude", "default_language_version", "unexpected_top_level",
+    "hooks"}`` where ``hooks`` maps each hook id to its full dict (plus the
+    owning ``repo`` and ``rev``), so repo-block grouping and ordering
+    differences between the committed YAML and the flake render never mask
+    (or fake) a real drift, and ``unexpected_top_level`` lists any top-level
+    key outside the rendered schema.
     """
     hooks: dict[str, Any] = {}
     for repo_block in config.get("repos", []):
@@ -91,6 +99,7 @@ def _normalize(config: dict[str, Any]) -> dict[str, Any]:
     return {
         "exclude": config.get("exclude"),
         "default_language_version": config.get("default_language_version"),
+        "unexpected_top_level": sorted(set(config) - KNOWN_TOP_LEVEL_KEYS),
         "hooks": hooks,
     }
 
@@ -98,7 +107,7 @@ def _normalize(config: dict[str, Any]) -> dict[str, Any]:
 def _diff_hooks(rendered: dict[str, Any], committed: dict[str, Any]) -> str:
     """Human-readable normalized diff (empty string == no drift)."""
     lines: list[str] = []
-    for key in ("exclude", "default_language_version"):
+    for key in ("exclude", "default_language_version", "unexpected_top_level"):
         if rendered[key] != committed[key]:
             lines.append(
                 f"{key}: rendered={rendered[key]!r} committed={committed[key]!r}"
@@ -135,6 +144,13 @@ def rendered_portable() -> dict[str, Any]:
 
 class TestPortableRenderFidelity:
     """The one Nix definition renders exactly the committed YAML artifacts."""
+
+    def test_normalize_flags_unexpected_top_level_keys(self) -> None:
+        """A hand-added top-level key (e.g. fail_fast) cannot pass unnoticed."""
+        sneaky = {"repos": [], "fail_fast": True}
+        clean = {"repos": []}
+        assert _normalize(sneaky)["unexpected_top_level"] == ["fail_fast"]
+        assert _diff_hooks(_normalize(clean), _normalize(sneaky)) != ""
 
     def test_runner_render_matches_committed_config(
         self, rendered_portable: dict[str, Any]
@@ -209,6 +225,26 @@ def consumer_config() -> dict[str, Any]:
     return yaml.safe_load(Path(result.stdout.strip()).read_text())
 
 
+@pytest.fixture(scope="module")
+def opted_in_shellhook() -> str:
+    """The shellHook of a minimally opted-in (``hooks = { }``) shell."""
+    expr = f"""
+    let
+      flake = builtins.getFlake "path:{REPO_ROOT}";
+      system = builtins.currentSystem;
+      pkgs = import flake.inputs.nixpkgs {{ inherit system; }};
+      shell = flake.lib.mkProjectShell {{
+        inherit pkgs;
+        hooks = {{ }};
+      }};
+    in
+    shell.shellHook
+    """
+    result = _run_nix(["eval", "--impure", "--raw", "--expr", expr])
+    assert result.returncode == 0, result.stderr
+    return result.stdout
+
+
 class TestConsumerHooksSurface:
     """mkProjectShell's ``hooks`` / ``hooksExcludes`` consumer surface."""
 
@@ -277,20 +313,29 @@ class TestZeroHooksParity:
         assert ".pre-commit-config.yaml" not in result.stdout
         assert "git-hooks.nix" not in result.stdout
 
-    def test_opted_in_shellhook_installs_config(self) -> None:
-        """Opting in wires the git-hooks.nix installation script into shellHook."""
-        expr = f"""
-        let
-          flake = builtins.getFlake "path:{REPO_ROOT}";
-          system = builtins.currentSystem;
-          pkgs = import flake.inputs.nixpkgs {{ inherit system; }};
-          shell = flake.lib.mkProjectShell {{
-            inherit pkgs;
-            hooks = {{ }};
-          }};
-        in
-        shell.shellHook
+    def test_opted_in_shellhook_installs_config(
+        self, opted_in_shellhook: str
+    ) -> None:
+        """Opting in wires the config installation into the shellHook.
+
+        The refuse-to-overwrite semantics (#878) must survive: a regular
+        (non-symlink) ``.pre-commit-config.yaml`` is never clobbered.
         """
-        result = _run_nix(["eval", "--impure", "--raw", "--expr", expr])
-        assert result.returncode == 0, result.stderr
-        assert ".pre-commit-config.yaml" in result.stdout
+        assert ".pre-commit-config.yaml" in opted_in_shellhook
+        assert "Refusing" in opted_in_shellhook
+
+    def test_opted_in_shellhook_never_rewires_hookspath(
+        self, opted_in_shellhook: str
+    ) -> None:
+        """Opting in must not touch ``core.hooksPath`` or ``.git/hooks``.
+
+        The scaffold's ``.githooks`` directory stays the single hook entry
+        point (its sanctioned-environment guard and any consumer-owned
+        scripts keep running); the generated config is picked up by
+        ``.githooks/pre-commit``'s ``prek run`` via the repo-root symlink.
+        PR #908 review defect: git-hooks.nix's stock installation script
+        unset/reset ``core.hooksPath`` and installed only the pre-commit
+        stage into ``.git/hooks``, silently bypassing ``.githooks``.
+        """
+        assert "core.hooksPath" not in opted_in_shellhook
+        assert "uninstall" not in opted_in_shellhook
