@@ -248,6 +248,29 @@ is_preserved_file() {
     return 1
 }
 
+# Preview the template-vs-preserved divergence for a preserved consumer file
+# (#878, #913). A preserved file never receives template evolution
+# automatically, so surface the diff for the consumer to fold in deliberately.
+# The image ships git but no diff(1)/cmp(1) (#916): use `git diff --no-index`,
+# whose --quiet form gates the block and which exits 1 (the expected "they
+# diverged" signal, not an error) when the files differ. Returns 0 when a diff
+# was printed (files differ), 1 when identical or either file is missing.
+print_preserved_template_diff() {
+    local rel="$1"
+    local preserved="$WORKSPACE_DIR/$rel"
+    local template="$TEMPLATE_DIR/$rel"
+    [[ -f "$preserved" && -f "$template" ]] || return 1
+    if git diff --no-index --quiet -- "$template" "$preserved" > /dev/null 2>&1; then
+        return 1  # identical: nothing to surface
+    fi
+    echo "Preserved $rel differs from the template (yours was kept)."
+    echo "Template changes NOT applied (fold in what you need, see MIGRATION.md):"
+    echo "─────────────────────────────────────────────────────────────"
+    git diff --no-index -- "$template" "$preserved" || true
+    echo "─────────────────────────────────────────────────────────────"
+    return 0
+}
+
 # Warn if forcing (prompt user) - show which files would be overwritten
 if [[ "$FORCE" == "true" ]]; then
     echo ""
@@ -571,17 +594,8 @@ fi
 # template so consumers can fold in what they need deliberately, and gate the
 # preserved file through `prek validate-config` — a config the runner cannot
 # load breaks every commit in the new image. Both are warnings, never fatal.
-if [[ "$PRECOMMIT_CONFIG_PREEXISTED" == "true" \
-    && -f "$WORKSPACE_DIR/.pre-commit-config.yaml" \
-    && -f "$TEMPLATE_DIR/.pre-commit-config.yaml" ]] \
-    && ! diff -q "$TEMPLATE_DIR/.pre-commit-config.yaml" \
-        "$WORKSPACE_DIR/.pre-commit-config.yaml" > /dev/null 2>&1; then
-    echo "Preserved .pre-commit-config.yaml differs from the template (yours was kept, #878)."
-    echo "Template changes NOT applied (fold in what you need, see MIGRATION.md):"
-    echo "─────────────────────────────────────────────────────────────"
-    diff -u "$WORKSPACE_DIR/.pre-commit-config.yaml" \
-        "$TEMPLATE_DIR/.pre-commit-config.yaml" || true
-    echo "─────────────────────────────────────────────────────────────"
+if [[ "$PRECOMMIT_CONFIG_PREEXISTED" == "true" ]] \
+    && print_preserved_template_diff ".pre-commit-config.yaml"; then
     if command -v prek > /dev/null 2>&1; then
         if ! (cd "$WORKSPACE_DIR" && prek validate-config .pre-commit-config.yaml > /dev/null 2>&1); then
             echo "Warning: preserved .pre-commit-config.yaml does not validate under prek (#878)." >&2

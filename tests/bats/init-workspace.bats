@@ -916,8 +916,9 @@ EOF
 @test "preserved-file diff preview uses git diff --no-index, not diff(1)/cmp(1) (#916)" {
     run grep -nE 'git diff --no-index' "$INIT_WORKSPACE_SH"
     assert_success
-    # no bare diff(1) or cmp(1) invocation survives (both absent from the image)
-    run grep -nE '(^|[[:space:]])(diff|cmp)[[:space:]]+-' "$INIT_WORKSPACE_SH"
+    # no bare diff(1) short-flag or cmp(1) invocation survives (both absent from
+    # the image); `git diff --no-index` (long flags) is the sanctioned form.
+    run grep -nE '(^|[[:space:]])diff -[a-z]|(^|[[:space:]])cmp[[:space:]]' "$INIT_WORKSPACE_SH"
     assert_failure
 }
 
