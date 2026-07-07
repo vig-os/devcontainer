@@ -1307,7 +1307,9 @@ _upgrade_legacy() {
     mkdir -p "$stub"
     printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
     chmod +x "$stub/just"
-    run env PATH="$stub:$PATH" \
+    # `env -u GITHUB_REPOSITORY`: GitHub Actions exports the variable
+    # globally, which would satisfy the resolver in CI and mask the abort.
+    run env -u GITHUB_REPOSITORY PATH="$stub:$PATH" \
         TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
         WORKSPACE_DIR="$ws" \
         SHORT_NAME=testproj \
