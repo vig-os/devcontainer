@@ -13,14 +13,23 @@
 #                 devcontainer  scaffold .devcontainer/ only (no flake.nix/.envrc)
 #                 direnv        scaffold flake.nix + .envrc only (no .devcontainer/)
 #                 both          scaffold everything (default)
-#                 Unset: prompt interactively, or default to "both" with --no-prompts
+#                 Unset: read DEVKIT_MODE from the workspace .vig-os manifest,
+#                 else prompt interactively / default to "both" with --no-prompts
 #
 # Environment variables (used with --no-prompts):
-#   SHORT_NAME           - Project short name (required)
-#   ORG_NAME             - Organization name (optional, defaults to "vigOS/devc")
-#   GITHUB_REPOSITORY    - owner/repo for Renovate preset extends (optional if origin is github.com)
+#   SHORT_NAME           - Project short name (required unless the workspace
+#                          .vig-os persists DEVKIT_PROJECT, #885)
+#   ORG_NAME             - Organization name (optional, defaults to DEVKIT_ORG
+#                          from .vig-os, else "vigOS/devc")
+#   GITHUB_REPOSITORY    - owner/repo for Renovate preset extends (optional if
+#                          persisted as DEVKIT_REPO or origin is github.com)
 #   VIG_OS_VERSION       - Override the DEVCONTAINER_VERSION pinned in the scaffolded
 #                          .vig-os (optional; install.sh forwards its --version, #852)
+#
+# The workspace .vig-os is the project's declarative manifest (#885): the
+# delivery mode and identity resolved by this script are written back to it,
+# so upgrades of a manifest-bearing repo are non-interactive and
+# shape-preserving with no flags. Precedence: flag/env > .vig-os > prompt/default.
 
 set -euo pipefail
 
@@ -175,14 +184,105 @@ if ! is_workspace_empty && [[ "$FORCE" != "true" ]]; then
     exit 1
 fi
 
-# Get SHORT_NAME - from env var or prompt
+# ── .vig-os project manifest (#885) ───────────────────────────────────────────
+# The workspace .vig-os persists the delivery mode, identity, and (reserved)
+# capability modules. Read it before any prompt/default so a manifest-bearing
+# repo (re)scaffolds its own shape; precedence stays flag/env > .vig-os >
+# prompt/default. Same tolerant line-based parsing as every other consumer
+# (unknown keys ignored, quotes stripped).
+
+VIG_OS_MANIFEST="$WORKSPACE_DIR/.vig-os"
+
+# Print the value of manifest key $2 in file $1; return 1 when absent.
+read_manifest_value() {
+    local file="$1" key="$2" line value
+    [[ -f "$file" ]] || return 1
+    while IFS= read -r line || [[ -n "${line:-}" ]]; do
+        [[ -z "${line//[[:space:]]/}" ]] && continue
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        case "$line" in
+            "$key"=*)
+                value="${line#*=}"
+                value="${value#"${value%%[![:space:]]*}"}"
+                value="${value%"${value##*[![:space:]]}"}"
+                if [[ "$value" =~ ^\".*\"$ ]]; then
+                    value="${value:1:-1}"
+                elif [[ "$value" =~ ^\'.*\'$ ]]; then
+                    value="${value:1:-1}"
+                fi
+                [[ -n "$value" ]] || return 1
+                echo "$value"
+                return 0
+                ;;
+        esac
+    done < "$file"
+    return 1
+}
+
+# Persist manifest key $1 with value $2 in the scaffolded .vig-os: replace the
+# existing line, or append it (self-documenting upgrade of a legacy
+# version-only file). Same sed pattern as the #852 version pin.
+write_manifest_value() {
+    local key="$1" value="$2" value_escaped
+    [[ -f "$VIG_OS_MANIFEST" ]] || return 0
+    if grep -q "^${key}=" "$VIG_OS_MANIFEST"; then
+        value_escaped=$(printf '%s\n' "$value" | sed 's/[&/\]/\\&/g')
+        sed -i "s/^${key}=.*/${key}=${value_escaped}/" "$VIG_OS_MANIFEST"
+    else
+        printf '%s=%s\n' "$key" "$value" >> "$VIG_OS_MANIFEST"
+    fi
+}
+
+MANIFEST_MODE="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_MODE || true)"
+MANIFEST_PROJECT="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_PROJECT || true)"
+MANIFEST_ORG="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_ORG || true)"
+MANIFEST_REPO="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_REPO || true)"
+MANIFEST_MODULES="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_MODULES || true)"
+
+# The OWNER/REPO placeholder (written when no origin was resolvable) must not
+# mask a now-detectable git origin on a later upgrade.
+[[ "$MANIFEST_REPO" == "OWNER/REPO" ]] && MANIFEST_REPO=""
+
+# A corrupt persisted mode must not silently fall back to "both" — that would
+# reshape the repo. Refuse loudly instead.
+case "$MANIFEST_MODE" in
+    ""|devcontainer|direnv|both) ;;
+    *)
+        echo "Error: Invalid DEVKIT_MODE in $VIG_OS_MANIFEST: $MANIFEST_MODE (expected: devcontainer | direnv | both)" >&2
+        exit 1
+        ;;
+esac
+
+# Mode switching is destructive (e.g. both -> direnv deletes .devcontainer/)
+# and owned by the upgrade-guard flow — it must never happen implicitly. An
+# explicit --mode that contradicts the persisted DEVKIT_MODE refuses;
+# --preview stays available as the way to inspect a would-be switch first.
+# (--smoke-test redeploys a CI checkout from scratch and is exempt.)
+if [[ -n "$MODE" && -n "$MANIFEST_MODE" && "$MODE" != "$MANIFEST_MODE" \
+    && "$PREVIEW" != "true" && "$SMOKE_TEST" != "true" ]]; then
+    echo "Error: requested --mode $MODE contradicts the persisted DEVKIT_MODE=$MANIFEST_MODE in .vig-os." >&2
+    echo "" >&2
+    echo "Mode switching reshapes the workspace and never happens implicitly:" >&2
+    echo "  1. Inspect the would-be change first:  init-workspace --preview --mode $MODE" >&2
+    echo "  2. Keep the persisted mode by omitting --mode, or" >&2
+    echo "  3. Switch deliberately: set DEVKIT_MODE=$MODE in .vig-os on a dedicated," >&2
+    echo "     clean upgrade branch (see the upgrade preflight guard in MIGRATION.md)" >&2
+    echo "     and re-run the upgrade." >&2
+    exit 1
+fi
+
+# Get SHORT_NAME - from env var, manifest, or prompt (#885)
+if [[ -z "${SHORT_NAME:-}" && -n "$MANIFEST_PROJECT" ]]; then
+    SHORT_NAME="$MANIFEST_PROJECT"
+    echo "Project short name from .vig-os manifest: $SHORT_NAME"
+fi
 if [[ "$NO_PROMPTS" == "true" ]]; then
-    # Non-interactive mode: require SHORT_NAME env var
+    # Non-interactive mode: require SHORT_NAME (env var or persisted manifest)
     if [[ -z "${SHORT_NAME:-}" ]]; then
         echo "Error: SHORT_NAME environment variable is required with --no-prompts" >&2
         exit 1
     fi
-else
+elif [[ -z "${SHORT_NAME:-}" ]]; then
     # Interactive mode: prompt user
     read -rp "Enter a short name for your project (letters/numbers only, e.g. my_proj): " SHORT_NAME
     if [[ -z "$SHORT_NAME" ]]; then
@@ -197,11 +297,15 @@ SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/__*/_/g' | sed 's/^[^a-z0-9]*//; s/[^a-
 SHORT_NAME="${SHORT_NAME:-project}"
 echo "Project short name set to: $SHORT_NAME"
 
-# Get ORG_NAME - from env var, default, or prompt
+# Get ORG_NAME - from env var, manifest, default, or prompt (#885)
+if [[ -z "${ORG_NAME:-}" && -n "$MANIFEST_ORG" ]]; then
+    ORG_NAME="$MANIFEST_ORG"
+    echo "Organization name from .vig-os manifest: $ORG_NAME"
+fi
 if [[ "$NO_PROMPTS" == "true" ]]; then
-    # Non-interactive mode: use env var or default
+    # Non-interactive mode: use env var/manifest or default
     ORG_NAME="${ORG_NAME:-vigOS/devc}"
-else
+elif [[ -z "${ORG_NAME:-}" ]]; then
     # Interactive mode: prompt user
     read -rp "Enter the name of your organization, e.g. 'vigOS': " ORG_NAME
     if [[ -z "$ORG_NAME" ]]; then
@@ -211,8 +315,14 @@ else
 fi
 echo "Organization name set to: $ORG_NAME"
 
-# Get MODE - from flag, prompt, or default. Selects which delivery the workspace
-# scaffolds: a devcontainer, the Nix/direnv stub, or both.
+# Get MODE - from flag, manifest, prompt, or default (#885). Selects which
+# delivery the workspace scaffolds: a devcontainer, the Nix/direnv stub, or
+# both. Smoke-test deploys ignore the manifest: they redeploy the full
+# template over a CI checkout regardless of the checked-in mode.
+if [[ -z "$MODE" && -n "$MANIFEST_MODE" && "$SMOKE_TEST" != "true" ]]; then
+    MODE="$MANIFEST_MODE"
+    echo "Delivery mode from .vig-os manifest: $MODE"
+fi
 if [[ -z "$MODE" ]]; then
     if [[ "$NO_PROMPTS" == "true" ]] || [[ ! -t 0 ]]; then
         # Non-interactive (--no-prompts, or no TTY: CI / piped stdin): default to
@@ -535,6 +645,14 @@ if [[ -n "${VIG_OS_VERSION:-}" && -f "$WORKSPACE_DIR/.vig-os" ]]; then
     sed -i "s/^DEVCONTAINER_VERSION=.*/DEVCONTAINER_VERSION=${VIG_OS_VERSION}/" "$WORKSPACE_DIR/.vig-os"
 fi
 
+# Persisted DEVKIT_REPO fills GITHUB_REPOSITORY when the env var is absent or
+# still the OWNER/REPO placeholder (#885); an explicit env value wins.
+if [[ -z "${GITHUB_REPOSITORY:-}" || "${GITHUB_REPOSITORY:-}" == "OWNER/REPO" ]] \
+    && [[ -n "$MANIFEST_REPO" ]]; then
+    GITHUB_REPOSITORY="$MANIFEST_REPO"
+    echo "GitHub repository from .vig-os manifest: $GITHUB_REPOSITORY"
+fi
+
 resolve_github_repository
 
 # Replace placeholders in files (using pre-built manifest from image)
@@ -565,6 +683,22 @@ else
             sed -i "s/{{SHORT_NAME}}/${SHORT_NAME_ESCAPED}/g; s/{{ORG_NAME}}/${ORG_NAME_ESCAPED}/g; s/{{GITHUB_REPOSITORY}}/${GITHUB_REPOSITORY_ESCAPED}/g" "$file"
         fi
     done
+fi
+
+# Persist the resolved manifest (#885). The scaffolded .vig-os is a managed
+# file (template-overwritten on upgrade), so the resolved delivery mode and
+# identity are written back on every (re)scaffold — the next upgrade then
+# needs no mode/identity flags at all. A consumer's DEVKIT_MODULES
+# declaration (#884, read before the template overwrite) is restored too.
+if [[ -f "$VIG_OS_MANIFEST" ]]; then
+    echo "Persisting resolved manifest values in .vig-os..."
+    write_manifest_value DEVKIT_MODE "$MODE"
+    write_manifest_value DEVKIT_PROJECT "$SHORT_NAME"
+    write_manifest_value DEVKIT_ORG "$ORG_NAME"
+    write_manifest_value DEVKIT_REPO "$GITHUB_REPOSITORY"
+    if [[ -n "$MANIFEST_MODULES" ]]; then
+        write_manifest_value DEVKIT_MODULES "\"$MANIFEST_MODULES\""
+    fi
 fi
 
 # Rename template_project directory to match project short name
