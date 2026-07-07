@@ -13,7 +13,7 @@
 #   --name NAME       Override project name (SHORT_NAME)
 #   --org ORG         Override organization name (default: vigOS)
 #   --repo OWNER/REPO GitHub repo for Renovate preset (default: detect from origin or OWNER/REPO)
-#   --mode MODE       Delivery mode: devcontainer | direnv | both (default: prompt, both non-interactively)
+#   --mode MODE       Delivery mode: devcontainer | direnv | both | bare (default: .vig-os manifest, prompt, or both)
 #   --smoke-test      Deploy smoke-test-specific assets
 #   --preview         Print the add/overwrite/preserve/delete file report for an
 #                     upgrade and exit without changing anything
@@ -78,8 +78,9 @@ OPTIONS:
     --name NAME       Override project name (SHORT_NAME, used for module name)
     --org ORG         Override organization name (default: vigOS)
     --repo OWNER/REPO GitHub repository for Renovate (default: git origin or OWNER/REPO)
-    --mode MODE       Delivery mode: devcontainer | direnv | both
-                      (default: prompt interactively; "both" non-interactively)
+    --mode MODE       Delivery mode: devcontainer | direnv | both | bare
+                      (default: DEVKIT_MODE from the target's .vig-os manifest,
+                      else prompt interactively / "both" non-interactively)
     --smoke-test      Deploy smoke-test-specific assets
     --preview         Preview an upgrade: print the add/overwrite/preserve/delete
                       file report and exit without changing any files
@@ -465,11 +466,11 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# Validate delivery mode (empty = let init-workspace.sh prompt / default to both)
+# Validate delivery mode (empty = .vig-os manifest, else init-workspace.sh prompt/default)
 case "$MODE" in
-    ""|devcontainer|direnv|both) ;;
+    ""|devcontainer|direnv|both|bare) ;;
     *)
-        err "Invalid --mode: $MODE (expected: devcontainer | direnv | both)"
+        err "Invalid --mode: $MODE (expected: devcontainer | direnv | both | bare)"
         usage
         exit 1
         ;;
@@ -522,7 +523,7 @@ MANIFEST_REPO="$(read_manifest_value "$PROJECT_PATH/.vig-os" DEVKIT_REPO || true
 [ "$MANIFEST_REPO" = "OWNER/REPO" ] && MANIFEST_REPO=""
 
 case "$MANIFEST_MODE" in
-    ""|devcontainer|direnv|both) ;;
+    ""|devcontainer|direnv|both|bare) ;;
     *)
         err "Invalid DEVKIT_MODE in $PROJECT_PATH/.vig-os: $MANIFEST_MODE"
         exit 1
@@ -779,11 +780,11 @@ info "Running post-initialization setup..."
 
 # 1. Copy host user configuration (git, ssh, gh) into .devcontainer/.conf/
 # Non-fatal: warnings about missing SSH keys or GH CLI are expected on CI/fresh machines.
-# direnv mode scaffolds no .devcontainer/, so the host-user-conf step (a
-# devcontainer-only concern) does not apply — skip it rather than emit a
-# misleading "script not found" warning (#738).
-if [ "$MODE" = "direnv" ]; then
-    info "direnv mode: skipping host user-conf copy (no .devcontainer/)"
+# direnv and bare modes scaffold no .devcontainer/, so the host-user-conf step
+# (a devcontainer-only concern) does not apply — skip it rather than emit a
+# misleading "script not found" warning (#738, #885).
+if [ "$MODE" = "direnv" ] || [ "$MODE" = "bare" ]; then
+    info "$MODE mode: skipping host user-conf copy (no .devcontainer/)"
 else
     run_user_conf "$PROJECT_PATH" || true
 fi
@@ -869,5 +870,9 @@ success "Devcontainer deployed to $PROJECT_PATH"
 echo ""
 echo "Next steps:"
 echo "  1. cd $PROJECT_PATH"
-echo "  2. Open in VS Code - it will detect .devcontainer/ and offer to reopen in container"
+if [ "$MODE" = "bare" ]; then
+    echo "  2. Run 'just help' to list the shipped recipes (host-native: no container)"
+else
+    echo "  2. Open in VS Code - it will detect .devcontainer/ and offer to reopen in container"
+fi
 echo ""

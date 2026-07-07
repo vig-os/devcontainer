@@ -9,10 +9,12 @@
 #   --smoke-test  Deploy smoke-test-specific assets
 #   --preview     Print the add/overwrite/preserve/delete report an upgrade
 #                 would produce, then exit 0 without touching the tree (#886)
-#   --mode MODE   Delivery mode: devcontainer | direnv | both
+#   --mode MODE   Delivery mode: devcontainer | direnv | both | bare
 #                 devcontainer  scaffold .devcontainer/ only (no flake.nix/.envrc)
 #                 direnv        scaffold flake.nix + .envrc only (no .devcontainer/)
 #                 both          scaffold everything (default)
+#                 bare          standards only: justfiles, hooks, host-native CI
+#                               (no .devcontainer/, no flake.nix/.envrc)
 #                 Unset: read DEVKIT_MODE from the workspace .vig-os manifest,
 #                 else prompt interactively / default to "both" with --no-prompts
 #
@@ -41,7 +43,7 @@ FORCE=false
 NO_PROMPTS=false
 SMOKE_TEST=false
 PREVIEW=false
-# Delivery mode: devcontainer | direnv | both. Empty = prompt (or "both" with --no-prompts).
+# Delivery mode: devcontainer | direnv | both | bare. Empty = manifest, prompt, or "both".
 MODE=""
 
 # Files to preserve during --force upgrades (never overwrite if they exist)
@@ -124,9 +126,9 @@ done
 
 # Validate delivery mode (empty handled later: prompt, or default to "both").
 case "$MODE" in
-    ""|devcontainer|direnv|both) ;;
+    ""|devcontainer|direnv|both|bare) ;;
     *)
-        echo "Error: Invalid --mode: $MODE (expected: devcontainer | direnv | both)" >&2
+        echo "Error: Invalid --mode: $MODE (expected: devcontainer | direnv | both | bare)" >&2
         exit 1
         ;;
 esac
@@ -246,9 +248,9 @@ MANIFEST_MODULES="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_MODULES || tru
 # A corrupt persisted mode must not silently fall back to "both" — that would
 # reshape the repo. Refuse loudly instead.
 case "$MANIFEST_MODE" in
-    ""|devcontainer|direnv|both) ;;
+    ""|devcontainer|direnv|both|bare) ;;
     *)
-        echo "Error: Invalid DEVKIT_MODE in $VIG_OS_MANIFEST: $MANIFEST_MODE (expected: devcontainer | direnv | both)" >&2
+        echo "Error: Invalid DEVKIT_MODE in $VIG_OS_MANIFEST: $MANIFEST_MODE (expected: devcontainer | direnv | both | bare)" >&2
         exit 1
         ;;
 esac
@@ -381,12 +383,13 @@ if [[ -z "$MODE" ]]; then
         echo "  1) devcontainer - VS Code Dev Containers (.devcontainer/)"
         echo "  2) direnv       - Nix flake + direnv (flake.nix + .envrc)"
         echo "  3) both         - scaffold both (default)"
-        read -rp "Delivery mode [devcontainer/direnv/both] (default: both): " MODE
+        echo "  4) bare         - standards only: justfiles, hooks, CI (no container, no flake)"
+        read -rp "Delivery mode [devcontainer/direnv/both/bare] (default: both): " MODE
         MODE="${MODE:-both}"
         case "$MODE" in
-            devcontainer|direnv|both) ;;
+            devcontainer|direnv|both|bare) ;;
             *)
-                echo "Error: Invalid mode: $MODE (expected: devcontainer | direnv | both)" >&2
+                echo "Error: Invalid mode: $MODE (expected: devcontainer | direnv | both | bare)" >&2
                 exit 1
                 ;;
         esac
@@ -464,14 +467,16 @@ if [[ "$FORCE" == "true" ]]; then
         workspace_file="$WORKSPACE_DIR/$rel_path"
 
         # Mode filters (#886): skip template paths the chosen delivery mode
-        # never scaffolds. direnv mode excludes .devcontainer/ from the copy
-        # entirely (#738); devcontainer mode prunes the flake.nix/.envrc stubs
-        # it would itself create — unless they pre-exist (#859), in which case
-        # they fall through to the PRESERVED listing below.
-        if [[ "$MODE" == "direnv" && "$rel_path" == .devcontainer/* ]]; then
+        # never scaffolds. direnv and bare modes exclude .devcontainer/ from
+        # the copy entirely (#738); devcontainer and bare modes prune the
+        # flake.nix/.envrc stubs they would themselves create — unless they
+        # pre-exist (#859), in which case they fall through to the PRESERVED
+        # listing below.
+        if [[ ("$MODE" == "direnv" || "$MODE" == "bare") \
+            && "$rel_path" == .devcontainer/* ]]; then
             continue
         fi
-        if [[ "$MODE" == "devcontainer" ]] \
+        if [[ "$MODE" == "devcontainer" || "$MODE" == "bare" ]] \
             && [[ "$rel_path" == "flake.nix" || "$rel_path" == ".envrc" ]] \
             && [[ ! -e "$workspace_file" ]]; then
             continue
@@ -491,9 +496,13 @@ if [[ "$FORCE" == "true" ]]; then
     # Mode-prune deletions (#886): paths that exist right now and the upgrade
     # would remove. Mirrors the prune guards further down (#738/#859/#877).
     DELETIONS=()
-    if [[ "$MODE" == "direnv" ]]; then
+    if [[ "$MODE" == "direnv" || "$MODE" == "bare" ]]; then
         if [[ -e "$WORKSPACE_DIR/.devcontainer" && "$DEVCONTAINER_PREEXISTED" != "true" ]]; then
             DELETIONS+=(".devcontainer/")
+        elif [[ "$DEVCONTAINER_PREEXISTED" == "true" ]]; then
+            # The #738 guard keeps a populated consumer .devcontainer/; say so
+            # explicitly instead of leaving it silently absent from the report.
+            PRESERVED+=(".devcontainer/ (pre-existing, kept — #738)")
         fi
     else
         # The devcontainer-mode flake.nix/.envrc prune only removes stubs this
@@ -614,14 +623,28 @@ else
         fi
     done
 
-    # direnv mode wants no .devcontainer/ at all, so never copy the template one
-    # over a populated consumer .devcontainer/ (#738). Excluding it from the copy
-    # (rather than copying-then-pruning) keeps a real .devcontainer/ intact.
-    if [[ "$MODE" == "direnv" ]]; then
+    # direnv and bare modes want no .devcontainer/ at all, so never copy the
+    # template one over a populated consumer .devcontainer/ (#738). Excluding it
+    # from the copy (rather than copying-then-pruning) keeps a real
+    # .devcontainer/ intact.
+    if [[ "$MODE" == "direnv" || "$MODE" == "bare" ]]; then
         EXCLUDE_ARGS+=("--exclude=.devcontainer")
     fi
 
     rsync -avL --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
+
+    # bare mode runs CI on the host, not in the image: overlay the host-native
+    # ci.yml variant over the container-based template one (#885). ci.yml is a
+    # managed file, so upgrades of a bare workspace re-apply the overlay too.
+    if [[ "$MODE" == "bare" ]]; then
+        BARE_OVERLAY_DIR="$SCRIPT_DIR/workspace-bare"
+        if [[ -d "$BARE_OVERLAY_DIR" ]]; then
+            echo "Deploying bare-mode overlay (host-native CI)..."
+            rsync -avL "$BARE_OVERLAY_DIR/" "$WORKSPACE_DIR/"
+        else
+            echo "Warning: bare-mode overlay not found at $BARE_OVERLAY_DIR; the scaffolded ci.yml is container-based." >&2
+        fi
+    fi
 fi
 
 # The Nix-built image stores the baked template as read-only symlinks into the
@@ -636,7 +659,31 @@ chmod -R u+w "$WORKSPACE_DIR"
 #   devcontainer -> remove the flake.nix + .envrc stub
 #   direnv       -> remove the .devcontainer/ scaffold
 #   both         -> keep everything
+#   bare         -> remove .devcontainer/ AND the flake.nix + .envrc stub
 case "$MODE" in
+    bare)
+        # Standards-only scaffold (#885): prune every container/flake
+        # artifact, with the same pre-existence guards as the other modes —
+        # consumer-owned files always survive (#738/#859).
+        if [[ "$DEVCONTAINER_PREEXISTED" == "true" ]]; then
+            echo "bare mode: preserving existing .devcontainer/ (#738)"
+        else
+            echo "Pruning to 'bare' mode: removing .devcontainer/..."
+            rm -rf "$WORKSPACE_DIR/.devcontainer"
+        fi
+        if [[ "$FLAKE_PREEXISTED" == "true" ]]; then
+            echo "bare mode: preserving existing flake.nix (#859)"
+        else
+            echo "Pruning to 'bare' mode: removing flake.nix..."
+            rm -f "$WORKSPACE_DIR/flake.nix"
+        fi
+        if [[ "$ENVRC_PREEXISTED" == "true" ]]; then
+            echo "bare mode: preserving existing .envrc (#859)"
+        else
+            echo "Pruning to 'bare' mode: removing .envrc..."
+            rm -f "$WORKSPACE_DIR/.envrc"
+        fi
+        ;;
     devcontainer)
         # Only prune the stub files this scaffold created; a consumer's own
         # pre-existing flake.nix/.envrc must survive (#859).
@@ -671,9 +718,10 @@ esac
 # 0.4.0 retired .devcontainer/justfile.base (recipes relocated to
 # justfile.project), so drop the stale copy an upgraded 0.3.x repo carries —
 # nothing imports it anymore (#877). Only when this scaffold manages
-# .devcontainer/: a direnv-mode consumer's own .devcontainer/ is never
-# touched (#738).
-if [[ "$MODE" != "direnv" && -f "$WORKSPACE_DIR/.devcontainer/justfile.base" ]]; then
+# .devcontainer/: a direnv- or bare-mode consumer's own .devcontainer/ is
+# never touched (#738).
+if [[ "$MODE" != "direnv" && "$MODE" != "bare" \
+    && -f "$WORKSPACE_DIR/.devcontainer/justfile.base" ]]; then
     echo "Removing retired .devcontainer/justfile.base (recipes live in justfile.project since 0.4.0)..."
     rm -f "$WORKSPACE_DIR/.devcontainer/justfile.base"
 fi
