@@ -1036,6 +1036,16 @@ _upgrade_no_flags() {
     done
 }
 
+@test "template .vig-os ships no baked-in delivery mode (#885)" {
+    # The template value lands verbatim in the consumer's .vig-os between the
+    # rsync overwrite and the resolved write-back. A non-empty DEVKIT_MODE in
+    # that window is a mode nobody chose: an abort inside it would persist the
+    # template's mode and legitimize a reshape on the next run. Empty is
+    # treated as unset by every parser, so ship it empty.
+    run grep -x 'DEVKIT_MODE=' "$TEMPLATE_DIR/.vig-os"
+    assert_success
+}
+
 @test "fresh scaffold persists resolved mode and identity in .vig-os (#885)" {
     ws="$BATS_TEST_TMPDIR/e2e-885-writeback"
     mkdir -p "$ws"
@@ -1273,6 +1283,53 @@ _upgrade_legacy() {
     run cat "$ws/.envrc"
     assert_output "use flake .#custom"
     run grep -x 'DEVKIT_MODE=both' "$ws/.vig-os"
+    assert_success
+}
+
+@test "aborted legacy upgrade does not poison DEVKIT_MODE for the next run (#885)" {
+    # Torn-state window: the template rsync overwrites .vig-os before the
+    # resolved values are written back, and resolve_github_repository sits
+    # inside that window — under --no-prompts it exits 1 on a legacy tree
+    # whose origin is not github.com. The abort must leave no mode the repo
+    # never chose, or the NEXT --force run trusts the persisted value and
+    # silently re-adds .devcontainer/ to a direnv-shaped repo.
+    ws="$BATS_TEST_TMPDIR/e2e-885-torn"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    _make_legacy_manifest "$ws"
+    git init -q "$ws"
+    git -C "$ws" remote add origin https://gitlab.example.com/acme/legacy.git
+
+    # First run: no GITHUB_REPOSITORY env, non-github origin -> aborts after
+    # the template overwrite, before the late write-back.
+    stub="$BATS_TEST_TMPDIR/stub-bin-885T"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/just"
+    run env PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=testproj \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts
+    assert_failure
+    assert_output --partial "GITHUB_REPOSITORY"
+
+    # The torn manifest must not claim the template's mode...
+    run grep -x 'DEVKIT_MODE=both' "$ws/.vig-os"
+    assert_failure
+    # ...and the mode resolved BEFORE the abort is already persisted (early
+    # write-back), so the manifest never lies even mid-run.
+    run grep -x 'DEVKIT_MODE=direnv' "$ws/.vig-os"
+    assert_success
+
+    # The second (repaired) run keeps the direnv shape instead of silently
+    # re-adding .devcontainer/.
+    run _upgrade_legacy "$ws"
+    assert_success
+    run test -e "$ws/.devcontainer"
+    assert_failure
+    run grep -x 'DEVKIT_MODE=direnv' "$ws/.vig-os"
     assert_success
 }
 
