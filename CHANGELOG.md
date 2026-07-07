@@ -101,6 +101,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Resolve the GitHub origin before scaffolding the workspace** ([#916](https://github.com/vig-os/devcontainer/issues/916))
   - Under `--no-prompts`, a missing or underivable origin now aborts before any files are copied, instead of leaving a half-scaffolded workspace mid-run.
 
+- **Namespace scaffold `justfile.gh` git helpers to prevent consumer recipe collisions** ([#915](https://github.com/vig-os/devcontainer/issues/915))
+  - Renamed the shipped git-helper recipes `log` → `gh-log` and `branch` → `gh-branch` (matching the `gh-issues` convention). A consumer whose preserved `justfile.project` defined its own `log`/`branch` recipes previously hit a hard `just` parse failure (`recipe log … is redefined`) after upgrade, making `just` unusable and silently disabling the [#877](https://github.com/vig-os/devcontainer/issues/877) base-recipe repair.
+  - **Migration:** consumers who scripted against the shipped `just log` / `just branch` recipes must switch to `just gh-log` / `just gh-branch`; consumers who defined their own `log`/`branch` now keep them without collision.
+
 - **Renovate changelog template no longer leaks the upstream `assets/workspace` mirror** ([#914](https://github.com/vig-os/devcontainer/issues/914))
   - The synced consumer `renovate-changelog-build.yml`/`-commit.yml` copied the `assets/workspace/.devcontainer/CHANGELOG.md` mirror plumbing verbatim; consumers have no such tree, so the steps hard-failed under `set -euo pipefail` on every Renovate changelog run. Manifest transforms now strip the mirror copies, leaving the template touching only the consumer's own `CHANGELOG.md`.
 
