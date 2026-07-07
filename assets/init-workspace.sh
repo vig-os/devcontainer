@@ -511,12 +511,24 @@ fi
 # do not resolve anywhere in the import graph — customized consumer recipes
 # always win, and re-running the upgrade is a no-op.
 if [[ "$JUSTFILE_PROJECT_PREEXISTED" == "true" && -f "$WORKSPACE_DIR/justfile.project" ]]; then
-    MISSING_RECIPES=()
-    for recipe in "${CI_CONTRACT_RECIPES[@]}"; do
-        if ! (cd "$WORKSPACE_DIR" && just --show "$recipe" > /dev/null 2>&1); then
-            MISSING_RECIPES+=("$recipe")
-        fi
-    done
+    if ! command -v just > /dev/null 2>&1; then
+        echo "Warning: 'just' not found on PATH; skipping base-recipe repair (#877)." >&2
+        MISSING_RECIPES=()
+    # If the import graph does not parse (e.g. a syntax error in the preserved
+    # justfile.project), `just --show` fails for EVERY recipe — probing would
+    # misread all of them as missing and append duplicates on each run.
+    elif ! (cd "$WORKSPACE_DIR" && just --list > /dev/null 2>&1); then
+        echo "Warning: justfile graph does not parse; skipping base-recipe repair (#877)." >&2
+        echo "         Fix the syntax error (run 'just --list' to see it) and re-run init-workspace." >&2
+        MISSING_RECIPES=()
+    else
+        MISSING_RECIPES=()
+        for recipe in "${CI_CONTRACT_RECIPES[@]}"; do
+            if ! (cd "$WORKSPACE_DIR" && just --show "$recipe" > /dev/null 2>&1); then
+                MISSING_RECIPES+=("$recipe")
+            fi
+        done
+    fi
     if [[ ${#MISSING_RECIPES[@]} -gt 0 ]]; then
         echo "Preserved justfile.project lacks base recipe(s): ${MISSING_RECIPES[*]}"
         echo "Appending them from the template (review the marked block, fold into your own recipes as needed)..."
@@ -528,8 +540,13 @@ if [[ "$JUSTFILE_PROJECT_PREEXISTED" == "true" && -f "$WORKSPACE_DIR/justfile.pr
             echo "# ci.yml requires sync/precommit/test. Review, keep, or fold into your own."
             echo "# ==============================================================================="
             for recipe in "${MISSING_RECIPES[@]}"; do
+                recipe_block="$(extract_template_recipe "$recipe")"
+                if [[ -z "$recipe_block" ]]; then
+                    echo "Warning: recipe '$recipe' not found in the template justfile.project; skipping it (#877)." >&2
+                    continue
+                fi
                 echo ""
-                extract_template_recipe "$recipe"
+                printf '%s\n' "$recipe_block"
             done
         } >> "$WORKSPACE_DIR/justfile.project"
     fi
