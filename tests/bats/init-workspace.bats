@@ -1171,3 +1171,107 @@ _upgrade_no_flags() {
     run grep -x 'DEVKIT_MODULES="native rust"' "$ws/.vig-os"
     assert_success
 }
+
+# ── legacy mode inference (#885) ──────────────────────────────────────────────
+# Consumers scaffolded before the manifest carry a version-only .vig-os (or
+# none): an upgrade without --mode must infer the delivery mode from the tree
+# shape — conservatively (the wider mode on ambiguity), transparently (the
+# inference is printed), and without ever reshaping the repo. The inferred
+# mode is persisted so the file self-documents from the first upgrade on.
+
+# Strip the workspace manifest back to the pre-#885 version-only form.
+_make_legacy_manifest() {
+    printf '# vig-os devcontainer configuration\nDEVCONTAINER_VERSION=0.3.9\n' \
+        > "$1/.vig-os"
+}
+
+# Upgrade with identity env but NO --mode: the legacy path under test.
+_upgrade_legacy() {
+    local ws="$1"
+    local stub="$BATS_TEST_TMPDIR/stub-bin-885L"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/just"
+    env PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=testproj \
+        GITHUB_REPOSITORY=test/repo \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts
+}
+
+@test "legacy upgrade infers devcontainer mode from a .devcontainer-only tree (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-infer-devc"
+    mkdir -p "$ws"
+    run _scaffold devcontainer "$ws"
+    assert_success
+    _make_legacy_manifest "$ws"
+    run _upgrade_legacy "$ws"
+    assert_success
+    assert_output --partial "Inferred delivery mode 'devcontainer'"
+    run test -d "$ws/.devcontainer"
+    assert_success
+    # no reshape: the flake stub must NOT be added to a devcontainer-only repo
+    run test -e "$ws/flake.nix"
+    assert_failure
+    run grep -x 'DEVKIT_MODE=devcontainer' "$ws/.vig-os"
+    assert_success
+}
+
+@test "legacy upgrade infers direnv mode from a flake/envrc-only tree (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-infer-direnv"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    _make_legacy_manifest "$ws"
+    run _upgrade_legacy "$ws"
+    assert_success
+    assert_output --partial "Inferred delivery mode 'direnv'"
+    run test -e "$ws/.devcontainer"
+    assert_failure
+    run test -f "$ws/flake.nix"
+    assert_success
+    run grep -x 'DEVKIT_MODE=direnv' "$ws/.vig-os"
+    assert_success
+}
+
+@test "legacy upgrade infers both from .devcontainer plus the scaffold flake stub (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-infer-both"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    _make_legacy_manifest "$ws"
+    run _upgrade_legacy "$ws"
+    assert_success
+    assert_output --partial "Inferred delivery mode 'both'"
+    run test -d "$ws/.devcontainer"
+    assert_success
+    run test -f "$ws/flake.nix"
+    assert_success
+    run grep -x 'DEVKIT_MODE=both' "$ws/.vig-os"
+    assert_success
+}
+
+@test "ambiguous legacy tree (consumer flake + .devcontainer) widens to both (#885)" {
+    # The #859 combination: a devcontainer-mode repo whose owners added their
+    # own nix-direnv setup. Resolve to the WIDER mode, print the inference,
+    # and keep the consumer files bit-identical (they are PRESERVE_FILES).
+    ws="$BATS_TEST_TMPDIR/e2e-885-infer-ambiguous"
+    mkdir -p "$ws"
+    run _scaffold devcontainer "$ws"
+    assert_success
+    _make_legacy_manifest "$ws"
+    printf '# SENTINEL-885 my own flake\n' > "$ws/flake.nix"
+    printf 'use flake .#custom\n' > "$ws/.envrc"
+    run _upgrade_legacy "$ws"
+    assert_success
+    assert_output --partial "Inferred delivery mode 'both'"
+    run test -d "$ws/.devcontainer"
+    assert_success
+    run cat "$ws/flake.nix"
+    assert_output "# SENTINEL-885 my own flake"
+    run cat "$ws/.envrc"
+    assert_output "use flake .#custom"
+    run grep -x 'DEVKIT_MODE=both' "$ws/.vig-os"
+    assert_success
+}
