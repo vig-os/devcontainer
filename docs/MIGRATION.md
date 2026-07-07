@@ -28,10 +28,10 @@ dependency manifest (`requirements.yaml` is gone); to change the toolchain you
 edit `devTools`, and to update it downstream you bump the flake input
 (`nix flake update vigos`).
 
-## The two delivery modes
+## The delivery modes
 
-`install.sh … --mode <devcontainer|direnv|both>` scaffolds a consumer for either
-or both modes:
+`install.sh … --mode <devcontainer|direnv|both|bare>` scaffolds a consumer for
+one of four modes:
 
 - **`devcontainer`** — a `.devcontainer/` that pulls the published image. The
   workspace is mounted; first-run `post-create.sh` sets up git/gh/pre-commit and
@@ -39,6 +39,57 @@ or both modes:
 - **`direnv`** — a minimal `flake.nix` + `.envrc` stub. `direnv allow` (or
   `nix develop`) drops you into the shared toolchain on the host, no container.
   The stub is never overwritten on re-scaffold; update with `nix flake update`.
+- **`both`** — everything above (the default).
+- **`bare`** — the standards layer only
+  ([#885](https://github.com/vig-os/devcontainer/issues/885)): justfiles,
+  `.pre-commit-config.yaml`, `.github/` CI, `pyproject.toml` scaffolding, and
+  `.vig-os` — no `.devcontainer/`, no `flake.nix`/`.envrc`. The tools come from
+  the host (`uv`, `just`, `prek`), and the shipped `ci.yml` is a host-native
+  variant: no image resolution and no in-container jobs — the runner sets up
+  `uv` directly and drives the same `just sync` / `just precommit` /
+  `just test` contract.
+
+The chosen mode is persisted as `DEVKIT_MODE` in the `.vig-os` manifest (below),
+so upgrades never need `--mode` again.
+
+## The `.vig-os` project manifest
+
+Since [#885](https://github.com/vig-os/devcontainer/issues/885), `.vig-os` is
+the project's declarative manifest, not just a version pin. Flat `KEY=VALUE`
+lines with `#` comments; every consumer parses it line-based and ignores
+unknown keys:
+
+| Key | Meaning |
+|-----|---------|
+| `DEVCONTAINER_VERSION` | Scaffold/image version pin (managed by release automation; keeps its legacy name until the devkit rename, [#781](https://github.com/vig-os/devcontainer/issues/781)) |
+| `DEVKIT_MODE` | Delivery mode: `devcontainer` \| `direnv` \| `both` \| `bare` |
+| `DEVKIT_PROJECT` | Persisted project short name (`SHORT_NAME`) |
+| `DEVKIT_ORG` | Persisted organization name (`ORG_NAME`) |
+| `DEVKIT_REPO` | Persisted GitHub `owner/repo` (Renovate preset) |
+| `DEVKIT_MODULES` | Reserved: space-separated capability modules mirroring `mkProjectShell`'s `modules = [ … ]` ([#884](https://github.com/vig-os/devcontainer/issues/884)) |
+
+How it behaves:
+
+- **Precedence:** explicit flag/env > `.vig-os` value > prompt/default. The
+  resolved values are written back on every (re)scaffold, so a manifest-bearing
+  repo upgrades with `install.sh --force` and **no mode/identity flags** while
+  keeping its shape and names.
+- **Legacy consumers** (version-only `.vig-os`, or none) get their mode
+  inferred conservatively on upgrade from the tree shape: a populated
+  `.devcontainer/` plus `flake.nix`/`.envrc` widens to `both` (ambiguity always
+  resolves to the wider mode, and the inference is printed; interactive runs
+  confirm). The inferred mode is persisted, so the file self-documents from the
+  first upgrade on. A repo is never reshaped on inference alone.
+- **Mode switching never happens implicitly.** An explicit `--mode` that
+  contradicts the persisted `DEVKIT_MODE` refuses: inspect the would-be change
+  with `--preview` first, then either keep the persisted mode or set
+  `DEVKIT_MODE` in `.vig-os` yourself on a dedicated, clean upgrade branch (the
+  preflight-guard flow below) and re-run the upgrade.
+- **Future flags live here.** The manifest is the home for upcoming per-project
+  devkit switches (e.g. the raw-YAML hook opt-out planned in
+  [#883](https://github.com/vig-os/devcontainer/issues/883)). `.vig-os` is a
+  managed file: the devkit-known keys are re-read and written back on upgrade —
+  do not park unrelated custom keys in it.
 
 ## What a consumer needs to know
 
