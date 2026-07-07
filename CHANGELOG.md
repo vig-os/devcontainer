@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Preflight guard and diff preview for scaffold upgrades** ([#886](https://github.com/vig-os/devcontainer/issues/886))
+  - `install.sh --force` upgrades now refuse on `main`/`dev`/`release/*`/detached HEAD and on a dirty tree, so every upgrade lands as a reviewable, revertible diff on a dedicated branch; on a protected branch with a clean tree the installer offers to create and switch to `chore/devkit-upgrade-<version>`, and non-git directories get a warn-and-confirm path. A single `--skip-preflight` flag bypasses the guard; `--smoke-test` runs and fresh installs are exempt.
+  - New `--preview` mode prints the add/overwrite/preserve/delete file report (including mode-prune deletions such as the retired `.devcontainer/justfile.base`) and exits without changing any files — unlike `--dry-run`, which only prints the container command.
+
 ### Changed
 
 ### Deprecated

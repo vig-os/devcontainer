@@ -30,7 +30,10 @@ devc-check *args:
     "$SCRIPT_DIR/version-check.sh" {{ if args == '' { 'check' } else { args } }}
 
 # Upgrade devcontainer to latest version (host-side only)
-# This recipe MUST be run from a host terminal, not inside the container
+# This recipe MUST be run from a host terminal, not inside the container.
+# The installer preflight (#886) refuses upgrades on main/dev/release/* or a
+# dirty tree; use the curl form to pass --preview (file report, no changes)
+# or --skip-preflight (bypass the guard) when needed.
 [group('info')]
 devc-upgrade:
     #!/usr/bin/env bash
@@ -72,6 +75,10 @@ devc-upgrade:
     fi
 
     echo "✓ Using $RUNTIME"
+    echo ""
+    echo "Note: the installer refuses upgrades on main/dev/release/* or a dirty tree."
+    echo "      Preview first:  curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --force --preview ."
+    echo "      Bypass guard:   curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --force --skip-preflight ."
     echo ""
     echo "Downloading and running install script..."
     curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --force .
