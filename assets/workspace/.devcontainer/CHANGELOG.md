@@ -68,6 +68,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Scaffold upgrade strands base recipes in a preserved `justfile.project`** ([#877](https://github.com/vig-os/devcontainer/issues/877))
+  - 0.4.0 moved `lint`/`format`/`precommit`/`test`/`test-cov`/`sync`/`update` into `justfile.project`, which is preserved on upgrade — 0.3.x consumers never received them and the shipped `ci.yml` failed with `justfile does not contain recipe 'sync'`. `init-workspace --force` now appends the missing base recipes from the template into the preserved file (customized recipes always win; idempotent).
+  - The retired `.devcontainer/justfile.base` is removed on upgrade where the scaffold manages `.devcontainer/` (never in `direnv` mode, [#738](https://github.com/vig-os/devcontainer/issues/738)), and the installer warns if the root `justfile` lacks the scaffold `import?` block.
+
 - **Renovate changelog artifact drops the workspace mirror; `metadata.env` breaks on parenthesized branches** ([#874](https://github.com/vig-os/devcontainer/issues/874))
   - `upload-artifact` silently excluded the mirror under the hidden `.devcontainer` directory, so the bot commit updated only the root `CHANGELOG.md` and tripped the `sync-manifest` gate; now uploaded with `include-hidden-files: true`.
   - `metadata.env` values are `%q`-quoted so grouped Renovate branch names (e.g. `renovate/python-(minor-and-patch)`) survive being `source`d by the commit workflow.
