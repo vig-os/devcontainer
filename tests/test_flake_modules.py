@@ -131,9 +131,7 @@ def test_native_module_exports_generic_cc_cxx(current_system: str) -> None:
     # The default shellHook banner writes to stdout, so only the last line is
     # the probe's answer.
     got = proc.stdout.splitlines()[-1] if proc.stdout else ""
-    assert got == "cc:c++", (
-        f"native module must export CC=cc and CXX=c++; got {got!r}"
-    )
+    assert got == "cc:c++", f"native module must export CC=cc and CXX=c++; got {got!r}"
 
 
 def test_native_module_builds_c_extension_sdist_with_uv(
@@ -158,7 +156,7 @@ def test_native_module_builds_c_extension_sdist_with_uv(
         "uv venv .venv\n"
         "uv pip install --python .venv/bin/python dist/native_ext-0.1.0.tar.gz\n"
         '.venv/bin/python -c "import native_ext; '
-        'assert native_ext.answer() == 42; print(\'sdist-ok\')"\n'
+        "assert native_ext.answer() == 42; print('sdist-ok')\"\n"
     )
     proc = _develop_native(current_system, script, pure=False)
     assert proc.returncode == 0 and "sdist-ok" in proc.stdout, (

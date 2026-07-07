@@ -2,7 +2,7 @@
 # (tests/test_flake_modules.py). Built as an sdist and compiled by uv inside
 # the module devshell — the pycatima-class scenario from #639/#879. Refs #884.
 [build-system]
-requires = [ "setuptools>=77" ]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
