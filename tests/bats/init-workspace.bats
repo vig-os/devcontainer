@@ -1005,3 +1005,169 @@ _preview() {
     run test -e "$ws/justfile"
     assert_failure
 }
+
+# ── .vig-os project manifest (#885) ───────────────────────────────────────────
+# .vig-os is the project's declarative manifest: the delivery mode and the
+# project identity (short name, org, GitHub repo) are persisted on every
+# (re)scaffold and read back before prompting — precedence flag/env > .vig-os >
+# prompt/default — so a manifest-bearing repo upgrades with `--force` and no
+# mode/identity flags while keeping its shape and names. `DEVKIT_MODULES` is
+# reserved for the capability-module declaration (#884) and survives upgrades.
+
+# Re-run the real script as an upgrade with NO mode/identity flags or env:
+# everything must resolve from the workspace's own .vig-os manifest.
+_upgrade_no_flags() {
+    local ws="$1"
+    local stub="$BATS_TEST_TMPDIR/stub-bin-885"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/just"
+    env PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts
+}
+
+@test "template .vig-os carries the manifest key set (#885)" {
+    for key in DEVCONTAINER_VERSION DEVKIT_MODE DEVKIT_PROJECT DEVKIT_ORG \
+        DEVKIT_REPO DEVKIT_MODULES; do
+        run grep -E "^${key}=" "$TEMPLATE_DIR/.vig-os"
+        assert_success
+    done
+}
+
+@test "fresh scaffold persists resolved mode and identity in .vig-os (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-writeback"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    run grep -x 'DEVKIT_MODE=direnv' "$ws/.vig-os"
+    assert_success
+    run grep -x 'DEVKIT_PROJECT=testproj' "$ws/.vig-os"
+    assert_success
+    # _scaffold sets no ORG_NAME, so the --no-prompts default is persisted
+    run grep -x 'DEVKIT_ORG=vigOS/devc' "$ws/.vig-os"
+    assert_success
+    run grep -x 'DEVKIT_REPO=test/repo' "$ws/.vig-os"
+    assert_success
+}
+
+@test "manifest-bearing upgrade keeps devcontainer shape and names, no flags (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-up-devc"
+    mkdir -p "$ws"
+    run _scaffold devcontainer "$ws"
+    assert_success
+    run _upgrade_no_flags "$ws"
+    assert_success
+    assert_output --partial "from .vig-os manifest"
+    run test -d "$ws/.devcontainer"
+    assert_success
+    run test -e "$ws/flake.nix"
+    assert_failure
+    run test -e "$ws/.envrc"
+    assert_failure
+    run test -d "$ws/src/testproj"
+    assert_success
+    run grep -x 'DEVKIT_MODE=devcontainer' "$ws/.vig-os"
+    assert_success
+}
+
+@test "manifest-bearing upgrade keeps direnv shape and names, no flags (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-up-direnv"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    run _upgrade_no_flags "$ws"
+    assert_success
+    assert_output --partial "from .vig-os manifest"
+    run test -e "$ws/.devcontainer"
+    assert_failure
+    run test -f "$ws/flake.nix"
+    assert_success
+    run test -d "$ws/src/testproj"
+    assert_success
+    run grep -x 'DEVKIT_MODE=direnv' "$ws/.vig-os"
+    assert_success
+    run grep -x 'DEVKIT_PROJECT=testproj' "$ws/.vig-os"
+    assert_success
+}
+
+@test "manifest-bearing upgrade keeps both shape and names, no flags (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-up-both"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    run _upgrade_no_flags "$ws"
+    assert_success
+    run test -d "$ws/.devcontainer"
+    assert_success
+    run test -f "$ws/flake.nix"
+    assert_success
+    run test -d "$ws/src/testproj"
+    assert_success
+    run grep -x 'DEVKIT_MODE=both' "$ws/.vig-os"
+    assert_success
+}
+
+@test "persisted-mode vs requested-mode mismatch refuses, pointing at --preview (#885)" {
+    # Mode switching is destructive (e.g. both -> bare deletes .devcontainer/)
+    # and out of scope here: it must never happen implicitly. A --mode that
+    # contradicts the persisted DEVKIT_MODE refuses instead of reshaping.
+    ws="$BATS_TEST_TMPDIR/e2e-885-mismatch"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    stub="$BATS_TEST_TMPDIR/stub-bin-885"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/just"
+    run env PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts --mode both
+    assert_failure
+    assert_output --partial "DEVKIT_MODE"
+    assert_output --partial "--preview"
+    # the tree was not reshaped
+    run test -e "$ws/.devcontainer"
+    assert_failure
+}
+
+@test "--preview is exempt from the mode-mismatch refusal (#885)" {
+    # Preview is report-only, so it is exactly how a user inspects a would-be
+    # mode switch before deciding.
+    ws="$BATS_TEST_TMPDIR/e2e-885-mismatch-preview"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    run _preview "$ws" --mode both
+    assert_success
+    assert_output --partial "Preview complete"
+    run test -e "$ws/.devcontainer"
+    assert_failure
+}
+
+@test "matching --mode proceeds against a persisted DEVKIT_MODE (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-match"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    run _scaffold direnv "$ws"
+    assert_success
+    run test -e "$ws/.devcontainer"
+    assert_failure
+}
+
+@test "upgrade preserves a persisted DEVKIT_MODULES value (#885)" {
+    # Reserved key (#884): .vig-os is a managed file, so the consumer's module
+    # declaration must be read before the template overwrite and written back.
+    ws="$BATS_TEST_TMPDIR/e2e-885-modules"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    sed -i 's/^DEVKIT_MODULES=.*/DEVKIT_MODULES="native rust"/' "$ws/.vig-os"
+    run _upgrade_no_flags "$ws"
+    assert_success
+    run grep -x 'DEVKIT_MODULES="native rust"' "$ws/.vig-os"
+    assert_success
+}

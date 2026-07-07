@@ -643,3 +643,86 @@ _make_repo() {
     assert_output --partial "overwrite/preserve/delete"
     assert_output --partial "container command"
 }
+
+# ── .vig-os project manifest (#885) ───────────────────────────────────────────
+# install.sh reads the persisted delivery mode and identity from the target's
+# .vig-os before falling back to defaults (flag > .vig-os > detection/default),
+# so `install.sh --force <path>` upgrades a manifest-bearing repo with no
+# mode/identity flags. An explicit --mode that contradicts the persisted
+# DEVKIT_MODE refuses (mode switching must never happen implicitly).
+
+# Clean feature-branch git fixture carrying a full manifest.
+_make_manifest_repo() {
+    local dir="$1" mode="${2:-direnv}"
+    _make_repo "$dir"
+    cat > "$dir/.vig-os" <<MANIFEST
+# vig-os devcontainer configuration
+DEVCONTAINER_VERSION=0.4.0
+DEVKIT_MODE=$mode
+DEVKIT_PROJECT=persisted_proj
+DEVKIT_ORG=PersistedOrg
+DEVKIT_REPO=persisted/repo
+MANIFEST
+    _git -C "$dir" add .vig-os
+    _git -C "$dir" commit -qm "chore: manifest"
+}
+
+@test "install.sh reads mode and identity from .vig-os when flags are absent (#885)" {
+    repo="$BATS_TEST_TMPDIR/manifest-read"
+    _make_manifest_repo "$repo"
+    run bash "$INSTALL_SH" --dry-run --force "$repo" </dev/null
+    assert_success
+    assert_output --partial '--mode direnv'
+    assert_output --partial 'SHORT_NAME=persisted_proj'
+    assert_output --partial 'ORG_NAME=PersistedOrg'
+    assert_output --partial 'GITHUB_REPOSITORY=persisted/repo'
+}
+
+@test "explicit flags override the .vig-os manifest (#885)" {
+    repo="$BATS_TEST_TMPDIR/manifest-override"
+    _make_manifest_repo "$repo"
+    run bash "$INSTALL_SH" --dry-run --force \
+        --name other_name --org OtherOrg --repo other/repo "$repo" </dev/null
+    assert_success
+    assert_output --partial 'SHORT_NAME=other_name'
+    assert_output --partial 'ORG_NAME=OtherOrg'
+    assert_output --partial 'GITHUB_REPOSITORY=other/repo'
+}
+
+@test "install.sh refuses when --mode conflicts with persisted DEVKIT_MODE (#885)" {
+    repo="$BATS_TEST_TMPDIR/manifest-conflict"
+    _make_manifest_repo "$repo"
+    run bash "$INSTALL_SH" --dry-run --force --mode both "$repo" </dev/null
+    assert_failure
+    assert_output --partial 'DEVKIT_MODE'
+    assert_output --partial '--preview'
+}
+
+@test "a matching --mode proceeds against the persisted DEVKIT_MODE (#885)" {
+    repo="$BATS_TEST_TMPDIR/manifest-mode-match"
+    _make_manifest_repo "$repo"
+    run bash "$INSTALL_SH" --dry-run --force --mode direnv "$repo" </dev/null
+    assert_success
+    assert_output --partial '--mode direnv'
+}
+
+@test "--preview bypasses the mode-mismatch refusal (#885)" {
+    repo="$BATS_TEST_TMPDIR/manifest-conflict-preview"
+    _make_manifest_repo "$repo"
+    run bash "$INSTALL_SH" --dry-run --force --preview --mode both "$repo" </dev/null
+    assert_success
+    assert_output --partial "Would execute:"
+}
+
+@test "version-only .vig-os leaves install.sh defaults untouched (#885)" {
+    repo="$BATS_TEST_TMPDIR/manifest-legacy"
+    _make_repo "$repo"
+    printf '# vig-os devcontainer configuration\nDEVCONTAINER_VERSION=0.3.9\n' \
+        > "$repo/.vig-os"
+    _git -C "$repo" add .vig-os
+    _git -C "$repo" commit -qm "chore: legacy pin"
+    run bash "$INSTALL_SH" --dry-run --force "$repo" </dev/null
+    assert_success
+    assert_output --partial 'ORG_NAME=vigOS'
+    assert_output --partial "SHORT_NAME=manifest_legacy"
+}
