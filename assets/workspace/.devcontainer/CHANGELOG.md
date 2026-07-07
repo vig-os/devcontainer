@@ -111,6 +111,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The 0.4.0 image retired the Python `pre-commit` for `prek` ([#778](https://github.com/vig-os/devcontainer/issues/778)), but files preserved on upgrade still invoke it and exit 127 (field-validated on a 0.3.5 → 0.4.0 consumer: the preserved `justfile.project` `precommit` recipe and repo-managed `.githooks` scripts broke every commit). The image now ships a **deprecated one-cycle `pre-commit → prek` shim** (stderr notice, removed in 0.5) so consumer hook scripts keep working while they migrate.
   - `init-workspace --force` scans the post-scaffold `justfile.project`, `.githooks/` scripts and `.pre-commit-config.yaml` for invocation-shaped `pre-commit` references and warns (non-fatally) with `file:line`, pointing at the MIGRATION.md rename checklist — which now also covers the NixOS `#!/bin/bash` shebang gotcha in old-scaffold `.githooks`.
 
+### Security
+
+- **Accept podman `CVE-2026-57231` in the vulnix register pending the nixpkgs 26.05 backport** ([#905](https://github.com/vig-os/devcontainer/issues/905))
+  - podman 5.8.2 (affects 5.8.1–5.8.3) leaks matching host environment variables into a container when a malicious image manifest carries malformed `Env` entries (a key with no value, via the `*` glob) — CVSS 7.5, a supply-chain risk only when running untrusted images. The release CVE gate blocked the 0.4.1 RC on this finding.
+  - Fixed upstream in 5.8.4/6.0.0, but the pinned `nixpkgs` `release-26.05` still ships 5.8.2 (backport [NixOS/nixpkgs#536367](https://github.com/NixOS/nixpkgs/pull/536367) open), so advancing the rev cannot remediate yet. Added a short-dated `.vulnixignore` exception (expires 2026-08-06, re-check weekly) to unblock the gate; the exception flips to a nixpkgs rev-advance once the backport lands.
+
 ## [0.4.0](https://github.com/vig-os/devcontainer/releases/tag/0.4.0) - 2026-07-06
 
 ### Added
