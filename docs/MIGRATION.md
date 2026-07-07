@@ -98,6 +98,98 @@ language toolchains like Rust, Go, or a C/C++ compiler. Source extra tools
 If a toolchain recurs across vigOS projects, promote it to a shared, opt-in
 module rather than baking it into every consumer's image.
 
+### The native-build contract
+
+`uv sync` compiles a dependency from sdist whenever PyPI has no wheel for the
+image's CPython (`cp314`) — common for scientific packages (pycatima, f2py
+extensions, anything built with scikit-build-core or meson-python). The image
+ships **no C/C++ compiler**, so where that toolchain comes from is an explicit,
+tiered contract:
+
+1. **Pure-Python / wheel-only projects — nothing to do.** Pre-compiled
+   manylinux wheels load out of the box (see above); the image works as-is.
+
+2. **Native deps, `direnv` mode (preferred).** Provide the toolchain via the
+   project flake:
+
+   ```nix
+   devShells.default = vigos.lib.mkProjectShell {
+     inherit pkgs;
+     extraPackages = [
+       pkgs.stdenv.cc # C/C++ compiler wrapper: puts cc/c++ on PATH, exports CC/CXX
+       pkgs.cmake
+       pkgs.pkg-config
+     ];
+   };
+   ```
+
+   Inside `nix develop` / `direnv` the stdenv compiler wrapper exports working
+   `CC`/`CXX`, so build backends find a real compiler regardless of what the
+   image's baked interpreter recorded at image-build time (the sysconfig
+   mechanics are tracked in
+   [#879](https://github.com/vig-os/devcontainer/issues/879)). This path is
+   field-validated by the 0.4.0 downstream runs
+   ([#639](https://github.com/vig-os/devcontainer/issues/639)).
+
+3. **Native deps, `devcontainer` mode (middle path).** No direnv migration
+   required: the baked Nix has flakes enabled, so run the sync *through* a Nix
+   shell inside the container:
+
+   ```bash
+   # Against the project flake (pinned, reproducible):
+   nix develop -c just sync
+
+   # Ad-hoc, when the project has no flake yet:
+   nix shell nixpkgs#gcc nixpkgs#cmake -c uv sync
+   ```
+
+   This is the supported interim answer for devcontainer-mode repos whose
+   dependencies lack `cp314` wheels. The pinned `nix develop -c` form also
+   works in CI until the nix-direct CI lane
+   ([#854](https://github.com/vig-os/devcontainer/issues/854)) lands; #854
+   tracks running consumer CI inside the project devshell so the contract is
+   enforced in CI, not just locally.
+
+#### Worked example: heavyweight scientific dependencies
+
+A bare compiler is often not enough. An extension that links against Geant4 or
+ROOT needs the library's headers, shared objects, and CMake package config at
+build time — none of which a fatter base image could supply generically. The
+project flake provides all of it, pinned:
+
+```nix
+devShells.default = vigos.lib.mkProjectShell {
+  inherit pkgs;
+  extraPackages = [
+    pkgs.stdenv.cc
+    pkgs.cmake
+    pkgs.pkg-config
+    pkgs.geant4 # headers + libs + Geant4 CMake config
+    pkgs.root # ROOT, likewise
+  ];
+};
+```
+
+`nix develop` composes the include/library/CMake search paths from these
+packages, so the build backend compiles against the exact Geant4/ROOT revision
+pinned by the project's `flake.lock`. This is why the answer to "the build
+needs gcc" is the flake, not the image: the same mechanism scales from a bare
+compiler to a full scientific stack.
+
+#### Non-goal: a C/C++ toolchain in the base image
+
+The published image will **not** ship gcc/cmake:
+
+- it breaks the minimal-image stance and inflates every consumer, most of
+  which never compile anything;
+- it still would not suffice — real native builds also need third-party
+  headers, libraries, and build config (see the Geant4 example above), which
+  only a pinned project flake provides reproducibly.
+
+The in-image behavior when no toolchain is provided is tracked in
+[#879](https://github.com/vig-os/devcontainer/issues/879); the toolchain
+itself always comes from one of the tiers above.
+
 ## Updating
 
 - **Downstream dev environment:** `nix flake update vigos` (or re-run

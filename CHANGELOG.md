@@ -54,6 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Renovate: update `numpy` to `v2.5.1`** ([#865](https://github.com/vig-os/devcontainer/pull/865))
 
+- **MIGRATION.md: formalized the native-build contract** ([#882](https://github.com/vig-os/devcontainer/issues/882))
+  - Tiered policy for native Python builds (wheel-only / toolchain from the project flake via `mkProjectShell.extraPackages` / in-container `nix develop -c` middle path), a worked Geant4/ROOT example, and the explicit non-goal of shipping a C/C++ toolchain in the base image. Cross-links [#879](https://github.com/vig-os/devcontainer/issues/879) and [#854](https://github.com/vig-os/devcontainer/issues/854).
+
 #### Modules
 
 - **homeManagerModules.default is now the umbrella** importing every `vigos.*` module, each disabled by default ([#818](https://github.com/vig-os/devcontainer/issues/818)); existing imports keep working unchanged.
