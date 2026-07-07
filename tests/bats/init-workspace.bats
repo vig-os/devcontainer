@@ -605,3 +605,114 @@ _scaffold() {
     run grep -F 'entry: typos --force-exclude' "$TEMPLATE_DIR/.pre-commit-config.yaml"
     assert_success
 }
+
+# ── upgrade must deliver the CI-contract base recipes (#877) ──────────────────
+# 0.4.0 relocated the base recipes (lint/format/precommit/test/test-cov/sync/
+# update) from the retired .devcontainer/justfile.base into justfile.project,
+# which is preserved on upgrade — so a 0.3.x consumer never received them while
+# the shipped ci.yml calls `just sync` / `just precommit` / `just test` (CI
+# failed with "justfile does not contain recipe 'sync'"). The upgrade must
+# append whichever contract recipes the preserved file does not resolve, and
+# drop the stale .devcontainer/justfile.base.
+
+# Run the real script as an upgrade: real `just` stays on PATH (the repair
+# probes recipes via `just --show`), `uv` is stubbed so the trailing
+# `just sync` is a fast no-op instead of a real dependency sync.
+_upgrade() {
+    local mode="$1" ws="$2"
+    local stub="$BATS_TEST_TMPDIR/stub-uv"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/uv"
+    chmod +x "$stub/uv"
+    env PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=testproj \
+        GITHUB_REPOSITORY=test/repo \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts --mode "$mode"
+}
+
+# A pre-0.4.0 consumer justfile.project: team recipes, no base recipes.
+_pre040_project_justfile() {
+    cat > "$1/justfile.project" <<'EOF'
+# SENTINEL-877 pre-0.4.0 consumer recipes (no base recipes)
+project := "consumer877"
+
+[group('info')]
+info:
+    @echo "Project: {{ project }}"
+EOF
+}
+
+@test "upgrade appends missing CI-contract recipes to a preserved justfile.project (#877)" {
+    real_just="$(command -v just)"
+    ws="$BATS_TEST_TMPDIR/e2e-877-repair"
+    mkdir -p "$ws"
+    _pre040_project_justfile "$ws"
+    run _upgrade both "$ws"
+    assert_success
+    # consumer content is preserved, not overwritten
+    run grep -q 'SENTINEL-877' "$ws/justfile.project"
+    assert_success
+    # every CI-contract recipe resolves after the upgrade
+    for r in lint format precommit test test-cov sync update; do
+        run bash -c "cd '$ws' && '$real_just' --show $r"
+        assert_success
+    done
+}
+
+@test "justfile.project repair keeps customized recipes and is idempotent (#877)" {
+    real_just="$(command -v just)"
+    ws="$BATS_TEST_TMPDIR/e2e-877-idem"
+    mkdir -p "$ws"
+    _pre040_project_justfile "$ws"
+    cat >> "$ws/justfile.project" <<'EOF'
+
+# consumer-customized test runner
+test *args:
+    @echo "SENTINEL-877-custom-test"
+EOF
+    run _upgrade both "$ws"
+    assert_success
+    run _upgrade both "$ws"
+    assert_success
+    # still parses (a duplicate append would be a just parse error)...
+    run bash -c "cd '$ws' && '$real_just' --list"
+    assert_success
+    # ...the customized recipe wins over the template one...
+    run bash -c "cd '$ws' && '$real_just' --show test"
+    assert_output --partial 'SENTINEL-877-custom-test'
+    # ...and each appended recipe appears exactly once
+    run bash -c "grep -c '^sync:' '$ws/justfile.project'"
+    assert_output "1"
+}
+
+@test "upgrade removes the retired .devcontainer/justfile.base (#877)" {
+    ws="$BATS_TEST_TMPDIR/e2e-877-stale"
+    mkdir -p "$ws/.devcontainer"
+    printf '# retired 0.3.x base recipes\n' >"$ws/.devcontainer/justfile.base"
+    run _upgrade both "$ws"
+    assert_success
+    run test -e "$ws/.devcontainer/justfile.base"
+    assert_failure
+}
+
+@test "direnv-mode upgrade leaves a pre-existing .devcontainer untouched, incl. justfile.base (#877)" {
+    # A consumer-owned .devcontainer/ is never modified in direnv mode (#738);
+    # the stale-file cleanup must respect that boundary.
+    ws="$BATS_TEST_TMPDIR/e2e-877-direnv"
+    mkdir -p "$ws/.devcontainer"
+    printf '# consumer-owned devcontainer file\n' >"$ws/.devcontainer/justfile.base"
+    run _upgrade direnv "$ws"
+    assert_success
+    run test -f "$ws/.devcontainer/justfile.base"
+    assert_success
+}
+
+@test "init-workspace verifies the root justfile scaffold import block (#877)" {
+    # One field consumer (talys) ended up with a root justfile carrying no
+    # `import?` lines at all, so even present recipes were unreachable. The
+    # script must check for the scaffold import block and warn when absent.
+    run grep -F "import? 'justfile.project'" "$INIT_WORKSPACE_SH"
+    assert_success
+}
