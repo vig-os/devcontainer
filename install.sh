@@ -13,7 +13,7 @@
 #   --name NAME       Override project name (SHORT_NAME)
 #   --org ORG         Override organization name (default: vigOS)
 #   --repo OWNER/REPO GitHub repo for Renovate preset (default: detect from origin or OWNER/REPO)
-#   --mode MODE       Delivery mode: devcontainer | direnv | both (default: prompt, both non-interactively)
+#   --mode MODE       Delivery mode: devcontainer | direnv | both | bare (default: .vig-os manifest, prompt, or both)
 #   --smoke-test      Deploy smoke-test-specific assets
 #   --preview         Print the add/overwrite/preserve/delete file report for an
 #                     upgrade and exit without changing anything
@@ -38,7 +38,8 @@ DRY_RUN=false
 SKIP_PULL=false
 PROJECT_PATH=""
 PROJECT_NAME=""
-ORG_NAME="vigOS"
+# Resolved after arg parsing: --org > .vig-os DEVKIT_ORG > "vigOS" (#885)
+ORG_NAME=""
 GITHUB_REPO_OVERRIDE=""
 MODE=""
 SMOKE_TEST=""
@@ -77,8 +78,9 @@ OPTIONS:
     --name NAME       Override project name (SHORT_NAME, used for module name)
     --org ORG         Override organization name (default: vigOS)
     --repo OWNER/REPO GitHub repository for Renovate (default: git origin or OWNER/REPO)
-    --mode MODE       Delivery mode: devcontainer | direnv | both
-                      (default: prompt interactively; "both" non-interactively)
+    --mode MODE       Delivery mode: devcontainer | direnv | both | bare
+                      (default: DEVKIT_MODE from the target's .vig-os manifest,
+                      else prompt interactively / "both" non-interactively)
     --smoke-test      Deploy smoke-test-specific assets
     --preview         Preview an upgrade: print the add/overwrite/preserve/delete
                       file report and exit without changing any files
@@ -464,11 +466,11 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# Validate delivery mode (empty = let init-workspace.sh prompt / default to both)
+# Validate delivery mode (empty = .vig-os manifest, else init-workspace.sh prompt/default)
 case "$MODE" in
-    ""|devcontainer|direnv|both) ;;
+    ""|devcontainer|direnv|both|bare) ;;
     *)
-        err "Invalid --mode: $MODE (expected: devcontainer | direnv | both)"
+        err "Invalid --mode: $MODE (expected: devcontainer | direnv | both | bare)"
         usage
         exit 1
         ;;
@@ -482,17 +484,97 @@ if [ ! -d "$PROJECT_PATH" ]; then
 fi
 PROJECT_PATH="$(cd "$PROJECT_PATH" && pwd)"
 
-# Derive project name from folder if not provided
+# ── .vig-os project manifest (#885) ───────────────────────────────────────────
+# The target's .vig-os persists the delivery mode and identity, so upgrades
+# need no mode/identity flags. Precedence per key: explicit flag > .vig-os >
+# detection/default. Same tolerant line-based parsing as every other consumer.
+
+# Print the value of manifest key $2 in file $1; return 1 when absent.
+read_manifest_value() {
+    local file="$1" key="$2" line value
+    [ -f "$file" ] || return 1
+    while IFS= read -r line || [ -n "${line:-}" ]; do
+        [ -z "${line//[[:space:]]/}" ] && continue
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        case "$line" in
+            "$key"=*)
+                value="${line#*=}"
+                value="${value#"${value%%[![:space:]]*}"}"
+                value="${value%"${value##*[![:space:]]}"}"
+                case "$value" in
+                    \"*\") value="${value#\"}"; value="${value%\"}" ;;
+                    \'*\') value="${value#\'}"; value="${value%\'}" ;;
+                esac
+                [ -n "$value" ] || return 1
+                echo "$value"
+                return 0
+                ;;
+        esac
+    done < "$file"
+    return 1
+}
+
+MANIFEST_MODE="$(read_manifest_value "$PROJECT_PATH/.vig-os" DEVKIT_MODE || true)"
+MANIFEST_PROJECT="$(read_manifest_value "$PROJECT_PATH/.vig-os" DEVKIT_PROJECT || true)"
+MANIFEST_ORG="$(read_manifest_value "$PROJECT_PATH/.vig-os" DEVKIT_ORG || true)"
+MANIFEST_REPO="$(read_manifest_value "$PROJECT_PATH/.vig-os" DEVKIT_REPO || true)"
+# The OWNER/REPO placeholder (persisted when no origin was resolvable) must
+# not mask a now-detectable git origin.
+[ "$MANIFEST_REPO" = "OWNER/REPO" ] && MANIFEST_REPO=""
+
+case "$MANIFEST_MODE" in
+    ""|devcontainer|direnv|both|bare) ;;
+    *)
+        err "Invalid DEVKIT_MODE in $PROJECT_PATH/.vig-os: $MANIFEST_MODE"
+        exit 1
+        ;;
+esac
+
+# Mode switching is destructive and never happens implicitly (#885): an
+# explicit --mode contradicting the persisted DEVKIT_MODE refuses. --preview
+# (report-only) stays available to inspect the would-be switch first.
+if [ -n "$MODE" ] && [ -n "$MANIFEST_MODE" ] && [ "$MODE" != "$MANIFEST_MODE" ] \
+    && [ -z "$PREVIEW" ] && [ -z "$SMOKE_TEST" ]; then
+    err "requested --mode $MODE contradicts the persisted DEVKIT_MODE=$MANIFEST_MODE in $PROJECT_PATH/.vig-os"
+    echo "  Mode switching reshapes the workspace and must be deliberate:"
+    echo "  1. Inspect the would-be change first:  install.sh --preview --mode $MODE $PROJECT_PATH"
+    echo "  2. Keep the persisted mode by omitting --mode, or"
+    echo "  3. Switch deliberately: set DEVKIT_MODE=$MODE in .vig-os on a dedicated,"
+    echo "     clean upgrade branch (the preflight guard flow) and re-run."
+    exit 1
+fi
+
+if [ -z "$MODE" ] && [ -n "$MANIFEST_MODE" ] && [ -z "$SMOKE_TEST" ]; then
+    MODE="$MANIFEST_MODE"
+    info "Delivery mode from .vig-os manifest: $MODE"
+fi
+
+# Derive project name: --name > persisted DEVKIT_PROJECT > folder name (#885)
+if [ -z "$PROJECT_NAME" ] && [ -n "$MANIFEST_PROJECT" ]; then
+    PROJECT_NAME="$MANIFEST_PROJECT"
+    info "Project name from .vig-os manifest: $PROJECT_NAME"
+fi
 if [ -z "$PROJECT_NAME" ]; then
     PROJECT_NAME="$(basename "$PROJECT_PATH")"
 fi
 PROJECT_NAME=$(sanitize_name "$PROJECT_NAME")
 
+# Organization: --org > persisted DEVKIT_ORG > default (#885)
+if [ -z "$ORG_NAME" ] && [ -n "$MANIFEST_ORG" ]; then
+    ORG_NAME="$MANIFEST_ORG"
+    info "Organization name from .vig-os manifest: $ORG_NAME"
+fi
+ORG_NAME="${ORG_NAME:-vigOS}"
 # Sanitize ORG_NAME for security (remove shell metacharacters) but preserve capitalization
 ORG_NAME=$(sanitize_for_security "$ORG_NAME")
 
-# GITHUB_REPOSITORY for init-workspace --no-prompts (Renovate extends in renovate.json)
+# GITHUB_REPOSITORY for init-workspace --no-prompts (Renovate extends in
+# renovate.json): --repo > persisted DEVKIT_REPO > git origin > OWNER/REPO
 GITHUB_REPOSITORY="$GITHUB_REPO_OVERRIDE"
+if [ -z "$GITHUB_REPOSITORY" ] && [ -n "$MANIFEST_REPO" ]; then
+    GITHUB_REPOSITORY="$MANIFEST_REPO"
+    info "GitHub repository from .vig-os manifest: $GITHUB_REPOSITORY"
+fi
 GITHUB_REPOSITORY=$(sanitize_for_security "$GITHUB_REPOSITORY")
 if [ -z "$GITHUB_REPOSITORY" ] && [ -d "$PROJECT_PATH/.git" ]; then
     url=$(git -C "$PROJECT_PATH" remote get-url origin 2>/dev/null || true)
@@ -698,11 +780,11 @@ info "Running post-initialization setup..."
 
 # 1. Copy host user configuration (git, ssh, gh) into .devcontainer/.conf/
 # Non-fatal: warnings about missing SSH keys or GH CLI are expected on CI/fresh machines.
-# direnv mode scaffolds no .devcontainer/, so the host-user-conf step (a
-# devcontainer-only concern) does not apply — skip it rather than emit a
-# misleading "script not found" warning (#738).
-if [ "$MODE" = "direnv" ]; then
-    info "direnv mode: skipping host user-conf copy (no .devcontainer/)"
+# direnv and bare modes scaffold no .devcontainer/, so the host-user-conf step
+# (a devcontainer-only concern) does not apply — skip it rather than emit a
+# misleading "script not found" warning (#738, #885).
+if [ "$MODE" = "direnv" ] || [ "$MODE" = "bare" ]; then
+    info "$MODE mode: skipping host user-conf copy (no .devcontainer/)"
 else
     run_user_conf "$PROJECT_PATH" || true
 fi
@@ -788,5 +870,9 @@ success "Devcontainer deployed to $PROJECT_PATH"
 echo ""
 echo "Next steps:"
 echo "  1. cd $PROJECT_PATH"
-echo "  2. Open in VS Code - it will detect .devcontainer/ and offer to reopen in container"
+if [ "$MODE" = "bare" ]; then
+    echo "  2. Run 'just help' to list the shipped recipes (host-native: no container)"
+else
+    echo "  2. Open in VS Code - it will detect .devcontainer/ and offer to reopen in container"
+fi
 echo ""

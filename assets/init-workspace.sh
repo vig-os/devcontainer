@@ -9,18 +9,29 @@
 #   --smoke-test  Deploy smoke-test-specific assets
 #   --preview     Print the add/overwrite/preserve/delete report an upgrade
 #                 would produce, then exit 0 without touching the tree (#886)
-#   --mode MODE   Delivery mode: devcontainer | direnv | both
+#   --mode MODE   Delivery mode: devcontainer | direnv | both | bare
 #                 devcontainer  scaffold .devcontainer/ only (no flake.nix/.envrc)
 #                 direnv        scaffold flake.nix + .envrc only (no .devcontainer/)
 #                 both          scaffold everything (default)
-#                 Unset: prompt interactively, or default to "both" with --no-prompts
+#                 bare          standards only: justfiles, hooks, host-native CI
+#                               (no .devcontainer/, no flake.nix/.envrc)
+#                 Unset: read DEVKIT_MODE from the workspace .vig-os manifest,
+#                 else prompt interactively / default to "both" with --no-prompts
 #
 # Environment variables (used with --no-prompts):
-#   SHORT_NAME           - Project short name (required)
-#   ORG_NAME             - Organization name (optional, defaults to "vigOS/devc")
-#   GITHUB_REPOSITORY    - owner/repo for Renovate preset extends (optional if origin is github.com)
+#   SHORT_NAME           - Project short name (required unless the workspace
+#                          .vig-os persists DEVKIT_PROJECT, #885)
+#   ORG_NAME             - Organization name (optional, defaults to DEVKIT_ORG
+#                          from .vig-os, else "vigOS/devc")
+#   GITHUB_REPOSITORY    - owner/repo for Renovate preset extends (optional if
+#                          persisted as DEVKIT_REPO or origin is github.com)
 #   VIG_OS_VERSION       - Override the DEVCONTAINER_VERSION pinned in the scaffolded
 #                          .vig-os (optional; install.sh forwards its --version, #852)
+#
+# The workspace .vig-os is the project's declarative manifest (#885): the
+# delivery mode and identity resolved by this script are written back to it,
+# so upgrades of a manifest-bearing repo are non-interactive and
+# shape-preserving with no flags. Precedence: flag/env > .vig-os > prompt/default.
 
 set -euo pipefail
 
@@ -32,7 +43,7 @@ FORCE=false
 NO_PROMPTS=false
 SMOKE_TEST=false
 PREVIEW=false
-# Delivery mode: devcontainer | direnv | both. Empty = prompt (or "both" with --no-prompts).
+# Delivery mode: devcontainer | direnv | both | bare. Empty = manifest, prompt, or "both".
 MODE=""
 
 # Files to preserve during --force upgrades (never overwrite if they exist)
@@ -115,9 +126,9 @@ done
 
 # Validate delivery mode (empty handled later: prompt, or default to "both").
 case "$MODE" in
-    ""|devcontainer|direnv|both) ;;
+    ""|devcontainer|direnv|both|bare) ;;
     *)
-        echo "Error: Invalid --mode: $MODE (expected: devcontainer | direnv | both)" >&2
+        echo "Error: Invalid --mode: $MODE (expected: devcontainer | direnv | both | bare)" >&2
         exit 1
         ;;
 esac
@@ -175,14 +186,105 @@ if ! is_workspace_empty && [[ "$FORCE" != "true" ]]; then
     exit 1
 fi
 
-# Get SHORT_NAME - from env var or prompt
+# ── .vig-os project manifest (#885) ───────────────────────────────────────────
+# The workspace .vig-os persists the delivery mode, identity, and (reserved)
+# capability modules. Read it before any prompt/default so a manifest-bearing
+# repo (re)scaffolds its own shape; precedence stays flag/env > .vig-os >
+# prompt/default. Same tolerant line-based parsing as every other consumer
+# (unknown keys ignored, quotes stripped).
+
+VIG_OS_MANIFEST="$WORKSPACE_DIR/.vig-os"
+
+# Print the value of manifest key $2 in file $1; return 1 when absent.
+read_manifest_value() {
+    local file="$1" key="$2" line value
+    [[ -f "$file" ]] || return 1
+    while IFS= read -r line || [[ -n "${line:-}" ]]; do
+        [[ -z "${line//[[:space:]]/}" ]] && continue
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        case "$line" in
+            "$key"=*)
+                value="${line#*=}"
+                value="${value#"${value%%[![:space:]]*}"}"
+                value="${value%"${value##*[![:space:]]}"}"
+                if [[ "$value" =~ ^\".*\"$ ]]; then
+                    value="${value:1:-1}"
+                elif [[ "$value" =~ ^\'.*\'$ ]]; then
+                    value="${value:1:-1}"
+                fi
+                [[ -n "$value" ]] || return 1
+                echo "$value"
+                return 0
+                ;;
+        esac
+    done < "$file"
+    return 1
+}
+
+# Persist manifest key $1 with value $2 in the scaffolded .vig-os: replace the
+# existing line, or append it (self-documenting upgrade of a legacy
+# version-only file). Same sed pattern as the #852 version pin.
+write_manifest_value() {
+    local key="$1" value="$2" value_escaped
+    [[ -f "$VIG_OS_MANIFEST" ]] || return 0
+    if grep -q "^${key}=" "$VIG_OS_MANIFEST"; then
+        value_escaped=$(printf '%s\n' "$value" | sed 's/[&/\]/\\&/g')
+        sed -i "s/^${key}=.*/${key}=${value_escaped}/" "$VIG_OS_MANIFEST"
+    else
+        printf '%s=%s\n' "$key" "$value" >> "$VIG_OS_MANIFEST"
+    fi
+}
+
+MANIFEST_MODE="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_MODE || true)"
+MANIFEST_PROJECT="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_PROJECT || true)"
+MANIFEST_ORG="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_ORG || true)"
+MANIFEST_REPO="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_REPO || true)"
+MANIFEST_MODULES="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_MODULES || true)"
+
+# The OWNER/REPO placeholder (written when no origin was resolvable) must not
+# mask a now-detectable git origin on a later upgrade.
+[[ "$MANIFEST_REPO" == "OWNER/REPO" ]] && MANIFEST_REPO=""
+
+# A corrupt persisted mode must not silently fall back to "both" — that would
+# reshape the repo. Refuse loudly instead.
+case "$MANIFEST_MODE" in
+    ""|devcontainer|direnv|both|bare) ;;
+    *)
+        echo "Error: Invalid DEVKIT_MODE in $VIG_OS_MANIFEST: $MANIFEST_MODE (expected: devcontainer | direnv | both | bare)" >&2
+        exit 1
+        ;;
+esac
+
+# Mode switching is destructive (e.g. both -> direnv deletes .devcontainer/)
+# and owned by the upgrade-guard flow — it must never happen implicitly. An
+# explicit --mode that contradicts the persisted DEVKIT_MODE refuses;
+# --preview stays available as the way to inspect a would-be switch first.
+# (--smoke-test redeploys a CI checkout from scratch and is exempt.)
+if [[ -n "$MODE" && -n "$MANIFEST_MODE" && "$MODE" != "$MANIFEST_MODE" \
+    && "$PREVIEW" != "true" && "$SMOKE_TEST" != "true" ]]; then
+    echo "Error: requested --mode $MODE contradicts the persisted DEVKIT_MODE=$MANIFEST_MODE in .vig-os." >&2
+    echo "" >&2
+    echo "Mode switching reshapes the workspace and never happens implicitly:" >&2
+    echo "  1. Inspect the would-be change first:  init-workspace --preview --mode $MODE" >&2
+    echo "  2. Keep the persisted mode by omitting --mode, or" >&2
+    echo "  3. Switch deliberately: set DEVKIT_MODE=$MODE in .vig-os on a dedicated," >&2
+    echo "     clean upgrade branch (see the upgrade preflight guard in MIGRATION.md)" >&2
+    echo "     and re-run the upgrade." >&2
+    exit 1
+fi
+
+# Get SHORT_NAME - from env var, manifest, or prompt (#885)
+if [[ -z "${SHORT_NAME:-}" && -n "$MANIFEST_PROJECT" ]]; then
+    SHORT_NAME="$MANIFEST_PROJECT"
+    echo "Project short name from .vig-os manifest: $SHORT_NAME"
+fi
 if [[ "$NO_PROMPTS" == "true" ]]; then
-    # Non-interactive mode: require SHORT_NAME env var
+    # Non-interactive mode: require SHORT_NAME (env var or persisted manifest)
     if [[ -z "${SHORT_NAME:-}" ]]; then
         echo "Error: SHORT_NAME environment variable is required with --no-prompts" >&2
         exit 1
     fi
-else
+elif [[ -z "${SHORT_NAME:-}" ]]; then
     # Interactive mode: prompt user
     read -rp "Enter a short name for your project (letters/numbers only, e.g. my_proj): " SHORT_NAME
     if [[ -z "$SHORT_NAME" ]]; then
@@ -197,11 +299,15 @@ SHORT_NAME=$(echo "$SHORT_NAME" | sed 's/__*/_/g' | sed 's/^[^a-z0-9]*//; s/[^a-
 SHORT_NAME="${SHORT_NAME:-project}"
 echo "Project short name set to: $SHORT_NAME"
 
-# Get ORG_NAME - from env var, default, or prompt
+# Get ORG_NAME - from env var, manifest, default, or prompt (#885)
+if [[ -z "${ORG_NAME:-}" && -n "$MANIFEST_ORG" ]]; then
+    ORG_NAME="$MANIFEST_ORG"
+    echo "Organization name from .vig-os manifest: $ORG_NAME"
+fi
 if [[ "$NO_PROMPTS" == "true" ]]; then
-    # Non-interactive mode: use env var or default
+    # Non-interactive mode: use env var/manifest or default
     ORG_NAME="${ORG_NAME:-vigOS/devc}"
-else
+elif [[ -z "${ORG_NAME:-}" ]]; then
     # Interactive mode: prompt user
     read -rp "Enter the name of your organization, e.g. 'vigOS': " ORG_NAME
     if [[ -z "$ORG_NAME" ]]; then
@@ -211,8 +317,61 @@ else
 fi
 echo "Organization name set to: $ORG_NAME"
 
-# Get MODE - from flag, prompt, or default. Selects which delivery the workspace
-# scaffolds: a devcontainer, the Nix/direnv stub, or both.
+# Get MODE - from flag, manifest, inference, prompt, or default (#885).
+# Selects which delivery the workspace scaffolds: a devcontainer, the
+# Nix/direnv stub, or both. Smoke-test deploys ignore the manifest: they
+# redeploy the full template over a CI checkout regardless of the
+# checked-in mode.
+if [[ -z "$MODE" && -n "$MANIFEST_MODE" && "$SMOKE_TEST" != "true" ]]; then
+    MODE="$MANIFEST_MODE"
+    echo "Delivery mode from .vig-os manifest: $MODE"
+fi
+
+# Legacy consumers (version-only .vig-os, or none) persist no DEVKIT_MODE:
+# infer it from the tree shape on upgrade — conservatively (the wider mode
+# on ambiguity), transparently (the inference is printed and, when
+# interactive, confirmed), and never reshaping the repo: the inferred mode
+# matches the shape that is already there. Sets MODE, or leaves it empty
+# when the tree carries no mode markers at all.
+infer_legacy_mode() {
+    local has_devc=false has_direnv=false
+    if [[ -d "$WORKSPACE_DIR/.devcontainer" ]] \
+        && [[ -n "$(ls -A "$WORKSPACE_DIR/.devcontainer" 2>/dev/null)" ]]; then
+        has_devc=true
+    fi
+    if [[ -f "$WORKSPACE_DIR/flake.nix" || -f "$WORKSPACE_DIR/.envrc" ]]; then
+        has_direnv=true
+    fi
+    if [[ "$has_devc" == "true" && "$has_direnv" == "true" ]]; then
+        MODE="both"
+        if [[ -f "$WORKSPACE_DIR/flake.nix" ]] \
+            && ! grep -q 'vigos.lib.mkProjectShell' "$WORKSPACE_DIR/flake.nix" 2>/dev/null; then
+            echo "Note: flake.nix does not look like the scaffold stub (consumer-authored?);"
+            echo "      resolving the ambiguity to the wider mode. Your flake.nix/.envrc are"
+            echo "      preserved files and stay untouched (#859)."
+        fi
+    elif [[ "$has_devc" == "true" ]]; then
+        MODE="devcontainer"
+    elif [[ "$has_direnv" == "true" ]]; then
+        MODE="direnv"
+    else
+        return 0
+    fi
+    echo "Inferred delivery mode '$MODE' from the existing tree (no DEVKIT_MODE"
+    echo "persisted in .vig-os): .devcontainer/ populated: $has_devc, flake.nix/.envrc: $has_direnv."
+    echo "The inferred mode will be persisted in .vig-os after the upgrade."
+    if [[ "$NO_PROMPTS" != "true" ]]; then
+        local reply
+        read -rp "Use inferred delivery mode '$MODE'? (Y/n): " reply
+        if [[ "$reply" =~ ^[Nn]$ ]]; then
+            MODE=""
+        fi
+    fi
+}
+if [[ -z "$MODE" && "$FORCE" == "true" && "$SMOKE_TEST" != "true" ]]; then
+    infer_legacy_mode
+fi
+
 if [[ -z "$MODE" ]]; then
     if [[ "$NO_PROMPTS" == "true" ]] || [[ ! -t 0 ]]; then
         # Non-interactive (--no-prompts, or no TTY: CI / piped stdin): default to
@@ -224,12 +383,13 @@ if [[ -z "$MODE" ]]; then
         echo "  1) devcontainer - VS Code Dev Containers (.devcontainer/)"
         echo "  2) direnv       - Nix flake + direnv (flake.nix + .envrc)"
         echo "  3) both         - scaffold both (default)"
-        read -rp "Delivery mode [devcontainer/direnv/both] (default: both): " MODE
+        echo "  4) bare         - standards only: justfiles, hooks, CI (no container, no flake)"
+        read -rp "Delivery mode [devcontainer/direnv/both/bare] (default: both): " MODE
         MODE="${MODE:-both}"
         case "$MODE" in
-            devcontainer|direnv|both) ;;
+            devcontainer|direnv|both|bare) ;;
             *)
-                echo "Error: Invalid mode: $MODE (expected: devcontainer | direnv | both)" >&2
+                echo "Error: Invalid mode: $MODE (expected: devcontainer | direnv | both | bare)" >&2
                 exit 1
                 ;;
         esac
@@ -307,14 +467,16 @@ if [[ "$FORCE" == "true" ]]; then
         workspace_file="$WORKSPACE_DIR/$rel_path"
 
         # Mode filters (#886): skip template paths the chosen delivery mode
-        # never scaffolds. direnv mode excludes .devcontainer/ from the copy
-        # entirely (#738); devcontainer mode prunes the flake.nix/.envrc stubs
-        # it would itself create — unless they pre-exist (#859), in which case
-        # they fall through to the PRESERVED listing below.
-        if [[ "$MODE" == "direnv" && "$rel_path" == .devcontainer/* ]]; then
+        # never scaffolds. direnv and bare modes exclude .devcontainer/ from
+        # the copy entirely (#738); devcontainer and bare modes prune the
+        # flake.nix/.envrc stubs they would themselves create — unless they
+        # pre-exist (#859), in which case they fall through to the PRESERVED
+        # listing below.
+        if [[ ("$MODE" == "direnv" || "$MODE" == "bare") \
+            && "$rel_path" == .devcontainer/* ]]; then
             continue
         fi
-        if [[ "$MODE" == "devcontainer" ]] \
+        if [[ "$MODE" == "devcontainer" || "$MODE" == "bare" ]] \
             && [[ "$rel_path" == "flake.nix" || "$rel_path" == ".envrc" ]] \
             && [[ ! -e "$workspace_file" ]]; then
             continue
@@ -334,9 +496,13 @@ if [[ "$FORCE" == "true" ]]; then
     # Mode-prune deletions (#886): paths that exist right now and the upgrade
     # would remove. Mirrors the prune guards further down (#738/#859/#877).
     DELETIONS=()
-    if [[ "$MODE" == "direnv" ]]; then
+    if [[ "$MODE" == "direnv" || "$MODE" == "bare" ]]; then
         if [[ -e "$WORKSPACE_DIR/.devcontainer" && "$DEVCONTAINER_PREEXISTED" != "true" ]]; then
             DELETIONS+=(".devcontainer/")
+        elif [[ "$DEVCONTAINER_PREEXISTED" == "true" ]]; then
+            # The #738 guard keeps a populated consumer .devcontainer/; say so
+            # explicitly instead of leaving it silently absent from the report.
+            PRESERVED+=(".devcontainer/ (pre-existing, kept — #738)")
         fi
     else
         # The devcontainer-mode flake.nix/.envrc prune only removes stubs this
@@ -457,14 +623,28 @@ else
         fi
     done
 
-    # direnv mode wants no .devcontainer/ at all, so never copy the template one
-    # over a populated consumer .devcontainer/ (#738). Excluding it from the copy
-    # (rather than copying-then-pruning) keeps a real .devcontainer/ intact.
-    if [[ "$MODE" == "direnv" ]]; then
+    # direnv and bare modes want no .devcontainer/ at all, so never copy the
+    # template one over a populated consumer .devcontainer/ (#738). Excluding it
+    # from the copy (rather than copying-then-pruning) keeps a real
+    # .devcontainer/ intact.
+    if [[ "$MODE" == "direnv" || "$MODE" == "bare" ]]; then
         EXCLUDE_ARGS+=("--exclude=.devcontainer")
     fi
 
     rsync -avL --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
+
+    # bare mode runs CI on the host, not in the image: overlay the host-native
+    # ci.yml variant over the container-based template one (#885). ci.yml is a
+    # managed file, so upgrades of a bare workspace re-apply the overlay too.
+    if [[ "$MODE" == "bare" ]]; then
+        BARE_OVERLAY_DIR="$SCRIPT_DIR/workspace-bare"
+        if [[ -d "$BARE_OVERLAY_DIR" ]]; then
+            echo "Deploying bare-mode overlay (host-native CI)..."
+            rsync -avL "$BARE_OVERLAY_DIR/" "$WORKSPACE_DIR/"
+        else
+            echo "Warning: bare-mode overlay not found at $BARE_OVERLAY_DIR; the scaffolded ci.yml is container-based." >&2
+        fi
+    fi
 fi
 
 # The Nix-built image stores the baked template as read-only symlinks into the
@@ -474,12 +654,49 @@ fi
 # — work. No-op on the Debian image (its template files are already writable).
 chmod -R u+w "$WORKSPACE_DIR"
 
+# Early write-back (#885): the rsync above just replaced .vig-os with the
+# template, so until the late write-back below the manifest would claim the
+# template's values instead of this run's. Any abort inside that window
+# (e.g. resolve_github_repository under --no-prompts) must not persist a
+# state the repo did not choose — the next --force run trusts the manifest.
+# Mode and identity are already resolved, so land them now; DEVKIT_REPO is
+# only known after resolve_github_repository and stays in the late write-back.
+if [[ -f "$VIG_OS_MANIFEST" ]]; then
+    write_manifest_value DEVKIT_MODE "$MODE"
+    write_manifest_value DEVKIT_PROJECT "$SHORT_NAME"
+    write_manifest_value DEVKIT_ORG "$ORG_NAME"
+fi
+
 # Prune the scaffold to the chosen delivery mode. Idempotent and safe: only
 # removes paths inside the new workspace.
 #   devcontainer -> remove the flake.nix + .envrc stub
 #   direnv       -> remove the .devcontainer/ scaffold
 #   both         -> keep everything
+#   bare         -> remove .devcontainer/ AND the flake.nix + .envrc stub
 case "$MODE" in
+    bare)
+        # Standards-only scaffold (#885): prune every container/flake
+        # artifact, with the same pre-existence guards as the other modes —
+        # consumer-owned files always survive (#738/#859).
+        if [[ "$DEVCONTAINER_PREEXISTED" == "true" ]]; then
+            echo "bare mode: preserving existing .devcontainer/ (#738)"
+        else
+            echo "Pruning to 'bare' mode: removing .devcontainer/..."
+            rm -rf "$WORKSPACE_DIR/.devcontainer"
+        fi
+        if [[ "$FLAKE_PREEXISTED" == "true" ]]; then
+            echo "bare mode: preserving existing flake.nix (#859)"
+        else
+            echo "Pruning to 'bare' mode: removing flake.nix..."
+            rm -f "$WORKSPACE_DIR/flake.nix"
+        fi
+        if [[ "$ENVRC_PREEXISTED" == "true" ]]; then
+            echo "bare mode: preserving existing .envrc (#859)"
+        else
+            echo "Pruning to 'bare' mode: removing .envrc..."
+            rm -f "$WORKSPACE_DIR/.envrc"
+        fi
+        ;;
     devcontainer)
         # Only prune the stub files this scaffold created; a consumer's own
         # pre-existing flake.nix/.envrc must survive (#859).
@@ -514,9 +731,10 @@ esac
 # 0.4.0 retired .devcontainer/justfile.base (recipes relocated to
 # justfile.project), so drop the stale copy an upgraded 0.3.x repo carries —
 # nothing imports it anymore (#877). Only when this scaffold manages
-# .devcontainer/: a direnv-mode consumer's own .devcontainer/ is never
-# touched (#738).
-if [[ "$MODE" != "direnv" && -f "$WORKSPACE_DIR/.devcontainer/justfile.base" ]]; then
+# .devcontainer/: a direnv- or bare-mode consumer's own .devcontainer/ is
+# never touched (#738).
+if [[ "$MODE" != "direnv" && "$MODE" != "bare" \
+    && -f "$WORKSPACE_DIR/.devcontainer/justfile.base" ]]; then
     echo "Removing retired .devcontainer/justfile.base (recipes live in justfile.project since 0.4.0)..."
     rm -f "$WORKSPACE_DIR/.devcontainer/justfile.base"
 fi
@@ -533,6 +751,14 @@ if [[ -n "${VIG_OS_VERSION:-}" && -f "$WORKSPACE_DIR/.vig-os" ]]; then
     fi
     echo "Pinning DEVCONTAINER_VERSION=${VIG_OS_VERSION} in .vig-os..."
     sed -i "s/^DEVCONTAINER_VERSION=.*/DEVCONTAINER_VERSION=${VIG_OS_VERSION}/" "$WORKSPACE_DIR/.vig-os"
+fi
+
+# Persisted DEVKIT_REPO fills GITHUB_REPOSITORY when the env var is absent or
+# still the OWNER/REPO placeholder (#885); an explicit env value wins.
+if [[ -z "${GITHUB_REPOSITORY:-}" || "${GITHUB_REPOSITORY:-}" == "OWNER/REPO" ]] \
+    && [[ -n "$MANIFEST_REPO" ]]; then
+    GITHUB_REPOSITORY="$MANIFEST_REPO"
+    echo "GitHub repository from .vig-os manifest: $GITHUB_REPOSITORY"
 fi
 
 resolve_github_repository
@@ -565,6 +791,22 @@ else
             sed -i "s/{{SHORT_NAME}}/${SHORT_NAME_ESCAPED}/g; s/{{ORG_NAME}}/${ORG_NAME_ESCAPED}/g; s/{{GITHUB_REPOSITORY}}/${GITHUB_REPOSITORY_ESCAPED}/g" "$file"
         fi
     done
+fi
+
+# Persist the resolved manifest (#885). The scaffolded .vig-os is a managed
+# file (template-overwritten on upgrade), so the resolved delivery mode and
+# identity are written back on every (re)scaffold — the next upgrade then
+# needs no mode/identity flags at all. A consumer's DEVKIT_MODULES
+# declaration (#884, read before the template overwrite) is restored too.
+if [[ -f "$VIG_OS_MANIFEST" ]]; then
+    echo "Persisting resolved manifest values in .vig-os..."
+    write_manifest_value DEVKIT_MODE "$MODE"
+    write_manifest_value DEVKIT_PROJECT "$SHORT_NAME"
+    write_manifest_value DEVKIT_ORG "$ORG_NAME"
+    write_manifest_value DEVKIT_REPO "$GITHUB_REPOSITORY"
+    if [[ -n "$MANIFEST_MODULES" ]]; then
+        write_manifest_value DEVKIT_MODULES "\"$MANIFEST_MODULES\""
+    fi
 fi
 
 # Rename template_project directory to match project short name

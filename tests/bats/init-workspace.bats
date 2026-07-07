@@ -1005,3 +1005,444 @@ _preview() {
     run test -e "$ws/justfile"
     assert_failure
 }
+
+# ── .vig-os project manifest (#885) ───────────────────────────────────────────
+# .vig-os is the project's declarative manifest: the delivery mode and the
+# project identity (short name, org, GitHub repo) are persisted on every
+# (re)scaffold and read back before prompting — precedence flag/env > .vig-os >
+# prompt/default — so a manifest-bearing repo upgrades with `--force` and no
+# mode/identity flags while keeping its shape and names. `DEVKIT_MODULES` is
+# reserved for the capability-module declaration (#884) and survives upgrades.
+
+# Re-run the real script as an upgrade with NO mode/identity flags or env:
+# everything must resolve from the workspace's own .vig-os manifest.
+_upgrade_no_flags() {
+    local ws="$1"
+    local stub="$BATS_TEST_TMPDIR/stub-bin-885"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/just"
+    env PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts
+}
+
+@test "template .vig-os carries the manifest key set (#885)" {
+    for key in DEVCONTAINER_VERSION DEVKIT_MODE DEVKIT_PROJECT DEVKIT_ORG \
+        DEVKIT_REPO DEVKIT_MODULES; do
+        run grep -E "^${key}=" "$TEMPLATE_DIR/.vig-os"
+        assert_success
+    done
+}
+
+@test "template .vig-os ships no baked-in delivery mode (#885)" {
+    # The template value lands verbatim in the consumer's .vig-os between the
+    # rsync overwrite and the resolved write-back. A non-empty DEVKIT_MODE in
+    # that window is a mode nobody chose: an abort inside it would persist the
+    # template's mode and legitimize a reshape on the next run. Empty is
+    # treated as unset by every parser, so ship it empty.
+    run grep -x 'DEVKIT_MODE=' "$TEMPLATE_DIR/.vig-os"
+    assert_success
+}
+
+@test "fresh scaffold persists resolved mode and identity in .vig-os (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-writeback"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    run grep -x 'DEVKIT_MODE=direnv' "$ws/.vig-os"
+    assert_success
+    run grep -x 'DEVKIT_PROJECT=testproj' "$ws/.vig-os"
+    assert_success
+    # _scaffold sets no ORG_NAME, so the --no-prompts default is persisted
+    run grep -x 'DEVKIT_ORG=vigOS/devc' "$ws/.vig-os"
+    assert_success
+    run grep -x 'DEVKIT_REPO=test/repo' "$ws/.vig-os"
+    assert_success
+}
+
+@test "manifest-bearing upgrade keeps devcontainer shape and names, no flags (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-up-devc"
+    mkdir -p "$ws"
+    run _scaffold devcontainer "$ws"
+    assert_success
+    run _upgrade_no_flags "$ws"
+    assert_success
+    assert_output --partial "from .vig-os manifest"
+    run test -d "$ws/.devcontainer"
+    assert_success
+    run test -e "$ws/flake.nix"
+    assert_failure
+    run test -e "$ws/.envrc"
+    assert_failure
+    run test -d "$ws/src/testproj"
+    assert_success
+    run grep -x 'DEVKIT_MODE=devcontainer' "$ws/.vig-os"
+    assert_success
+}
+
+@test "manifest-bearing upgrade keeps direnv shape and names, no flags (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-up-direnv"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    run _upgrade_no_flags "$ws"
+    assert_success
+    assert_output --partial "from .vig-os manifest"
+    run test -e "$ws/.devcontainer"
+    assert_failure
+    run test -f "$ws/flake.nix"
+    assert_success
+    run test -d "$ws/src/testproj"
+    assert_success
+    run grep -x 'DEVKIT_MODE=direnv' "$ws/.vig-os"
+    assert_success
+    run grep -x 'DEVKIT_PROJECT=testproj' "$ws/.vig-os"
+    assert_success
+}
+
+@test "manifest-bearing upgrade keeps both shape and names, no flags (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-up-both"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    run _upgrade_no_flags "$ws"
+    assert_success
+    run test -d "$ws/.devcontainer"
+    assert_success
+    run test -f "$ws/flake.nix"
+    assert_success
+    run test -d "$ws/src/testproj"
+    assert_success
+    run grep -x 'DEVKIT_MODE=both' "$ws/.vig-os"
+    assert_success
+}
+
+@test "persisted-mode vs requested-mode mismatch refuses, pointing at --preview (#885)" {
+    # Mode switching is destructive (e.g. both -> bare deletes .devcontainer/)
+    # and out of scope here: it must never happen implicitly. A --mode that
+    # contradicts the persisted DEVKIT_MODE refuses instead of reshaping.
+    ws="$BATS_TEST_TMPDIR/e2e-885-mismatch"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    stub="$BATS_TEST_TMPDIR/stub-bin-885"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/just"
+    run env PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts --mode both
+    assert_failure
+    assert_output --partial "DEVKIT_MODE"
+    assert_output --partial "--preview"
+    # the tree was not reshaped
+    run test -e "$ws/.devcontainer"
+    assert_failure
+}
+
+@test "--preview is exempt from the mode-mismatch refusal (#885)" {
+    # Preview is report-only, so it is exactly how a user inspects a would-be
+    # mode switch before deciding.
+    ws="$BATS_TEST_TMPDIR/e2e-885-mismatch-preview"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    run _preview "$ws" --mode both
+    assert_success
+    assert_output --partial "Preview complete"
+    run test -e "$ws/.devcontainer"
+    assert_failure
+}
+
+@test "matching --mode proceeds against a persisted DEVKIT_MODE (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-match"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    run _scaffold direnv "$ws"
+    assert_success
+    run test -e "$ws/.devcontainer"
+    assert_failure
+}
+
+@test "upgrade preserves a persisted DEVKIT_MODULES value (#885)" {
+    # Reserved key (#884): .vig-os is a managed file, so the consumer's module
+    # declaration must be read before the template overwrite and written back.
+    ws="$BATS_TEST_TMPDIR/e2e-885-modules"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    sed -i 's/^DEVKIT_MODULES=.*/DEVKIT_MODULES="native rust"/' "$ws/.vig-os"
+    run _upgrade_no_flags "$ws"
+    assert_success
+    run grep -x 'DEVKIT_MODULES="native rust"' "$ws/.vig-os"
+    assert_success
+}
+
+# ── legacy mode inference (#885) ──────────────────────────────────────────────
+# Consumers scaffolded before the manifest carry a version-only .vig-os (or
+# none): an upgrade without --mode must infer the delivery mode from the tree
+# shape — conservatively (the wider mode on ambiguity), transparently (the
+# inference is printed), and without ever reshaping the repo. The inferred
+# mode is persisted so the file self-documents from the first upgrade on.
+
+# Strip the workspace manifest back to the pre-#885 version-only form.
+_make_legacy_manifest() {
+    printf '# vig-os devcontainer configuration\nDEVCONTAINER_VERSION=0.3.9\n' \
+        > "$1/.vig-os"
+}
+
+# Upgrade with identity env but NO --mode: the legacy path under test.
+_upgrade_legacy() {
+    local ws="$1"
+    local stub="$BATS_TEST_TMPDIR/stub-bin-885L"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/just"
+    env PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=testproj \
+        GITHUB_REPOSITORY=test/repo \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts
+}
+
+@test "legacy upgrade infers devcontainer mode from a .devcontainer-only tree (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-infer-devc"
+    mkdir -p "$ws"
+    run _scaffold devcontainer "$ws"
+    assert_success
+    _make_legacy_manifest "$ws"
+    run _upgrade_legacy "$ws"
+    assert_success
+    assert_output --partial "Inferred delivery mode 'devcontainer'"
+    run test -d "$ws/.devcontainer"
+    assert_success
+    # no reshape: the flake stub must NOT be added to a devcontainer-only repo
+    run test -e "$ws/flake.nix"
+    assert_failure
+    run grep -x 'DEVKIT_MODE=devcontainer' "$ws/.vig-os"
+    assert_success
+}
+
+@test "legacy upgrade infers direnv mode from a flake/envrc-only tree (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-infer-direnv"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    _make_legacy_manifest "$ws"
+    run _upgrade_legacy "$ws"
+    assert_success
+    assert_output --partial "Inferred delivery mode 'direnv'"
+    run test -e "$ws/.devcontainer"
+    assert_failure
+    run test -f "$ws/flake.nix"
+    assert_success
+    run grep -x 'DEVKIT_MODE=direnv' "$ws/.vig-os"
+    assert_success
+}
+
+@test "legacy upgrade infers both from .devcontainer plus the scaffold flake stub (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-infer-both"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    _make_legacy_manifest "$ws"
+    run _upgrade_legacy "$ws"
+    assert_success
+    assert_output --partial "Inferred delivery mode 'both'"
+    run test -d "$ws/.devcontainer"
+    assert_success
+    run test -f "$ws/flake.nix"
+    assert_success
+    run grep -x 'DEVKIT_MODE=both' "$ws/.vig-os"
+    assert_success
+}
+
+@test "ambiguous legacy tree (consumer flake + .devcontainer) widens to both (#885)" {
+    # The #859 combination: a devcontainer-mode repo whose owners added their
+    # own nix-direnv setup. Resolve to the WIDER mode, print the inference,
+    # and keep the consumer files bit-identical (they are PRESERVE_FILES).
+    ws="$BATS_TEST_TMPDIR/e2e-885-infer-ambiguous"
+    mkdir -p "$ws"
+    run _scaffold devcontainer "$ws"
+    assert_success
+    _make_legacy_manifest "$ws"
+    printf '# SENTINEL-885 my own flake\n' > "$ws/flake.nix"
+    printf 'use flake .#custom\n' > "$ws/.envrc"
+    run _upgrade_legacy "$ws"
+    assert_success
+    assert_output --partial "Inferred delivery mode 'both'"
+    run test -d "$ws/.devcontainer"
+    assert_success
+    run cat "$ws/flake.nix"
+    assert_output "# SENTINEL-885 my own flake"
+    run cat "$ws/.envrc"
+    assert_output "use flake .#custom"
+    run grep -x 'DEVKIT_MODE=both' "$ws/.vig-os"
+    assert_success
+}
+
+@test "aborted legacy upgrade does not poison DEVKIT_MODE for the next run (#885)" {
+    # Torn-state window: the template rsync overwrites .vig-os before the
+    # resolved values are written back, and resolve_github_repository sits
+    # inside that window — under --no-prompts it exits 1 on a legacy tree
+    # whose origin is not github.com. The abort must leave no mode the repo
+    # never chose, or the NEXT --force run trusts the persisted value and
+    # silently re-adds .devcontainer/ to a direnv-shaped repo.
+    ws="$BATS_TEST_TMPDIR/e2e-885-torn"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    _make_legacy_manifest "$ws"
+    git init -q "$ws"
+    git -C "$ws" remote add origin https://gitlab.example.com/acme/legacy.git
+
+    # First run: no GITHUB_REPOSITORY env, non-github origin -> aborts after
+    # the template overwrite, before the late write-back.
+    stub="$BATS_TEST_TMPDIR/stub-bin-885T"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/just"
+    # `env -u GITHUB_REPOSITORY`: GitHub Actions exports the variable
+    # globally, which would satisfy the resolver in CI and mask the abort.
+    run env -u GITHUB_REPOSITORY PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=testproj \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts
+    assert_failure
+    assert_output --partial "GITHUB_REPOSITORY"
+
+    # The torn manifest must not claim the template's mode...
+    run grep -x 'DEVKIT_MODE=both' "$ws/.vig-os"
+    assert_failure
+    # ...and the mode resolved BEFORE the abort is already persisted (early
+    # write-back), so the manifest never lies even mid-run.
+    run grep -x 'DEVKIT_MODE=direnv' "$ws/.vig-os"
+    assert_success
+
+    # The second (repaired) run keeps the direnv shape instead of silently
+    # re-adding .devcontainer/.
+    run _upgrade_legacy "$ws"
+    assert_success
+    run test -e "$ws/.devcontainer"
+    assert_failure
+    run grep -x 'DEVKIT_MODE=direnv' "$ws/.vig-os"
+    assert_success
+}
+
+# ── bare delivery mode (#885) ─────────────────────────────────────────────────
+# `bare` ships the standards layer only — justfiles, hooks config, .github CI,
+# pyproject scaffolding, .vig-os — and prunes every container/flake artifact
+# (.devcontainer/, flake.nix, .envrc) with the same #738/#859 pre-existence
+# guards as the other modes. The shipped ci.yml is replaced by a host-native
+# variant: no resolve-image, no container jobs — the runner sets up uv
+# directly and drives the same `just sync|precommit|test` contract.
+
+@test "init-workspace --mode=bare scaffolds the standards layer only (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-bare"
+    mkdir -p "$ws"
+    run _scaffold bare "$ws"
+    assert_success
+    # pruned: container and flake machinery
+    run test -e "$ws/.devcontainer"
+    assert_failure
+    run test -e "$ws/flake.nix"
+    assert_failure
+    run test -e "$ws/.envrc"
+    assert_failure
+    # shipped: the standards layer
+    for f in justfile justfile.project justfile.local .pre-commit-config.yaml \
+        .github/workflows/ci.yml pyproject.toml .vig-os; do
+        run test -e "$ws/$f"
+        assert_success
+    done
+    run grep -x 'DEVKIT_MODE=bare' "$ws/.vig-os"
+    assert_success
+}
+
+@test "fresh bare workspace resolves the CI-contract recipes (#885)" {
+    # The shipped host-native ci.yml calls `just sync|precommit|test`; the
+    # root justfile's .devcontainer imports are optional (import?), so the
+    # graph must load and every contract recipe must resolve without any
+    # .devcontainer/ recipe file.
+    real_just="$(command -v just)"
+    ws="$BATS_TEST_TMPDIR/e2e-bare-just"
+    mkdir -p "$ws"
+    run _scaffold bare "$ws"
+    assert_success
+    run bash -c "cd '$ws' && '$real_just' --list"
+    assert_success
+    for r in sync precommit test; do
+        run bash -c "cd '$ws' && '$real_just' --show $r"
+        assert_success
+    done
+}
+
+@test "bare-mode ci.yml is host-native: no image resolution, no container jobs (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-bare-ci"
+    mkdir -p "$ws"
+    run _scaffold bare "$ws"
+    assert_success
+    run grep -E 'resolve-image|container:' "$ws/.github/workflows/ci.yml"
+    assert_failure
+    run grep -q 'astral-sh/setup-uv' "$ws/.github/workflows/ci.yml"
+    assert_success
+    # scorecard-conform: every action reference is SHA-pinned
+    run bash -c "grep 'uses:' '$ws/.github/workflows/ci.yml' | grep -vE '@[0-9a-f]{40}'"
+    assert_failure
+}
+
+@test "bare scaffold preserves a pre-existing .devcontainer/, flake.nix and .envrc (#885)" {
+    # Same guards as #738/#859: bare never deletes consumer-owned machinery,
+    # even though a stock bare workspace ships none.
+    ws="$BATS_TEST_TMPDIR/e2e-bare-guards"
+    mkdir -p "$ws/.devcontainer"
+    printf '# SENTINEL-885 consumer compose\n' > "$ws/.devcontainer/docker-compose.yml"
+    printf '# SENTINEL-885 my own flake\n' > "$ws/flake.nix"
+    printf 'use flake .#custom\n' > "$ws/.envrc"
+    run _scaffold bare "$ws"
+    assert_success
+    run grep -q 'SENTINEL-885 consumer compose' "$ws/.devcontainer/docker-compose.yml"
+    assert_success
+    run cat "$ws/flake.nix"
+    assert_output "# SENTINEL-885 my own flake"
+    run cat "$ws/.envrc"
+    assert_output "use flake .#custom"
+}
+
+@test "manifest-bearing upgrade keeps bare shape and names, no flags (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-up-bare"
+    mkdir -p "$ws"
+    run _scaffold bare "$ws"
+    assert_success
+    run _upgrade_no_flags "$ws"
+    assert_success
+    assert_output --partial "from .vig-os manifest"
+    run test -e "$ws/.devcontainer"
+    assert_failure
+    run test -e "$ws/flake.nix"
+    assert_failure
+    run test -d "$ws/src/testproj"
+    assert_success
+    run grep -x 'DEVKIT_MODE=bare' "$ws/.vig-os"
+    assert_success
+    run grep -E 'resolve-image|container:' "$ws/.github/workflows/ci.yml"
+    assert_failure
+}
+
+@test "preview lists a pre-existing .devcontainer/ as preserved in direnv/bare modes (#885)" {
+    # A populated consumer .devcontainer/ is kept by the #738 guard but was
+    # silently absent from the preview report — the mode-switch UX needs the
+    # explicit "preserved" line.
+    ws="$BATS_TEST_TMPDIR/e2e-885-preview-preserved"
+    mkdir -p "$ws/.devcontainer"
+    printf '# consumer-owned\n' > "$ws/.devcontainer/docker-compose.yml"
+    run _preview "$ws" --mode direnv
+    assert_success
+    assert_output --partial ".devcontainer/ (pre-existing"
+}
