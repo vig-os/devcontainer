@@ -743,3 +743,83 @@ EOF
     run grep -F "import? 'justfile.project'" "$INIT_WORKSPACE_SH"
     assert_success
 }
+
+# ── upgrade must not clobber a customized .pre-commit-config.yaml (#878) ──────
+# The scaffold upgrade replaced the consumer's .pre-commit-config.yaml
+# wholesale, silently dropping the repo-specific global `exclude:` block and
+# per-hook `exclude:` keys (hyrr: the hook suite then "fixed" ~45 physics data
+# files it must never touch, and detect-private-key false-flagged a file with
+# PEM marker literals). Like justfile.project (#877), the consumer owns the
+# file: it is preserved on upgrade, the upgrade prints a diff against the
+# template so hook-stack evolution stays visible, and a prek parse gate warns
+# when the preserved config would break every commit in the new image.
+
+# A consumer .pre-commit-config.yaml: global + per-hook excludes (hyrr shape).
+_custom_precommit_config() {
+    cat > "$1/.pre-commit-config.yaml" <<'EOF'
+# SENTINEL-878 consumer hook config
+exclude: ^data/stopping/|\.dat$
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b  # v5.0.0
+    hooks:
+      - id: detect-private-key
+        exclude: ^worker/src/index\.ts$
+EOF
+}
+
+@test "upgrade preserves a customized .pre-commit-config.yaml (#878)" {
+    ws="$BATS_TEST_TMPDIR/e2e-878-preserve"
+    mkdir -p "$ws"
+    _custom_precommit_config "$ws"
+    run _upgrade both "$ws"
+    assert_success
+    # the consumer file survives verbatim: global exclude + per-hook exclude
+    run grep -q 'SENTINEL-878' "$ws/.pre-commit-config.yaml"
+    assert_success
+    run grep -q '^exclude: \^data/stopping/' "$ws/.pre-commit-config.yaml"
+    assert_success
+    run grep -q 'worker/src/index' "$ws/.pre-commit-config.yaml"
+    assert_success
+}
+
+@test "upgrade prints a template diff hint for a preserved .pre-commit-config.yaml (#878)" {
+    ws="$BATS_TEST_TMPDIR/e2e-878-diff"
+    mkdir -p "$ws"
+    _custom_precommit_config "$ws"
+    run _upgrade both "$ws"
+    assert_success
+    assert_output --partial 'Preserved .pre-commit-config.yaml differs from the template'
+    # the hint shows template evolution the preserved file lacks
+    assert_output --partial 'default_language_version'
+}
+
+@test "no .pre-commit-config.yaml diff hint when it matches the template (#878)" {
+    # Fresh scaffold delivers the template file; re-running the upgrade must
+    # stay silent (no spurious warning on every upgrade of a stock consumer).
+    ws="$BATS_TEST_TMPDIR/e2e-878-stock"
+    mkdir -p "$ws"
+    run _upgrade both "$ws"
+    assert_success
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial 'Preserved .pre-commit-config.yaml differs from the template'
+}
+
+@test "upgrade warns when the preserved .pre-commit-config.yaml does not validate (#878)" {
+    # A preserved config prek cannot load breaks every commit in the new
+    # image; the upgrade must warn loudly — and stay non-fatal (#877 parse
+    # gate precedent).
+    ws="$BATS_TEST_TMPDIR/e2e-878-invalid"
+    mkdir -p "$ws"
+    cat > "$ws/.pre-commit-config.yaml" <<'EOF'
+# SENTINEL-878 broken consumer config
+repos: this-is-not-a-repo-list
+EOF
+    run _upgrade both "$ws"
+    assert_success
+    assert_output --partial 'does not validate'
+    # and the broken file is still preserved, not clobbered
+    run grep -q 'SENTINEL-878' "$ws/.pre-commit-config.yaml"
+    assert_success
+}
