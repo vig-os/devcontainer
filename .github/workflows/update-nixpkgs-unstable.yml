@@ -89,10 +89,21 @@ jobs:
           COMMIT_MESSAGE: "chore(nix): bump nixpkgs-unstable (fast-movers refresh)"
           FILE_PATHS: flake.lock
 
+      # PR creation needs pull-requests: write, which the commit app does not
+      # have (least-privilege split: COMMIT_APP_* commits, RELEASE_APP_* does
+      # PR operations). Same two-app pattern as sync-main-to-dev.yml (#817).
+      - name: Generate Release App Token
+        if: steps.detect.outputs.changed == 'true'
+        id: release-app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - name: Open PR if none exists
         if: steps.detect.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          GH_TOKEN: ${{ steps.release-app-token.outputs.token }}
         run: |
           set -euo pipefail
           if ! gh pr list --head chore/update-nixpkgs-unstable --base dev --state open \
