@@ -88,6 +88,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Namespace scaffold `justfile.gh` git helpers to prevent consumer recipe collisions** ([#915](https://github.com/vig-os/devcontainer/issues/915))
+  - Renamed the shipped git-helper recipes `log` → `gh-log` and `branch` → `gh-branch` (matching the `gh-issues` convention). A consumer whose preserved `justfile.project` defined its own `log`/`branch` recipes previously hit a hard `just` parse failure (`recipe log … is redefined`) after upgrade, making `just` unusable and silently disabling the [#877](https://github.com/vig-os/devcontainer/issues/877) base-recipe repair.
+  - **Migration:** consumers who scripted against the shipped `just log` / `just branch` recipes must switch to `just gh-log` / `just gh-branch`; consumers who defined their own `log`/`branch` now keep them without collision.
+
 - **Scaffold upgrade strands base recipes in a preserved `justfile.project`** ([#877](https://github.com/vig-os/devcontainer/issues/877))
   - 0.4.0 moved `lint`/`format`/`precommit`/`test`/`test-cov`/`sync`/`update` into `justfile.project`, which is preserved on upgrade — 0.3.x consumers never received them and the shipped `ci.yml` failed with `justfile does not contain recipe 'sync'`. `init-workspace --force` now appends the missing base recipes from the template into the preserved file (customized recipes always win; idempotent).
   - The retired `.devcontainer/justfile.base` is removed on upgrade where the scaffold manages `.devcontainer/` (never in `direnv` mode, [#738](https://github.com/vig-os/devcontainer/issues/738)), and the installer warns if the root `justfile` lacks the scaffold `import?` block.
