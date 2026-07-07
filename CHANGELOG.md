@@ -88,6 +88,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Preserve a customized `.typos.toml` on upgrade** ([#913](https://github.com/vig-os/devcontainer/issues/913))
+  - `.typos.toml` joins the preserved-file set so a consumer's spell-check exceptions survive a `--force` upgrade; the upgrade prints the template diff (like `.pre-commit-config.yaml`, [#878](https://github.com/vig-os/devcontainer/issues/878)). Previously the generic template overwrote it and the `typos` hook then "corrected" real content.
+  - A consumer carrying the legacy `_typos.toml` no longer also receives the template `.typos.toml`, avoiding two active typos configs.
+
+- **Render preserved-file diff previews with `git diff`** ([#916](https://github.com/vig-os/devcontainer/issues/916))
+  - The preserved-file upgrade preview called `diff`, which the image does not ship, printing `command not found` into an empty box; it now uses `git diff --no-index`.
+
+- **Scan preserved CI workflows for the retired `pre-commit` binary** ([#916](https://github.com/vig-os/devcontainer/issues/916))
+  - The upgrade reference scan ([#881](https://github.com/vig-os/devcontainer/issues/881)) now also covers preserved `.github/workflows/*.yml`, flagging real `pre-commit` invocations with `file:line` while ignoring comments and step `name:` descriptions.
+
+- **Resolve the GitHub origin before scaffolding the workspace** ([#916](https://github.com/vig-os/devcontainer/issues/916))
+  - Under `--no-prompts`, a missing or underivable origin now aborts before any files are copied, instead of leaving a half-scaffolded workspace mid-run.
+
 - **Scaffold upgrade strands base recipes in a preserved `justfile.project`** ([#877](https://github.com/vig-os/devcontainer/issues/877))
   - 0.4.0 moved `lint`/`format`/`precommit`/`test`/`test-cov`/`sync`/`update` into `justfile.project`, which is preserved on upgrade — 0.3.x consumers never received them and the shipped `ci.yml` failed with `justfile does not contain recipe 'sync'`. `init-workspace --force` now appends the missing base recipes from the template into the preserved file (customized recipes always win; idempotent).
   - The retired `.devcontainer/justfile.base` is removed on upgrade where the scaffold manages `.devcontainer/` (never in `direnv` mode, [#738](https://github.com/vig-os/devcontainer/issues/738)), and the installer warns if the root `justfile` lacks the scaffold `import?` block.
