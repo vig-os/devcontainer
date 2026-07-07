@@ -370,6 +370,13 @@ PRECOMMIT_CONFIG_PREEXISTED=false
 TYPOS_CONFIG_PREEXISTED=false
 [[ -f "$WORKSPACE_DIR/.typos.toml" ]] && TYPOS_CONFIG_PREEXISTED=true
 
+# Resolve (and validate) the GitHub origin for renovate.json BEFORE the first
+# filesystem mutation (#916): under --no-prompts a missing/underivable origin
+# must abort while the workspace is still pristine, not after rsync has left a
+# half-scaffolded tree. The resolved value feeds the placeholder substitution
+# below; nothing between here and the copy depends on files being present yet.
+resolve_github_repository
+
 # Copy template contents to workspace
 echo "Initializing workspace from template..."
 echo "Copying files from $TEMPLATE_DIR to $WORKSPACE_DIR..."
@@ -496,8 +503,6 @@ if [[ -n "${VIG_OS_VERSION:-}" && -f "$WORKSPACE_DIR/.vig-os" ]]; then
     echo "Pinning DEVCONTAINER_VERSION=${VIG_OS_VERSION} in .vig-os..."
     sed -i "s/^DEVCONTAINER_VERSION=.*/DEVCONTAINER_VERSION=${VIG_OS_VERSION}/" "$WORKSPACE_DIR/.vig-os"
 fi
-
-resolve_github_repository
 
 # Replace placeholders in files (using pre-built manifest from image)
 echo "Replacing placeholders in files..."
