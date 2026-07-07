@@ -171,43 +171,46 @@ class TestPortableRenderFidelity:
             )
 
 
+@pytest.fixture(scope="module")
+def consumer_config() -> dict[str, Any]:
+    """Build the generated config for a customized consumer shell."""
+    expr = f"""
+    let
+      flake = builtins.getFlake "path:{REPO_ROOT}";
+      system = builtins.currentSystem;
+      pkgs = import flake.inputs.nixpkgs {{ inherit system; }};
+      shell = flake.lib.mkProjectShell {{
+        inherit pkgs;
+        hooks = {{
+          typos.enable = false;
+          detect-private-keys.excludes = [ "worker/src/index\\\\.ts" ];
+          my-data-check = {{
+            enable = true;
+            name = "my-data-check";
+            entry = "./scripts/check-dat.sh";
+            files = "\\\\.dat$";
+            language = "system";
+          }};
+        }};
+        hooksExcludes = [ "^data/stopping/" ];
+      }};
+    in
+    shell.hooksConfigFile
+    """
+    result = _run_nix(
+        ["build", "--impure", "--no-link", "--print-out-paths", "--expr", expr],
+        timeout=1800,
+    )
+    assert result.returncode == 0, (
+        "building the generated hook config failed:\n" + result.stderr
+    )
+    # The generated file is JSON preceded by "# …" comment lines; YAML is
+    # a JSON superset that treats them as comments, so parse with yaml.
+    return yaml.safe_load(Path(result.stdout.strip()).read_text())
+
+
 class TestConsumerHooksSurface:
     """mkProjectShell's ``hooks`` / ``hooksExcludes`` consumer surface."""
-
-    @pytest.fixture(scope="class")
-    def consumer_config(self) -> dict[str, Any]:
-        """Build the generated config for a customized consumer shell."""
-        expr = f"""
-        let
-          flake = builtins.getFlake "path:{REPO_ROOT}";
-          system = builtins.currentSystem;
-          pkgs = import flake.inputs.nixpkgs {{ inherit system; }};
-          shell = flake.lib.mkProjectShell {{
-            inherit pkgs;
-            hooks = {{
-              typos.enable = false;
-              detect-private-keys.excludes = [ "worker/src/index\\\\.ts" ];
-              my-data-check = {{
-                enable = true;
-                name = "my-data-check";
-                entry = "./scripts/check-dat.sh";
-                files = "\\\\.dat$";
-                language = "system";
-              }};
-            }};
-            hooksExcludes = [ "^data/stopping/" ];
-          }};
-        in
-        shell.hooksConfigFile
-        """
-        result = _run_nix(
-            ["build", "--impure", "--no-link", "--print-out-paths", "--expr", expr],
-            timeout=1800,
-        )
-        assert result.returncode == 0, (
-            "building the generated hook config failed:\n" + result.stderr
-        )
-        return json.loads(Path(result.stdout.strip()).read_text())
 
     def test_custom_hook_is_rendered(self, consumer_config: dict[str, Any]) -> None:
         hooks = _normalize(consumer_config)["hooks"]
