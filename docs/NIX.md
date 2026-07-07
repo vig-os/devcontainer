@@ -326,35 +326,51 @@ These are decided inline in `flake.nix`; summarized here.
   `just precommit` runs `prek run --all-files`, and the baked hook cache is
   `PREK_HOME=/opt/prek-cache`.
 
-  **Two hook artifacts, kept in agreement.** The flake is the SSoT for the hook
-  *toolchain* and exposes a Nix-verified gate, but the runner still reads a
-  committed config, so there are two artifacts that must agree:
+  **One hook definition, three renders (#883; supersedes the former
+  "two hook artifacts" model).** `nix/hooks.nix` defines every pre-commit hook
+  exactly once, and the flake renders it three ways:
 
-  1. The committed **`.pre-commit-config.yaml`** is the hand-maintained,
-     PATH-based **runner** config that `prek` executes locally, in the image, and
-     in the downstream scaffold (`assets/workspace/`, which has no flake and whose
-     `language: system` hooks resolve from the image toolchain). It is *not*
-     generated from Nix: a store-path-bound generated file would not be portable
-     to the scaffold and would churn on every nixpkgs bump. The scaffold copy is
-     mirrored from it by the `sync-manifest` hook.
-  2. The flake's **`checks.pre-commit`** (built by `git-hooks.nix` with
-     `package = pkgs.prek`) runs the **sandbox-pure subset** of those hooks under
-     `nix flake check` — no network, no project venv. It reuses `treefmtEval` for
-     the single formatting hook (nixfmt + ruff-format + taplo), the nix-provided
-     pure linters (ruff, shellcheck, yamllint, typos, `taplo lint`), the
-     `just --fmt --check` justfile-format check (the committed `just-fmt` hook,
-     mirrored in check mode since the sandbox is read-only), the
-     `pre-commit-hooks` meta hooks, and the `vig-utils`/`bandit` hooks wired to
-     hermetic Nix binaries (`${vigUtils}/bin/…`, `${pkgs.bandit}/bin/bandit`).
+  1. The flake's **`checks.pre-commit`** (built by `git-hooks.nix` with
+     `package = pkgs.prek`) evaluates the definition's **sandbox-pure
+     profile** under `nix flake check` — no network, no project venv. It
+     reuses `treefmtEval` for the single formatting hook (nixfmt +
+     ruff-format + taplo), the nix-provided pure linters (ruff, shellcheck,
+     yamllint, typos, `taplo lint`), the `just --fmt --check`
+     justfile-format check (the runner hook mirrored in check mode since the
+     sandbox is read-only), the `pre-commit-hooks` meta hooks, and the
+     `vig-utils`/`bandit` hooks wired to hermetic Nix binaries
+     (`${vigUtils}/bin/…`, `${pkgs.bandit}/bin/bandit`).
+  2. The committed **`.pre-commit-config.yaml`** (and its scaffold copy in
+     `assets/workspace/`) is the definition's **PATH-portable render** — the
+     runner config `prek` executes locally, in the image, and in the
+     downstream scaffold. It stays a committed file rather than a gitignored
+     store artifact so it is portable and does not churn on nixpkgs bumps,
+     but it is no longer hand-maintained in parallel:
+     `tests/test_flake_hooks.py` diffs the render
+     (`nix eval .#lib.hooksPortable`) against both committed files
+     (normalized, every hook id/args/files/excludes/stages) and fails CI on
+     any drift. The former `sync-manifest` transform chain for the scaffold
+     copy is retired — the fidelity test is the single agreement mechanism.
+  3. The **consumer generation surface**: `mkProjectShell`'s opt-in
+     `hooks`/`hooksExcludes` arguments compose the definition's consumer
+     profile with per-repo overrides, and git-hooks.nix's installation
+     script (in the `shellHook`) installs the rendered
+     `.pre-commit-config.yaml` — gitignored and regenerated on shell entry,
+     upstream's recommended model. See `docs/MIGRATION.md` ("Customizing
+     pre-commit hooks from the project flake") for the consumer contract,
+     including the guarantee that a preserved hand-edited YAML is never
+     overwritten (#878) and the planned `.vig-os` manifest opt-out flag
+     (#885).
 
   Hooks that cannot run in the sandbox stay **runner-only** in the committed
-  config and are deliberately excluded from `checks.pre-commit`: the generators
+  render and carry no gate profile in `nix/hooks.nix`: the generators
   `generate-docs`/`sync-manifest`, `pip-licenses` (reads `uv.lock`), `pymarkdown`
-  (not in nixpkgs), `no-commit-to-branch` and `destroyed-symlinks`
+  (not in nixpkgs — also the one residual missing from the consumer generation
+  profile), `no-commit-to-branch` and `destroyed-symlinks`
   (git-state-dependent), `check-agent-identity` (inspects the commit
   author/committer), and the `commit-msg`/`prepare-commit-msg`-stage hooks (never
   run by `--all-files`). `checks.pre-commit` is thus a Nix-verified guarantee that
-  the pure hooks in the committed config stay correct; the impure ones remain
+  the pure hooks stay correct; the impure ones remain
   covered by CI's `prek run --all-files`. One fidelity note: the meta
   `debug-statements` hook parses the file's Python AST, so its `git-hooks.nix`
   package is pinned to the 3.14 `pre-commit-hooks` build to match the runner

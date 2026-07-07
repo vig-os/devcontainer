@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `native` module ships first (`stdenv.cc`, `cmake`, `gnumake`, `pkg-config`, generic `CC`/`CXX`) — the long-term [#879](https://github.com/vig-os/devcontainer/issues/879) answer; `geant4`/`rust`/`fortran`/`root` stay ask-gated candidates.
   - Per-module flake checks (`checks.<system>.module-<name>`) plus a uv C-extension sdist smoke test (`tests/test_flake_modules.py`).
 
+- **Flake-generated pre-commit hooks: one definition, consumer-extensible** ([#883](https://github.com/vig-os/devcontainer/issues/883))
+  - `nix/hooks.nix` now defines the pre-commit hook set once; it renders the sandbox-pure `checks.pre-commit` gate, the committed `.pre-commit-config.yaml` + scaffold copy (drift CI-gated by `tests/test_flake_hooks.py` against `nix eval .#lib.hooksPortable` — the hand-synced triangle and the manifest transform chain are retired), and the consumer surface.
+  - `mkProjectShell` gains opt-in `hooks` (toggle base hooks, per-hook `excludes`/overrides, fully custom hooks) and `hooksExcludes` (global excludes): entering the shell installs the rendered config via git-hooks.nix; a preserved hand-edited YAML ([#878](https://github.com/vig-os/devcontainer/issues/878)) is never overwritten, and the zero-hooks dev-shell stays byte-identical.
+  - Consumer contract and migration steps in `docs/MIGRATION.md`; the `.vig-os` manifest raw-YAML opt-out flag is tracked in [#885](https://github.com/vig-os/devcontainer/issues/885).
+
 ### Changed
 
 ### Deprecated

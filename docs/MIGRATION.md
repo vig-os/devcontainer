@@ -196,6 +196,58 @@ The in-image behavior when no toolchain is provided is tracked in
 [#879](https://github.com/vig-os/devcontainer/issues/879); the toolchain
 itself always comes from one of the tiers above.
 
+## Customizing pre-commit hooks from the project flake (opt-in)
+
+Since [#883](https://github.com/vig-os/devcontainer/issues/883) the shared
+hook set is defined once in the vigOS flake, and a consumer can compose it
+from the **preserved** project `flake.nix` instead of hand-editing the
+scaffolded `.pre-commit-config.yaml`:
+
+```nix
+devShells.default = vigos.lib.mkProjectShell {
+  inherit pkgs;
+  hooks = {
+    pymarkdown.enable = false;                            # toggle a base hook
+    detect-private-keys.excludes = [ "worker/src/index\\.ts" ];
+    "no-commit-to-branch".settings.pattern = [ "^wip/.*$" ];
+    my-data-check = {                                     # fully custom hook
+      enable = true;
+      entry = "./scripts/check-dat.sh";
+      files = "\\.dat$";
+      language = "system";
+    };
+  };
+  hooksExcludes = [ "^data/stopping/" "\\.dat$" ];        # global excludes
+};
+```
+
+The contract:
+
+- **Opt-in only.** Without a `hooks`/`hooksExcludes` argument nothing changes:
+  the dev-shell is byte-identical to before and your (preserved,
+  [#878](https://github.com/vig-os/devcontainer/issues/878))
+  `.pre-commit-config.yaml` stays the runner config, hand-managed by you.
+- **Opting in makes the flake the generator.** On shell entry
+  ([git-hooks.nix](https://github.com/cachix/git-hooks.nix)'s installation
+  script inside the `shellHook`) the rendered config is installed as
+  `.pre-commit-config.yaml` — a symlink into the Nix store. Add
+  `.pre-commit-config.yaml` to `.gitignore`: it is a generated artifact now
+  and regenerates on every toolchain bump.
+- **A hand-edited file is never clobbered.** If a regular (non-symlink)
+  `.pre-commit-config.yaml` exists, the installation script *refuses* and
+  warns instead of overwriting. To complete the opt-in, port your
+  customizations (global `exclude:`, per-hook `exclude:`) into the
+  `hooks`/`hooksExcludes` block as above, then delete the YAML and gitignore
+  it. To opt back out, remove the `hooks` argument and commit a plain YAML
+  again.
+- **Residual:** the `pymarkdown` hook is not in nixpkgs, so the generated
+  base set does not include it (the scaffolded YAML runs it from its upstream
+  pre-commit repo). Add it as a custom hook if you need it under generation.
+- The planned declarative `.vig-os` manifest
+  ([#885](https://github.com/vig-os/devcontainer/issues/885)) will carry an
+  explicit raw-YAML opt-out flag so the choice is recorded per-repo rather
+  than inferred from the file state.
+
 ## Updating
 
 - **Downstream dev environment:** `nix flake update vigos` (or re-run
