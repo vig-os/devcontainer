@@ -726,3 +726,26 @@ MANIFEST
     assert_output --partial 'ORG_NAME=vigOS'
     assert_output --partial "SHORT_NAME=manifest_legacy"
 }
+
+# ── bare delivery mode (#885) ─────────────────────────────────────────────────
+
+@test "install.sh accepts and forwards --mode bare (#885)" {
+    test_dir="$BATS_TEST_TMPDIR/bare-fresh"
+    mkdir -p "$test_dir"
+    run bash "$INSTALL_SH" --dry-run --mode bare "$test_dir"
+    assert_success
+    assert_output --partial '--mode bare'
+}
+
+@test "help documents the bare mode (#885)" {
+    run bash "$INSTALL_SH" --help
+    assert_success
+    assert_output --partial 'bare'
+}
+
+@test "install.sh skips the host user-conf copy in bare mode (#885)" {
+    # Same reasoning as direnv (#738): no .devcontainer/ is scaffolded, so the
+    # devcontainer-only host-conf step must not run (or warn misleadingly).
+    run grep -E 'MODE" = "direnv" \] \|\| \[ "\$MODE" = "bare"' "$INSTALL_SH"
+    assert_success
+}

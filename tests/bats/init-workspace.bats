@@ -1275,3 +1275,115 @@ _upgrade_legacy() {
     run grep -x 'DEVKIT_MODE=both' "$ws/.vig-os"
     assert_success
 }
+
+# ── bare delivery mode (#885) ─────────────────────────────────────────────────
+# `bare` ships the standards layer only — justfiles, hooks config, .github CI,
+# pyproject scaffolding, .vig-os — and prunes every container/flake artifact
+# (.devcontainer/, flake.nix, .envrc) with the same #738/#859 pre-existence
+# guards as the other modes. The shipped ci.yml is replaced by a host-native
+# variant: no resolve-image, no container jobs — the runner sets up uv
+# directly and drives the same `just sync|precommit|test` contract.
+
+@test "init-workspace --mode=bare scaffolds the standards layer only (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-bare"
+    mkdir -p "$ws"
+    run _scaffold bare "$ws"
+    assert_success
+    # pruned: container and flake machinery
+    run test -e "$ws/.devcontainer"
+    assert_failure
+    run test -e "$ws/flake.nix"
+    assert_failure
+    run test -e "$ws/.envrc"
+    assert_failure
+    # shipped: the standards layer
+    for f in justfile justfile.project justfile.local .pre-commit-config.yaml \
+        .github/workflows/ci.yml pyproject.toml .vig-os; do
+        run test -e "$ws/$f"
+        assert_success
+    done
+    run grep -x 'DEVKIT_MODE=bare' "$ws/.vig-os"
+    assert_success
+}
+
+@test "fresh bare workspace resolves the CI-contract recipes (#885)" {
+    # The shipped host-native ci.yml calls `just sync|precommit|test`; the
+    # root justfile's .devcontainer imports are optional (import?), so the
+    # graph must load and every contract recipe must resolve without any
+    # .devcontainer/ recipe file.
+    real_just="$(command -v just)"
+    ws="$BATS_TEST_TMPDIR/e2e-bare-just"
+    mkdir -p "$ws"
+    run _scaffold bare "$ws"
+    assert_success
+    run bash -c "cd '$ws' && '$real_just' --list"
+    assert_success
+    for r in sync precommit test; do
+        run bash -c "cd '$ws' && '$real_just' --show $r"
+        assert_success
+    done
+}
+
+@test "bare-mode ci.yml is host-native: no image resolution, no container jobs (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-bare-ci"
+    mkdir -p "$ws"
+    run _scaffold bare "$ws"
+    assert_success
+    run grep -E 'resolve-image|container:' "$ws/.github/workflows/ci.yml"
+    assert_failure
+    run grep -q 'astral-sh/setup-uv' "$ws/.github/workflows/ci.yml"
+    assert_success
+    # scorecard-conform: every action reference is SHA-pinned
+    run bash -c "grep 'uses:' '$ws/.github/workflows/ci.yml' | grep -vE '@[0-9a-f]{40}'"
+    assert_failure
+}
+
+@test "bare scaffold preserves a pre-existing .devcontainer/, flake.nix and .envrc (#885)" {
+    # Same guards as #738/#859: bare never deletes consumer-owned machinery,
+    # even though a stock bare workspace ships none.
+    ws="$BATS_TEST_TMPDIR/e2e-bare-guards"
+    mkdir -p "$ws/.devcontainer"
+    printf '# SENTINEL-885 consumer compose\n' > "$ws/.devcontainer/docker-compose.yml"
+    printf '# SENTINEL-885 my own flake\n' > "$ws/flake.nix"
+    printf 'use flake .#custom\n' > "$ws/.envrc"
+    run _scaffold bare "$ws"
+    assert_success
+    run grep -q 'SENTINEL-885 consumer compose' "$ws/.devcontainer/docker-compose.yml"
+    assert_success
+    run cat "$ws/flake.nix"
+    assert_output "# SENTINEL-885 my own flake"
+    run cat "$ws/.envrc"
+    assert_output "use flake .#custom"
+}
+
+@test "manifest-bearing upgrade keeps bare shape and names, no flags (#885)" {
+    ws="$BATS_TEST_TMPDIR/e2e-885-up-bare"
+    mkdir -p "$ws"
+    run _scaffold bare "$ws"
+    assert_success
+    run _upgrade_no_flags "$ws"
+    assert_success
+    assert_output --partial "from .vig-os manifest"
+    run test -e "$ws/.devcontainer"
+    assert_failure
+    run test -e "$ws/flake.nix"
+    assert_failure
+    run test -d "$ws/src/testproj"
+    assert_success
+    run grep -x 'DEVKIT_MODE=bare' "$ws/.vig-os"
+    assert_success
+    run grep -E 'resolve-image|container:' "$ws/.github/workflows/ci.yml"
+    assert_failure
+}
+
+@test "preview lists a pre-existing .devcontainer/ as preserved in direnv/bare modes (#885)" {
+    # A populated consumer .devcontainer/ is kept by the #738 guard but was
+    # silently absent from the preview report — the mode-switch UX needs the
+    # explicit "preserved" line.
+    ws="$BATS_TEST_TMPDIR/e2e-885-preview-preserved"
+    mkdir -p "$ws/.devcontainer"
+    printf '# consumer-owned\n' > "$ws/.devcontainer/docker-compose.yml"
+    run _preview "$ws" --mode direnv
+    assert_success
+    assert_output --partial ".devcontainer/ (pre-existing"
+}
