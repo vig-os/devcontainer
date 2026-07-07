@@ -15,7 +15,10 @@
 #   --repo OWNER/REPO GitHub repo for Renovate preset (default: detect from origin or OWNER/REPO)
 #   --mode MODE       Delivery mode: devcontainer | direnv | both (default: prompt, both non-interactively)
 #   --smoke-test      Deploy smoke-test-specific assets
-#   --dry-run         Show what would be done without executing
+#   --preview         Print the add/overwrite/preserve/delete file report for an
+#                     upgrade and exit without changing anything
+#   --skip-preflight  Bypass the upgrade preflight guard (branch + clean-tree checks)
+#   --dry-run         Show the container command that would run without executing
 #   -h, --help        Show this help message
 #
 # Examples:
@@ -39,6 +42,8 @@ ORG_NAME="vigOS"
 GITHUB_REPO_OVERRIDE=""
 MODE=""
 SMOKE_TEST=""
+PREVIEW=""
+SKIP_PREFLIGHT=false
 
 # Colors (disabled if not a tty)
 if [ -t 1 ]; then
@@ -75,7 +80,12 @@ OPTIONS:
     --mode MODE       Delivery mode: devcontainer | direnv | both
                       (default: prompt interactively; "both" non-interactively)
     --smoke-test      Deploy smoke-test-specific assets
-    --dry-run         Show what would be done
+    --preview         Preview an upgrade: print the add/overwrite/preserve/delete
+                      file report and exit without changing any files
+    --skip-preflight  Bypass the upgrade preflight guard (--force refuses on
+                      main/dev/release/*/detached HEAD and on a dirty tree)
+    --dry-run         Show the container command that would run (unlike
+                      --preview, no file report is computed)
     -h, --help        Show this help
 
 EXAMPLES:
@@ -283,6 +293,102 @@ run_user_conf() {
     fi
 }
 
+# ── Upgrade preflight guard (#886) ────────────────────────────────────────────
+# An upgrade (`--force`) rewrites and deletes files across the consumer tree,
+# so it must land on a dedicated working branch with a clean tree, where it
+# stays a single reviewable, revertible diff. The guard runs host-side because
+# only the host reliably sees git state: the container mounts $PROJECT_PATH
+# alone, so in a git worktree (where .git is a file pointing at an unmounted
+# gitdir) git is unusable inside the container.
+
+# Read a yes/no confirmation for the preflight guard.
+# Returns 0 on yes, 1 on no or when no interactive input is available.
+# stdin is used when it is a terminal or a redirected pipe/file; in the
+# curl | bash form the script itself occupies stdin, so the prompt goes to
+# /dev/tty and the reply never consumes script text.
+preflight_confirm() {
+    local prompt="$1" reply="" invoked
+    invoked="$(basename -- "${0#-}")"
+    if [ -t 0 ]; then
+        read -rp "$prompt" reply
+    elif [ "$invoked" = "bash" ] || [ "$invoked" = "sh" ]; then
+        if [ -e /dev/tty ]; then
+            read -rp "$prompt" reply </dev/tty || return 1
+        else
+            return 1
+        fi
+    else
+        read -rp "$prompt" reply || return 1
+    fi
+    [[ "$reply" =~ ^[Yy]$ ]]
+}
+
+# Gate the --force (upgrade) path on git state. Refuses (exit != 0) on a dirty
+# tree, on a detached HEAD, and on protected branches (main, dev, release/*
+# by prefix) — on the latter, with a clean tree, it offers to create and
+# switch to chore/devkit-upgrade-<version> and proceed there. A non-git
+# directory gets a loud warning plus an explicit confirmation. Every refusal
+# prints the --skip-preflight bypass. Under --dry-run nothing is mutated (the
+# branch offer only reports what it would do).
+run_preflight_guard() {
+    local path="$1"
+    local skip_hint="Re-run with --skip-preflight to bypass the upgrade preflight guard."
+    local branch upgrade_branch dirty
+
+    if ! command -v git >/dev/null 2>&1 \
+        || ! git -C "$path" rev-parse --git-dir >/dev/null 2>&1; then
+        warn "preflight: $path is not a git repository (or git is unavailable)."
+        warn "There is no VCS safety net here: a bad upgrade cannot be reviewed or reverted."
+        if preflight_confirm "Continue the upgrade anyway? (y/N): "; then
+            return 0
+        fi
+        err "preflight: upgrade refused (no git repository, not confirmed)."
+        echo "  Put the project under version control first, or:"
+        echo "  $skip_hint"
+        exit 1
+    fi
+
+    dirty="$(git -C "$path" status --porcelain 2>/dev/null || true)"
+    if [ -n "$dirty" ]; then
+        err "preflight: refusing to upgrade on a dirty tree."
+        echo "  An upgrade must be the only change in its diff — commit or stash this first:"
+        printf '%s\n' "$dirty" | head -10 | sed 's/^/    /'
+        echo "  $skip_hint"
+        exit 1
+    fi
+
+    upgrade_branch="chore/devkit-upgrade-$VERSION"
+    if ! branch="$(git -C "$path" symbolic-ref --quiet --short HEAD)"; then
+        err "preflight: refusing to upgrade on a detached HEAD."
+        echo "  Check out a working branch first, e.g.:"
+        echo "    git -C \"$path\" switch -c $upgrade_branch"
+        echo "  $skip_hint"
+        exit 1
+    fi
+
+    case "$branch" in
+        main|dev|release/*)
+            warn "preflight: '$branch' is a protected branch — upgrades need a dedicated branch."
+            if preflight_confirm "Create and switch to '$upgrade_branch' now? (y/N): "; then
+                if [ "$DRY_RUN" = true ]; then
+                    info "dry-run: would create and switch to '$upgrade_branch'"
+                elif git -C "$path" checkout -b "$upgrade_branch"; then
+                    info "Switched to new branch '$upgrade_branch'"
+                else
+                    err "preflight: could not create branch '$upgrade_branch'."
+                    exit 1
+                fi
+            else
+                err "preflight: refusing to upgrade on protected branch '$branch'."
+                echo "  Create a dedicated branch and re-run:"
+                echo "    git -C \"$path\" checkout -b $upgrade_branch"
+                echo "  $skip_hint"
+                exit 1
+            fi
+            ;;
+    esac
+}
+
 # Parse arguments
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -328,6 +434,14 @@ while [ $# -gt 0 ]; do
             ;;
         --smoke-test)
             SMOKE_TEST="--smoke-test"
+            shift
+            ;;
+        --preview)
+            PREVIEW="--preview"
+            shift
+            ;;
+        --skip-preflight)
+            SKIP_PREFLIGHT=true
             shift
             ;;
         --skip-pull)
@@ -390,6 +504,18 @@ if [ -z "$GITHUB_REPOSITORY" ] && [ -d "$PROJECT_PATH/.git" ]; then
 fi
 if [ -z "$GITHUB_REPOSITORY" ]; then
     GITHUB_REPOSITORY="OWNER/REPO"
+fi
+
+# Preflight-gate --force upgrades (#886). Exemptions:
+# - --smoke-test: the downstream release gate runs `install.sh --version <tag>
+#   --smoke-test --force --docker .` headless on a CI checkout;
+# - --preview: report-only, exits before mutating anything (#885 mode switches
+#   point users at it first, so it must work from any branch/tree state);
+# - fresh installs (no --force): the "workspace not empty" refusal in
+#   init-workspace.sh already covers accidental re-runs.
+if [ -n "$FORCE" ] && [ -z "$SMOKE_TEST" ] && [ -z "$PREVIEW" ] \
+    && [ "$SKIP_PREFLIGHT" = false ]; then
+    run_preflight_guard "$PROJECT_PATH"
 fi
 
 # Detect container runtime
@@ -483,6 +609,10 @@ if [ -n "$SMOKE_TEST" ]; then
     CMD+=(--smoke-test)
 fi
 
+if [ -n "$PREVIEW" ]; then
+    CMD+=(--preview)
+fi
+
 if [ -n "$MODE" ]; then
     CMD+=(--mode "$MODE")
 fi
@@ -540,13 +670,25 @@ else
 fi
 
 # Run the initialization
-info "Initializing workspace..."
+if [ -n "$PREVIEW" ]; then
+    info "Previewing upgrade (no files will be changed)..."
+else
+    info "Initializing workspace..."
+fi
 echo ""
 
 # Execute the container using array expansion (safe from shell injection)
 if ! "${CMD[@]}"; then
     err "Failed to initialize workspace"
     exit 1
+fi
+
+# Preview mode: init-workspace.sh printed the file report and exited before
+# mutating anything — skip all post-initialization (user conf, git setup).
+if [ -n "$PREVIEW" ]; then
+    echo ""
+    success "Preview complete — no files were changed in $PROJECT_PATH"
+    exit 0
 fi
 
 # ── Post-initialization: host-side setup ──────────────────────────────────────
