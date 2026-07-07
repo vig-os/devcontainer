@@ -134,19 +134,14 @@ re-scaffold:
    `tests/test_example.py`) may be rewritten to a name that differs from your
    original scaffold. Review the diff before committing.
 
-## Staying on the Debian image (rollback)
+## The retired Debian line (historical)
 
-The final Debian-built release is **0.3.9**; every release from 0.4.0 onward is
-Nix-built. Released images are never deleted, so a consumer can stay on — or
-roll back to — the last Debian image by pinning it in the repo-root `.vig-os`:
-
-```text
-DEVCONTAINER_VERSION=0.3.9
-```
-
-The Debian line is frozen: it receives no CVE fixes (the nightly scan already
-reports fixable HIGH/CRITICAL findings against it), so treat the pin as a
-temporary escape hatch, not a supported track.
+The Debian build path was decommissioned in
+[#642](https://github.com/vig-os/devcontainer/issues/642): the final
+Debian-built release is **0.3.9**, and every release from 0.4.0 onward is
+Nix-built. Released images are never deleted, so 0.3.9 remains pullable
+(`DEVCONTAINER_VERSION=0.3.9` in the repo-root `.vig-os`), but the line is
+frozen — it receives no CVE fixes and is not a supported rollback track.
 
 ## Upcoming rename: `devcontainer` → `devkit`
 

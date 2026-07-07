@@ -66,6 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **Documented Debian fallback retired** ([#642](https://github.com/vig-os/devcontainer/issues/642))
+  - The build has been Nix-only since 0.4.0; docs and workflow comments no longer present the Debian image as a rollback path. Pinning the frozen 0.3.9 release remains possible but unsupported.
+
 ### Fixed
 
 - **Renovate changelog artifact drops the workspace mirror; `metadata.env` breaks on parenthesized branches** ([#874](https://github.com/vig-os/devcontainer/issues/874))
