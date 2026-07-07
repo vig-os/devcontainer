@@ -293,12 +293,14 @@
             package = pkgs.prek;
             imports = [
               {
-                config.hooks = consumerHooksDefaults;
-                config.excludes = consumerHooksBase.excludes ++ hooksExcludes;
-                # Never let git-hooks.nix install into `.git/hooks` or rewire
-                # `core.hooksPath` — the config-only snippet below owns the
-                # shellHook and `.githooks` stays the entry point (#908).
-                config.install.enable = false;
+                config = {
+                  hooks = consumerHooksDefaults;
+                  excludes = consumerHooksBase.excludes ++ hooksExcludes;
+                  # Never let git-hooks.nix install into `.git/hooks` or rewire
+                  # `core.hooksPath` — the config-only snippet below owns the
+                  # shellHook and `.githooks` stays the entry point (#908).
+                  install.enable = false;
+                };
               }
               { config.hooks = if hooks == null then { } else hooks; }
             ];
