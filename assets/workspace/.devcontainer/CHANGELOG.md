@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Release-candidate dispatch gates on CI only** ([#902](https://github.com/vig-os/devcontainer/issues/902))
+  - `release.yml` no longer requires the release PR to be marked ready-for-review and approved before publishing a candidate — candidate dispatch now gates on CI status only, so RCs are freely dispatchable during verification while the PR stays a draft.
+  - The draft + approval gate now applies only to the **final** release (the step that burns the immutable `X.Y.Z` tag); `promote-release.yml`'s merge job still re-enforces approval before merging to `main`, so `main` and `:latest` remain fully protected.
+  - Release docs, `justfile`, and `CONTRIBUTE.md` reordered accordingly: publish candidates to verify first, then mark ready and get approval before `finalize-release`.
+
 ### Deprecated
 
 ### Removed
