@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `install.sh --force` upgrades now refuse on `main`/`dev`/`release/*`/detached HEAD and on a dirty tree, so every upgrade lands as a reviewable, revertible diff on a dedicated branch; on a protected branch with a clean tree the installer offers to create and switch to `chore/devkit-upgrade-<version>`, and non-git directories get a warn-and-confirm path. A single `--skip-preflight` flag bypasses the guard; `--smoke-test` runs and fresh installs are exempt.
   - New `--preview` mode prints the add/overwrite/preserve/delete file report (including mode-prune deletions such as the retired `.devcontainer/justfile.base`) and exits without changing any files — unlike `--dry-run`, which only prints the container command.
 
+- **Flake-generated pre-commit hooks: one definition, consumer-extensible** ([#883](https://github.com/vig-os/devcontainer/issues/883))
+  - `nix/hooks.nix` now defines the pre-commit hook set once; it renders the sandbox-pure `checks.pre-commit` gate, the committed `.pre-commit-config.yaml` + scaffold copy (drift CI-gated by `tests/test_flake_hooks.py` against `nix eval .#lib.hooksPortable` — the hand-synced triangle and the manifest transform chain are retired), and the consumer surface.
+  - `mkProjectShell` gains opt-in `hooks` (toggle base hooks, per-hook `excludes`/overrides, fully custom hooks) and `hooksExcludes` (global excludes): entering the shell installs the rendered config as a repo-root symlink without ever touching `core.hooksPath` — the scaffold's `.githooks` entry point stays in charge; a preserved hand-edited YAML ([#878](https://github.com/vig-os/devcontainer/issues/878)) is never overwritten, and the zero-hooks dev-shell stays byte-identical.
+  - Consumer contract and migration steps in `docs/MIGRATION.md`; the `.vig-os` manifest raw-YAML opt-out flag is tracked in [#885](https://github.com/vig-os/devcontainer/issues/885).
+
 ### Changed
 
 - **Release-candidate dispatch gates on CI only** ([#902](https://github.com/vig-os/devcontainer/issues/902))
