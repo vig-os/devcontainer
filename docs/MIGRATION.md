@@ -236,9 +236,11 @@ re-scaffold:
    lines in `.pre-commit-config.yaml`, and CI configs. The installer scans
    the preserved surfaces and warns with `file:line`
    ([#881](https://github.com/vig-os/devcontainer/issues/881)). As a bridge,
-   0.4.x images ship a deprecated `pre-commit → prek` shim that prints a
-   stderr notice and is **removed in 0.5** — treat the notice as the
-   migration deadline, not a supported path. While editing old `.githooks`
+   0.4.x images shipped a deprecated `pre-commit → prek` shim that printed a
+   stderr notice; the one-cycle window is over and **0.5 images carry no
+   `pre-commit` binary at all** ([#897](https://github.com/vig-os/devcontainer/issues/897))
+   — unrenamed invocations now fail with exit 127, so act on the installer's
+   scan warnings before committing. While editing old `.githooks`
    scripts, also change `#!/bin/bash` shebangs to `#!/usr/bin/env bash`:
    `/bin/bash` does not exist on NixOS hosts, so those hooks fail outside
    the container even after the rename.
