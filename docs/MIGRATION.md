@@ -227,12 +227,19 @@ The contract:
   the dev-shell is byte-identical to before and your (preserved,
   [#878](https://github.com/vig-os/devcontainer/issues/878))
   `.pre-commit-config.yaml` stays the runner config, hand-managed by you.
-- **Opting in makes the flake the generator.** On shell entry
-  ([git-hooks.nix](https://github.com/cachix/git-hooks.nix)'s installation
-  script inside the `shellHook`) the rendered config is installed as
-  `.pre-commit-config.yaml` — a symlink into the Nix store. Add
+- **Opting in makes the flake the generator.** On shell entry (a
+  config-only snippet inside the `shellHook`) the rendered
+  [git-hooks.nix](https://github.com/cachix/git-hooks.nix) config is
+  installed as `.pre-commit-config.yaml` — a symlink into the Nix store. Add
   `.pre-commit-config.yaml` to `.gitignore`: it is a generated artifact now
   and regenerates on every toolchain bump.
+- **`.githooks` stays the hook entry point — generation never rewires
+  `core.hooksPath`.** Opting in only maintains the config symlink; it never
+  touches `core.hooksPath` or installs anything into `.git/hooks`, so the
+  scaffold's `.githooks` scripts (sanctioned-environment guard, any
+  repo-owned additions) keep running all stages, and `.githooks/pre-commit`'s
+  `prek run` picks the generated config up from the repo root. Opting back
+  out leaves the git wiring untouched for the same reason.
 - **A hand-edited file is never clobbered.** If a regular (non-symlink)
   `.pre-commit-config.yaml` exists, the installation script *refuses* and
   warns instead of overwriting. To complete the opt-in, port your
