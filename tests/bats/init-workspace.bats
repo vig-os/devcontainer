@@ -933,3 +933,58 @@ EOF
     # a real hunk line from the template the preserved file lacks
     assert_output --partial 'default_language_version'
 }
+
+# ── upgrade must preserve a customized .typos.toml, no dual configs (#913) ────
+# The typos hook reads a project's spell-check exceptions; a consumer curates
+# repo-specific extend-words/extend-exclude that a template overwrite silently
+# destroyed (their lint then flags legitimate domain terms). Preserve it like
+# .pre-commit-config.yaml (#878) and print the template diff. The `typos` tool
+# also reads the legacy `_typos.toml`, so a consumer carrying that must NOT also
+# receive the template `.typos.toml` — two active configs would collide.
+
+@test ".typos.toml is preserved on --force upgrade (#913)" {
+    # shellcheck disable=SC2016
+    run grep -E '"\.typos\.toml"' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+@test "upgrade preserves a customized .typos.toml (#913)" {
+    ws="$BATS_TEST_TMPDIR/e2e-913-preserve"
+    mkdir -p "$ws"
+    printf '# SENTINEL-913 consumer typos config\n[default.extend-words]\nfoo = "foo"\n' \
+        >"$ws/.typos.toml"
+    run _upgrade both "$ws"
+    assert_success
+    run grep -q 'SENTINEL-913' "$ws/.typos.toml"
+    assert_success
+}
+
+@test "upgrade prints a template diff hint for a preserved .typos.toml (#913)" {
+    ws="$BATS_TEST_TMPDIR/e2e-913-diff"
+    mkdir -p "$ws"
+    # a config lacking the template's exception words
+    printf '# SENTINEL-913 minimal consumer typos config\n' >"$ws/.typos.toml"
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial 'command not found'
+    assert_output --partial 'Preserved .typos.toml differs from the template'
+    # a template exception word the preserved file lacks shows in the diff
+    assert_output --partial 'unexcepted'
+}
+
+@test "upgrade with a legacy _typos.toml does not leave dual typos configs (#913)" {
+    # vault scenario: consumer carries _typos.toml and no .typos.toml. Shipping
+    # the template .typos.toml alongside it would give two active configs.
+    ws="$BATS_TEST_TMPDIR/e2e-913-legacy"
+    mkdir -p "$ws"
+    printf '# SENTINEL-913 legacy typos config\n[default.extend-words]\nteh = "teh"\n' \
+        >"$ws/_typos.toml"
+    run _upgrade both "$ws"
+    assert_success
+    # legacy config preserved verbatim
+    run grep -q 'SENTINEL-913' "$ws/_typos.toml"
+    assert_success
+    # template .typos.toml NOT shipped -> single active config
+    run test -e "$ws/.typos.toml"
+    assert_failure
+}
