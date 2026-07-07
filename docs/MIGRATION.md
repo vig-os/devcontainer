@@ -257,6 +257,36 @@ The contract:
   (Renovate's `nix` manager opens the PR); `flake.lock` is the controlling
   version document.
 
+### Upgrade preflight guard and preview
+
+An upgrade (`just devc-upgrade`, or `install.sh --force`) rewrites and deletes
+files across the consumer tree, so the installer requires it to land on a
+dedicated working branch as a single reviewable, revertible diff
+([#886](https://github.com/vig-os/devcontainer/issues/886)):
+
+- **Protected branches refuse** — `main`, `dev`, `release/*` (prefix), and a
+  detached `HEAD`. On a protected branch with a clean tree the installer
+  offers to create and switch to `chore/devkit-upgrade-<version>` for you;
+  non-interactively it refuses with that command as the hint.
+- **Dirty trees refuse** — `git status --porcelain` must be empty (staged,
+  unstaged, or untracked-unignored changes all count; gitignored clutter such
+  as `.venv/` does not). Commit or stash first.
+- **Non-git directories warn** — there is no VCS safety net, so the installer
+  asks for explicit confirmation before continuing.
+- **`--skip-preflight` bypasses** both checks; `--smoke-test` runs and fresh
+  installs (no `--force`) are exempt.
+
+To see what an upgrade would change before running it, use `--preview`:
+
+```bash
+curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh \
+  | bash -s -- --force --preview .
+```
+
+It prints the add/overwrite/preserve/delete file report and exits without
+touching the tree (unlike `--dry-run`, which only prints the container command
+and computes no file report).
+
 ## Upgrading an existing 0.3.x consumer — manual steps
 
 `install.sh --version <X> --force` refreshes the scaffold and pins `<X>` in

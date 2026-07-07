@@ -15,12 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `native` module ships first (`stdenv.cc`, `cmake`, `gnumake`, `pkg-config`, generic `CC`/`CXX`) — the long-term [#879](https://github.com/vig-os/devcontainer/issues/879) answer; `geant4`/`rust`/`fortran`/`root` stay ask-gated candidates.
   - Per-module flake checks (`checks.<system>.module-<name>`) plus a uv C-extension sdist smoke test (`tests/test_flake_modules.py`).
 
+- **Preflight guard and diff preview for scaffold upgrades** ([#886](https://github.com/vig-os/devcontainer/issues/886))
+  - `install.sh --force` upgrades now refuse on `main`/`dev`/`release/*`/detached HEAD and on a dirty tree, so every upgrade lands as a reviewable, revertible diff on a dedicated branch; on a protected branch with a clean tree the installer offers to create and switch to `chore/devkit-upgrade-<version>`, and non-git directories get a warn-and-confirm path. A single `--skip-preflight` flag bypasses the guard; `--smoke-test` runs and fresh installs are exempt.
+  - New `--preview` mode prints the add/overwrite/preserve/delete file report (including mode-prune deletions such as the retired `.devcontainer/justfile.base`) and exits without changing any files — unlike `--dry-run`, which only prints the container command.
+
 - **Flake-generated pre-commit hooks: one definition, consumer-extensible** ([#883](https://github.com/vig-os/devcontainer/issues/883))
   - `nix/hooks.nix` now defines the pre-commit hook set once; it renders the sandbox-pure `checks.pre-commit` gate, the committed `.pre-commit-config.yaml` + scaffold copy (drift CI-gated by `tests/test_flake_hooks.py` against `nix eval .#lib.hooksPortable` — the hand-synced triangle and the manifest transform chain are retired), and the consumer surface.
-  - `mkProjectShell` gains opt-in `hooks` (toggle base hooks, per-hook `excludes`/overrides, fully custom hooks) and `hooksExcludes` (global excludes): entering the shell installs the rendered config via git-hooks.nix; a preserved hand-edited YAML ([#878](https://github.com/vig-os/devcontainer/issues/878)) is never overwritten, and the zero-hooks dev-shell stays byte-identical.
+  - `mkProjectShell` gains opt-in `hooks` (toggle base hooks, per-hook `excludes`/overrides, fully custom hooks) and `hooksExcludes` (global excludes): entering the shell installs the rendered config as a repo-root symlink without ever touching `core.hooksPath` — the scaffold's `.githooks` entry point stays in charge; a preserved hand-edited YAML ([#878](https://github.com/vig-os/devcontainer/issues/878)) is never overwritten, and the zero-hooks dev-shell stays byte-identical.
   - Consumer contract and migration steps in `docs/MIGRATION.md`; the `.vig-os` manifest raw-YAML opt-out flag is tracked in [#885](https://github.com/vig-os/devcontainer/issues/885).
 
 ### Changed
+
+- **Release-candidate dispatch gates on CI only** ([#902](https://github.com/vig-os/devcontainer/issues/902))
+  - `release.yml` no longer requires the release PR to be marked ready-for-review and approved before publishing a candidate — candidate dispatch now gates on CI status only, so RCs are freely dispatchable during verification while the PR stays a draft.
+  - The draft + approval gate now applies only to the **final** release (the step that burns the immutable `X.Y.Z` tag); `promote-release.yml`'s merge job still re-enforces approval before merging to `main`, so `main` and `:latest` remain fully protected.
+  - Release docs, `justfile`, and `CONTRIBUTE.md` reordered accordingly: publish candidates to verify first, then mark ready and get approval before `finalize-release`.
 
 ### Deprecated
 
