@@ -58,6 +58,12 @@ PRESERVE_FILES=(
     # justfile.project; the upgrade prints a diff against the template below so
     # hook-stack evolution stays visible.
     ".pre-commit-config.yaml"
+    # The consumer owns its spell-check exceptions (#913): repos curate
+    # repo-specific extend-words/extend-exclude that a template overwrite
+    # silently destroyed, so the typos hook then flagged legitimate domain
+    # terms. Preserved like .pre-commit-config.yaml; the upgrade prints a diff
+    # against the template below. (Legacy `_typos.toml` handled at copy time.)
+    ".typos.toml"
 )
 
 # Base recipes the shipped .github/workflows/ci.yml depends on (sync, precommit,
@@ -359,6 +365,11 @@ JUSTFILE_PROJECT_PREEXISTED=false
 PRECOMMIT_CONFIG_PREEXISTED=false
 [[ -f "$WORKSPACE_DIR/.pre-commit-config.yaml" ]] && PRECOMMIT_CONFIG_PREEXISTED=true
 
+# A preserved .typos.toml is the consumer's spell-check exception set (#913);
+# record it so the post-scaffold guard can surface template divergence.
+TYPOS_CONFIG_PREEXISTED=false
+[[ -f "$WORKSPACE_DIR/.typos.toml" ]] && TYPOS_CONFIG_PREEXISTED=true
+
 # Copy template contents to workspace
 echo "Initializing workspace from template..."
 echo "Copying files from $TEMPLATE_DIR to $WORKSPACE_DIR..."
@@ -403,6 +414,16 @@ else
     # (rather than copying-then-pruning) keeps a real .devcontainer/ intact.
     if [[ "$MODE" == "direnv" ]]; then
         EXCLUDE_ARGS+=("--exclude=.devcontainer")
+    fi
+
+    # Legacy typos config (#913): the `typos` tool reads .typos.toml, typos.toml
+    # AND _typos.toml. A consumer still carrying _typos.toml (and no .typos.toml)
+    # must not also receive the template .typos.toml, or two active configs
+    # collide. Skip shipping the template one; their _typos.toml stands as the
+    # single config (a preserved .typos.toml is already excluded above).
+    if [[ -f "$WORKSPACE_DIR/_typos.toml" && ! -f "$WORKSPACE_DIR/.typos.toml" ]]; then
+        echo "Consumer carries legacy _typos.toml; not shipping template .typos.toml (#913)."
+        EXCLUDE_ARGS+=("--exclude=.typos.toml")
     fi
 
     rsync -avL --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
@@ -602,6 +623,14 @@ if [[ "$PRECOMMIT_CONFIG_PREEXISTED" == "true" ]] \
             echo "         Every commit will fail until it parses — run 'prek validate-config .pre-commit-config.yaml' and fix it." >&2
         fi
     fi
+fi
+
+# A preserved .typos.toml is the consumer's (#913) — never overwritten, so
+# their spell-check exceptions survive; the cost is that template exception
+# evolution no longer arrives automatically. Print the divergence so consumers
+# can fold in what they need deliberately. Non-fatal, like the #878 guard.
+if [[ "$TYPOS_CONFIG_PREEXISTED" == "true" ]]; then
+    print_preserved_template_diff ".typos.toml" || true
 fi
 
 # The retired `pre-commit` binary (#778) exits 127 at first use: a preserved
