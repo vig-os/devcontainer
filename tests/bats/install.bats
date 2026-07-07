@@ -746,6 +746,7 @@ MANIFEST
 @test "install.sh skips the host user-conf copy in bare mode (#885)" {
     # Same reasoning as direnv (#738): no .devcontainer/ is scaffolded, so the
     # devcontainer-only host-conf step must not run (or warn misleadingly).
+    # shellcheck disable=SC2016
     run grep -E 'MODE" = "direnv" \] \|\| \[ "\$MODE" = "bare"' "$INSTALL_SH"
     assert_success
 }
