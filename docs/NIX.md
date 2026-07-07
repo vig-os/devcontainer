@@ -20,7 +20,9 @@ everywhere — the dev-shell now and the image's `imageTools` set.
   `nix develop` (or `direnv`) gives you exactly that toolchain.
 - **`mkProjectShell`** is also a reusable `lib` output: downstream repos build
   their own shell as `devTools ++ extraPackages` (see the scaffolded
-  `assets/workspace/flake.nix`).
+  `assets/workspace/flake.nix`). For projects that compile native Python
+  extensions, `extraPackages` is where the C/C++ toolchain comes from — see
+  the [native-build contract](./MIGRATION.md#the-native-build-contract).
 - **`mkProjectServices`** is the local-dev-services counterpart (#795): a `lib`
   builder that turns declared [services-flake](https://github.com/juspay/services-flake)
   modules into a daemonless `process-compose` stack (`nix run .#services`) —
