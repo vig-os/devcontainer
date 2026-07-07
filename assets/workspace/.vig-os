@@ -9,8 +9,10 @@
 # legacy name until the devkit rename, #781).
 DEVCONTAINER_VERSION={{IMAGE_TAG}}
 
-# Delivery mode: devcontainer | direnv | both | bare
-DEVKIT_MODE=both
+# Delivery mode: devcontainer | direnv | both | bare. Ships empty (= unset:
+# resolved and written back on scaffold) so an aborted upgrade can never
+# persist a mode this repo did not choose.
+DEVKIT_MODE=
 
 # Project identity (persisted SHORT_NAME / ORG_NAME / GITHUB_REPOSITORY);
 # written back by init-workspace.sh — edit only to deliberately rename.

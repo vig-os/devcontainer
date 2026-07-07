@@ -654,6 +654,19 @@ fi
 # — work. No-op on the Debian image (its template files are already writable).
 chmod -R u+w "$WORKSPACE_DIR"
 
+# Early write-back (#885): the rsync above just replaced .vig-os with the
+# template, so until the late write-back below the manifest would claim the
+# template's values instead of this run's. Any abort inside that window
+# (e.g. resolve_github_repository under --no-prompts) must not persist a
+# state the repo did not choose — the next --force run trusts the manifest.
+# Mode and identity are already resolved, so land them now; DEVKIT_REPO is
+# only known after resolve_github_repository and stays in the late write-back.
+if [[ -f "$VIG_OS_MANIFEST" ]]; then
+    write_manifest_value DEVKIT_MODE "$MODE"
+    write_manifest_value DEVKIT_PROJECT "$SHORT_NAME"
+    write_manifest_value DEVKIT_ORG "$ORG_NAME"
+fi
+
 # Prune the scaffold to the chosen delivery mode. Idempotent and safe: only
 # removes paths inside the new workspace.
 #   devcontainer -> remove the flake.nix + .envrc stub
