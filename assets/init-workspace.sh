@@ -315,14 +315,61 @@ elif [[ -z "${ORG_NAME:-}" ]]; then
 fi
 echo "Organization name set to: $ORG_NAME"
 
-# Get MODE - from flag, manifest, prompt, or default (#885). Selects which
-# delivery the workspace scaffolds: a devcontainer, the Nix/direnv stub, or
-# both. Smoke-test deploys ignore the manifest: they redeploy the full
-# template over a CI checkout regardless of the checked-in mode.
+# Get MODE - from flag, manifest, inference, prompt, or default (#885).
+# Selects which delivery the workspace scaffolds: a devcontainer, the
+# Nix/direnv stub, or both. Smoke-test deploys ignore the manifest: they
+# redeploy the full template over a CI checkout regardless of the
+# checked-in mode.
 if [[ -z "$MODE" && -n "$MANIFEST_MODE" && "$SMOKE_TEST" != "true" ]]; then
     MODE="$MANIFEST_MODE"
     echo "Delivery mode from .vig-os manifest: $MODE"
 fi
+
+# Legacy consumers (version-only .vig-os, or none) persist no DEVKIT_MODE:
+# infer it from the tree shape on upgrade — conservatively (the wider mode
+# on ambiguity), transparently (the inference is printed and, when
+# interactive, confirmed), and never reshaping the repo: the inferred mode
+# matches the shape that is already there. Sets MODE, or leaves it empty
+# when the tree carries no mode markers at all.
+infer_legacy_mode() {
+    local has_devc=false has_direnv=false
+    if [[ -d "$WORKSPACE_DIR/.devcontainer" ]] \
+        && [[ -n "$(ls -A "$WORKSPACE_DIR/.devcontainer" 2>/dev/null)" ]]; then
+        has_devc=true
+    fi
+    if [[ -f "$WORKSPACE_DIR/flake.nix" || -f "$WORKSPACE_DIR/.envrc" ]]; then
+        has_direnv=true
+    fi
+    if [[ "$has_devc" == "true" && "$has_direnv" == "true" ]]; then
+        MODE="both"
+        if [[ -f "$WORKSPACE_DIR/flake.nix" ]] \
+            && ! grep -q 'vigos.lib.mkProjectShell' "$WORKSPACE_DIR/flake.nix" 2>/dev/null; then
+            echo "Note: flake.nix does not look like the scaffold stub (consumer-authored?);"
+            echo "      resolving the ambiguity to the wider mode. Your flake.nix/.envrc are"
+            echo "      preserved files and stay untouched (#859)."
+        fi
+    elif [[ "$has_devc" == "true" ]]; then
+        MODE="devcontainer"
+    elif [[ "$has_direnv" == "true" ]]; then
+        MODE="direnv"
+    else
+        return 0
+    fi
+    echo "Inferred delivery mode '$MODE' from the existing tree (no DEVKIT_MODE"
+    echo "persisted in .vig-os): .devcontainer/ populated: $has_devc, flake.nix/.envrc: $has_direnv."
+    echo "The inferred mode will be persisted in .vig-os after the upgrade."
+    if [[ "$NO_PROMPTS" != "true" ]]; then
+        local reply
+        read -rp "Use inferred delivery mode '$MODE'? (Y/n): " reply
+        if [[ "$reply" =~ ^[Nn]$ ]]; then
+            MODE=""
+        fi
+    fi
+}
+if [[ -z "$MODE" && "$FORCE" == "true" && "$SMOKE_TEST" != "true" ]]; then
+    infer_legacy_mode
+fi
+
 if [[ -z "$MODE" ]]; then
     if [[ "$NO_PROMPTS" == "true" ]] || [[ ! -t 0 ]]; then
         # Non-interactive (--no-prompts, or no TTY: CI / piped stdin): default to
