@@ -217,22 +217,31 @@ re-scaffold:
    block and fold it into your own recipes; also verify the root `justfile`
    still carries the scaffold `import?` lines — without them no layered
    recipe is reachable (the installer warns if the block is missing).
-2. **`justfile.project` hook recipe** — your preserved `precommit` recipe still
+2. **`.pre-commit-config.yaml` is preserved on upgrade** — earlier upgrades
+   replaced it wholesale, silently dropping repo-specific global and per-hook
+   `exclude:` patterns (the autofix hooks then rewrote data files they must
+   never touch, [#878](https://github.com/vig-os/devcontainer/issues/878)).
+   The installer now keeps your file and prints a diff against the incoming
+   template — review it and fold in the template evolution you want (e.g.
+   `default_language_version`, runner-compat fixes, new hooks). It also warns
+   if the preserved config does not parse under the shipped runner; check
+   with `prek validate-config .pre-commit-config.yaml`.
+3. **`justfile.project` hook recipe** — your preserved `precommit` recipe still
    runs `uv run pre-commit run --all-files`; `pre-commit` is gone from the
    0.4.0 image and venv. Change it to `prek run --all-files`.
-3. **Recipe renames** — the managed base recipes are now `devc-*`-namespaced
+4. **Recipe renames** — the managed base recipes are now `devc-*`-namespaced
    and the template test recipe is `just test` (formerly `just test-pytest`).
    Run `just --list` once and update any scripts/muscle memory.
-4. **typos config precedence** — if your repo owns a `typos.toml` or
+5. **typos config precedence** — if your repo owns a `typos.toml` or
    `_typos.toml`, it silently **shadows** the shipped `.typos.toml`. Merge the
    shipped `[default.extend-words]` entries (`Nd`, `unexcepted`, `ba` — needed
    by scaffold-shipped content such as `version-check.sh` and the synced
    `.devcontainer/CHANGELOG.md`) into your file.
-5. **Committed binary/generated artifacts** (plot exports, PDFs, golden `.bin`
+6. **Committed binary/generated artifacts** (plot exports, PDFs, golden `.bin`
    fixtures, SVGs): add them to your typos `[files] extend-exclude` and
    consider a global `exclude:` in `.pre-commit-config.yaml` so the autofix
    hooks (end-of-file-fixer, trailing-whitespace) don't rewrite them.
-6. **Project name re-derivation** — the re-scaffold substitutes placeholders
+7. **Project name re-derivation** — the re-scaffold substitutes placeholders
    from the current directory/`--name`; template-origin files (e.g.
    `tests/test_example.py`) may be rewritten to a name that differs from your
    original scaffold. Review the diff before committing.
