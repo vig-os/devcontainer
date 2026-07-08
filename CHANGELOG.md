@@ -51,6 +51,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Template `sync` recipe no longer forces `--all-extras`** ([#892](https://github.com/vig-os/devcontainer/issues/892))
+  - The shipped `justfile.project` `sync` recipe used `uv sync --all-extras --all-groups`, which forced every optional extra to install. Repos that quarantine platform-limited dependencies (e.g. cp312/cp313-only wheels) in extras got a hard `just sync` failure on the cp314 image.
+  - The recipe is now parameterized (`sync *args="--all-groups"`) and defaults to `--all-groups`: dev groups stay synced while extras become opt-in via `just sync --all-extras`. The `update` recipe (which calls `just sync`) uses the new default unchanged.
+
 - **Version-skew hardening for the shipped CI glue** ([#854](https://github.com/vig-os/devcontainer/issues/854))
   - **CI-wired skew guard:** the shipped container `ci.yml` and the new direnv `ci.yml` lint jobs now fail fast with an actionable `::error::` if the toolchain does not provide `prek`, turning an opaque `just precommit` exit 127 (old scaffold vs new image, or an image too old to ship the prek hook runner) into a one-line diagnosis.
   - **`prepare-release.yml` resolver unified:** the scaffold's forked inline-awk image resolver with a silent `latest` fallback is replaced by the shared `resolve-image` action, which hard-fails on a missing/unreadable `DEVCONTAINER_VERSION` pin.
