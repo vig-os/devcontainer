@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.5.0] - TBD
+
+### Added
+
 - **Opt-in Python starter flake template** ([#930](https://github.com/vig-os/devcontainer/issues/930))
   - `nix flake init -t github:vig-os/devcontainer#python` restores a Python package layout (`pyproject.toml`, `src/`, `tests/`) onto the now language-neutral scaffold ([#929](https://github.com/vig-os/devcontainer/issues/929)). The template uses a concrete `example_pkg` name the user renames — `nix flake init -t` does no placeholder substitution — and ships a minimal pytest dev group (no `science`/`jupyter` extras).
 
@@ -54,8 +68,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The scaffold no longer assumes a Python package: `just lint/format/test/test-cov` are guarded on `pyproject.toml` and no-op (exit 0) when it is absent, mirroring the existing `sync` guard, so a non-Python repo's `just sync|precommit|test` CI contract stays green out of the box.
   - `init-workspace.sh` drops the `src/template_project` → `src/<name>` rename and test-import rewrite; `pyproject.toml` stays in the preserved set, so a consumer that brings its own is never clobbered.
 
-### Deprecated
-
 ### Removed
 
 - **`pre-commit` compat shim removed from the image** ([#897](https://github.com/vig-os/devcontainer/issues/897))
@@ -85,8 +97,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **pipefail in every mode:** `set shell := ["bash", "-euo", "pipefail", "-c"]` moved from the devc-only `justfile.devc` to the root `justfile` (the SSoT), so direnv/bare recipes get pipefail too.
   - **`init-precommit.sh` derives its root** from the script location instead of a hard-coded `/workspace/{{SHORT_NAME}}`.
   - **Stale doc fixed:** `docs/container-ci-quirks.md` no longer describes a removed `uv run bandit` `pre-commit` hook; the private-image (unauthenticated `resolve-image` probe + missing `credentials:`) limitation is documented, with the first-class fix tracked in [#920](https://github.com/vig-os/devcontainer/issues/920).
-
-### Security
 
 ## [0.4.1](https://github.com/vig-os/devcontainer/releases/tag/0.4.1) - 2026-07-08
 
