@@ -75,7 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-## [0.4.1] - TBD
+## [0.4.1](https://github.com/vig-os/devcontainer/releases/tag/0.4.1) - 2026-07-08
 
 ### Added
 
@@ -144,6 +144,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Preserve a customized `.typos.toml` on upgrade** ([#913](https://github.com/vig-os/devcontainer/issues/913))
+  - `.typos.toml` joins the preserved-file set so a consumer's spell-check exceptions survive a `--force` upgrade; the upgrade prints the template diff (like `.pre-commit-config.yaml`, [#878](https://github.com/vig-os/devcontainer/issues/878)). Previously the generic template overwrote it and the `typos` hook then "corrected" real content.
+  - A consumer carrying the legacy `_typos.toml` no longer also receives the template `.typos.toml`, avoiding two active typos configs.
+
+- **Render preserved-file diff previews with `git diff`** ([#916](https://github.com/vig-os/devcontainer/issues/916))
+  - The preserved-file upgrade preview called `diff`, which the image does not ship, printing `command not found` into an empty box; it now uses `git diff --no-index`.
+
+- **Scan preserved CI workflows for the retired `pre-commit` binary** ([#916](https://github.com/vig-os/devcontainer/issues/916))
+  - The upgrade reference scan ([#881](https://github.com/vig-os/devcontainer/issues/881)) now also covers preserved `.github/workflows/*.yml`, flagging real `pre-commit` invocations with `file:line` while ignoring comments and step `name:` descriptions.
+
+- **Resolve the GitHub origin before scaffolding the workspace** ([#916](https://github.com/vig-os/devcontainer/issues/916))
+  - Under `--no-prompts`, a missing or underivable origin now aborts before any files are copied, instead of leaving a half-scaffolded workspace mid-run.
+
+- **Namespace scaffold `justfile.gh` git helpers to prevent consumer recipe collisions** ([#915](https://github.com/vig-os/devcontainer/issues/915))
+  - Renamed the shipped git-helper recipes `log` → `gh-log` and `branch` → `gh-branch` (matching the `gh-issues` convention). A consumer whose preserved `justfile.project` defined its own `log`/`branch` recipes previously hit a hard `just` parse failure (`recipe log … is redefined`) after upgrade, making `just` unusable and silently disabling the [#877](https://github.com/vig-os/devcontainer/issues/877) base-recipe repair.
+  - **Migration:** consumers who scripted against the shipped `just log` / `just branch` recipes must switch to `just gh-log` / `just gh-branch`; consumers who defined their own `log`/`branch` now keep them without collision.
+
+- **Renovate changelog template no longer leaks the upstream `assets/workspace` mirror** ([#914](https://github.com/vig-os/devcontainer/issues/914))
+  - The synced consumer `renovate-changelog-build.yml`/`-commit.yml` copied the `assets/workspace/.devcontainer/CHANGELOG.md` mirror plumbing verbatim; consumers have no such tree, so the steps hard-failed under `set -euo pipefail` on every Renovate changelog run. Manifest transforms now strip the mirror copies, leaving the template touching only the consumer's own `CHANGELOG.md`.
+
 - **Scaffold upgrade strands base recipes in a preserved `justfile.project`** ([#877](https://github.com/vig-os/devcontainer/issues/877))
   - 0.4.0 moved `lint`/`format`/`precommit`/`test`/`test-cov`/`sync`/`update` into `justfile.project`, which is preserved on upgrade — 0.3.x consumers never received them and the shipped `ci.yml` failed with `justfile does not contain recipe 'sync'`. `init-workspace --force` now appends the missing base recipes from the template into the preserved file (customized recipes always win; idempotent).
   - The retired `.devcontainer/justfile.base` is removed on upgrade where the scaffold manages `.devcontainer/` (never in `direnv` mode, [#738](https://github.com/vig-os/devcontainer/issues/738)), and the installer warns if the root `justfile` lacks the scaffold `import?` block.
@@ -166,6 +186,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`pre-commit` binary dropped without a compat path — preserved consumer recipes and `.githooks` calling it break** ([#881](https://github.com/vig-os/devcontainer/issues/881))
   - The 0.4.0 image retired the Python `pre-commit` for `prek` ([#778](https://github.com/vig-os/devcontainer/issues/778)), but files preserved on upgrade still invoke it and exit 127 (field-validated on a 0.3.5 → 0.4.0 consumer: the preserved `justfile.project` `precommit` recipe and repo-managed `.githooks` scripts broke every commit). The image now ships a **deprecated one-cycle `pre-commit → prek` shim** (stderr notice, removed in 0.5) so consumer hook scripts keep working while they migrate.
   - `init-workspace --force` scans the post-scaffold `justfile.project`, `.githooks/` scripts and `.pre-commit-config.yaml` for invocation-shaped `pre-commit` references and warns (non-fatally) with `file:line`, pointing at the MIGRATION.md rename checklist — which now also covers the NixOS `#!/bin/bash` shebang gotcha in old-scaffold `.githooks`.
+
+### Security
+
+- **Accept podman `CVE-2026-57231` in the vulnix register pending the nixpkgs 26.05 backport** ([#905](https://github.com/vig-os/devcontainer/issues/905))
+  - podman 5.8.2 (affects 5.8.1–5.8.3) leaks matching host environment variables into a container when a malicious image manifest carries malformed `Env` entries (a key with no value, via the `*` glob) — CVSS 7.5, a supply-chain risk only when running untrusted images. The release CVE gate blocked the 0.4.1 RC on this finding.
+  - Fixed upstream in 5.8.4/6.0.0, but the pinned `nixpkgs` `release-26.05` still ships 5.8.2 (backport [NixOS/nixpkgs#536367](https://github.com/NixOS/nixpkgs/pull/536367) open), so advancing the rev cannot remediate yet. Added a short-dated `.vulnixignore` exception (expires 2026-08-06, re-check weekly) to unblock the gate; the exception flips to a nixpkgs rev-advance once the backport lands.
 
 ## [0.4.0](https://github.com/vig-os/devcontainer/releases/tag/0.4.0) - 2026-07-06
 
