@@ -983,6 +983,160 @@ EOF
     refute_output --partial "retired 'pre-commit' binary"
 }
 
+# ── preserved-file diff preview must use git, not diff(1) (#916) ──────────────
+# The image ships git but no diff(1)/cmp(1); the #878 preview called `diff`,
+# which prints "diff: command not found" and an empty box in-container. Render
+# the divergence with `git diff --no-index` (its --quiet form gates the block;
+# --no-index exits 1 when files differ, which is the expected signal).
+
+@test "preserved-file diff preview uses git diff --no-index, not diff(1)/cmp(1) (#916)" {
+    run grep -nE 'git diff --no-index' "$INIT_WORKSPACE_SH"
+    assert_success
+    # no bare diff(1) short-flag or cmp(1) invocation survives (both absent from
+    # the image); `git diff --no-index` (long flags) is the sanctioned form.
+    run grep -nE '(^|[[:space:]])diff -[a-z]|(^|[[:space:]])cmp[[:space:]]' "$INIT_WORKSPACE_SH"
+    assert_failure
+}
+
+@test "preserved .pre-commit-config.yaml diff preview renders real content, not 'command not found' (#916)" {
+    ws="$BATS_TEST_TMPDIR/e2e-916-gitdiff"
+    mkdir -p "$ws"
+    _custom_precommit_config "$ws"
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial 'command not found'
+    assert_output --partial 'Preserved .pre-commit-config.yaml differs from the template'
+    # a real hunk line from the template the preserved file lacks
+    assert_output --partial 'default_language_version'
+}
+
+# ── upgrade must preserve a customized .typos.toml, no dual configs (#913) ────
+# The typos hook reads a project's spell-check exceptions; a consumer curates
+# repo-specific extend-words/extend-exclude that a template overwrite silently
+# destroyed (their lint then flags legitimate domain terms). Preserve it like
+# .pre-commit-config.yaml (#878) and print the template diff. The `typos` tool
+# also reads the legacy `_typos.toml`, so a consumer carrying that must NOT also
+# receive the template `.typos.toml` — two active configs would collide.
+
+@test ".typos.toml is preserved on --force upgrade (#913)" {
+    # shellcheck disable=SC2016
+    run grep -E '"\.typos\.toml"' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+@test "upgrade preserves a customized .typos.toml (#913)" {
+    ws="$BATS_TEST_TMPDIR/e2e-913-preserve"
+    mkdir -p "$ws"
+    printf '# SENTINEL-913 consumer typos config\n[default.extend-words]\nfoo = "foo"\n' \
+        >"$ws/.typos.toml"
+    run _upgrade both "$ws"
+    assert_success
+    run grep -q 'SENTINEL-913' "$ws/.typos.toml"
+    assert_success
+}
+
+@test "upgrade prints a template diff hint for a preserved .typos.toml (#913)" {
+    ws="$BATS_TEST_TMPDIR/e2e-913-diff"
+    mkdir -p "$ws"
+    # a config lacking the template's exception words
+    printf '# SENTINEL-913 minimal consumer typos config\n' >"$ws/.typos.toml"
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial 'command not found'
+    assert_output --partial 'Preserved .typos.toml differs from the template'
+    # a template exception word the preserved file lacks shows in the diff
+    assert_output --partial 'unexcepted'
+}
+
+@test "upgrade with a legacy _typos.toml does not leave dual typos configs (#913)" {
+    # vault scenario: consumer carries _typos.toml and no .typos.toml. Shipping
+    # the template .typos.toml alongside it would give two active configs.
+    ws="$BATS_TEST_TMPDIR/e2e-913-legacy"
+    mkdir -p "$ws"
+    printf '# SENTINEL-913 legacy typos config\n[default.extend-words]\nmyterm = "myterm"\n' \
+        >"$ws/_typos.toml"
+    run _upgrade both "$ws"
+    assert_success
+    # legacy config preserved verbatim
+    run grep -q 'SENTINEL-913' "$ws/_typos.toml"
+    assert_success
+    # template .typos.toml NOT shipped -> single active config
+    run test -e "$ws/.typos.toml"
+    assert_failure
+}
+
+# ── pre-commit reference scan must cover preserved workflows (#916) ────────────
+# The #881 scan only looked at justfile.project and .githooks/, but a consumer
+# CI workflow that still invokes the retired `pre-commit` binary breaks the same
+# way. Extend the scan to preserved .github/workflows/*.yml. A YAML `name:` step
+# description or a comment mention must NOT be flagged; only real invocations.
+
+@test "pre-commit scan flags a real invocation in a consumer workflow (#916)" {
+    ws="$BATS_TEST_TMPDIR/e2e-916-workflow-hit"
+    mkdir -p "$ws/.github/workflows"
+    # consumer-owned workflow (not in the template set) survives the rsync
+    cat > "$ws/.github/workflows/consumer-ci.yml" <<'EOF'
+name: Consumer CI
+on: [push]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      # pre-commit MENTIONONLY: migrate to prek before 0.5
+      - name: Run pre-commit hooks
+        run: uv run pre-commit run --all-files
+EOF
+    run _upgrade both "$ws"
+    assert_success
+    assert_output --partial "retired 'pre-commit' binary"
+    # the real invocation line is flagged with file:line
+    assert_output --regexp '\.github/workflows/consumer-ci\.yml:[0-9]+'
+    # neither the comment mention nor the step `name:` description is flagged
+    refute_output --partial 'MENTIONONLY'
+    refute_output --partial 'Run pre-commit hooks'
+}
+
+@test "no pre-commit warning for a workflow that only mentions it (#916)" {
+    ws="$BATS_TEST_TMPDIR/e2e-916-workflow-clean"
+    mkdir -p "$ws/.github/workflows"
+    cat > "$ws/.github/workflows/consumer-clean.yml" <<'EOF'
+name: Consumer CI
+on: [push]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      # pre-commit was replaced by prek
+      - name: Run pre-commit hooks
+        run: uv run prek run --all-files
+EOF
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial "retired 'pre-commit' binary"
+}
+
+# ── origin must resolve before any filesystem mutation (#916) ─────────────────
+# Under --no-prompts, the GITHUB_REPOSITORY resolution ran AFTER the rsync copy,
+# so an abort left a half-scaffolded tree behind. Resolve (and validate) the
+# origin BEFORE the first filesystem mutation so a failure leaves the workspace
+# untouched.
+
+@test "no-prompts without a derivable origin aborts before mutating the workspace (#916)" {
+    ws="$BATS_TEST_TMPDIR/e2e-916-no-origin"
+    mkdir -p "$ws"
+    # no .git origin and GITHUB_REPOSITORY unset (cleared: CI may export it)
+    run env -u GITHUB_REPOSITORY \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=probe \
+        bash "$INIT_WORKSPACE_SH" --no-prompts --mode both
+    assert_failure
+    assert_output --partial 'GITHUB_REPOSITORY is required'
+    # the workspace was never scaffolded: still empty (no template files copied)
+    run bash -c "ls -A '$ws'"
+    assert_output ""
+}
+
 # ── --preview: report-only upgrade preview (#886) ─────────────────────────────
 # `--preview` runs the existing conflict-report machinery (OVERWRITTEN /
 # PRESERVED), extended with the mode-prune DELETED listing and the ADDED
