@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`.vig-os` project manifest and new `bare` delivery mode** ([#885](https://github.com/vig-os/devcontainer/issues/885))
   - `.vig-os` now persists the delivery mode and identity (`DEVKIT_MODE`, `DEVKIT_PROJECT`, `DEVKIT_ORG`, `DEVKIT_REPO`, reserved `DEVKIT_MODULES`) alongside the version pin — flat `KEY=VALUE` format unchanged, existing parsers byte-for-byte unaffected. Precedence flag/env > `.vig-os` > prompt/default, with resolved values written back, so manifest-bearing repos upgrade with `--force` and no mode/identity flags while keeping shape and names.
   - Legacy (version-only) consumers get their mode inferred conservatively from the tree shape on upgrade (wider mode on ambiguity, inference printed and persisted, never reshaping); an explicit `--mode` contradicting the persisted `DEVKIT_MODE` refuses, pointing at `--preview` and the preflight-guard flow.
-  - New `bare` mode ships the standards layer only (justfiles, hooks config, `.github/` CI, `pyproject.toml`, `.vig-os`), prunes `.devcontainer/`/`flake.nix`/`.envrc` behind the #738/#859 pre-existence guards, and scaffolds a host-native `ci.yml` (no image resolution, no container jobs — `setup-uv` on the runner drives the same `just sync|precommit|test` contract) with `rust-just`/`prek` pinned to the toolchain versions.
+  - New `bare` mode ships the standards layer only (justfiles, hooks config, `.github/` CI, `.vig-os`), prunes `.devcontainer/`/`flake.nix`/`.envrc` behind the #738/#859 pre-existence guards, and scaffolds a host-native `ci.yml` (no image resolution, no container jobs — `setup-uv` on the runner drives the same `just sync|precommit|test` contract) with `rust-just`/`prek` pinned to the toolchain versions.
   - The template `.vig-os` ships `DEVKIT_MODE` empty and the resolved mode/identity are persisted immediately after the template copy, so an upgrade aborted mid-scaffold can never persist a delivery mode the repo did not choose.
 
 - **Preflight guard and diff preview for scaffold upgrades** ([#886](https://github.com/vig-os/devcontainer/issues/886))
@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The draft + approval gate now applies only to the **final** release (the step that burns the immutable `X.Y.Z` tag); `promote-release.yml`'s merge job still re-enforces approval before merging to `main`, so `main` and `:latest` remain fully protected.
   - Release docs, `justfile`, and `CONTRIBUTE.md` reordered accordingly: publish candidates to verify first, then mark ready and get approval before `finalize-release`.
 
+- **Copied scaffold is language-neutral** ([#929](https://github.com/vig-os/devcontainer/issues/929))
+  - The scaffold no longer assumes a Python package: `just lint/format/test/test-cov` are guarded on `pyproject.toml` and no-op (exit 0) when it is absent, mirroring the existing `sync` guard, so a non-Python repo's `just sync|precommit|test` CI contract stays green out of the box.
+  - `init-workspace.sh` drops the `src/template_project` → `src/<name>` rename and test-import rewrite; `pyproject.toml` stays in the preserved set, so a consumer that brings its own is never clobbered.
+
 ### Deprecated
 
 ### Removed
@@ -54,6 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`pre-commit` compat shim removed from the image** ([#897](https://github.com/vig-os/devcontainer/issues/897))
   - The one-release-cycle `pre-commit → prek` shim shipped in 0.4.x ([#881](https://github.com/vig-os/devcontainer/issues/881)) is gone; `pre-commit` invocations now fail with exit 127.
   - Consumers had the 0.4.x cycle to rename invocations; the upgrade-time scan still warns with `file:line` on preserved surfaces — see `docs/MIGRATION.md` for the rename checklist (justfile recipes, repo-owned `.githooks/`, CI configs → `prek`).
+
+- **Python package starter dropped from the scaffold** ([#929](https://github.com/vig-os/devcontainer/issues/929))
+  - `pyproject.toml`, `src/template_project/`, and `tests/` are no longer shipped in `assets/workspace/`; a fresh scaffold is language-neutral. Restore a Python layout on demand with the opt-in `nix flake init -t github:vig-os/devcontainer#python` template ([#930](https://github.com/vig-os/devcontainer/issues/930)).
 
 ### Fixed
 
