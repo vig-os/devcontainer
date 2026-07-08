@@ -51,6 +51,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Imageless upgrades stamp the real built tag** ([#921](https://github.com/vig-os/devcontainer/issues/921))
+  - The image now bakes an authoritative built-tag record (`/root/assets/VERSION`) distinct from the template `.vig-os` pin: the release `build-image` action runs `nix build --impure` with `VIG_OS_VERSION` set to the true publish tag (RCs included), which the flake reads via `builtins.getEnv`. A plain, pure `nix build` reads `""` and falls back to the checked-in repo pin, so ordinary builds stay bit-reproducible.
+  - `init-workspace.sh` reads that record when no `VIG_OS_VERSION` is forwarded, so a bare `podman run … init-workspace.sh` upgrade (no `install.sh`) now pins `.vig-os` to the image's real tag instead of the stale baked template pin ([#916](https://github.com/vig-os/devcontainer/issues/916)); an explicit `VIG_OS_VERSION` still wins, and an absent record leaves the pin untouched.
+
 - **Version-skew hardening for the shipped CI glue** ([#854](https://github.com/vig-os/devcontainer/issues/854))
   - **CI-wired skew guard:** the shipped container `ci.yml` and the new direnv `ci.yml` lint jobs now fail fast with an actionable `::error::` if the toolchain does not provide `prek`, turning an opaque `just precommit` exit 127 (old scaffold vs new image, or an image too old to ship the prek hook runner) into a one-line diagnosis.
   - **`prepare-release.yml` resolver unified:** the scaffold's forked inline-awk image resolver with a silent `latest` fallback is replaced by the shared `resolve-image` action, which hard-fails on a missing/unreadable `DEVCONTAINER_VERSION` pin.
