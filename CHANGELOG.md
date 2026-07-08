@@ -9,13 +9,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Authenticated GHCR pulls for the shipped container CI** ([#920](https://github.com/vig-os/devcontainer/issues/920))
+  - The `resolve-image` action now runs an **authenticated** manifest probe: it logs in to `ghcr.io` before the probe when given a token (new optional `registry-token`/`registry-username` inputs) and no longer swallows the probe's stderr, so failures are classified into actionable `::error::` annotations that distinguish an auth/denied failure ("set the `GHCR_PULL_TOKEN` secret / grant `packages: read`") from a genuinely missing tag. The anonymous path is kept for public images.
+  - Every shipped container job (`ci.yml`, `prepare-release.yml`, `promote-release.yml`, `release.yml`, `release-core.yml`, `release-publish.yml`, `sync-issues.yml`, `sync-main-to-dev.yml`, `renovate-changelog-build.yml`) gains an opt-in `credentials:` block (`username: github.actor`, `password: ${{ secrets.GHCR_PULL_TOKEN || github.token }}`) and `packages: read`, so a **private** or rate-limited image pulls without per-repo edits.
+  - **Public consumers are unaffected:** with `GHCR_PULL_TOKEN` unset the expression falls back to the automatic `github.token` (never an empty password), which performs an authenticated pull of a public image successfully.
+  - `docs/container-ci-quirks.md` re-framed from a "public-image limitation" note into first-class authenticated-pull documentation (secret contract, `github.token` fallback, `packages: read` requirement). Split out of the workflow audit ([#854](https://github.com/vig-os/devcontainer/issues/854)) and rides the devkit rename cycle ([#781](https://github.com/vig-os/devcontainer/issues/781)).
+
+- **Nix-direct CI lane for direnv-mode consumers** ([#854](https://github.com/vig-os/devcontainer/issues/854))
+  - `direnv` mode now scaffolds a host-native `ci.yml` overlay (`assets/workspace-direnv/`, applied like the bare overlay and keyed off the persisted `DEVKIT_MODE`): no `resolve-image`, no in-container jobs — the runner installs Nix (with the vig-os Cachix substituter, SHA-pinned `install-nix`/`cachix` actions reused from this repo's own lane) and drives the same `just sync|precommit|test` contract inside the flake dev-shell via `nix develop -c`, dropping the container-only `PREK_HOME`/`UV_PROJECT_ENVIRONMENT` env.
+  - Documented boundary in `docs/MIGRATION.md` ("direnv-mode CI"): only `ci.yml` is converted for direnv mode; the other shipped workflows (`prepare-release`, `promote-release`, `release*`, `sync-issues`, `renovate-changelog-build`, `sync-main-to-dev`) stay container-based and devcontainer-mode-only until the full workflow audit rides the devkit rename ([#781](https://github.com/vig-os/devcontainer/issues/781)); the container-independent ones (`codeql`, `scorecard`, `renovate-changelog-commit`, `release-extension`) keep working in every mode.
+
+- **Opt-in capability modules for `mkProjectShell`** ([#884](https://github.com/vig-os/devcontainer/issues/884))
+  - `modules = [ "native" ]` composes curated capability modules (packages + env vars + shellHook fragments) onto the project dev-shell; contract recorded in `docs/rfcs/ADR-capability-modules.md`.
+  - Zero-module shells are byte-identical to the previous builder and the published image stays base-only; `extraPackages` remains the per-repo escape hatch and wins PATH lookup.
+  - `native` module ships first (`stdenv.cc`, `cmake`, `gnumake`, `pkg-config`, generic `CC`/`CXX`) — the long-term [#879](https://github.com/vig-os/devcontainer/issues/879) answer; `geant4`/`rust`/`fortran`/`root` stay ask-gated candidates.
+  - Per-module flake checks (`checks.<system>.module-<name>`) plus a uv C-extension sdist smoke test (`tests/test_flake_modules.py`).
+
+- **`.vig-os` project manifest and new `bare` delivery mode** ([#885](https://github.com/vig-os/devcontainer/issues/885))
+  - `.vig-os` now persists the delivery mode and identity (`DEVKIT_MODE`, `DEVKIT_PROJECT`, `DEVKIT_ORG`, `DEVKIT_REPO`, reserved `DEVKIT_MODULES`) alongside the version pin — flat `KEY=VALUE` format unchanged, existing parsers byte-for-byte unaffected. Precedence flag/env > `.vig-os` > prompt/default, with resolved values written back, so manifest-bearing repos upgrade with `--force` and no mode/identity flags while keeping shape and names.
+  - Legacy (version-only) consumers get their mode inferred conservatively from the tree shape on upgrade (wider mode on ambiguity, inference printed and persisted, never reshaping); an explicit `--mode` contradicting the persisted `DEVKIT_MODE` refuses, pointing at `--preview` and the preflight-guard flow.
+  - New `bare` mode ships the standards layer only (justfiles, hooks config, `.github/` CI, `pyproject.toml`, `.vig-os`), prunes `.devcontainer/`/`flake.nix`/`.envrc` behind the #738/#859 pre-existence guards, and scaffolds a host-native `ci.yml` (no image resolution, no container jobs — `setup-uv` on the runner drives the same `just sync|precommit|test` contract) with `rust-just`/`prek` pinned to the toolchain versions.
+  - The template `.vig-os` ships `DEVKIT_MODE` empty and the resolved mode/identity are persisted immediately after the template copy, so an upgrade aborted mid-scaffold can never persist a delivery mode the repo did not choose.
+
+- **Preflight guard and diff preview for scaffold upgrades** ([#886](https://github.com/vig-os/devcontainer/issues/886))
+  - `install.sh --force` upgrades now refuse on `main`/`dev`/`release/*`/detached HEAD and on a dirty tree, so every upgrade lands as a reviewable, revertible diff on a dedicated branch; on a protected branch with a clean tree the installer offers to create and switch to `chore/devkit-upgrade-<version>`, and non-git directories get a warn-and-confirm path. A single `--skip-preflight` flag bypasses the guard; `--smoke-test` runs and fresh installs are exempt.
+  - New `--preview` mode prints the add/overwrite/preserve/delete file report (including mode-prune deletions such as the retired `.devcontainer/justfile.base`) and exits without changing any files — unlike `--dry-run`, which only prints the container command.
+
+- **Flake-generated pre-commit hooks: one definition, consumer-extensible** ([#883](https://github.com/vig-os/devcontainer/issues/883))
+  - `nix/hooks.nix` now defines the pre-commit hook set once; it renders the sandbox-pure `checks.pre-commit` gate, the committed `.pre-commit-config.yaml` + scaffold copy (drift CI-gated by `tests/test_flake_hooks.py` against `nix eval .#lib.hooksPortable` — the hand-synced triangle and the manifest transform chain are retired), and the consumer surface.
+  - `mkProjectShell` gains opt-in `hooks` (toggle base hooks, per-hook `excludes`/overrides, fully custom hooks) and `hooksExcludes` (global excludes): entering the shell installs the rendered config as a repo-root symlink without ever touching `core.hooksPath` — the scaffold's `.githooks` entry point stays in charge; a preserved hand-edited YAML ([#878](https://github.com/vig-os/devcontainer/issues/878)) is never overwritten, and the zero-hooks dev-shell stays byte-identical.
+  - Consumer contract and migration steps in `docs/MIGRATION.md`; the `.vig-os` manifest raw-YAML opt-out flag is tracked in [#885](https://github.com/vig-os/devcontainer/issues/885).
+
 ### Changed
+
+- **Release-candidate dispatch gates on CI only** ([#902](https://github.com/vig-os/devcontainer/issues/902))
+  - `release.yml` no longer requires the release PR to be marked ready-for-review and approved before publishing a candidate — candidate dispatch now gates on CI status only, so RCs are freely dispatchable during verification while the PR stays a draft.
+  - The draft + approval gate now applies only to the **final** release (the step that burns the immutable `X.Y.Z` tag); `promote-release.yml`'s merge job still re-enforces approval before merging to `main`, so `main` and `:latest` remain fully protected.
+  - Release docs, `justfile`, and `CONTRIBUTE.md` reordered accordingly: publish candidates to verify first, then mark ready and get approval before `finalize-release`.
 
 ### Deprecated
 
 ### Removed
 
+- **`pre-commit` compat shim removed from the image** ([#897](https://github.com/vig-os/devcontainer/issues/897))
+  - The one-release-cycle `pre-commit → prek` shim shipped in 0.4.x ([#881](https://github.com/vig-os/devcontainer/issues/881)) is gone; `pre-commit` invocations now fail with exit 127.
+  - Consumers had the 0.4.x cycle to rename invocations; the upgrade-time scan still warns with `file:line` on preserved surfaces — see `docs/MIGRATION.md` for the rename checklist (justfile recipes, repo-owned `.githooks/`, CI configs → `prek`).
+
 ### Fixed
+
+- **Imageless upgrades stamp the real built tag** ([#921](https://github.com/vig-os/devcontainer/issues/921))
+  - The image now bakes an authoritative built-tag record (`/root/assets/VERSION`) distinct from the template `.vig-os` pin: the release `build-image` action runs `nix build --impure` with `VIG_OS_VERSION` set to the true publish tag (RCs included), which the flake reads via `builtins.getEnv`. A plain, pure `nix build` reads `""` and falls back to the checked-in repo pin, so ordinary builds stay bit-reproducible.
+  - `init-workspace.sh` reads that record when no `VIG_OS_VERSION` is forwarded, so a bare `podman run … init-workspace.sh` upgrade (no `install.sh`) now pins `.vig-os` to the image's real tag instead of the stale baked template pin ([#916](https://github.com/vig-os/devcontainer/issues/916)); an explicit `VIG_OS_VERSION` still wins, and an absent record leaves the pin untouched.
+
+- **Template `sync` recipe no longer forces `--all-extras`** ([#892](https://github.com/vig-os/devcontainer/issues/892))
+  - The shipped `justfile.project` `sync` recipe used `uv sync --all-extras --all-groups`, which forced every optional extra to install. Repos that quarantine platform-limited dependencies (e.g. cp312/cp313-only wheels) in extras got a hard `just sync` failure on the cp314 image.
+  - The recipe is now parameterized (`sync *args="--all-groups"`) and defaults to `--all-groups`: dev groups stay synced while extras become opt-in via `just sync --all-extras`. The `update` recipe (which calls `just sync`) uses the new default unchanged.
+
+- **Version-skew hardening for the shipped CI glue** ([#854](https://github.com/vig-os/devcontainer/issues/854))
+  - **CI-wired skew guard:** the shipped container `ci.yml` and the new direnv `ci.yml` lint jobs now fail fast with an actionable `::error::` if the toolchain does not provide `prek`, turning an opaque `just precommit` exit 127 (old scaffold vs new image, or an image too old to ship the prek hook runner) into a one-line diagnosis.
+  - **`prepare-release.yml` resolver unified:** the scaffold's forked inline-awk image resolver with a silent `latest` fallback is replaced by the shared `resolve-image` action, which hard-fails on a missing/unreadable `DEVCONTAINER_VERSION` pin.
+  - **`devc-upgrade` honors the pin:** the recipe read `install.sh` from `main` regardless of the consumer's pin; it now reads `DEVCONTAINER_VERSION` from `.vig-os` and upgrades to that generation (script ref + `--version`), keeping `main`/`latest` only for unpinned repos.
+  - **pipefail in every mode:** `set shell := ["bash", "-euo", "pipefail", "-c"]` moved from the devc-only `justfile.devc` to the root `justfile` (the SSoT), so direnv/bare recipes get pipefail too.
+  - **`init-precommit.sh` derives its root** from the script location instead of a hard-coded `/workspace/{{SHORT_NAME}}`.
+  - **Stale doc fixed:** `docs/container-ci-quirks.md` no longer describes a removed `uv run bandit` `pre-commit` hook; the private-image (unauthenticated `resolve-image` probe + missing `credentials:`) limitation is documented, with the first-class fix tracked in [#920](https://github.com/vig-os/devcontainer/issues/920).
 
 ### Security
 
