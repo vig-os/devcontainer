@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Opt-in Python starter flake template** ([#930](https://github.com/vig-os/devcontainer/issues/930))
+  - `nix flake init -t github:vig-os/devcontainer#python` restores a Python package layout (`pyproject.toml`, `src/`, `tests/`) onto the now language-neutral scaffold ([#929](https://github.com/vig-os/devcontainer/issues/929)). The template uses a concrete `example_pkg` name the user renames — `nix flake init -t` does no placeholder substitution — and ships a minimal pytest dev group (no `science`/`jupyter` extras).
+
 - **Authenticated GHCR pulls for the shipped container CI** ([#920](https://github.com/vig-os/devcontainer/issues/920))
   - The `resolve-image` action now runs an **authenticated** manifest probe: it logs in to `ghcr.io` before the probe when given a token (new optional `registry-token`/`registry-username` inputs) and no longer swallows the probe's stderr, so failures are classified into actionable `::error::` annotations that distinguish an auth/denied failure ("set the `GHCR_PULL_TOKEN` secret / grant `packages: read`") from a genuinely missing tag. The anonymous path is kept for public images.
   - Every shipped container job (`ci.yml`, `prepare-release.yml`, `promote-release.yml`, `release.yml`, `release-core.yml`, `release-publish.yml`, `sync-issues.yml`, `sync-main-to-dev.yml`, `renovate-changelog-build.yml`) gains an opt-in `credentials:` block (`username: github.actor`, `password: ${{ secrets.GHCR_PULL_TOKEN || github.token }}`) and `packages: read`, so a **private** or rate-limited image pulls without per-repo edits.
