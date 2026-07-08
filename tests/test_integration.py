@@ -2092,7 +2092,13 @@ class TestJustRecipes:
         )
 
     def test_just_test_recipe(self, devcontainer_up):
-        """Test the just test command."""
+        """`just test` no-ops (exit 0) on a language-neutral base scaffold (#929).
+
+        The scaffold ships no ``pyproject.toml``, so the guarded recipe runs
+        nothing and exits 0 — the shipped ``ci.yml`` (and the release smoke-test
+        dispatch) stay green on a project that has not added a Python package.
+        Adding one (e.g. ``nix flake init -t ...#python``, #930) activates pytest.
+        """
         workspace_path = str(devcontainer_up.resolve())
 
         just_cmd = self._just_cmd(workspace_path, ["test"])
@@ -2112,12 +2118,9 @@ class TestJustRecipes:
             f"command: {' '.join(just_cmd)}"
         )
 
-        assert (
-            "test session starts" in result.stdout
-            and "passed" in result.stdout
-            and "failed" not in result.stdout
-        ), (
-            f"Unexpected pytest output\n"
+        # No pyproject.toml -> the guard skips pytest entirely (no session).
+        assert "test session starts" not in result.stdout, (
+            f"`just test` should no-op without a pyproject.toml, but pytest ran\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}\n"
             f"command: {' '.join(just_cmd)}"
