@@ -991,7 +991,7 @@ class TestDevContainerUserConf:
     def test_project_installed_after_init(self, initialized_workspace):
         """Regression: uv.lock must reference the actual project name after init.
 
-        init-workspace.sh runs `just sync` which calls `uv sync --all-extras`.
+        init-workspace.sh runs `just sync` which calls `uv sync --all-groups`.
         This resolves the lock file for the renamed project and installs it.
 
         Before the fix, init did not sync, so uv.lock still referenced
