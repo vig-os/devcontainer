@@ -19,6 +19,124 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.4.1](https://github.com/vig-os/devcontainer/releases/tag/0.4.1) - 2026-07-08
+
+### Added
+
+- **ADR: terminal home environment as devkit home-manager modules** ([#815](https://github.com/vig-os/devcontainer/issues/815))
+  - Accepted `docs/rfcs/ADR-home-environment-modules.md`: parameterized `vigos.*` home-manager modules as a second product of this repo (epic [#814](https://github.com/vig-os/devcontainer/issues/814)).
+
+- **Home-manager module release/versioning policy** ([#816](https://github.com/vig-os/devcontainer/issues/816))
+  - `docs/NIX.md`: modules ride the existing release train (consumers pin tags), `mkRenamedOptionModule` deprecation shims, dogfood-canary exception, and the `#### Modules` changelog sub-heading convention.
+  - Workspace scaffold `vigos.url` float is now documented as deliberate, with the pin recipe.
+
+- **Scheduled nixpkgs-unstable lock bump** ([#817](https://github.com/vig-os/devcontainer/issues/817))
+  - Weekly workflow refreshing the fast-movers pin (uv, gh, claude-code) via a chore PR to dev, gated by full CI.
+
+- **vigos.* home module set + homeConfigurations matrix** ([#818](https://github.com/vig-os/devcontainer/issues/818), [#819](https://github.com/vig-os/devcontainer/issues/819))
+  - `homeManagerModules.{default,packages,shell,multiplexer,cli,direnv,git}` exported as path modules (+ `homeModules` alias); `home-manager` flake input (release-26.05, nixpkgs follows); `ci-{minimal,full}` homeConfigurations across 4 systems built as Tier-0 `hm-*` checks (x86_64-darwin eval-only).
+
+- **Home Matrix CI workflow** ([#820](https://github.com/vig-os/devcontainer/issues/820))
+  - Builds the ci homeConfigurations on aarch64-darwin (macos-latest) and aarch64-linux and pushes closures to Cachix; separate non-required workflow (fail-soft by status).
+
+- **vigos.shell module** ([#821](https://github.com/vig-os/devcontainer/issues/821))
+  - Bash + zsh, starship, atuin, zoxide under one enable flag; opt-in secretsEnv hook exporting ~/.config/vigos/secrets/<NAME> per the ADR credentials interface.
+
+- **vigos.multiplexer, vigos.cli, vigos.direnv modules** ([#821](https://github.com/vig-os/devcontainer/issues/821))
+  - tmux org defaults (vi keys, sane scrollback), modern-unix config (bat/eza/fzf/ripgrep/fd — configuration only, packages stay in vigos.packages), direnv + nix-direnv.
+
+- **vigos.git module** ([#821](https://github.com/vig-os/devcontainer/issues/821))
+  - git + delta, gh (ssh protocol), lazygit; identity and per-user-x-host SSH signing are null-default options — nothing is written unless set, so fresh hosts never fail their first commit.
+
+- **templates.personal + homeConfigurations.demo** ([#827](https://github.com/vig-os/devcontainer/issues/827))
+  - `nix flake init -t github:vig-os/devcontainer#personal` scaffolds a personal home-manager flake on the vigos.* modules; `demo` is the full-profile reference configuration.
+
+- **Home environment docs** ([#825](https://github.com/vig-os/devcontainer/issues/825), [#826](https://github.com/vig-os/devcontainer/issues/826))
+  - docs/home/: bootstrap guide (installer, macOS trusted-users trap, first activation), override cookbook, rollback table, best-effort Intel meaning, credential-hygiene runbook.
+
+- **CLAUDE.md hierarchy templates** ([#828](https://github.com/vig-os/devcontainer/issues/828))
+  - docs/home/claude-md/: user-global, workspace-root, and workspace layer templates + the directory-layout convention that makes the cascade work. Guidelines, not enforcement.
+
+- **vigos.claude module + container secrets path** ([#823](https://github.com/vig-os/devcontainer/issues/823), absorbs [#546](https://github.com/vig-os/devcontainer/issues/546))
+  - ~/.claude policy per the ADR: settings.json seeded copy-if-absent (org seed pre-authorizes nothing, includeCoAuthoredBy=false), managed vigos.md fragment (checksum-overwrite + .bak), @vigos.md import line seeded into the user-owned CLAUDE.md, DISABLE_AUTOUPDATER via sessionVariables, optional workspace-CLAUDE.md management (empty by default).
+  - Devcontainer scaffold mounts ~/.config/vigos/secrets read-only and exports the files as env vars at shell startup — the slim token path replacing setup-claude.sh forwarding.
+
+- **vigos.sesh, vigos.ghdash, vigos.editor modules** ([#824](https://github.com/vig-os/devcontainer/issues/824))
+  - sesh project sessions with a parameterized standard tmux layout (sessions + layout.windows options, no hardcoded paths), gh-dash with scoped lean sections via repoFilters, neovim with the claudecode.nvim bridge (plain programs.neovim, no nixvim input).
+
+### Changed
+
+- **Renovate: update `numpy` to `v2.5.1`** ([#865](https://github.com/vig-os/devcontainer/pull/865))
+
+- **MIGRATION.md: formalized the native-build contract** ([#882](https://github.com/vig-os/devcontainer/issues/882))
+  - Tiered policy for native Python builds (wheel-only / toolchain from the project flake via `mkProjectShell.extraPackages` / in-container `nix develop -c` middle path), a worked Geant4/ROOT example, and the explicit non-goal of shipping a C/C++ toolchain in the base image. Cross-links [#879](https://github.com/vig-os/devcontainer/issues/879) and [#854](https://github.com/vig-os/devcontainer/issues/854).
+
+#### Modules
+
+- **homeManagerModules.default is now the umbrella** importing every `vigos.*` module, each disabled by default ([#818](https://github.com/vig-os/devcontainer/issues/818)); existing imports keep working unchanged.
+
+### Deprecated
+
+#### Modules
+
+- **`programs.vigos-devtools.enable`** → `vigos.packages.enable` ([#818](https://github.com/vig-os/devcontainer/issues/818)); a `mkRenamedOptionModule` shim keeps the old option working for one release (docs/NIX.md policy).
+
+### Removed
+
+- **Documented Debian fallback retired** ([#642](https://github.com/vig-os/devcontainer/issues/642))
+  - The build has been Nix-only since 0.4.0; docs and workflow comments no longer present the Debian image as a rollback path. Pinning the frozen 0.3.9 release remains possible but unsupported.
+
+### Fixed
+
+- **Preserve a customized `.typos.toml` on upgrade** ([#913](https://github.com/vig-os/devcontainer/issues/913))
+  - `.typos.toml` joins the preserved-file set so a consumer's spell-check exceptions survive a `--force` upgrade; the upgrade prints the template diff (like `.pre-commit-config.yaml`, [#878](https://github.com/vig-os/devcontainer/issues/878)). Previously the generic template overwrote it and the `typos` hook then "corrected" real content.
+  - A consumer carrying the legacy `_typos.toml` no longer also receives the template `.typos.toml`, avoiding two active typos configs.
+
+- **Render preserved-file diff previews with `git diff`** ([#916](https://github.com/vig-os/devcontainer/issues/916))
+  - The preserved-file upgrade preview called `diff`, which the image does not ship, printing `command not found` into an empty box; it now uses `git diff --no-index`.
+
+- **Scan preserved CI workflows for the retired `pre-commit` binary** ([#916](https://github.com/vig-os/devcontainer/issues/916))
+  - The upgrade reference scan ([#881](https://github.com/vig-os/devcontainer/issues/881)) now also covers preserved `.github/workflows/*.yml`, flagging real `pre-commit` invocations with `file:line` while ignoring comments and step `name:` descriptions.
+
+- **Resolve the GitHub origin before scaffolding the workspace** ([#916](https://github.com/vig-os/devcontainer/issues/916))
+  - Under `--no-prompts`, a missing or underivable origin now aborts before any files are copied, instead of leaving a half-scaffolded workspace mid-run.
+
+- **Namespace scaffold `justfile.gh` git helpers to prevent consumer recipe collisions** ([#915](https://github.com/vig-os/devcontainer/issues/915))
+  - Renamed the shipped git-helper recipes `log` → `gh-log` and `branch` → `gh-branch` (matching the `gh-issues` convention). A consumer whose preserved `justfile.project` defined its own `log`/`branch` recipes previously hit a hard `just` parse failure (`recipe log … is redefined`) after upgrade, making `just` unusable and silently disabling the [#877](https://github.com/vig-os/devcontainer/issues/877) base-recipe repair.
+  - **Migration:** consumers who scripted against the shipped `just log` / `just branch` recipes must switch to `just gh-log` / `just gh-branch`; consumers who defined their own `log`/`branch` now keep them without collision.
+
+- **Renovate changelog template no longer leaks the upstream `assets/workspace` mirror** ([#914](https://github.com/vig-os/devcontainer/issues/914))
+  - The synced consumer `renovate-changelog-build.yml`/`-commit.yml` copied the `assets/workspace/.devcontainer/CHANGELOG.md` mirror plumbing verbatim; consumers have no such tree, so the steps hard-failed under `set -euo pipefail` on every Renovate changelog run. Manifest transforms now strip the mirror copies, leaving the template touching only the consumer's own `CHANGELOG.md`.
+
+- **Scaffold upgrade strands base recipes in a preserved `justfile.project`** ([#877](https://github.com/vig-os/devcontainer/issues/877))
+  - 0.4.0 moved `lint`/`format`/`precommit`/`test`/`test-cov`/`sync`/`update` into `justfile.project`, which is preserved on upgrade — 0.3.x consumers never received them and the shipped `ci.yml` failed with `justfile does not contain recipe 'sync'`. `init-workspace --force` now appends the missing base recipes from the template into the preserved file (customized recipes always win; idempotent).
+  - The retired `.devcontainer/justfile.base` is removed on upgrade where the scaffold manages `.devcontainer/` (never in `direnv` mode, [#738](https://github.com/vig-os/devcontainer/issues/738)), and the installer warns if the root `justfile` lacks the scaffold `import?` block.
+
+- **Renovate changelog artifact drops the workspace mirror; `metadata.env` breaks on parenthesized branches** ([#874](https://github.com/vig-os/devcontainer/issues/874))
+  - `upload-artifact` silently excluded the mirror under the hidden `.devcontainer` directory, so the bot commit updated only the root `CHANGELOG.md` and tripped the `sync-manifest` gate; now uploaded with `include-hidden-files: true`.
+  - `metadata.env` values are `%q`-quoted so grouped Renovate branch names (e.g. `renovate/python-(minor-and-patch)`) survive being `source`d by the commit workflow.
+
+- **Renovate changelog entries land as plain `### Changed` bullets, not under `#### Modules`** ([#867](https://github.com/vig-os/devcontainer/issues/867))
+  - `renovate-changelog-pr` appended entries at the bottom of the `### Changed` block, so with the `#### Modules` sub-heading convention ([#816](https://github.com/vig-os/devcontainer/issues/816)) a dependency bump was filed beneath `#### Modules` and read as a module change. Entries now insert at the top of `### Changed`, above any `####` sub-heading, with Keep-a-Changelog spacing preserved.
+
+- **Image Python advertised the phantom Nix build toolchain (`gcc`/`g++`) in sysconfig** ([#879](https://github.com/vig-os/devcontainer/issues/879))
+  - The baked CPython recorded its nixpkgs build compilers in `sysconfig` (`CC`/`CXX`/`LINKCC`/`LDSHARED`/`BLDSHARED`/`LDCXXSHARED`), but the image ships no compiler — PEP 517 backends inherited the phantom names verbatim: scikit-build-core exports `CC`/`CXX`, so CMake hard-failed on the missing `g++` instead of discovering the project-flake toolchain on `PATH`, and setuptools invoked the literal `gcc`.
+  - The image build now sanitizes the baked `_sysconfigdata*.py` / `_sysconfig_vars*.json` / config `Makefile` first tokens to the generic POSIX `cc`/`c++`, restoring `PATH` compiler discovery. Implemented as a shadow copy in the final image layer — no CPython rebuild, dev-shell toolchain untouched, and the no-compiler-baked consumer contract stands (documented via [#882](https://github.com/vig-os/devcontainer/issues/882)).
+
+- **Scaffold upgrade replaces `.pre-commit-config.yaml`, silently clobbering repo-specific hook config** ([#878](https://github.com/vig-os/devcontainer/issues/878))
+  - The upgrade overwrote the consumer's `.pre-commit-config.yaml` wholesale, dropping the repo-specific global `exclude:` block and per-hook `exclude:` keys — the hook suite then rewrote data files it must never touch and false-flagged PEM marker literals. The file is now preserved on upgrade (like `justfile.project`, [#877](https://github.com/vig-os/devcontainer/issues/877)).
+  - Because template hook-stack evolution no longer arrives automatically, `init-workspace --force` prints a diff of the preserved file against the incoming template so consumers can fold changes in deliberately, and warns (non-fatally) when the preserved config does not parse under `prek validate-config` — a config the runner cannot load breaks every commit in the new image.
+
+- **`pre-commit` binary dropped without a compat path — preserved consumer recipes and `.githooks` calling it break** ([#881](https://github.com/vig-os/devcontainer/issues/881))
+  - The 0.4.0 image retired the Python `pre-commit` for `prek` ([#778](https://github.com/vig-os/devcontainer/issues/778)), but files preserved on upgrade still invoke it and exit 127 (field-validated on a 0.3.5 → 0.4.0 consumer: the preserved `justfile.project` `precommit` recipe and repo-managed `.githooks` scripts broke every commit). The image now ships a **deprecated one-cycle `pre-commit → prek` shim** (stderr notice, removed in 0.5) so consumer hook scripts keep working while they migrate.
+  - `init-workspace --force` scans the post-scaffold `justfile.project`, `.githooks/` scripts and `.pre-commit-config.yaml` for invocation-shaped `pre-commit` references and warns (non-fatally) with `file:line`, pointing at the MIGRATION.md rename checklist — which now also covers the NixOS `#!/bin/bash` shebang gotcha in old-scaffold `.githooks`.
+
+### Security
+
+- **Accept podman `CVE-2026-57231` in the vulnix register pending the nixpkgs 26.05 backport** ([#905](https://github.com/vig-os/devcontainer/issues/905))
+  - podman 5.8.2 (affects 5.8.1–5.8.3) leaks matching host environment variables into a container when a malicious image manifest carries malformed `Env` entries (a key with no value, via the `*` glob) — CVSS 7.5, a supply-chain risk only when running untrusted images. The release CVE gate blocked the 0.4.1 RC on this finding.
+  - Fixed upstream in 5.8.4/6.0.0, but the pinned `nixpkgs` `release-26.05` still ships 5.8.2 (backport [NixOS/nixpkgs#536367](https://github.com/NixOS/nixpkgs/pull/536367) open), so advancing the rev cannot remediate yet. Added a short-dated `.vulnixignore` exception (expires 2026-08-06, re-check weekly) to unblock the gate; the exception flips to a nixpkgs rev-advance once the backport lands.
+
 ## [0.4.0](https://github.com/vig-os/devcontainer/releases/tag/0.4.0) - 2026-07-06
 
 ### Added

@@ -24,6 +24,12 @@
     # exactly two leaf entries. Consumed by mkProjectServices. Refs #795.
     process-compose-flake.url = "github:Platonic-Systems/process-compose-flake";
     services-flake.url = "github:juspay/services-flake";
+    # home-manager powers the vigos.* home environment — the ONLY input the
+    # module product adds (ADR-home-environment-modules axis 3). The release
+    # branch matches the nixos-26.05 pin; follows keeps one resolved nixpkgs.
+    # Refs #819.
+    home-manager.url = "github:nix-community/home-manager/release-26.05";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -36,6 +42,7 @@
       git-hooks-nix,
       process-compose-flake,
       services-flake,
+      home-manager,
     }:
     let
       # ---------------------------------------------------------------------
@@ -58,13 +65,7 @@
       # (tests/bats/test_helper.bash) resolves them from the Nix store — the
       # flake SSoT — replacing the npm (node_modules) / Debian (/usr/lib)
       # resolution that does not exist on the Nix toolchain. Refs #695.
-      batsWithLibs =
-        pkgs:
-        pkgs.bats.withLibraries (p: [
-          p.bats-support
-          p.bats-assert
-          p.bats-file
-        ]);
+      batsWithLibs = import ./nix/bats.nix;
 
       # Import nixpkgs-unstable for a given system (allowUnfree covers
       # claude-code). Evaluated once per system in the per-system `let` below and
@@ -95,6 +96,77 @@
       overlay = final: prev: mkFastMoverOverlay (importUnstable final.system) final prev;
 
       # ---------------------------------------------------------------------
+      # vigos home environment (#819): self-pkgs + the ci homeConfigurations.
+      # ---------------------------------------------------------------------
+      # pkgs for the flake's own homeConfigurations (self-pkgs): the same
+      # stable base + fast-mover overlay + allowUnfree combination as the
+      # per-system dev-shell pkgs, so claude-code and friends resolve to the
+      # very same versions across dev-shell, image, and home modules.
+      mkHomePkgs =
+        system:
+        import nixpkgs {
+          inherit system;
+          overlays = [ (mkFastMoverOverlay (importUnstable system)) ];
+          config.allowUnfree = true;
+        };
+
+      # Every system the home modules target. x86_64-darwin evaluates but is
+      # never built in CI (best-effort tier, ADR platform table).
+      hmSystems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
+        "x86_64-darwin"
+      ];
+
+      # The two CI profiles: minimal exercises one module, full exercises the
+      # whole option surface. Kept in lockstep with nix/home/.
+      hmProfiles = {
+        minimal = {
+          vigos.shell.enable = true;
+        };
+        full = {
+          vigos = {
+            packages.enable = true;
+            claude.enable = true;
+            sesh.enable = true;
+            ghdash.enable = true;
+            editor.enable = true;
+            shell.enable = true;
+            multiplexer.enable = true;
+            cli.enable = true;
+            direnv.enable = true;
+            git.enable = true;
+          };
+        };
+      };
+
+      # ci-<profile>-<system> homeConfigurations: synthetic user, pinned
+      # stateVersion — schema-asserted by tests/test_flake_checks.py.
+      ciHomeConfigurations = nixpkgs.lib.listToAttrs (
+        nixpkgs.lib.concatMap (
+          system:
+          map (profile: {
+            name = "ci-${profile}-${system}";
+            value = home-manager.lib.homeManagerConfiguration {
+              pkgs = mkHomePkgs system;
+              modules = [
+                ./nix/home/default.nix
+                {
+                  home = {
+                    username = "ci";
+                    homeDirectory = if nixpkgs.lib.hasSuffix "-darwin" system then "/Users/ci" else "/home/ci";
+                    stateVersion = "26.05";
+                  };
+                }
+                hmProfiles.${profile}
+              ];
+            };
+          }) (builtins.attrNames hmProfiles)
+        ) hmSystems
+      );
+
+      # ---------------------------------------------------------------------
       # devTools — the single source of truth for the toolchain.
       #
       # This list is the shared basis for the dev-shell now and the image later
@@ -102,60 +174,7 @@
       # (tests/test_flake_devshell.py) reads `devShellTools` so it can never
       # drift from this list.
       # ---------------------------------------------------------------------
-      devTools =
-        pkgs: with pkgs; [
-          # Build automation
-          just
-
-          # Git-hook runner: prek (Rust drop-in for the Python pre-commit,
-          # faster and one fewer manylinux/FHS consumer). The SSoT runner for
-          # the `.githooks` hooks and the flake's `checks.pre-commit`. Refs #778.
-          prek
-
-          # Version control & GitHub (gh from unstable via overlay)
-          git
-          gh
-          lazygit
-          delta
-
-          # Python tooling (uv from unstable via overlay)
-          uv
-
-          # Node.js (devcontainer CLI via npm)
-          nodejs
-
-          # Shell testing: bats core + helper libraries (support/assert/file).
-          # Wrapped so BATS_LIB_PATH is exported for bats_load_library. Refs #695.
-          (batsWithLibs pkgs)
-
-          # Shell & JSON utilities
-          jq
-          tmux
-          shellcheck
-
-          # Linting
-          taplo
-          nixfmt-rfc-style # nix file formatter (treefmt `nix fmt`, pre-commit hook)
-          ruff # python linter/formatter (pre-commit ruff/ruff-format hooks)
-          typos # source typo checker (pre-commit typos hook)
-          deadnix # dead-Nix-code linter (flake `checks.deadnix`)
-          statix # nix anti-pattern linter (flake `checks.statix`)
-
-          # Container runtime
-          podman
-
-          # Agent / terminal toolkit (absorbed from #545)
-          ripgrep # rg
-          fd
-          bat
-          eza
-          zoxide
-          starship
-          charm-freeze # freeze (charmbracelet terminal screenshots)
-          expect
-          neovim # nvim
-          claude-code # claude
-        ];
+      devTools = import ./nix/devtools.nix;
 
       # Binary names exposed for the parity test. Prefer the package's declared
       # `meta.mainProgram` (the canonical executable name, e.g. ripgrep -> rg,
@@ -551,6 +570,19 @@
             pythonEnv
             bandit
 
+            # DEPRECATED — remove in 0.5 (#881): one-release-cycle
+            # `pre-commit -> prek` compat shim. #778 dropped the Python
+            # pre-commit for prek, but consumer files preserved on upgrade
+            # (justfile.project recipes, repo-managed .githooks scripts)
+            # still invoke `pre-commit` and exited 127 at commit time. prek
+            # is drop-in for run-style invocations, so the shim dispatches
+            # and prints a one-line stderr notice (stdout stays clean for
+            # pipelines) until consumers rename their invocations.
+            (writeShellScriptBin "pre-commit" ''
+              echo "pre-commit: deprecated compat shim, dispatching to prek — rename your invocation; the shim is removed in 0.5 (vig-os/devcontainer#881)" >&2
+              exec ${prek}/bin/prek "$@"
+            '')
+
             # Rust/cargo + just LSP/formatter tools. The Debian image installed
             # these via cargo-binstall; Nix-native from nixpkgs here (#666).
             cargo-binstall
@@ -659,7 +691,7 @@
           # `{ self, … }` output signature, whose intentionally-unused args
           # deadnix would otherwise flag. Refs #777.
           deadnix = pkgs.runCommand "deadnix-check" { nativeBuildInputs = [ pkgs.deadnix ]; } ''
-            deadnix --fail ${./flake.nix}
+            deadnix --fail ${./flake.nix} ${./nix}
             touch "$out"
           '';
 
@@ -667,6 +699,7 @@
           # `inherit`). Same authored-flake scoping rationale as deadnix. Refs #777.
           statix = pkgs.runCommand "statix-check" { nativeBuildInputs = [ pkgs.statix ]; } ''
             statix check ${./flake.nix}
+            statix check ${./nix}
             touch "$out"
           '';
 
@@ -683,6 +716,13 @@
             test "$count" -gt 0
             touch "$out"
           '';
+        }
+        # The ci homeConfigurations build as Tier-0 checks. x86_64-darwin is
+        # the eval-only best-effort tier (ADR platform table): it exists as a
+        # homeConfiguration but gets no build leg. Refs #819.
+        // pkgs.lib.optionalAttrs (system != "x86_64-darwin") {
+          hm-minimal = self.homeConfigurations."ci-minimal-${system}".activationPackage;
+          hm-full = self.homeConfigurations."ci-full-${system}".activationPackage;
         };
 
         # ------------------------------------------------------------------
@@ -937,6 +977,56 @@
 
               contents = imageTools ++ [ bootstrap ];
 
+              # Sanitize the baked CPython's sysconfig compiler records (#879).
+              # nixpkgs' python bakes its Nix build toolchain into sysconfig
+              # (`_sysconfigdata*.py` / `_sysconfig_vars*.json` / config Makefile):
+              # CC='gcc', CXX='g++', and link commands starting with those names.
+              # The image deliberately ships no compiler (consumer contract:
+              # toolchains come from the project flake — documented via #882),
+              # so those are phantom names: PEP 517 backends inherit them
+              # verbatim — scikit-build-core exports CC/CXX into the
+              # environment, making CMake hard-fail on the missing 'g++'
+              # instead of doing PATH discovery, and setuptools invokes the
+              # literal 'gcc'. Rewriting the first tokens to the generic POSIX
+              # 'cc'/'c++' restores PATH discovery against whatever toolchain
+              # the project provides (and yields an honest "no compiler found"
+              # when none does).
+              #
+              # Mechanism: a last-layer shadow copy, not a CPython rebuild.
+              # fakeRootCommands runs in the image-root staging dir, so files
+              # created under ./nix/store/<python>/... are tarred into the
+              # customisation layer (ordered last) and override the python
+              # layer's copies at container runtime; the dev-shell toolchain
+              # and every python-dependent derivation stay fully cached. The
+              # python layer's stale `_sysconfigdata*.pyc` are hash-based
+              # (CHECKED_HASH), so the interpreter detects the changed source
+              # and recompiles instead of serving the old values. Note
+              # `enableFakechroot` can NOT do this: its layer tar excludes
+              # ./nix/store. Deterministic (fixed sed over fixed input), so
+              # digest reproducibility is preserved.
+              fakeRootCommands = ''
+                pylib=${python}/lib/python${python.pythonVersion}
+                shadow=.$pylib
+                mkdir -p "$shadow"
+                cp "$pylib"/_sysconfigdata__*.py "$pylib"/_sysconfig_vars__*.json "$shadow/"
+                cfg="$(basename "$pylib"/config-*)"
+                mkdir -p "$shadow/$cfg"
+                cp "$pylib/$cfg/Makefile" "$shadow/$cfg/"
+                chmod -R u+w "$shadow"
+                sed -i -E \
+                  -e "s/'(CC|LINKCC|LDSHARED|BLDSHARED)': 'gcc(['[:space:]])/'\1': 'cc\2/" \
+                  -e "s/'(CXX|LDCXXSHARED)': 'g\+\+(['[:space:]])/'\1': 'c++\2/" \
+                  "$shadow"/_sysconfigdata__*.py
+                sed -i -E \
+                  -e 's/"(CC|LINKCC|LDSHARED|BLDSHARED)": "gcc(["[:space:]])/"\1": "cc\2/' \
+                  -e 's/"(CXX|LDCXXSHARED)": "g\+\+(["[:space:]])/"\1": "c++\2/' \
+                  "$shadow"/_sysconfig_vars__*.json
+                sed -i -E \
+                  -e 's/^(CC=[[:space:]]*)gcc$/\1cc/' \
+                  -e 's/^(CXX=[[:space:]]*)g\+\+$/\1c++/' \
+                  "$shadow/$cfg/Makefile"
+              '';
+
               # Deterministic epoch timestamp keeps the digest reproducible.
               created = "1970-01-01T00:00:00Z";
 
@@ -1081,22 +1171,57 @@
           };
         };
 
-      # No `nixpkgs.overlays` here: home-manager rejects setting it when the
-      # consumer supplies an external `pkgs` (the common flake case). Fast-movers
-      # then track the consumer's channel unless they apply `overlays.default`
-      # themselves — documented in docs/NIX.md. Refs #777.
-      homeManagerModules.default =
-        {
-          config,
-          lib,
-          pkgs,
-          ...
-        }:
-        {
-          options.programs.vigos-devtools.enable = lib.mkEnableOption "the vigOS devcontainer toolchain (devTools)";
-          config = lib.mkIf config.programs.vigos-devtools.enable {
-            home.packages = devTools pkgs;
-          };
+      # ----------------------------------------------------------------------
+      # vigos.* home modules (#818) - the terminal home environment as
+      # per-concern home-manager modules (ADR-home-environment-modules).
+      # Exported as PATHS, not imported functions: the module system dedups
+      # path imports, so importing the `default` umbrella plus an individual
+      # module never double-declares options. The legacy
+      # `programs.vigos-devtools.enable` is shimmed in packages.nix
+      # (mkRenamedOptionModule, one release - docs/NIX.md policy).
+      # `homeModules` is the newer-convention alias of the same set.
+      # ----------------------------------------------------------------------
+      homeManagerModules = {
+        default = ./nix/home/default.nix;
+        packages = ./nix/home/packages.nix;
+        shell = ./nix/home/shell.nix;
+        multiplexer = ./nix/home/multiplexer.nix;
+        cli = ./nix/home/cli.nix;
+        direnv = ./nix/home/direnv.nix;
+        git = ./nix/home/git.nix;
+        claude = ./nix/home/claude.nix;
+        sesh = ./nix/home/sesh.nix;
+        ghdash = ./nix/home/ghdash.nix;
+        editor = ./nix/home/editor.nix;
+      };
+      homeModules = self.homeManagerModules;
+
+      # The ci matrix plus `demo` — onboarding sugar built from the same
+      # modules (full profile, synthetic user). Refs #827.
+      homeConfigurations = ciHomeConfigurations // {
+        demo = home-manager.lib.homeManagerConfiguration {
+          pkgs = mkHomePkgs "x86_64-linux";
+          modules = [
+            ./nix/home/default.nix
+            {
+              home = {
+                username = "demo";
+                homeDirectory = "/home/demo";
+                stateVersion = "26.05";
+              };
+            }
+            hmProfiles.full
+          ];
         };
+      };
+
+      # `nix flake init -t github:vig-os/devcontainer#personal` scaffolds a
+      # ~40-line personal flake importing the vigos.* modules. NOT in the
+      # deadnix/statix scope: like the workspace scaffold, the template keeps
+      # idiomatic possibly-unused args. Refs #827.
+      templates.personal = {
+        path = ./templates/personal;
+        description = "Personal home-manager flake importing the vigOS home modules";
+      };
     };
 }

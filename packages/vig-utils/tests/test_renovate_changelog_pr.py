@@ -87,7 +87,8 @@ def test_format_single_missing_old() -> None:
     )
 
 
-def test_insert_appends_to_changed_section() -> None:
+def test_insert_prepends_to_changed_section() -> None:
+    """New entries go at the top of ### Changed, above existing bullets."""
     changelog = textwrap.dedent(
         """\
         ## Unreleased
@@ -104,6 +105,7 @@ def test_insert_appends_to_changed_section() -> None:
     entry = "- **New** ([#2](https://github.com/o/r/pull/2))\n"
     new_content, did = insert_renovate_changelog_entry(changelog, 2, entry)
     assert did is True
+    assert new_content.index(entry) < new_content.index("**Existing**")
     assert new_content.index(entry) < new_content.index("### Deprecated")
     assert "**Existing**" in new_content
 
@@ -143,6 +145,31 @@ def test_insert_idempotent() -> None:
     new_content, did = insert_renovate_changelog_entry(changelog, 5, entry)
     assert did is False
     assert new_content == changelog
+
+
+def test_insert_above_subheading_in_changed() -> None:
+    """Renovate entries land as a plain ### Changed bullet, above any #### sub-heading."""
+    changelog = textwrap.dedent(
+        """\
+        ## Unreleased
+
+        ### Changed
+
+        #### Modules
+
+        - **Module thing** ([#1](https://github.com/o/r/pull/1))
+
+        ### Deprecated
+        """
+    )
+    entry = "- **Renovate: update `x`** ([#2](https://github.com/o/r/pull/2))\n"
+    new_content, did = insert_renovate_changelog_entry(changelog, 2, entry)
+    assert did is True
+    # Plain bullet at the top of ### Changed, not nested under #### Modules
+    assert new_content.index(entry) < new_content.index("#### Modules")
+    assert "### Changed\n\n- **Renovate" in new_content
+    # Keep-a-Changelog spacing preserved before the sub-heading
+    assert "\n\n#### Modules" in new_content
 
 
 def test_insert_changed_is_last_section_before_version() -> None:

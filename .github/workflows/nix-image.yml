@@ -183,8 +183,8 @@ jobs:
 
       # Regression guard (#664): a Nix image bakes the workspace template as
       # read-only /nix/store symlinks, so the scaffold must produce REAL, writable
-      # files (not dangling symlinks on the host). The install/integration suite
-      # only covers the Debian image, so assert the Nix scaffold here.
+      # files (not dangling symlinks on the host). Assert it here, directly on
+      # the freshly built per-arch image.
       - name: Assert the scaffold has no dangling store symlinks (#664)
         if: matrix.arch == 'amd64'
         run: |

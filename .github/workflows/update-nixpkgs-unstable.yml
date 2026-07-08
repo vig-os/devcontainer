@@ -1,0 +1,115 @@
+# Scheduled bump of the nixpkgs-unstable flake input.
+#
+# The fastMovers overlay (uv, gh, claude-code) tracks nixpkgs-unstable, so the
+# only thing standing between us and a fresh claude-code is this lock pin
+# (ADR-home-environment-modules rejects third-party claude-code flakes). This
+# workflow refreshes the pin weekly on a chore branch and opens a PR to dev —
+# the full CI pipeline on that PR is the merge gate.
+#
+# Refs #817.
+name: Update nixpkgs-unstable
+
+on:  # yamllint disable-line rule:truthy
+  schedule:
+    # Mondays 05:00 UTC — lands before the work week, CI gates the merge.
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    name: Bump nixpkgs-unstable lock
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Generate a token
+        id: generate-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+        with:
+          client-id: ${{ secrets.COMMIT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
+
+      - name: Checkout dev
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          ref: dev
+          token: ${{ steps.generate-token.outputs.token }}
+
+      - name: Install Nix (upstream CppNix)
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3  # v31.10.6
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Update the nixpkgs-unstable input
+        run: nix flake update nixpkgs-unstable
+
+      - name: Detect lock change
+        id: detect
+        run: |
+          set -euo pipefail
+          if git diff --quiet flake.lock; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "flake.lock unchanged - nothing to do."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or reset the chore branch at dev HEAD
+        if: steps.detect.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse HEAD)
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/chore/update-nixpkgs-unstable" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/git/refs/heads/chore/update-nixpkgs-unstable" \
+              -f sha="$sha" -F force=true >/dev/null
+          else
+            gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/heads/chore/update-nixpkgs-unstable" -f sha="$sha" >/dev/null
+          fi
+
+      # Commit via the GitHub API (vig-os/commit-action) so the commit carries
+      # GitHub's verified signature - the repo rules reject unsigned git-CLI
+      # pushes. Same mechanism as renovate-changelog-commit.yml.
+      - name: Commit the lock bump via API
+        if: steps.detect.outputs.changed == 'true'
+        uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TARGET_BRANCH: refs/heads/chore/update-nixpkgs-unstable
+          MAX_ATTEMPTS: "3"
+          COMMIT_MESSAGE: "chore(nix): bump nixpkgs-unstable (fast-movers refresh)"
+          FILE_PATHS: flake.lock
+
+      # PR creation needs pull-requests: write, which the commit app does not
+      # have (least-privilege split: COMMIT_APP_* commits, RELEASE_APP_* does
+      # PR operations). Same two-app pattern as sync-main-to-dev.yml (#817).
+      - name: Generate Release App Token
+        if: steps.detect.outputs.changed == 'true'
+        id: release-app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Open PR if none exists
+        if: steps.detect.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.release-app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          if ! gh pr list --head chore/update-nixpkgs-unstable --base dev --state open \
+              --json number --jq '.[0].number' | grep -q .; then
+            body="$(printf 'Scheduled refresh of the nixpkgs-unstable pin (uv, gh, claude-code via the fastMovers overlay). Full CI on this PR is the merge gate.\n\nRefs: #817\n')"
+            gh pr create --base dev --head chore/update-nixpkgs-unstable \
+              --title "chore(nix): bump nixpkgs-unstable (fast-movers refresh)" \
+              --body "$body"
+          fi

@@ -51,7 +51,27 @@ PRESERVE_FILES=(
     # The consumer owns its project manifest (#738): a (re)scaffold must never
     # overwrite an existing pyproject.toml with the generic template one.
     "pyproject.toml"
+    # The consumer owns its hook configuration (#878): repos carry repo-specific
+    # global/per-hook `exclude:` patterns (data tables, generated files, PEM
+    # marker literals) that a template overwrite silently destroyed — the hook
+    # suite then rewrote files it must never touch. Preserved like
+    # justfile.project; the upgrade prints a diff against the template below so
+    # hook-stack evolution stays visible.
+    ".pre-commit-config.yaml"
+    # The consumer owns its spell-check exceptions (#913): repos curate
+    # repo-specific extend-words/extend-exclude that a template overwrite
+    # silently destroyed, so the typos hook then flagged legitimate domain
+    # terms. Preserved like .pre-commit-config.yaml; the upgrade prints a diff
+    # against the template below. (Legacy `_typos.toml` handled at copy time.)
+    ".typos.toml"
 )
+
+# Base recipes the shipped .github/workflows/ci.yml depends on (sync, precommit,
+# test) plus their template siblings. Since 0.4.0 they live in justfile.project,
+# which is preserved on upgrade — a pre-0.4.0 consumer never receives them and
+# in-container CI fails with "justfile does not contain recipe 'sync'" (#877).
+# The upgrade repair below appends the missing ones from the template.
+CI_CONTRACT_RECIPES=(lint format precommit test test-cov sync update)
 
 # Get script directory for manifest location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -208,6 +228,21 @@ if [[ -z "$MODE" ]]; then
 fi
 echo "Delivery mode set to: $MODE"
 
+# Print one recipe block from the template justfile.project: the immediately
+# preceding comment/attribute lines, the recipe header, and the indented body.
+# Used to repair a preserved pre-0.4.0 justfile.project that lacks the
+# relocated base recipes (#877); the template stays the single source of truth.
+extract_template_recipe() {
+    local recipe="$1"
+    awk -v r="$recipe" '
+        found && /^[[:space:]]/ { print; next }
+        found { exit }
+        /^(#|\[)/ { buf = buf $0 ORS; next }
+        $0 ~ ("^" r "([[:space:]][^:]*)?:") { found = 1; printf "%s", buf; print; next }
+        { buf = "" }
+    ' "$TEMPLATE_DIR/justfile.project"
+}
+
 # Helper: check if a file is in the preserve list
 is_preserved_file() {
     local file="$1"
@@ -217,6 +252,29 @@ is_preserved_file() {
         fi
     done
     return 1
+}
+
+# Preview the template-vs-preserved divergence for a preserved consumer file
+# (#878, #913). A preserved file never receives template evolution
+# automatically, so surface the diff for the consumer to fold in deliberately.
+# The image ships git but no diff(1)/cmp(1) (#916): use `git diff --no-index`,
+# whose --quiet form gates the block and which exits 1 (the expected "they
+# diverged" signal, not an error) when the files differ. Returns 0 when a diff
+# was printed (files differ), 1 when identical or either file is missing.
+print_preserved_template_diff() {
+    local rel="$1"
+    local preserved="$WORKSPACE_DIR/$rel"
+    local template="$TEMPLATE_DIR/$rel"
+    [[ -f "$preserved" && -f "$template" ]] || return 1
+    if git diff --no-index --quiet -- "$template" "$preserved" > /dev/null 2>&1; then
+        return 1  # identical: nothing to surface
+    fi
+    echo "Preserved $rel differs from the template (yours was kept)."
+    echo "Template changes NOT applied (fold in what you need, see MIGRATION.md):"
+    echo "─────────────────────────────────────────────────────────────"
+    git diff --no-index -- "$template" "$preserved" || true
+    echo "─────────────────────────────────────────────────────────────"
+    return 0
 }
 
 # Warn if forcing (prompt user) - show which files would be overwritten
@@ -297,6 +355,30 @@ FLAKE_PREEXISTED=false
 ENVRC_PREEXISTED=false
 [[ -f "$WORKSPACE_DIR/.envrc" ]] && ENVRC_PREEXISTED=true
 
+# A preserved justfile.project may predate the 0.4.0 base-recipe relocation
+# (#877); record it so the post-scaffold repair can append what is missing.
+JUSTFILE_PROJECT_PREEXISTED=false
+[[ -f "$WORKSPACE_DIR/justfile.project" ]] && JUSTFILE_PROJECT_PREEXISTED=true
+
+# A preserved .pre-commit-config.yaml may lag the template hook stack (#878);
+# record it so the post-scaffold guard can surface the divergence.
+PRECOMMIT_CONFIG_PREEXISTED=false
+[[ -f "$WORKSPACE_DIR/.pre-commit-config.yaml" ]] && PRECOMMIT_CONFIG_PREEXISTED=true
+
+# A preserved .typos.toml is the consumer's spell-check exception set (#913);
+# record it so the post-scaffold guard can surface template divergence.
+TYPOS_CONFIG_PREEXISTED=false
+[[ -f "$WORKSPACE_DIR/.typos.toml" ]] && TYPOS_CONFIG_PREEXISTED=true
+
+# Under --no-prompts, resolve (and validate) the GitHub origin for renovate.json
+# BEFORE the first filesystem mutation (#916): a missing/underivable origin must
+# abort while the workspace is still pristine, not after rsync has left a
+# half-scaffolded tree. In interactive mode the resolution (which prompts) stays
+# after the copy, at its original call site below, to preserve prompt ordering.
+if [[ "$NO_PROMPTS" == "true" ]]; then
+    resolve_github_repository
+fi
+
 # Copy template contents to workspace
 echo "Initializing workspace from template..."
 echo "Copying files from $TEMPLATE_DIR to $WORKSPACE_DIR..."
@@ -341,6 +423,16 @@ else
     # (rather than copying-then-pruning) keeps a real .devcontainer/ intact.
     if [[ "$MODE" == "direnv" ]]; then
         EXCLUDE_ARGS+=("--exclude=.devcontainer")
+    fi
+
+    # Legacy typos config (#913): the `typos` tool reads .typos.toml, typos.toml
+    # AND _typos.toml. A consumer still carrying _typos.toml (and no .typos.toml)
+    # must not also receive the template .typos.toml, or two active configs
+    # collide. Skip shipping the template one; their _typos.toml stands as the
+    # single config (a preserved .typos.toml is already excluded above).
+    if [[ -f "$WORKSPACE_DIR/_typos.toml" && ! -f "$WORKSPACE_DIR/.typos.toml" ]]; then
+        echo "Consumer carries legacy _typos.toml; not shipping template .typos.toml (#913)."
+        EXCLUDE_ARGS+=("--exclude=.typos.toml")
     fi
 
     rsync -avL --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
@@ -390,11 +482,30 @@ case "$MODE" in
         ;;
 esac
 
+# 0.4.0 retired .devcontainer/justfile.base (recipes relocated to
+# justfile.project), so drop the stale copy an upgraded 0.3.x repo carries —
+# nothing imports it anymore (#877). Only when this scaffold manages
+# .devcontainer/: a direnv-mode consumer's own .devcontainer/ is never
+# touched (#738).
+if [[ "$MODE" != "direnv" && -f "$WORKSPACE_DIR/.devcontainer/justfile.base" ]]; then
+    echo "Removing retired .devcontainer/justfile.base (recipes live in justfile.project since 0.4.0)..."
+    rm -f "$WORKSPACE_DIR/.devcontainer/justfile.base"
+fi
+
 # Pin the explicitly requested devcontainer version (#852). The image bakes
 # the release it was built from into the scaffolded .vig-os (flake bootstrap),
 # which is correct for finals but stale for release candidates: the repo-root
 # pin only advances at finalize. install.sh forwards its --version here so the
 # scaffold pins the image actually installed.
+#
+# NOTE (#916): when VIG_OS_VERSION is unset (raw `podman run … init-workspace.sh`
+# outside install.sh), the scaffold keeps the baked pin. We cannot stamp the
+# true image version from the runtime here: the ONLY in-image version record is
+# this same baked template .vig-os (built from the repo-root pin), so reading it
+# back is a no-op and still stale for RC images. Stamping the actual built tag
+# for RCs requires a build-side change — bake the true tag into the image as an
+# authoritative record (an env var or VERSION file distinct from the repo-root
+# pin) that this block could read when VIG_OS_VERSION is unset.
 if [[ -n "${VIG_OS_VERSION:-}" && -f "$WORKSPACE_DIR/.vig-os" ]]; then
     if [[ ! "$VIG_OS_VERSION" =~ ^[A-Za-z0-9._-]+$ ]]; then
         echo "Error: invalid VIG_OS_VERSION: $VIG_OS_VERSION" >&2
@@ -404,7 +515,13 @@ if [[ -n "${VIG_OS_VERSION:-}" && -f "$WORKSPACE_DIR/.vig-os" ]]; then
     sed -i "s/^DEVCONTAINER_VERSION=.*/DEVCONTAINER_VERSION=${VIG_OS_VERSION}/" "$WORKSPACE_DIR/.vig-os"
 fi
 
-resolve_github_repository
+# Interactive origin resolution (the renovate.json owner/repo prompt) runs here,
+# after the copy, to keep the prompt ordering consumers and the integration
+# tests expect. Under --no-prompts this already resolved before the copy (#916),
+# so this call is a no-op then (GITHUB_REPOSITORY is set).
+if [[ "$NO_PROMPTS" != "true" ]]; then
+    resolve_github_repository
+fi
 
 # Replace placeholders in files (using pre-built manifest from image)
 echo "Replacing placeholders in files..."
@@ -456,6 +573,129 @@ fi
 echo "Setting executable permissions on shell scripts and hooks..."
 find "$WORKSPACE_DIR" -type f -name "*.sh" -exec chmod +x {} \;
 find "$WORKSPACE_DIR/.githooks" -type f -exec chmod +x {} \; 2>/dev/null || true
+
+# The root justfile is managed (rsync overwrites it on upgrade), so the
+# scaffold import block must be present at this point; without it every
+# layered recipe is unreachable, however complete justfile.project is
+# (#877, observed in the field). Warn loudly — this indicates a broken
+# scaffold or external interference.
+if [[ -f "$WORKSPACE_DIR/justfile" ]] \
+    && ! grep -qF "import? 'justfile.project'" "$WORKSPACE_DIR/justfile"; then
+    echo "Warning: root justfile lacks the scaffold import block (import? 'justfile.project')." >&2
+    echo "         Restore the imports from the template or layered recipes stay unreachable (see MIGRATION.md)." >&2
+fi
+
+# Repair a preserved pre-0.4.0 justfile.project (#877): the shipped ci.yml
+# calls `just sync` / `just precommit` / `just test`, so an upgrade must
+# deliver the CI-contract recipes. Append (from the template) only those that
+# do not resolve anywhere in the import graph — customized consumer recipes
+# always win, and re-running the upgrade is a no-op.
+if [[ "$JUSTFILE_PROJECT_PREEXISTED" == "true" && -f "$WORKSPACE_DIR/justfile.project" ]]; then
+    if ! command -v just > /dev/null 2>&1; then
+        echo "Warning: 'just' not found on PATH; skipping base-recipe repair (#877)." >&2
+        MISSING_RECIPES=()
+    # If the import graph does not parse (e.g. a syntax error in the preserved
+    # justfile.project), `just --show` fails for EVERY recipe — probing would
+    # misread all of them as missing and append duplicates on each run.
+    elif ! (cd "$WORKSPACE_DIR" && just --list > /dev/null 2>&1); then
+        echo "Warning: justfile graph does not parse; skipping base-recipe repair (#877)." >&2
+        echo "         Fix the syntax error (run 'just --list' to see it) and re-run init-workspace." >&2
+        MISSING_RECIPES=()
+    else
+        MISSING_RECIPES=()
+        for recipe in "${CI_CONTRACT_RECIPES[@]}"; do
+            if ! (cd "$WORKSPACE_DIR" && just --show "$recipe" > /dev/null 2>&1); then
+                MISSING_RECIPES+=("$recipe")
+            fi
+        done
+    fi
+    if [[ ${#MISSING_RECIPES[@]} -gt 0 ]]; then
+        echo "Preserved justfile.project lacks base recipe(s): ${MISSING_RECIPES[*]}"
+        echo "Appending them from the template (review the marked block, fold into your own recipes as needed)..."
+        {
+            echo ""
+            echo "# ==============================================================================="
+            echo "# BASE RECIPES appended by init-workspace on upgrade (vig-os/devcontainer#877)."
+            echo "# Since 0.4.0 these live in justfile.project (preserved on upgrade); the shipped"
+            echo "# ci.yml requires sync/precommit/test. Review, keep, or fold into your own."
+            echo "# ==============================================================================="
+            for recipe in "${MISSING_RECIPES[@]}"; do
+                recipe_block="$(extract_template_recipe "$recipe")"
+                if [[ -z "$recipe_block" ]]; then
+                    echo "Warning: recipe '$recipe' not found in the template justfile.project; skipping it (#877)." >&2
+                    continue
+                fi
+                echo ""
+                printf '%s\n' "$recipe_block"
+            done
+        } >> "$WORKSPACE_DIR/justfile.project"
+    fi
+fi
+
+# A preserved .pre-commit-config.yaml is the consumer's (#878) — never
+# overwritten, so their global/per-hook `exclude:` patterns survive. The cost
+# is that template hook-stack evolution (runner migrations, new hooks, compat
+# fixes) no longer arrives automatically: print the divergence from the
+# template so consumers can fold in what they need deliberately, and gate the
+# preserved file through `prek validate-config` — a config the runner cannot
+# load breaks every commit in the new image. Both are warnings, never fatal.
+if [[ "$PRECOMMIT_CONFIG_PREEXISTED" == "true" ]] \
+    && print_preserved_template_diff ".pre-commit-config.yaml"; then
+    if command -v prek > /dev/null 2>&1; then
+        if ! (cd "$WORKSPACE_DIR" && prek validate-config .pre-commit-config.yaml > /dev/null 2>&1); then
+            echo "Warning: preserved .pre-commit-config.yaml does not validate under prek (#878)." >&2
+            echo "         Every commit will fail until it parses — run 'prek validate-config .pre-commit-config.yaml' and fix it." >&2
+        fi
+    fi
+fi
+
+# A preserved .typos.toml is the consumer's (#913) — never overwritten, so
+# their spell-check exceptions survive; the cost is that template exception
+# evolution no longer arrives automatically. Print the divergence so consumers
+# can fold in what they need deliberately. Non-fatal, like the #878 guard.
+if [[ "$TYPOS_CONFIG_PREEXISTED" == "true" ]]; then
+    print_preserved_template_diff ".typos.toml" || true
+fi
+
+# The retired `pre-commit` binary (#778) exits 127 at first use: a preserved
+# justfile.project recipe, a consumer-owned .githooks script, or a hook entry
+# in the preserved .pre-commit-config.yaml that still invokes it breaks even
+# after a clean re-scaffold — the image ships prek plus a one-cycle compat
+# shim (removed in 0.5). Scan the post-scaffold state of those surfaces for
+# invocation-shaped references and warn with file:line (#881). Non-fatal,
+# like the #877/#878 guards. The pattern only matches `pre-commit` framed as
+# a command word (start/whitespace/shell punctuation on both sides), so the
+# config FILENAME (leading `.`), pre-commit-hooks repo URLs (leading `/`),
+# pre-commit.com links (trailing `.`), and `prek` never trip it; comment
+# lines, bare YAML stage-name list items (`- pre-commit`), and YAML `name:`
+# step descriptions (a workflow's "Run pre-commit hooks" step name, #916) are
+# filtered. Preserved consumer CI workflows are scanned too (#916): a workflow
+# that still runs the retired binary breaks the same way as a justfile recipe.
+PRECOMMIT_REF_PATTERN='(^|[[:space:]("'"'"';&|=`])pre-commit([[:space:])"'"'"';&|]|$)'
+PRECOMMIT_SCAN_TARGETS=()
+for scan_file in "$WORKSPACE_DIR/justfile.project" "$WORKSPACE_DIR/.pre-commit-config.yaml"; do
+    [[ -f "$scan_file" ]] && PRECOMMIT_SCAN_TARGETS+=("$scan_file")
+done
+while IFS= read -r scan_file; do
+    PRECOMMIT_SCAN_TARGETS+=("$scan_file")
+done < <({ find "$WORKSPACE_DIR/.githooks" -type f 2>/dev/null
+          find "$WORKSPACE_DIR/.github/workflows" -maxdepth 1 -type f \
+              \( -name '*.yml' -o -name '*.yaml' \) 2>/dev/null; } | sort)
+PRECOMMIT_REF_HITS=""
+if [[ ${#PRECOMMIT_SCAN_TARGETS[@]} -gt 0 ]]; then
+    PRECOMMIT_REF_HITS="$(grep -nHE "$PRECOMMIT_REF_PATTERN" "${PRECOMMIT_SCAN_TARGETS[@]}" 2>/dev/null \
+        | grep -vE '^[^:]*:[0-9]+:[[:space:]]*#' \
+        | grep -vE '^[^:]*:[0-9]+:[[:space:]]*-[[:space:]]+pre-commit[[:space:]]*$' \
+        | grep -vE '^[^:]*:[0-9]+:[[:space:]]*(-[[:space:]]+)?name:' || true)"
+fi
+if [[ -n "$PRECOMMIT_REF_HITS" ]]; then
+    echo "Warning: the retired 'pre-commit' binary is still invoked by preserved file(s) (#881):" >&2
+    printf '%s\n' "$PRECOMMIT_REF_HITS" | sed "s|^$WORKSPACE_DIR/|         |" >&2
+    echo "         The image ships 'prek' (drop-in for run-style invocations); a temporary" >&2
+    echo "         pre-commit->prek shim keeps these working through 0.4.x only — it is" >&2
+    echo "         removed in 0.5. Rename the invocations to 'prek' (see MIGRATION.md," >&2
+    echo "         'Upgrading an existing 0.3.x consumer')." >&2
+fi
 
 # Sync dependencies: resolves uv.lock for the new project name and installs the
 # project. Non-fatal (#859): a preserved old-generation justfile.project may not

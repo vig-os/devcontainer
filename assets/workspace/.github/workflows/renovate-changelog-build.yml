@@ -77,10 +77,6 @@ jobs:
           if git diff --quiet CHANGELOG.md 2>/dev/null; then
             echo "modified=false" >> "$GITHUB_OUTPUT"
           else
-            # Keep the preserved-on-upgrade mirror in lockstep with root CHANGELOG.md
-            # so the sync-manifest gate stays green. The scripts/manifest.toml entry
-            # for CHANGELOG.md is a verbatim copy (no transform), so cp == sync output.
-            cp CHANGELOG.md assets/workspace/.devcontainer/CHANGELOG.md
             echo "modified=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -93,16 +89,16 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p changelog-artifact
+          # %q-quote values: the commit workflow sources this file, and grouped
+          # Renovate branch names contain shell metacharacters (e.g. parentheses
+          # in renovate/python-(minor-and-patch)).
           {
-            echo "MODIFIED=${MODIFIED}"
-            echo "PR_NUMBER=${PR_NUMBER}"
-            echo "HEAD_REF=${HEAD_REF}"
+            printf 'MODIFIED=%q\n' "${MODIFIED}"
+            printf 'PR_NUMBER=%q\n' "${PR_NUMBER}"
+            printf 'HEAD_REF=%q\n' "${HEAD_REF}"
           } > changelog-artifact/metadata.env
           if [[ "${MODIFIED}" == "true" ]]; then
             cp CHANGELOG.md changelog-artifact/
-            mkdir -p changelog-artifact/assets/workspace/.devcontainer
-            cp assets/workspace/.devcontainer/CHANGELOG.md \
-              changelog-artifact/assets/workspace/.devcontainer/CHANGELOG.md
           fi
 
       - name: Upload changelog artifact
@@ -110,4 +106,7 @@ jobs:
         with:
           name: renovate-changelog
           path: changelog-artifact/
+          # The workspace mirror lives under the hidden .devcontainer directory,
+          # which upload-artifact excludes by default.
+          include-hidden-files: true
           retention-days: 1

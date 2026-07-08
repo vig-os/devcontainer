@@ -605,3 +605,458 @@ _scaffold() {
     run grep -F 'entry: typos --force-exclude' "$TEMPLATE_DIR/.pre-commit-config.yaml"
     assert_success
 }
+
+# ── upgrade must deliver the CI-contract base recipes (#877) ──────────────────
+# 0.4.0 relocated the base recipes (lint/format/precommit/test/test-cov/sync/
+# update) from the retired .devcontainer/justfile.base into justfile.project,
+# which is preserved on upgrade — so a 0.3.x consumer never received them while
+# the shipped ci.yml calls `just sync` / `just precommit` / `just test` (CI
+# failed with "justfile does not contain recipe 'sync'"). The upgrade must
+# append whichever contract recipes the preserved file does not resolve, and
+# drop the stale .devcontainer/justfile.base.
+
+# Run the real script as an upgrade: real `just` stays on PATH (the repair
+# probes recipes via `just --show`), `uv` is stubbed so the trailing
+# `just sync` is a fast no-op instead of a real dependency sync.
+_upgrade() {
+    local mode="$1" ws="$2"
+    local stub="$BATS_TEST_TMPDIR/stub-uv"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/uv"
+    chmod +x "$stub/uv"
+    env PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=testproj \
+        GITHUB_REPOSITORY=test/repo \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts --mode "$mode"
+}
+
+# A pre-0.4.0 consumer justfile.project: team recipes, no base recipes.
+_pre040_project_justfile() {
+    cat > "$1/justfile.project" <<'EOF'
+# SENTINEL-877 pre-0.4.0 consumer recipes (no base recipes)
+project := "consumer877"
+
+[group('info')]
+info:
+    @echo "Project: {{ project }}"
+EOF
+}
+
+@test "upgrade appends missing CI-contract recipes to a preserved justfile.project (#877)" {
+    real_just="$(command -v just)"
+    ws="$BATS_TEST_TMPDIR/e2e-877-repair"
+    mkdir -p "$ws"
+    _pre040_project_justfile "$ws"
+    run _upgrade both "$ws"
+    assert_success
+    # consumer content is preserved, not overwritten
+    run grep -q 'SENTINEL-877' "$ws/justfile.project"
+    assert_success
+    # every CI-contract recipe resolves after the upgrade
+    for r in lint format precommit test test-cov sync update; do
+        run bash -c "cd '$ws' && '$real_just' --show $r"
+        assert_success
+    done
+}
+
+@test "justfile.project repair keeps customized recipes and is idempotent (#877)" {
+    real_just="$(command -v just)"
+    ws="$BATS_TEST_TMPDIR/e2e-877-idem"
+    mkdir -p "$ws"
+    _pre040_project_justfile "$ws"
+    cat >> "$ws/justfile.project" <<'EOF'
+
+# consumer-customized test runner
+test *args:
+    @echo "SENTINEL-877-custom-test"
+EOF
+    run _upgrade both "$ws"
+    assert_success
+    run _upgrade both "$ws"
+    assert_success
+    # still parses (a duplicate append would be a just parse error)...
+    run bash -c "cd '$ws' && '$real_just' --list"
+    assert_success
+    # ...the customized recipe wins over the template one...
+    run bash -c "cd '$ws' && '$real_just' --show test"
+    assert_output --partial 'SENTINEL-877-custom-test'
+    # ...and each appended recipe appears exactly once
+    run bash -c "grep -c '^sync:' '$ws/justfile.project'"
+    assert_output "1"
+}
+
+@test "repair skips with a warning when the justfile graph does not parse (#877)" {
+    # A syntax error in the preserved justfile.project makes `just --show`
+    # fail for EVERY recipe, so the probe would misread all of them as
+    # missing and append duplicates on each --force run — turning a fixable
+    # parse error into hard "recipe redefined" failures. The repair must
+    # detect the broken graph, warn, and skip all appends (non-fatally).
+    ws="$BATS_TEST_TMPDIR/e2e-877-broken"
+    mkdir -p "$ws"
+    cat > "$ws/justfile.project" <<'EOF'
+# SENTINEL-877 broken consumer file: defines sync but has a syntax error
+sync:
+    @echo "SENTINEL-877-consumer-sync"
+
+this line is not valid justfile syntax
+EOF
+    run _upgrade both "$ws"
+    assert_success
+    assert_output --partial 'skipping base-recipe repair'
+    run _upgrade both "$ws"
+    assert_success
+    # nothing was appended: sync still defined exactly once, no repair banner
+    run bash -c "grep -c '^sync:' '$ws/justfile.project'"
+    assert_output "1"
+    run grep -q 'BASE RECIPES appended' "$ws/justfile.project"
+    assert_failure
+}
+
+@test "upgrade removes the retired .devcontainer/justfile.base (#877)" {
+    ws="$BATS_TEST_TMPDIR/e2e-877-stale"
+    mkdir -p "$ws/.devcontainer"
+    printf '# retired 0.3.x base recipes\n' >"$ws/.devcontainer/justfile.base"
+    run _upgrade both "$ws"
+    assert_success
+    run test -e "$ws/.devcontainer/justfile.base"
+    assert_failure
+}
+
+@test "direnv-mode upgrade leaves a pre-existing .devcontainer untouched, incl. justfile.base (#877)" {
+    # A consumer-owned .devcontainer/ is never modified in direnv mode (#738);
+    # the stale-file cleanup must respect that boundary.
+    ws="$BATS_TEST_TMPDIR/e2e-877-direnv"
+    mkdir -p "$ws/.devcontainer"
+    printf '# consumer-owned devcontainer file\n' >"$ws/.devcontainer/justfile.base"
+    run _upgrade direnv "$ws"
+    assert_success
+    run test -f "$ws/.devcontainer/justfile.base"
+    assert_success
+}
+
+@test "init-workspace verifies the root justfile scaffold import block (#877)" {
+    # One field consumer (talys) ended up with a root justfile carrying no
+    # `import?` lines at all, so even present recipes were unreachable. The
+    # script must check for the scaffold import block and warn when absent.
+    run grep -F "import? 'justfile.project'" "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+# ── upgrade must not clobber a customized .pre-commit-config.yaml (#878) ──────
+# The scaffold upgrade replaced the consumer's .pre-commit-config.yaml
+# wholesale, silently dropping the repo-specific global `exclude:` block and
+# per-hook `exclude:` keys (hyrr: the hook suite then "fixed" ~45 physics data
+# files it must never touch, and detect-private-key false-flagged a file with
+# PEM marker literals). Like justfile.project (#877), the consumer owns the
+# file: it is preserved on upgrade, the upgrade prints a diff against the
+# template so hook-stack evolution stays visible, and a prek parse gate warns
+# when the preserved config would break every commit in the new image.
+
+# A consumer .pre-commit-config.yaml: global + per-hook excludes (hyrr shape).
+_custom_precommit_config() {
+    cat > "$1/.pre-commit-config.yaml" <<'EOF'
+# SENTINEL-878 consumer hook config
+exclude: ^data/stopping/|\.dat$
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b  # v5.0.0
+    hooks:
+      - id: detect-private-key
+        exclude: ^worker/src/index\.ts$
+EOF
+}
+
+@test "upgrade preserves a customized .pre-commit-config.yaml (#878)" {
+    ws="$BATS_TEST_TMPDIR/e2e-878-preserve"
+    mkdir -p "$ws"
+    _custom_precommit_config "$ws"
+    run _upgrade both "$ws"
+    assert_success
+    # the consumer file survives verbatim: global exclude + per-hook exclude
+    run grep -q 'SENTINEL-878' "$ws/.pre-commit-config.yaml"
+    assert_success
+    run grep -q '^exclude: \^data/stopping/' "$ws/.pre-commit-config.yaml"
+    assert_success
+    run grep -q 'worker/src/index' "$ws/.pre-commit-config.yaml"
+    assert_success
+}
+
+@test "upgrade prints a template diff hint for a preserved .pre-commit-config.yaml (#878)" {
+    ws="$BATS_TEST_TMPDIR/e2e-878-diff"
+    mkdir -p "$ws"
+    _custom_precommit_config "$ws"
+    run _upgrade both "$ws"
+    assert_success
+    assert_output --partial 'Preserved .pre-commit-config.yaml differs from the template'
+    # the hint shows template evolution the preserved file lacks
+    assert_output --partial 'default_language_version'
+}
+
+@test "no .pre-commit-config.yaml diff hint when it matches the template (#878)" {
+    # Fresh scaffold delivers the template file; re-running the upgrade must
+    # stay silent (no spurious warning on every upgrade of a stock consumer).
+    ws="$BATS_TEST_TMPDIR/e2e-878-stock"
+    mkdir -p "$ws"
+    run _upgrade both "$ws"
+    assert_success
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial 'Preserved .pre-commit-config.yaml differs from the template'
+}
+
+@test "upgrade warns when the preserved .pre-commit-config.yaml does not validate (#878)" {
+    # A preserved config prek cannot load breaks every commit in the new
+    # image; the upgrade must warn loudly — and stay non-fatal (#877 parse
+    # gate precedent).
+    ws="$BATS_TEST_TMPDIR/e2e-878-invalid"
+    mkdir -p "$ws"
+    cat > "$ws/.pre-commit-config.yaml" <<'EOF'
+# SENTINEL-878 broken consumer config
+repos: this-is-not-a-repo-list
+EOF
+    run _upgrade both "$ws"
+    assert_success
+    assert_output --partial 'does not validate'
+    # and the broken file is still preserved, not clobbered
+    run grep -q 'SENTINEL-878' "$ws/.pre-commit-config.yaml"
+    assert_success
+}
+
+# ── upgrade must flag preserved files still invoking `pre-commit` (#881) ──────
+# The 0.4.0 image ships `prek` only (#778); a one-cycle `pre-commit` shim
+# covers 0.4.x. Preserved consumer files (justfile.project recipes, extra
+# .githooks scripts, .pre-commit-config.yaml entries) that still invoke the
+# retired binary would otherwise exit 127 at first use — the upgrade must
+# scan them and warn with file:line, non-fatally (#877/#878 precedent).
+
+@test "upgrade warns file:line when preserved files still invoke pre-commit (#881)" {
+    ws="$BATS_TEST_TMPDIR/e2e-881-hit"
+    mkdir -p "$ws/.githooks"
+    # vault shape: preserved recipe calls the retired binary
+    cat > "$ws/justfile.project" <<'EOF'
+# SENTINEL-881 consumer recipes
+sync:
+    uv sync
+
+precommit:
+    uv run pre-commit run --all-files
+
+test:
+    @echo test
+EOF
+    # consumer-owned hook outside the template set survives the rsync
+    cat > "$ws/.githooks/pre-push" <<'EOF'
+#!/bin/bash
+pre-commit run --all-files
+EOF
+    chmod +x "$ws/.githooks/pre-push"
+    run _upgrade both "$ws"
+    assert_success
+    assert_output --partial "retired 'pre-commit' binary"
+    # file:line listing for both surfaces
+    assert_output --regexp 'justfile\.project:[0-9]+'
+    assert_output --regexp '\.githooks/pre-push:[0-9]+'
+    # points at the migration doc and the drop-in runner
+    assert_output --partial 'MIGRATION.md'
+    assert_output --partial 'prek'
+}
+
+@test "no pre-commit-reference warning on a stock scaffold (#881)" {
+    ws="$BATS_TEST_TMPDIR/e2e-881-stock"
+    mkdir -p "$ws"
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial "retired 'pre-commit' binary"
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial "retired 'pre-commit' binary"
+}
+
+@test "pre-commit scan skips filenames, repo URLs, stage names, prek (#881)" {
+    # False-positive guard: none of these are invocations of the retired
+    # binary — the config filename, pre-commit-hooks repo URLs, YAML stage
+    # names, comments, and the prek runner itself must not trip the warning.
+    ws="$BATS_TEST_TMPDIR/e2e-881-clean"
+    mkdir -p "$ws"
+    cat > "$ws/.pre-commit-config.yaml" <<'EOF'
+# SENTINEL-881 clean consumer config: mentions .pre-commit-config.yaml
+default_stages: [pre-commit]
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b  # v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+        stages:
+          - pre-commit
+EOF
+    cat > "$ws/justfile.project" <<'EOF'
+# SENTINEL-881 clean consumer recipes (see https://pre-commit.com)
+sync:
+    uv sync
+
+precommit:
+    prek run --all-files
+
+test:
+    @echo test
+EOF
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial "retired 'pre-commit' binary"
+}
+
+# ── preserved-file diff preview must use git, not diff(1) (#916) ──────────────
+# The image ships git but no diff(1)/cmp(1); the #878 preview called `diff`,
+# which prints "diff: command not found" and an empty box in-container. Render
+# the divergence with `git diff --no-index` (its --quiet form gates the block;
+# --no-index exits 1 when files differ, which is the expected signal).
+
+@test "preserved-file diff preview uses git diff --no-index, not diff(1)/cmp(1) (#916)" {
+    run grep -nE 'git diff --no-index' "$INIT_WORKSPACE_SH"
+    assert_success
+    # no bare diff(1) short-flag or cmp(1) invocation survives (both absent from
+    # the image); `git diff --no-index` (long flags) is the sanctioned form.
+    run grep -nE '(^|[[:space:]])diff -[a-z]|(^|[[:space:]])cmp[[:space:]]' "$INIT_WORKSPACE_SH"
+    assert_failure
+}
+
+@test "preserved .pre-commit-config.yaml diff preview renders real content, not 'command not found' (#916)" {
+    ws="$BATS_TEST_TMPDIR/e2e-916-gitdiff"
+    mkdir -p "$ws"
+    _custom_precommit_config "$ws"
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial 'command not found'
+    assert_output --partial 'Preserved .pre-commit-config.yaml differs from the template'
+    # a real hunk line from the template the preserved file lacks
+    assert_output --partial 'default_language_version'
+}
+
+# ── upgrade must preserve a customized .typos.toml, no dual configs (#913) ────
+# The typos hook reads a project's spell-check exceptions; a consumer curates
+# repo-specific extend-words/extend-exclude that a template overwrite silently
+# destroyed (their lint then flags legitimate domain terms). Preserve it like
+# .pre-commit-config.yaml (#878) and print the template diff. The `typos` tool
+# also reads the legacy `_typos.toml`, so a consumer carrying that must NOT also
+# receive the template `.typos.toml` — two active configs would collide.
+
+@test ".typos.toml is preserved on --force upgrade (#913)" {
+    # shellcheck disable=SC2016
+    run grep -E '"\.typos\.toml"' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+@test "upgrade preserves a customized .typos.toml (#913)" {
+    ws="$BATS_TEST_TMPDIR/e2e-913-preserve"
+    mkdir -p "$ws"
+    printf '# SENTINEL-913 consumer typos config\n[default.extend-words]\nfoo = "foo"\n' \
+        >"$ws/.typos.toml"
+    run _upgrade both "$ws"
+    assert_success
+    run grep -q 'SENTINEL-913' "$ws/.typos.toml"
+    assert_success
+}
+
+@test "upgrade prints a template diff hint for a preserved .typos.toml (#913)" {
+    ws="$BATS_TEST_TMPDIR/e2e-913-diff"
+    mkdir -p "$ws"
+    # a config lacking the template's exception words
+    printf '# SENTINEL-913 minimal consumer typos config\n' >"$ws/.typos.toml"
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial 'command not found'
+    assert_output --partial 'Preserved .typos.toml differs from the template'
+    # a template exception word the preserved file lacks shows in the diff
+    assert_output --partial 'unexcepted'
+}
+
+@test "upgrade with a legacy _typos.toml does not leave dual typos configs (#913)" {
+    # vault scenario: consumer carries _typos.toml and no .typos.toml. Shipping
+    # the template .typos.toml alongside it would give two active configs.
+    ws="$BATS_TEST_TMPDIR/e2e-913-legacy"
+    mkdir -p "$ws"
+    printf '# SENTINEL-913 legacy typos config\n[default.extend-words]\nmyterm = "myterm"\n' \
+        >"$ws/_typos.toml"
+    run _upgrade both "$ws"
+    assert_success
+    # legacy config preserved verbatim
+    run grep -q 'SENTINEL-913' "$ws/_typos.toml"
+    assert_success
+    # template .typos.toml NOT shipped -> single active config
+    run test -e "$ws/.typos.toml"
+    assert_failure
+}
+
+# ── pre-commit reference scan must cover preserved workflows (#916) ────────────
+# The #881 scan only looked at justfile.project and .githooks/, but a consumer
+# CI workflow that still invokes the retired `pre-commit` binary breaks the same
+# way. Extend the scan to preserved .github/workflows/*.yml. A YAML `name:` step
+# description or a comment mention must NOT be flagged; only real invocations.
+
+@test "pre-commit scan flags a real invocation in a consumer workflow (#916)" {
+    ws="$BATS_TEST_TMPDIR/e2e-916-workflow-hit"
+    mkdir -p "$ws/.github/workflows"
+    # consumer-owned workflow (not in the template set) survives the rsync
+    cat > "$ws/.github/workflows/consumer-ci.yml" <<'EOF'
+name: Consumer CI
+on: [push]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      # pre-commit MENTIONONLY: migrate to prek before 0.5
+      - name: Run pre-commit hooks
+        run: uv run pre-commit run --all-files
+EOF
+    run _upgrade both "$ws"
+    assert_success
+    assert_output --partial "retired 'pre-commit' binary"
+    # the real invocation line is flagged with file:line
+    assert_output --regexp '\.github/workflows/consumer-ci\.yml:[0-9]+'
+    # neither the comment mention nor the step `name:` description is flagged
+    refute_output --partial 'MENTIONONLY'
+    refute_output --partial 'Run pre-commit hooks'
+}
+
+@test "no pre-commit warning for a workflow that only mentions it (#916)" {
+    ws="$BATS_TEST_TMPDIR/e2e-916-workflow-clean"
+    mkdir -p "$ws/.github/workflows"
+    cat > "$ws/.github/workflows/consumer-clean.yml" <<'EOF'
+name: Consumer CI
+on: [push]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      # pre-commit was replaced by prek
+      - name: Run pre-commit hooks
+        run: uv run prek run --all-files
+EOF
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial "retired 'pre-commit' binary"
+}
+
+# ── origin must resolve before any filesystem mutation (#916) ─────────────────
+# Under --no-prompts, the GITHUB_REPOSITORY resolution ran AFTER the rsync copy,
+# so an abort left a half-scaffolded tree behind. Resolve (and validate) the
+# origin BEFORE the first filesystem mutation so a failure leaves the workspace
+# untouched.
+
+@test "no-prompts without a derivable origin aborts before mutating the workspace (#916)" {
+    ws="$BATS_TEST_TMPDIR/e2e-916-no-origin"
+    mkdir -p "$ws"
+    # no .git origin and GITHUB_REPOSITORY unset (cleared: CI may export it)
+    run env -u GITHUB_REPOSITORY \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=probe \
+        bash "$INIT_WORKSPACE_SH" --no-prompts --mode both
+    assert_failure
+    assert_output --partial 'GITHUB_REPOSITORY is required'
+    # the workspace was never scaffolded: still empty (no template files copied)
+    run bash -c "ls -A '$ws'"
+    assert_output ""
+}
