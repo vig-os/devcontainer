@@ -29,9 +29,7 @@ def _probe_step_script() -> str:
     """The bash body of the action's 'Validate image accessibility' step."""
     action = yaml.safe_load(RESOLVE_IMAGE_ACTION.read_text(encoding="utf-8"))
     steps = action["runs"]["steps"]
-    probe = next(
-        s for s in steps if s.get("name") == "Validate image accessibility"
-    )
+    probe = next(s for s in steps if s.get("name") == "Validate image accessibility")
     return probe["run"]
 
 
@@ -98,9 +96,7 @@ def _run_probe(
 
 def test_probe_success_is_quiet(tmp_path: Path) -> None:
     """A readable manifest returns success (public, anonymous path)."""
-    result, marker = _run_probe(
-        tmp_path, token="", manifest_rc=0, manifest_stderr=""
-    )
+    result, marker = _run_probe(tmp_path, token="", manifest_rc=0, manifest_stderr="")
     assert result.returncode == 0, result.stderr
     assert not marker.exists()  # no login without a token
 
