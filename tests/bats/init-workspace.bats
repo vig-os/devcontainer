@@ -330,6 +330,61 @@ _scaffold() {
     assert_success
 }
 
+# ── upgrade preview/report follows template symlinks (#949) ───────────────────
+# The Nix image bakes assets/workspace as a tree of symlinks into the nix store,
+# so the --preview/--force classifier's `find -type f` matched ZERO files and the
+# OVERWRITTEN/ADDED report was always empty. The real copy uses `rsync -avL`
+# (follows symlinks), so only the report was blind. The classifier must follow
+# symlinks (find -L) to match the copy semantics.
+
+# Build a TEMPLATE_DIR whose files are symlinks into a store-like dir (mirrors
+# the baked Nix image), then run the --preview report against workspace $1 and
+# echo it. `just` is stubbed so nothing external is required.
+_preview_symlinked_template() {
+    local ws="$1"
+    local tmpl="$BATS_TEST_TMPDIR/tmpl-949"
+    local store="$BATS_TEST_TMPDIR/store-949"
+    mkdir -p "$tmpl" "$store"
+    printf 'template overwrite body\n' >"$store/overwrite-src"
+    printf 'template add body\n' >"$store/add-src"
+    # Symlinked template files (as the nix store bakes them), not regular files.
+    ln -s "$store/overwrite-src" "$tmpl/sentinel-overwrite.txt"
+    ln -s "$store/add-src" "$tmpl/sentinel-add.txt"
+    local stub="$BATS_TEST_TMPDIR/stub-bin-949"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/just"
+    env PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$tmpl" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=testproj \
+        GITHUB_REPOSITORY=test/repo \
+        bash "$INIT_WORKSPACE_SH" --preview --force --no-prompts --mode both
+}
+
+@test "upgrade preview lists a symlinked template file that conflicts under OVERWRITTEN (#949)" {
+    ws="$BATS_TEST_TMPDIR/e2e-preview-overwrite"
+    mkdir -p "$ws"
+    # A workspace file the symlinked template would overwrite.
+    printf 'consumer body\n' >"$ws/sentinel-overwrite.txt"
+    run _preview_symlinked_template "$ws"
+    assert_success
+    refute_output --partial "No existing files would be overwritten"
+    assert_output --partial "will be OVERWRITTEN"
+    assert_output --partial "sentinel-overwrite.txt"
+}
+
+@test "upgrade preview lists a symlinked, workspace-absent template file under ADDED (#949)" {
+    ws="$BATS_TEST_TMPDIR/e2e-preview-add"
+    mkdir -p "$ws"
+    printf 'consumer body\n' >"$ws/sentinel-overwrite.txt"
+    run _preview_symlinked_template "$ws"
+    assert_success
+    refute_output --partial "No new files would be added"
+    assert_output --partial "will be ADDED"
+    assert_output --partial "sentinel-add.txt"
+}
+
 # ── script structure ──────────────────────────────────────────────────────────
 
 @test "init-workspace.sh is executable" {
