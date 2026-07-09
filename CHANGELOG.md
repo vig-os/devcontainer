@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.5.1] - TBD
+
+### Changed
+
 - **Renovate: update `github-backup` from `==0.63.0` to `==0.64.0`** ([#960](https://github.com/vig-os/devcontainer/pull/960))
 - **Renovate dependency update** ([#866](https://github.com/vig-os/devcontainer/pull/866))
   - Update `aquasecurity/trivy` from `v0.71.2` to `v0.72.0`
@@ -18,10 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Update `docker/login-action` from `v4.2.0` to `v4.4.0`
 
 - **Renovate: update `github/codeql-action` from `8aad20d` to `99df26d`** ([#862](https://github.com/vig-os/devcontainer/pull/862))
-
-### Deprecated
-
-### Removed
 
 ### Fixed
 
@@ -38,8 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `solve-and-pr` skill now launches `/worktree_solve-and-pr` (underscore, matching the real skill name).
   - `worktree_pr` PR title format aligned with `pr_create`: no manual issue number in title.
   - Obsolete `.claude/commands/` wrappers deleted (superseded by skills providing `/X` directly).
-
-### Security
 
 ## [0.5.0](https://github.com/vig-os/devcontainer/releases/tag/0.5.0) - 2026-07-09
 
