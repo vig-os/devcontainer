@@ -689,10 +689,17 @@ if [[ "$SMOKE_TEST" == "true" ]]; then
     fi
 else
     # Build exclude list for preserved files that already exist
+    # Root-anchor each exclude (leading slash) so it matches the exact
+    # transfer-root path, not the basename at every depth (#953). Bare names
+    # like README.md/CHANGELOG.md protect the consumer's ROOT docs only;
+    # without the anchor rsync also skipped devkit-authored NESTED docs
+    # (.devcontainer/README.md, .claude/skills/*/README.md), which the preview
+    # (is_preserved_file, exact rel-path) still promised as ADDED. The anchor
+    # matches is_preserved_file's exact-path semantics.
     EXCLUDE_ARGS=()
     for preserved in "${PRESERVE_FILES[@]}"; do
         if [[ -e "$WORKSPACE_DIR/$preserved" ]]; then
-            EXCLUDE_ARGS+=("--exclude=$preserved")
+            EXCLUDE_ARGS+=("--exclude=/$preserved")
         fi
     done
 

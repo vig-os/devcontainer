@@ -380,7 +380,7 @@ _scaffold() {
     # shellcheck disable=SC2016
     assert_output --partial 'if [[ -e "$WORKSPACE_DIR/$preserved" ]]; then'
     # shellcheck disable=SC2016
-    assert_output --partial 'EXCLUDE_ARGS+=("--exclude=$preserved")'
+    assert_output --partial 'EXCLUDE_ARGS+=("--exclude=/$preserved")'
 }
 
 # ── preserve excludes must be root-anchored, not basename-matched (#953) ──────
