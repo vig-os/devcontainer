@@ -1324,6 +1324,41 @@ _upgrade_no_flags() {
     assert_success
 }
 
+# ── imageless --no-prompts must not default the org to a bogus literal (#954) ─
+# On --no-prompts with no ORG_NAME env and no manifest DEVKIT_ORG, ORG_NAME
+# defaulted to the hardcoded literal "vigOS/devc" — a bogus org (contains '/')
+# that gets sed-substituted into {{ORG_NAME}} in generated files (e.g. the
+# LICENSE copyright line). GITHUB_REPOSITORY (owner/repo) is available on this
+# path (DEVKIT_REPO uses it), so derive the org from its owner segment instead.
+
+@test "no-prompts derives DEVKIT_ORG from the repo owner, not a bogus literal (#954)" {
+    ws="$BATS_TEST_TMPDIR/e2e-954-org"
+    mkdir -p "$ws"
+    stub="$BATS_TEST_TMPDIR/stub-bin-954"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/just"
+    # no ORG_NAME env, no manifest DEVKIT_ORG: the org must come from the owner
+    # segment of GITHUB_REPOSITORY, not the hardcoded slash-bearing literal.
+    run env -u ORG_NAME PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=testproj \
+        GITHUB_REPOSITORY=some-org/repo \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts --mode both
+    assert_success
+    # persisted org is the owner segment, never the bogus '/'-bearing literal
+    run grep -x 'DEVKIT_ORG=some-org' "$ws/.vig-os"
+    assert_success
+    run grep -q 'vigOS/devc' "$ws/.vig-os"
+    assert_failure
+    # the org substitution into generated files carries no '/'-bearing org
+    run grep -q 'Copyright 2025 some-org' "$ws/LICENSE"
+    assert_success
+    run grep -q 'vigOS/devc' "$ws/LICENSE"
+    assert_failure
+}
+
 @test "manifest-bearing upgrade keeps devcontainer shape and names, no flags (#885)" {
     ws="$BATS_TEST_TMPDIR/e2e-885-up-devc"
     mkdir -p "$ws"
