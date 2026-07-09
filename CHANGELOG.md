@@ -79,6 +79,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Upgrade preview report follows template symlinks** ([#949](https://github.com/vig-os/devcontainer/issues/949))
+  - On the Nix image the baked template is a tree of symlinks into the nix store, so the `--preview`/`--force` classifier's `find … -type f` matched zero files and the OVERWRITTEN/ADDED report was always empty even though the real copy (`rsync -avL`) still overwrote them. The classifier now uses `find -L` to follow symlinks and match the copy semantics.
+
 - **Autochangelog now records grouped Renovate PRs** ([#936](https://github.com/vig-os/devcontainer/issues/936))
   - `renovate-changelog-pr` parsed the update table only when the change cell used an ASCII `->` arrow, but Renovate renders it with the Unicode arrow `→` (U+2192). Every real Renovate PR body therefore parsed to nothing; a changelog entry only appeared when the PR *title* happened to match (digest bumps, single `update X to Y`), so grouped dependency PRs were silently skipped. The change-cell parser now accepts both arrows.
 
