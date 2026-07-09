@@ -120,6 +120,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **`init-precommit.sh` derives its root** from the script location instead of a hard-coded `/workspace/{{SHORT_NAME}}`.
   - **Stale doc fixed:** `docs/container-ci-quirks.md` no longer describes a removed `uv run bandit` `pre-commit` hook; the private-image (unauthenticated `resolve-image` probe + missing `credentials:`) limitation is documented, with the first-class fix tracked in [#920](https://github.com/vig-os/devcontainer/issues/920).
 
+### Security
+
+- **Accept the curl 8.20.0 advisory batch in the vulnix register pending a patched upstream release** ([#941](https://github.com/vig-os/devcontainer/issues/941))
+  - The 2026-06-24 curl disclosure added 17 HIGH/CRITICAL CVEs against curl 8.20.0 to the vulnix feed (four CVSS 9.8 — an HTTP/2 stream-dependency-tree UAF, a cross-origin Digest auth-state leak, a SASL double-free, and a stale proxy-password leak — plus a CVSS 9.1 batch and further HIGHs); they surfaced 2026-07-08 and blocked the 0.5.0-rc1 publish at the release vulnix gate. curl is reachable in the image (https/git-over-https, flake fetches, the docker→podman shim), so this is a time-boxed risk acceptance, not a dismissal.
+  - No fixed curl exists to advance to: 8.20.0 is the newest release upstream and in both `nixos-26.05` and `nixpkgs-unstable`, so the "advance the rev" lever has nowhere to land. Added a short-dated `.vulnixignore` exception (expires 2026-07-22) to unblock the gate; the block is dropped and the pin advanced once Renovate's `nix` manager surfaces a patched curl.
+
 ## [0.4.1](https://github.com/vig-os/devcontainer/releases/tag/0.4.1) - 2026-07-08
 
 ### Added
