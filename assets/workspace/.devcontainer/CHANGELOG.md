@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Update `astral-sh/setup-uv` from `v8.3.1` to `v8.3.2`
   - Update `docker/login-action` from `v4.2.0` to `v4.4.0`
 
+- **Renovate: update `github/codeql-action` from `8aad20d` to `99df26d`** ([#862](https://github.com/vig-os/devcontainer/pull/862))
+
 ### Deprecated
 
 ### Removed
