@@ -385,6 +385,54 @@ _preview_symlinked_template() {
     assert_output --partial "sentinel-add.txt"
 }
 
+# ── upgrade preview must not over-report the baked .venv symlink tree (#951) ───
+# The #949 fix switched the report classifier to `find -L`, which correctly
+# follows the store-symlink template. But `find -L` also descends the baked
+# .venv symlink tree, so the ADDED section listed phantom
+# .venv/.../site-packages/* files the real rsync copy never writes — the copy
+# excludes .git, .venv, docs/issues/ and docs/pull-requests/. The report `find`
+# must mirror those static excludes so ADDED matches what the upgrade will do.
+
+# Build a TEMPLATE_DIR that contains both a normal symlinked template file and a
+# symlinked file inside a baked .venv tree (mirrors the Nix image), then run the
+# --preview report against workspace $1 and echo it.
+_preview_symlinked_template_venv() {
+    local ws="$1"
+    local tmpl="$BATS_TEST_TMPDIR/tmpl-951"
+    local store="$BATS_TEST_TMPDIR/store-951"
+    mkdir -p "$tmpl/.venv/lib/python3.12/site-packages" "$store"
+    printf 'template add body\n' >"$store/add-src"
+    printf 'phantom venv body\n' >"$store/venv-src"
+    # A normal symlinked template file that must still be reported as ADDED...
+    ln -s "$store/add-src" "$tmpl/sentinel-add.txt"
+    # ...and a symlinked file inside the baked .venv tree that must NOT be.
+    ln -s "$store/venv-src" \
+        "$tmpl/.venv/lib/python3.12/site-packages/phantom-venv-pkg.py"
+    local stub="$BATS_TEST_TMPDIR/stub-bin-951"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/just"
+    env PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$tmpl" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=testproj \
+        GITHUB_REPOSITORY=test/repo \
+        bash "$INIT_WORKSPACE_SH" --preview --force --no-prompts --mode both
+}
+
+@test "upgrade preview omits the baked .venv symlink tree from ADDED (#951)" {
+    ws="$BATS_TEST_TMPDIR/e2e-preview-venv"
+    mkdir -p "$ws"
+    run _preview_symlinked_template_venv "$ws"
+    assert_success
+    # The real symlinked template file is still reported as ADDED...
+    assert_output --partial "will be ADDED"
+    assert_output --partial "sentinel-add.txt"
+    # ...but the baked .venv tree the rsync copy excludes is not over-reported.
+    refute_output --partial "phantom-venv-pkg.py"
+    refute_output --partial "site-packages"
+}
+
 # ── script structure ──────────────────────────────────────────────────────────
 
 @test "init-workspace.sh is executable" {
