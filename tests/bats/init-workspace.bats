@@ -383,6 +383,38 @@ _scaffold() {
     assert_output --partial 'EXCLUDE_ARGS+=("--exclude=$preserved")'
 }
 
+# ── preserve excludes must be root-anchored, not basename-matched (#953) ──────
+# PRESERVE_FILES lists bare names (README.md/CHANGELOG.md) to protect the
+# consumer's ROOT docs. Built as `--exclude=$preserved` (no leading slash),
+# rsync matches by basename at EVERY depth, silently dropping devkit-authored
+# NESTED docs (.devcontainer/README.md, .claude/skills/*/README.md). The preview
+# classifies via the exact rel-path is_preserved_file, so it promised those
+# nested docs as ADDED while the copy never wrote them. Root-anchoring the
+# excludes (--exclude=/$preserved) restores the exact-path semantics.
+
+@test "upgrade copies devkit-authored nested docs while preserving root docs (#953)" {
+    ws="$BATS_TEST_TMPDIR/e2e-953-nested"
+    mkdir -p "$ws"
+    # consumer's pre-existing ROOT docs: must survive the upgrade untouched
+    printf '# SENTINEL-953 consumer root readme\n' >"$ws/README.md"
+    printf '# SENTINEL-953 consumer root changelog\n' >"$ws/CHANGELOG.md"
+    run _upgrade both "$ws"
+    assert_success
+    # root docs preserved (PRESERVE_FILES, exact root-relative match)
+    run grep -q 'SENTINEL-953 consumer root readme' "$ws/README.md"
+    assert_success
+    run grep -q 'SENTINEL-953 consumer root changelog' "$ws/CHANGELOG.md"
+    assert_success
+    # devkit-authored NESTED docs are copied, not dropped by an unanchored
+    # basename exclude that matched the root docs' names at every depth
+    run test -f "$ws/.devcontainer/README.md"
+    assert_success
+    run test -f "$ws/.devcontainer/CHANGELOG.md"
+    assert_success
+    run test -f "$ws/.claude/skills/inception_explore/README.md"
+    assert_success
+}
+
 @test "init-workspace.sh accepts --smoke-test flag" {
     run grep -- '--smoke-test' "$INIT_WORKSPACE_SH"
     assert_success
