@@ -18,7 +18,7 @@ two ways:
 
 - **Container image** — assembled by `dockerTools.buildLayeredImage` (no base
   distro, no `Dockerfile FROM`), bit-reproducible, and built natively for
-  `amd64` and `arm64`. Published as `ghcr.io/vig-os/devkit`.
+  `amd64` and `arm64`. Published as `ghcr.io/vig-os/devcontainer`.
 - **Bare-nix dev-shell** — the same toolchain via `nix develop` / `direnv`,
   consumed as a flake input (`vigos.url = "github:vig-os/devcontainer"`).
 
@@ -62,7 +62,7 @@ so upgrades never need `--mode` again.
 
 `direnv` (and `bare`) consumers cannot run the container-based CI: with no
 `.devcontainer/`, a `.vig-os`-driven `resolve-image` job hard-fails and bricks
-every workflow that runs `container: ghcr.io/vig-os/devkit:<pin>`. To keep
+every workflow that runs `container: ghcr.io/vig-os/devcontainer:<pin>`. To keep
 the main lane working, `direnv` mode ships a **nix-direct `ci.yml`** overlay
 ([#854](https://github.com/vig-os/devcontainer/issues/854)) that runs on the host
 runner (`install-nix` + Cachix → `nix develop -c just sync|precommit|test`),
@@ -461,12 +461,15 @@ Nix-built. Released images are never deleted, so 0.3.9 remains pullable
 (`DEVCONTAINER_VERSION=0.3.9` in the repo-root `.vig-os`), but the line is
 frozen — it receives no CVE fixes and is not a supported rollback track.
 
-## Upcoming rename: `devcontainer` → `devkit`
+## Upcoming rename: repository `devcontainer` → `devkit`
 
-The repository and image are scheduled to be renamed to **`devkit`** in the
-release cycle after the Nix cutover
-([#781](https://github.com/vig-os/devcontainer/issues/781)). GitHub redirects
-the repository URL, but the image moves to a **new** GHCR package
-(`ghcr.io/vig-os/devkit`) — a one-time `install.sh --force` re-scaffold will
-migrate consumers. Existing `ghcr.io/vig-os/devcontainer` images remain
-pullable indefinitely.
+The **repository** is scheduled to be renamed to **`devkit`** in the release
+cycle after the Nix cutover
+([#781](https://github.com/vig-os/devcontainer/issues/781)). GitHub redirects the
+old repository URL. The **published image is unchanged** — it stays
+`ghcr.io/vig-os/devcontainer` (the artifact is a dev container; `devkit` is the
+project that builds and ships it), so existing `.vig-os` pins and `podman pull`
+commands keep working with no change. A re-scaffold (`install.sh --force`) only
+refreshes the `install.sh` source URL and templated files; it does not change the
+image you pull. The `.vig-os` version-pin key is `DEVKIT_VERSION` (the legacy
+`DEVCONTAINER_VERSION` is still accepted).

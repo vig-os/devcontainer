@@ -12,7 +12,7 @@
 #   release-date / release-url / build-timestamp / vcs-ref: release metadata
 #     (kept for caller compatibility; the Nix image stamps its own static,
 #     reproducible OCI labels in flake.nix, so these are not baked into it)
-#   registry: Container registry URL (default: ghcr.io/vig-os/devkit)
+#   registry: Container registry URL (default: ghcr.io/vig-os/devcontainer)
 #   output-file: Path for the tar output
 #   cachix-cache / cachix-auth-token: passed to flake provisioning (setup-env)
 #   push-image-closure: when 'true', push the built image closure to Cachix as a
@@ -21,7 +21,7 @@
 #     guarded on the auth token so fork PRs (no secret) never fail.
 #
 # Outputs:
-#   image-tag: Full image tag (e.g., ghcr.io/vig-os/devkit:1.0.0-amd64)
+#   image-tag: Full image tag (e.g., ghcr.io/vig-os/devcontainer:1.0.0-amd64)
 #   tar-file: Path to the saved tar file
 
 name: 'Build Container Image'
@@ -53,7 +53,7 @@ inputs:
   registry:
     description: 'Container registry URL'
     required: false
-    default: 'ghcr.io/vig-os/devkit'
+    default: 'ghcr.io/vig-os/devcontainer'
   output-file:
     description: 'Path for the tar output'
     required: false
