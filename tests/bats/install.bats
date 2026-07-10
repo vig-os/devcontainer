@@ -83,7 +83,7 @@ setup() {
 @test "dry-run includes image registry in command" {
     run bash "$INSTALL_SH" --dry-run .
     assert_success
-    assert_output --partial "ghcr.io/vig-os/devkit"
+    assert_output --partial "ghcr.io/vig-os/devcontainer"
 }
 
 @test "dry-run output is shell-quoted for safe copy-paste" {
@@ -92,7 +92,7 @@ setup() {
     # The command is rendered from the real CMD array via printf '%q', so each
     # argument is shell-safe (quoted only when it contains special characters).
     assert_output --regexp '[^ ]+:/workspace'
-    assert_output --regexp 'ghcr\.io/vig-os/devkit:[^ ]+'
+    assert_output --regexp 'ghcr\.io/vig-os/devcontainer:[^ ]+'
 }
 
 # ── version flag ──────────────────────────────────────────────────────────────
@@ -100,13 +100,13 @@ setup() {
 @test "version flag appears in dry-run command" {
     run bash "$INSTALL_SH" --dry-run --version 1.2.3 .
     assert_success
-    assert_output --partial "ghcr.io/vig-os/devkit:1.2.3"
+    assert_output --partial "ghcr.io/vig-os/devcontainer:1.2.3"
 }
 
 @test "default version is latest" {
     run bash "$INSTALL_SH" --dry-run .
     assert_success
-    assert_output --partial "ghcr.io/vig-os/devkit:latest"
+    assert_output --partial "ghcr.io/vig-os/devcontainer:latest"
 }
 
 # ── force flag ────────────────────────────────────────────────────────────────

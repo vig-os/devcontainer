@@ -20,16 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Image published to the new `ghcr.io/vig-os/devkit` package** ([#781](https://github.com/vig-os/devcontainer/issues/781))
-  - The container image reference moves from `ghcr.io/vig-os/devcontainer` to a
-    **new GHCR package `ghcr.io/vig-os/devkit`** across the flake, CI/release
-    workflows, `install.sh`, the scaffold template (compose + workflows), and
-    documentation. The Nix flake output attributes are renamed to match
-    (`devcontainerImage` → `devkitImage`, `devcontainerImageEnv` → `devkitImageEnv`).
-    The old `ghcr.io/vig-os/devcontainer` package is frozen at `0.5.1` and remains
-    pullable; consumers move to the new package on their next
-    `install.sh --force` re-scaffold. The source-repo URL and the image's OCI
-    `source` label are unchanged in this slice (they follow the repository rename).
+- **Nix flake image attributes renamed to `devkitImage` / `devkitImageEnv`** ([#781](https://github.com/vig-os/devcontainer/issues/781))
+  - As part of the `devcontainer` → `devkit` project rename, the Nix flake output
+    attributes are renamed (`devcontainerImage` → `devkitImage`,
+    `devcontainerImageEnv` → `devkitImageEnv`). The **published image name is
+    unchanged** — it remains `ghcr.io/vig-os/devcontainer`: the artifact is a dev
+    container, while `devkit` names the project/repository that builds and ships
+    it. Consumers need **no image-ref change** and keep pulling the same image.
 
 - **Scaffolded `.vig-os` pins under `DEVKIT_VERSION`** ([#781](https://github.com/vig-os/devcontainer/issues/781))
   - The scaffold/release writeback now emits the renamed `DEVKIT_VERSION` key:

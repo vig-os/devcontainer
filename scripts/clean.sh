@@ -10,7 +10,7 @@ if [[ "$VERSION" =~ ^version= ]]; then
 	VERSION="${VERSION#version=}"
 fi
 
-REPO="${2:-${TEST_REGISTRY:-ghcr.io/vig-os/devkit}}"
+REPO="${2:-${TEST_REGISTRY:-ghcr.io/vig-os/devcontainer}}"
 # Strip trailing slash if present
 REPO="${REPO%/}"
 
