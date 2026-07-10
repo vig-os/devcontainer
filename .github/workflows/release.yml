@@ -872,7 +872,7 @@ jobs:
       - name: Build the vulnix scan target (image package closure)
         run: |
           set -euo pipefail
-          nix build .#devcontainerImageEnv --print-build-logs
+          nix build .#devkitImageEnv --print-build-logs
 
       # First-class, BLOCKING push of the scan-target closure to Cachix (#776) so
       # the CVE-scan closure is cache-backed too (nightly + re-runs substitute it
