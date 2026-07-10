@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Version-pin parsers accept the renamed `DEVKIT_VERSION` key** ([#781](https://github.com/vig-os/devcontainer/issues/781))
+  - As the first step of the `devcontainer` → `devkit` rename, every `.vig-os`
+    version-pin reader now prefers a `DEVKIT_VERSION` key and falls back to the
+    legacy `DEVCONTAINER_VERSION` when it is absent, so un-migrated consumer pins
+    keep resolving (soft cutover). When both keys are present, `DEVKIT_VERSION`
+    wins regardless of line order. Covers the `resolve-image` composite action
+    (root + scaffold), the scaffold `initialize.sh` / `version-check.sh` scripts,
+    and the Nix image build.
+
 ### Changed
 
 ### Deprecated

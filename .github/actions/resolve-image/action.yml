@@ -40,34 +40,46 @@ runs:
         fi
 
         if [[ -f .vig-os ]]; then
-          VERSION=""
+          # Prefer the renamed DEVKIT_VERSION key, falling back to the legacy
+          # DEVCONTAINER_VERSION so un-migrated pins keep resolving (#781). Both
+          # keys are captured and preferred after the read, so DEVKIT_VERSION
+          # wins regardless of line order.
+          DEVKIT_VERSION=""
+          LEGACY_VERSION=""
           while IFS= read -r line || [[ -n "${line:-}" ]]; do
             [[ -z "${line//[[:space:]]/}" ]] && continue
             [[ "$line" =~ ^[[:space:]]*# ]] && continue
 
             case "$line" in
-              DEVCONTAINER_VERSION=*)
-                VERSION="${line#*=}"
-                VERSION="${VERSION#"${VERSION%%[![:space:]]*}"}"
-                VERSION="${VERSION%"${VERSION##*[![:space:]]}"}"
+              DEVKIT_VERSION=*|DEVCONTAINER_VERSION=*)
+                key="${line%%=*}"
+                value="${line#*=}"
+                value="${value#"${value%%[![:space:]]*}"}"
+                value="${value%"${value##*[![:space:]]}"}"
 
-                if [[ "$VERSION" =~ ^\".*\"$ ]]; then
-                  VERSION="${VERSION:1:-1}"
-                elif [[ "$VERSION" =~ ^\'.*\'$ ]]; then
-                  VERSION="${VERSION:1:-1}"
+                if [[ "$value" =~ ^\".*\"$ ]]; then
+                  value="${value:1:-1}"
+                elif [[ "$value" =~ ^\'.*\'$ ]]; then
+                  value="${value:1:-1}"
                 fi
-                break
+
+                if [[ "$key" == "DEVKIT_VERSION" ]]; then
+                  DEVKIT_VERSION="$value"
+                else
+                  LEGACY_VERSION="$value"
+                fi
                 ;;
             esac
           done < .vig-os
 
+          VERSION="${DEVKIT_VERSION:-$LEGACY_VERSION}"
           if [[ -n "$VERSION" ]]; then
             echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
             exit 0
           fi
         fi
 
-        echo "ERROR: Could not resolve DEVCONTAINER_VERSION from .vig-os and no image-tag override was provided."
+        echo "ERROR: Could not resolve DEVKIT_VERSION (or legacy DEVCONTAINER_VERSION) from .vig-os and no image-tag override was provided."
         exit 1
 
     - name: Validate image accessibility
@@ -99,7 +111,7 @@ runs:
           if echo "$PROBE_ERR" | grep -qiE 'unauthorized|denied|authentication|forbidden|toomanyrequests|rate limit'; then
             echo "::error::Cannot access image manifest: ${IMAGE} — authentication required or denied. Set the GHCR_PULL_TOKEN secret (or grant the workflow token packages:read) and pass it to this action."
           else
-            echo "::error::Cannot access image manifest: ${IMAGE} — the tag does not exist or is not readable. Check that DEVCONTAINER_VERSION in .vig-os points at a published image tag."
+            echo "::error::Cannot access image manifest: ${IMAGE} — the tag does not exist or is not readable. Check that DEVKIT_VERSION (or legacy DEVCONTAINER_VERSION) in .vig-os points at a published image tag."
           fi
           exit 1
         fi

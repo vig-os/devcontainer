@@ -864,9 +864,12 @@
 
                     # Resolve the built tag: the explicit VIG_OS_VERSION override
                     # (release build, via --impure) when present, else the repo's
-                    # pinned DEVCONTAINER_VERSION. Empty override => pure/plain
-                    # `nix build`, so this is the reproducible repo pin (#921/#642).
-                    dcver="$(sed -n 's/^DEVCONTAINER_VERSION=//p' ${./.vig-os})"
+                    # pinned version. Empty override => pure/plain `nix build`, so
+                    # this is the reproducible repo pin (#921/#642). Prefer the
+                    # renamed DEVKIT_VERSION key, falling back to the legacy
+                    # DEVCONTAINER_VERSION so an un-migrated pin still builds (#781).
+                    dcver="$(sed -n 's/^DEVKIT_VERSION=//p' ${./.vig-os})"
+                    [ -n "$dcver" ] || dcver="$(sed -n 's/^DEVCONTAINER_VERSION=//p' ${./.vig-os})"
                     imageVersion="${imageVersionOverride}"
                     [ -n "$imageVersion" ] || imageVersion="$dcver"
 
