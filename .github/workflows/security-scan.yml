@@ -14,6 +14,11 @@
 # Jobs:
 #   1. scan-nix-image - build the image closure, run vulnix (+ Trivy SBOM)
 #
+# On failure:
+#   - A deduplicated `security-scan` tracking issue is opened (#965). Scheduled
+#     runs execute from the default branch with no other signal, so a red gate
+#     must surface as an issue, not just a red run.
+#
 # Artifacts:
 #   - vulnix findings (JSON + table) and a CycloneDX SBOM (uploaded)
 
@@ -38,8 +43,8 @@ jobs:
   # step is BLOCKING (#639): the nixpkgs baseline was advanced to 26.05 and the
   # residual findings triaged into .vulnixignore (see docs/security/
   # nix-cutover-scan-overlap.md), so any new unexcepted HIGH/CRITICAL fails the
-  # scan. SARIF upload to the Security tab + a deduplicated issue can be added
-  # alongside the actual publish-cutover.
+  # scan, which opens a deduplicated tracking issue (#965). SARIF upload to the
+  # Security tab can still be added alongside the actual publish-cutover.
   scan-nix-image:
     name: Scan Nix image (vulnix + SBOM)
     runs-on: ubuntu-24.04
@@ -48,6 +53,7 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: read
+      issues: write  # open a deduplicated tracking issue when the vulnix gate fails (#965)
 
     steps:
       - name: Checkout repository
@@ -185,3 +191,49 @@ jobs:
             echo "vulnix over-reports CVEs already patched in nixpkgs; triage findings"
             echo "into \`.vulnixignore\` and advance the nixpkgs rev before #639."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Restore the deduplicated tracking issue lost in the Debian->Nix cutover
+      # (#965): a scheduled run from the default branch has no other signal, so a
+      # red vulnix gate must surface as an issue, not just a red run.
+      - name: Open a tracking issue when the vulnix gate fails
+        # failure() lets this step run despite the failing gate; the outcome
+        # guard scopes it to a gate failure (not an infra/scan crash upstream).
+        if: ${{ failure() && steps.vulnix-gate.outcome == 'failure' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SECURITY_URL: ${{ github.server_url }}/${{ github.repository }}/security
+        run: |
+          set -euo pipefail
+          # Refresh the (Nix-era) label; --force updates an existing label's
+          # description/color, correcting the stale ":latest image" text.
+          gh label create security-scan \
+            --description 'Automated nightly security scan findings for the Nix devcontainer image' \
+            --color BFD4F2 --force 2>/dev/null || true
+          # Dedup by the auto-issue's distinctive title, NOT the label alone, so
+          # we never collide with human-filed security-scan issues (per-CVE
+          # triage, this very regression, etc.). One open tracking issue at a
+          # time; it is closed when a later scheduled run passes the gate.
+          TITLE='Nightly security scan: unexcepted HIGH/CRITICAL vulnix findings'
+          EXISTING=$(gh issue list --state open --label security-scan \
+            --search "\"$TITLE\" in:title" --json number -q '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            echo "Open tracking issue already exists: #$EXISTING -- skipping create"
+            exit 0
+          fi
+          BODY="$(cat <<EOF
+          The nightly vulnix gate found **unexcepted HIGH/CRITICAL** CVEs in the Nix image closure (after \`.vulnixignore\`).
+
+          - **Scan target:** flake \`devcontainerImageEnv\` (image package closure)
+          - **Scan date (UTC):** $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          - **Workflow run:** ${RUN_URL}
+          - **Findings artifact:** \`nix-image-cve-scan\` on the run above (\`vulnix-findings.json\`, \`vulnix-report.txt\`)
+          - **Security tab:** ${SECURITY_URL}
+
+          **To remediate:** advance the pinned nixpkgs rev if a fix has landed, or add a time-boxed \`.vulnixignore\` exception with a rationale (see \`docs/CONTAINER_SECURITY.md\`). Close this issue once a later scheduled run passes the gate.
+          EOF
+          )"
+          gh issue create \
+            --title "$TITLE" \
+            --label security-scan --label security \
+            --body "$BODY"

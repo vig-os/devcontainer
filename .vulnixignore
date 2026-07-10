@@ -255,3 +255,28 @@ CVE-2026-9545
 CVE-2026-9546
 CVE-2026-9547
 CVE-2026-9080
+
+# ============================================================================
+# Triage 2026-07-10 — openssh client use-after-free (release-cycle fix, #963).
+# Verified ONLINE against NVD/MITRE/GHSA, the upstream OpenSSH release, and the
+# nixpkgs branch contents (nixos-26.05, release-26.05, staging-26.05, master,
+# nixpkgs-unstable) on 2026-07-10. Real product match (openssh the SSH client,
+# no CPE collision). Surfaced in the vulnix feed 2026-07-10 (nightly
+# security-scan went red that morning, run 29079456127).
+# ============================================================================
+
+# openssh 10.3p1 — CVE-2026-60002 (CVSS 7.7 HIGH per MITRE; NVD scores 9.4
+#   CRITICAL): use-after-free in the ssh(1) CLIENT (not sshd) when a
+#   malicious/compromised server changes its host key during key re-exchange
+#   (CWE-416). openssh is in-closure (a direct dev tool; git-over-ssh). The
+#   client is genuinely reachable, but exploitation needs a dev-initiated
+#   connection OUT to an attacker-controlled SSH server that mutates its host
+#   key mid-rekey — bounded by the single-user dev model and typically-known
+#   hosts. Fixed upstream in 10.4p1 (2026-07-06) but NOT yet in any nixpkgs
+#   branch (all still 10.3p1); the bump is merged into the 26.05 staging
+#   pipeline (nixpkgs #539452 -> staging-nixos, backport #539933 ->
+#   staging-nixos-26.05, 2026-07-10) and has not reached nixos-26.05. Flip to a
+#   nixpkgs rev-advance once 10.4p1 lands in the pinned channel; short expiry to
+#   force near-term re-check.
+Expiration: 2026-07-24
+CVE-2026-60002
