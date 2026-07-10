@@ -551,8 +551,8 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          sed -i "s/^DEVCONTAINER_VERSION=.*/DEVCONTAINER_VERSION=$VERSION/" .vig-os
-          echo "✓ Set DEVCONTAINER_VERSION=$VERSION in .vig-os"
+          sed -i -E "s/^(DEVKIT_VERSION|DEVCONTAINER_VERSION)=.*/DEVKIT_VERSION=$VERSION/" .vig-os
+          echo "✓ Set DEVKIT_VERSION=$VERSION in .vig-os"
 
       - name: Collect finalization files
         if: needs.validate.outputs.release_kind == 'final'

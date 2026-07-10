@@ -5,9 +5,9 @@
 # upgrades need no mode/identity flags. Future per-project devkit flags
 # (e.g. the #883 hook opt-out) live in this file too.
 
-# Scaffold/image version pin (managed by release automation; kept under the
-# legacy name until the devkit rename, #781).
-DEVCONTAINER_VERSION={{IMAGE_TAG}}
+# Scaffold/image version pin (managed by release automation). Readers also
+# accept the legacy DEVCONTAINER_VERSION key for un-migrated consumers (#781).
+DEVKIT_VERSION={{IMAGE_TAG}}
 
 # Delivery mode: devcontainer | direnv | both | bare. Ships empty (= unset:
 # resolved and written back on scaffold) so an aborted upgrade can never

@@ -40,14 +40,14 @@ devc-check *args:
 devc-upgrade:
     #!/usr/bin/env bash
     # Honor the consumer's pinned devkit generation (#854): read
-    # DEVCONTAINER_VERSION from .vig-os and upgrade to THAT tag (both the
-    # install.sh script ref and the pinned image version), not whatever
-    # `main`/`latest` happens to be. An unpinned or `latest` manifest keeps the
-    # floating `main`/`latest` behavior.
+    # DEVKIT_VERSION (or the legacy DEVCONTAINER_VERSION for un-migrated pins,
+    # #781) from .vig-os and upgrade to THAT tag (both the install.sh script ref
+    # and the pinned image version), not whatever `main`/`latest` happens to be.
+    # An unpinned or `latest` manifest keeps the floating `main`/`latest` behavior.
     REF="main"
     PIN_ARGS=()
     if [[ -f .vig-os ]]; then
-        PINNED="$(awk -F= '/^DEVCONTAINER_VERSION=/{gsub(/^[ \t"]+|[ \t"]+$/, "", $2); print $2; exit}' .vig-os || true)"
+        PINNED="$(awk -F= '/^DEVKIT_VERSION=/{gsub(/^[ \t"]+|[ \t"]+$/, "", $2); devkit=$2} /^DEVCONTAINER_VERSION=/{gsub(/^[ \t"]+|[ \t"]+$/, "", $2); legacy=$2} END{print (devkit != "" ? devkit : legacy)}' .vig-os || true)"
         if [[ -n "${PINNED:-}" && "$PINNED" != "latest" ]]; then
             REF="$PINNED"
             PIN_ARGS=(--version "$PINNED")

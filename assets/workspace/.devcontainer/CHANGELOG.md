@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Scaffolded `.vig-os` pins under `DEVKIT_VERSION`** ([#781](https://github.com/vig-os/devcontainer/issues/781))
+  - The scaffold/release writeback now emits the renamed `DEVKIT_VERSION` key:
+    the template manifest, `init-workspace.sh`, the `release.yml` finalize step,
+    the repo-root `.vig-os`, and the scaffolded `devc-upgrade` recipe. A `--force`
+    upgrade migrates a legacy `DEVCONTAINER_VERSION` pin to `DEVKIT_VERSION`
+    (the `.vig-os` overwrite drops the stale key). Readers still accept the legacy
+    key (soft cutover). The docker-compose `.env` interpolation variable is
+    unchanged in this slice.
+
 ### Deprecated
 
 ### Removed

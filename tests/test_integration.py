@@ -673,13 +673,11 @@ class TestVigOsConfig:
         assert vig_os_file.exists(), ".vig-os not found in workspace root"
         assert vig_os_file.is_file(), ".vig-os is not a regular file"
 
-    def test_vig_os_contains_devcontainer_version(self, initialized_workspace):
-        """Test that .vig-os contains DEVCONTAINER_VERSION key."""
+    def test_vig_os_contains_devkit_version(self, initialized_workspace):
+        """Test that .vig-os contains the renamed DEVKIT_VERSION key (#781)."""
         vig_os_file = initialized_workspace / ".vig-os"
         content = vig_os_file.read_text(encoding="utf-8")
-        assert "DEVCONTAINER_VERSION=" in content, (
-            "DEVCONTAINER_VERSION key not found in .vig-os"
-        )
+        assert "DEVKIT_VERSION=" in content, "DEVKIT_VERSION key not found in .vig-os"
         assert "{{IMAGE_TAG}}" not in content, (
             "IMAGE_TAG placeholder should be replaced in .vig-os"
         )
@@ -710,7 +708,7 @@ class TestVigOsConfig:
         vig_os_file = workspace / ".vig-os"
         assert vig_os_file.exists(), ".vig-os not scaffolded"
         content = vig_os_file.read_text(encoding="utf-8")
-        assert "DEVCONTAINER_VERSION=9.9.9-rc9" in content, (
+        assert "DEVKIT_VERSION=9.9.9-rc9" in content, (
             f".vig-os does not pin the requested version:\n{content}"
         )
 

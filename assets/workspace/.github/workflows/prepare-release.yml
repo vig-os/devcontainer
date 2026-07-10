@@ -62,8 +62,9 @@ jobs:
 
       # Resolve + validate the pinned devcontainer image via the shared
       # resolve-image action (#854): hard-fails on a missing/unreadable
-      # DEVCONTAINER_VERSION instead of silently falling back to `latest`, so
-      # this workflow can no longer diverge from ci.yml's resolver semantics.
+      # DEVKIT_VERSION (or legacy DEVCONTAINER_VERSION) instead of silently
+      # falling back to `latest`, so this workflow can no longer diverge from
+      # ci.yml's resolver semantics.
       - name: Resolve container image
         id: resolve_image
         uses: ./.github/actions/resolve-image
