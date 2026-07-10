@@ -19,6 +19,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.5.1](https://github.com/vig-os/devcontainer/releases/tag/0.5.1) - 2026-07-10
+
+### Changed
+
+- **Renovate: update `github-backup` from `==0.63.0` to `==0.64.0`** ([#960](https://github.com/vig-os/devcontainer/pull/960))
+- **Renovate dependency update** ([#866](https://github.com/vig-os/devcontainer/pull/866))
+  - Update `aquasecurity/trivy` from `v0.71.2` to `v0.72.0`
+  - Update `astral-sh/setup-uv` from `v8.3.1` to `v8.3.2`
+  - Update `docker/login-action` from `v4.2.0` to `v4.4.0`
+
+- **Renovate: update `github/codeql-action` from `8aad20d` to `99df26d`** ([#862](https://github.com/vig-os/devcontainer/pull/862))
+
+### Fixed
+
+- **Nested scaffold docs dropped by unanchored preserve excludes** ([#953](https://github.com/vig-os/devcontainer/issues/953))
+  - `init-workspace.sh` built its rsync preserve excludes as `--exclude=$name`, so bare `PRESERVE_FILES` entries (`README.md`, `CHANGELOG.md`) matched by basename at every depth and silently dropped devkit-authored nested docs (`.devcontainer/README.md`, `.devcontainer/CHANGELOG.md`, `.claude/skills/*/README.md`) on `--force` upgrades — files the `--preview` report still listed as ADDED. The excludes are now root-anchored (`--exclude=/$name`), matching `is_preserved_file`'s exact-path semantics: root docs stay preserved, nested docs ship.
+
+- **Imageless `--no-prompts` defaulted the org to a bogus `vigOS/devc` literal** ([#954](https://github.com/vig-os/devcontainer/issues/954))
+  - With no `ORG_NAME` env and no manifest `DEVKIT_ORG`, the org defaulted to the hardcoded `vigOS/devc` — a `/`-bearing value that sed-substituted into `{{ORG_NAME}}` in generated files (e.g. the LICENSE copyright line). The default now derives from the `GITHUB_REPOSITORY` owner segment (already resolved on this path via `DEVKIT_REPO`), falling back to the literal `vigOS` only when no usable owner/repo is present.
+
+- **Broken links, duplicate sections, and name/title mismatches in agent skills** ([#912](https://github.com/vig-os/devcontainer/issues/912))
+  - All `../../rules/*.mdc` links in `.claude/skills/` now point to the correct skill files or `CLAUDE.md` (`.claude/rules/` was removed in #626).
+  - `../docs/RELEASE_CYCLE.md` links in `pr_create` and `pr_post-merge` corrected to `../../../docs/RELEASE_CYCLE.md`.
+  - Duplicate `## Delegation` sections removed from `ci_check`, `worktree_ci-fix`, and `worktree_verify`.
+  - `solve-and-pr` skill now launches `/worktree_solve-and-pr` (underscore, matching the real skill name).
+  - `worktree_pr` PR title format aligned with `pr_create`: no manual issue number in title.
+  - Obsolete `.claude/commands/` wrappers deleted (superseded by skills providing `/X` directly).
+
+### Security
+
+- **Accept the openssh 10.3p1 client use-after-free (CVE-2026-60002) in the vulnix register pending the nixpkgs bump to 10.4p1** ([#963](https://github.com/vig-os/devcontainer/issues/963))
+  - The 2026-07-10 nightly security scan went red at the blocking vulnix gate on CVE-2026-60002 (CVSS 7.7 HIGH per MITRE, 9.4 CRITICAL per NVD): a use-after-free in the OpenSSH **client** (`ssh(1)`, not `sshd`) triggered when a malicious/compromised server changes its host key during key re-exchange. `openssh` is in the image closure and the client is reachable, but exploitation requires connecting out to an attacker-controlled SSH server that mutates its host key mid-rekey — bounded by the single-user dev model — so this is a time-boxed risk acceptance, not a dismissal.
+  - Fixed upstream in openssh 10.4p1 (2026-07-06), but the bump has not reached the pinned `nixos-26.05` channel (still 10.3p1, as are `release-26.05`, `staging-26.05`, `master`, `nixpkgs-unstable`); it is merged into the 26.05 staging pipeline (nixpkgs [#539452](https://github.com/NixOS/nixpkgs/pull/539452), backport [#539933](https://github.com/NixOS/nixpkgs/pull/539933)). Added a short-dated `.vulnixignore` exception (expires 2026-07-24) to unblock the gate; the block is dropped and the pin advanced once 10.4p1 lands in `nixos-26.05`.
+
 ## [0.5.0](https://github.com/vig-os/devcontainer/releases/tag/0.5.0) - 2026-07-09
 
 ### Added
@@ -103,6 +137,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **pipefail in every mode:** `set shell := ["bash", "-euo", "pipefail", "-c"]` moved from the devc-only `justfile.devc` to the root `justfile` (the SSoT), so direnv/bare recipes get pipefail too.
   - **`init-precommit.sh` derives its root** from the script location instead of a hard-coded `/workspace/{{SHORT_NAME}}`.
   - **Stale doc fixed:** `docs/container-ci-quirks.md` no longer describes a removed `uv run bandit` `pre-commit` hook; the private-image (unauthenticated `resolve-image` probe + missing `credentials:`) limitation is documented, with the first-class fix tracked in [#920](https://github.com/vig-os/devcontainer/issues/920).
+
+### Security
+
+- **Accept the curl 8.20.0 advisory batch in the vulnix register pending a patched upstream release** ([#941](https://github.com/vig-os/devcontainer/issues/941))
+  - The 2026-06-24 curl disclosure added 17 HIGH/CRITICAL CVEs against curl 8.20.0 to the vulnix feed (four CVSS 9.8 — an HTTP/2 stream-dependency-tree UAF, a cross-origin Digest auth-state leak, a SASL double-free, and a stale proxy-password leak — plus a CVSS 9.1 batch and further HIGHs); they surfaced 2026-07-08 and blocked the 0.5.0-rc1 publish at the release vulnix gate. curl is reachable in the image (https/git-over-https, flake fetches, the docker→podman shim), so this is a time-boxed risk acceptance, not a dismissal.
+  - No fixed curl exists to advance to: 8.20.0 is the newest release upstream and in both `nixos-26.05` and `nixpkgs-unstable`, so the "advance the rev" lever has nowhere to land. Added a short-dated `.vulnixignore` exception (expires 2026-07-22) to unblock the gate; the block is dropped and the pin advanced once Renovate's `nix` manager surfaces a patched curl.
 
 ## [0.4.1](https://github.com/vig-os/devcontainer/releases/tag/0.4.1) - 2026-07-08
 
