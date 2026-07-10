@@ -665,9 +665,9 @@ _preview_symlinked_template_venv() {
     assert_success
 }
 
-@test "init-workspace writes DEVCONTAINER_VERSION from the VIG_OS_VERSION override (#852)" {
+@test "init-workspace writes DEVKIT_VERSION from the VIG_OS_VERSION override (#852)" {
     # shellcheck disable=SC2016
-    run grep -F 'DEVCONTAINER_VERSION=${VIG_OS_VERSION}' "$INIT_WORKSPACE_SH"
+    run grep -F 'DEVKIT_VERSION=${VIG_OS_VERSION}' "$INIT_WORKSPACE_SH"
     assert_success
 }
 
@@ -702,8 +702,26 @@ _scaffold_with_version_file() {
     printf '0.5.0-rc3\n' >"$verfile"
     run _scaffold_with_version_file bare "$ws" "$verfile"
     assert_success
+    run grep '^DEVKIT_VERSION=' "$ws/.vig-os"
+    assert_output "DEVKIT_VERSION=0.5.0-rc3"
+}
+
+@test "init-workspace migrates a legacy DEVCONTAINER_VERSION pin to DEVKIT_VERSION (#781)" {
+    ws="$BATS_TEST_TMPDIR/e2e-781-migrate"
+    mkdir -p "$ws"
+    # Pre-seed a legacy version-only manifest: a --force upgrade overwrites
+    # .vig-os from the template (which now carries DEVKIT_VERSION), so the stale
+    # legacy key must be gone and the renamed key pinned to the new version.
+    printf '# vig-os devcontainer configuration\nDEVCONTAINER_VERSION=0.3.9\n' \
+        > "$ws/.vig-os"
+    verfile="$BATS_TEST_TMPDIR/VERSION-781"
+    printf '1.0.0\n' >"$verfile"
+    run _scaffold_with_version_file bare "$ws" "$verfile"
+    assert_success
     run grep '^DEVCONTAINER_VERSION=' "$ws/.vig-os"
-    assert_output "DEVCONTAINER_VERSION=0.5.0-rc3"
+    assert_failure
+    run grep '^DEVKIT_VERSION=' "$ws/.vig-os"
+    assert_output "DEVKIT_VERSION=1.0.0"
 }
 
 @test "init-workspace leaves the baked pin untouched when no VERSION record exists (#921)" {
@@ -713,8 +731,8 @@ _scaffold_with_version_file() {
     # the template's baked placeholder survives (no image build happened here).
     run _scaffold_with_version_file bare "$ws" "$BATS_TEST_TMPDIR/does-not-exist"
     assert_success
-    run grep '^DEVCONTAINER_VERSION=' "$ws/.vig-os"
-    assert_output "DEVCONTAINER_VERSION={{IMAGE_TAG}}"
+    run grep '^DEVKIT_VERSION=' "$ws/.vig-os"
+    assert_output "DEVKIT_VERSION={{IMAGE_TAG}}"
 }
 
 @test "init-workspace prefers an explicit VIG_OS_VERSION over the VERSION record (#921)" {
@@ -735,8 +753,8 @@ _scaffold_with_version_file() {
         GITHUB_REPOSITORY=test/repo \
         bash "$INIT_WORKSPACE_SH" --force --no-prompts --mode bare
     assert_success
-    run grep '^DEVCONTAINER_VERSION=' "$ws/.vig-os"
-    assert_output "DEVCONTAINER_VERSION=1.2.3"
+    run grep '^DEVKIT_VERSION=' "$ws/.vig-os"
+    assert_output "DEVKIT_VERSION=1.2.3"
 }
 
 @test "template ships .typos.toml alongside the typos hook (#855)" {
@@ -1394,7 +1412,7 @@ _upgrade_no_flags() {
 }
 
 @test "template .vig-os carries the manifest key set (#885)" {
-    for key in DEVCONTAINER_VERSION DEVKIT_MODE DEVKIT_PROJECT DEVKIT_ORG \
+    for key in DEVKIT_VERSION DEVKIT_MODE DEVKIT_PROJECT DEVKIT_ORG \
         DEVKIT_REPO DEVKIT_MODULES; do
         run grep -E "^${key}=" "$TEMPLATE_DIR/.vig-os"
         assert_success

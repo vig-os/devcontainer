@@ -19,6 +19,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [1.0.0](https://github.com/vig-os/devcontainer/releases/tag/1.0.0) - 2026-07-10
+
+### Added
+
+- **Version-pin parsers accept the renamed `DEVKIT_VERSION` key** ([#781](https://github.com/vig-os/devcontainer/issues/781))
+  - As the first step of the `devcontainer` → `devkit` rename, every `.vig-os`
+    version-pin reader now prefers a `DEVKIT_VERSION` key and falls back to the
+    legacy `DEVCONTAINER_VERSION` when it is absent, so un-migrated consumer pins
+    keep resolving (soft cutover). When both keys are present, `DEVKIT_VERSION`
+    wins regardless of line order. Covers the `resolve-image` composite action
+    (root + scaffold), the scaffold `initialize.sh` / `version-check.sh` scripts,
+    and the Nix image build.
+
+### Changed
+
+- **Nix flake image attributes renamed to `devkitImage` / `devkitImageEnv`** ([#781](https://github.com/vig-os/devcontainer/issues/781))
+  - As part of the `devcontainer` → `devkit` project rename, the Nix flake output
+    attributes are renamed (`devcontainerImage` → `devkitImage`,
+    `devcontainerImageEnv` → `devkitImageEnv`). The **published image name is
+    unchanged** — it remains `ghcr.io/vig-os/devcontainer`: the artifact is a dev
+    container, while `devkit` names the project/repository that builds and ships
+    it. Consumers need **no image-ref change** and keep pulling the same image.
+
+- **Scaffolded `.vig-os` pins under `DEVKIT_VERSION`** ([#781](https://github.com/vig-os/devcontainer/issues/781))
+  - The scaffold/release writeback now emits the renamed `DEVKIT_VERSION` key:
+    the template manifest, `init-workspace.sh`, the `release.yml` finalize step,
+    the repo-root `.vig-os`, and the scaffolded `devc-upgrade` recipe. A `--force`
+    upgrade migrates a legacy `DEVCONTAINER_VERSION` pin to `DEVKIT_VERSION`
+    (the `.vig-os` overwrite drops the stale key). Readers still accept the legacy
+    key (soft cutover). The docker-compose `.env` interpolation variable is
+    unchanged in this slice.
+
+- **Release dispatch targets the renamed `devkit-smoke-test` repo** ([#781](https://github.com/vig-os/devcontainer/issues/781))
+  - The cross-repo smoke-test validation repository was renamed
+    `devcontainer-smoke-test` → `devkit-smoke-test`. `release.yml` /
+    `promote-release.yml` now target the new name for the `repository_dispatch`,
+    the scoped app token, and the downstream published-release gate — GitHub's API
+    does not reliably redirect `POST …/dispatches` across a rename. The smoke-test
+    template mirror (`assets/smoke-test/`) and the release docs are updated to
+    match. The source repository name is unchanged in this slice.
+
+- **Documented `install.sh` one-liners follow redirects (`curl -sSfL`)** ([#781](https://github.com/vig-os/devcontainer/issues/781))
+  - Pre-rename hardening: every documented `curl … | bash` install/upgrade
+    one-liner (README, `install.sh` help text, `MIGRATION.md`, the smoke-test
+    template, and the in-container upgrade hint) now passes `-L` so the fetch
+    follows HTTP redirects, keeping the bootstrap working across the upcoming
+    `devcontainer` → `devkit` repository rename. Repository and image URLs are
+    unchanged in this slice.
+
 ## [0.5.1](https://github.com/vig-os/devcontainer/releases/tag/0.5.1) - 2026-07-10
 
 ### Changed

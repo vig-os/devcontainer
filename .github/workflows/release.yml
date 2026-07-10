@@ -551,8 +551,8 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          sed -i "s/^DEVCONTAINER_VERSION=.*/DEVCONTAINER_VERSION=$VERSION/" .vig-os
-          echo "✓ Set DEVCONTAINER_VERSION=$VERSION in .vig-os"
+          sed -i -E "s/^(DEVKIT_VERSION|DEVCONTAINER_VERSION)=.*/DEVKIT_VERSION=$VERSION/" .vig-os
+          echo "✓ Set DEVKIT_VERSION=$VERSION in .vig-os"
 
       - name: Collect finalization files
         if: needs.validate.outputs.release_kind == 'final'
@@ -872,7 +872,7 @@ jobs:
       - name: Build the vulnix scan target (image package closure)
         run: |
           set -euo pipefail
-          nix build .#devcontainerImageEnv --print-build-logs
+          nix build .#devkitImageEnv --print-build-logs
 
       # First-class, BLOCKING push of the scan-target closure to Cachix (#776) so
       # the CVE-scan closure is cache-backed too (nightly + re-runs substitute it
@@ -1378,7 +1378,7 @@ jobs:
             echo "  1. Smoke-test dispatch runs in the smoke-test job."
             echo "  2. If downstream pre-release passes, run: just finalize-release $BASE_VERSION"
           else
-            echo "  1. Smoke-test dispatch runs in the smoke-test job; wait for downstream final release on devcontainer-smoke-test."
+            echo "  1. Smoke-test dispatch runs in the smoke-test job; wait for downstream final release on devkit-smoke-test."
             echo "  2. Run: just promote-release $BASE_VERSION — updates :latest, publishes the draft GitHub Release, merges the release PR to main."
           fi
 
@@ -1399,7 +1399,7 @@ jobs:
           client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: vig-os
-          repositories: devcontainer-smoke-test
+          repositories: devkit-smoke-test
 
       # Local actions from ./.github/actions/* require repository checkout in this job workspace.
       - name: Checkout repository
@@ -1425,7 +1425,7 @@ jobs:
         run: |
           set -euo pipefail
           retry --retries 3 --backoff 10 --max-backoff 10 -- \
-            gh api repos/vig-os/devcontainer-smoke-test/dispatches \
+            gh api repos/vig-os/devkit-smoke-test/dispatches \
               -f event_type=smoke-test-trigger \
               -f "client_payload[tag]=$RELEASE_TAG" \
               -f "client_payload[release_kind]=$RELEASE_KIND" \
@@ -1444,7 +1444,7 @@ jobs:
           RELEASE_KIND: ${{ needs.validate.outputs.release_kind }}
         run: |
           echo "✓ Triggered smoke-test dispatch for release tag: $RELEASE_TAG"
-          echo "Downstream validation is asynchronous; verify in devcontainer-smoke-test."
+          echo "Downstream validation is asynchronous; verify in devkit-smoke-test."
           if [ "$RELEASE_KIND" = "final" ]; then
             echo "Final: when downstream smoke-test has published its release for this tag, run: just promote-release $RELEASE_TAG"
           fi
@@ -1471,7 +1471,7 @@ jobs:
 
             **Next Steps:**
             1. Review smoke-test dispatch logs in this workflow run.
-            2. Validate token/repository_dispatch permissions for \`vig-os/devcontainer-smoke-test\`.
+            2. Validate token/repository_dispatch permissions for \`vig-os/devkit-smoke-test\`.
             3. Re-trigger dispatch after fixing the root cause.
             `;
 

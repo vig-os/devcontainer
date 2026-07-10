@@ -194,32 +194,45 @@ record_check() {
 get_current_version() {
     local config_file="$DEVCONTAINER_DIR/../.vig-os"
     local line
+    local devkit_version=""
+    local legacy_version=""
     local version=""
 
     if [[ ! -f "$config_file" ]]; then
         return 1
     fi
 
+    # Prefer the renamed DEVKIT_VERSION key, falling back to the legacy
+    # DEVCONTAINER_VERSION so un-migrated pins keep resolving (#781). Both keys
+    # are captured and preferred after the read, so DEVKIT_VERSION wins
+    # regardless of line order.
     while IFS= read -r line || [[ -n "$line" ]]; do
         [[ -z "${line//[[:space:]]/}" ]] && continue
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
 
         case "$line" in
-            DEVCONTAINER_VERSION=*)
-                version="${line#*=}"
-                version="${version#"${version%%[![:space:]]*}"}"
-                version="${version%"${version##*[![:space:]]}"}"
+            DEVKIT_VERSION=*|DEVCONTAINER_VERSION=*)
+                local key="${line%%=*}"
+                local value="${line#*=}"
+                value="${value#"${value%%[![:space:]]*}"}"
+                value="${value%"${value##*[![:space:]]}"}"
 
-                if [[ "$version" =~ ^\".*\"$ ]]; then
-                    version="${version:1:-1}"
-                elif [[ "$version" =~ ^\'.*\'$ ]]; then
-                    version="${version:1:-1}"
+                if [[ "$value" =~ ^\".*\"$ ]]; then
+                    value="${value:1:-1}"
+                elif [[ "$value" =~ ^\'.*\'$ ]]; then
+                    value="${value:1:-1}"
                 fi
-                break
+
+                if [[ "$key" == "DEVKIT_VERSION" ]]; then
+                    devkit_version="$value"
+                else
+                    legacy_version="$value"
+                fi
                 ;;
         esac
     done < "$config_file"
 
+    version="${devkit_version:-$legacy_version}"
     if [[ -z "$version" || "$version" == "dev" || "$version" == "latest" ]]; then
         return 1  # Not a pinned version
     fi
@@ -284,7 +297,7 @@ notify_update() {
     echo ""
     echo -e "  Or without just:"
     echo ""
-    echo -e "    curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --force ."
+    echo -e "    curl -sSfL https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --force ."
     echo ""
     echo -e "  After upgrading, rebuild the container in VS Code."
     echo ""

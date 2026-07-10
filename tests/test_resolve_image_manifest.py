@@ -44,6 +44,26 @@ DEVKIT_MODULES="native rust"
 DEVKIT_FUTURE_FLAG=whatever
 """
 
+# The rename (#781) moves the version pin key DEVCONTAINER_VERSION -> DEVKIT_VERSION.
+# The parser must read the new key, preferring it over the legacy one regardless of
+# file order, while still resolving a legacy-only manifest (soft cutover).
+DEVKIT_ONLY_MANIFEST = """\
+# vig-os devkit configuration
+DEVKIT_VERSION=1.2.3
+"""
+
+DUAL_KEY_LEGACY_FIRST = """\
+# vig-os devkit configuration
+DEVCONTAINER_VERSION=0.4.0
+DEVKIT_VERSION=1.2.3
+"""
+
+DUAL_KEY_DEVKIT_FIRST = """\
+# vig-os devkit configuration
+DEVKIT_VERSION=1.2.3
+DEVCONTAINER_VERSION=0.4.0
+"""
+
 
 def _resolve_step_script() -> str:
     """The bash body of the action's 'Resolve image tag' step."""
@@ -94,3 +114,18 @@ def test_resolver_output_identical_for_legacy_and_full_manifest(
     legacy = _run_resolver(tmp_path, VERSION_ONLY_MANIFEST, "legacy")
     full = _run_resolver(tmp_path, FULL_MANIFEST, "full")
     assert legacy == full == "tag=0.4.0\n"
+
+
+def test_resolver_reads_devkit_version(tmp_path: Path) -> None:
+    """The renamed pin key DEVKIT_VERSION resolves on its own (#781)."""
+    output = _run_resolver(tmp_path, DEVKIT_ONLY_MANIFEST, "devkit")
+    assert output == "tag=1.2.3\n"
+
+
+def test_resolver_prefers_devkit_over_legacy_regardless_of_order(
+    tmp_path: Path,
+) -> None:
+    """DEVKIT_VERSION wins over legacy DEVCONTAINER_VERSION in either order (#781)."""
+    legacy_first = _run_resolver(tmp_path, DUAL_KEY_LEGACY_FIRST, "legacy-first")
+    devkit_first = _run_resolver(tmp_path, DUAL_KEY_DEVKIT_FIRST, "devkit-first")
+    assert legacy_first == devkit_first == "tag=1.2.3\n"

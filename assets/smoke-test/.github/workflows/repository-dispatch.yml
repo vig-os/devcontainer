@@ -16,7 +16,7 @@ name: Repository Dispatch Listener
 #                client_payload.correlation_id
 #
 # NOTE: Changes to this template may require manual redeploy to
-# vig-os/devcontainer-smoke-test and promotion through PRs until merged to main.
+# vig-os/devkit-smoke-test and promotion through PRs until merged to main.
 #
 # If this repo (or a fork) orchestrates workspace release.yml for candidates,
 # pass workflow_dispatch input rc-number=<N> where N is needs.validate.outputs.rc_number

@@ -1,6 +1,6 @@
 # Composite action to build the Nix-built devcontainer image to a tar.
 #
-# Builds `packages.devcontainerImage` (flake `dockerTools.buildLayeredImage`)
+# Builds `packages.devkitImage` (flake `dockerTools.buildLayeredImage`)
 # natively for the runner's architecture and writes a gzipped OCI tar. Nix is
 # the only build path (the Debian Containerfile was decommissioned in #642).
 #
@@ -25,7 +25,7 @@
 #   tar-file: Path to the saved tar file
 
 name: 'Build Container Image'
-description: 'Build the Nix-built devcontainer image (flake devcontainerImage) for an architecture'
+description: 'Build the Nix-built devcontainer image (flake devkitImage) for an architecture'
 
 inputs:
   version:
@@ -118,7 +118,7 @@ runs:
         # tar; docker/podman load handles gzip. The flake sets the OCI labels.
         # `--impure` lets the flake read VIG_OS_VERSION (the true build tag);
         # see the env note above and the flake's imageVersionOverride (#921).
-        nix build .#devcontainerImage --impure --print-build-logs
+        nix build .#devkitImage --impure --print-build-logs
         cp -L result "${{ inputs.output-file }}"
         ls -lL "${{ inputs.output-file }}"
 

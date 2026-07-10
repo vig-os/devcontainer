@@ -26,7 +26,7 @@
 #                          segment, else the literal "vigOS")
 #   GITHUB_REPOSITORY    - owner/repo for Renovate preset extends (optional if
 #                          persisted as DEVKIT_REPO or origin is github.com)
-#   VIG_OS_VERSION       - Override the DEVCONTAINER_VERSION pinned in the scaffolded
+#   VIG_OS_VERSION       - Override the DEVKIT_VERSION pinned in the scaffolded
 #                          .vig-os (optional; install.sh forwards its --version, #852)
 #
 # The workspace .vig-os is the project's declarative manifest (#885): the
@@ -886,8 +886,11 @@ if [[ -n "${VIG_OS_VERSION:-}" && -f "$WORKSPACE_DIR/.vig-os" ]]; then
         echo "Error: invalid VIG_OS_VERSION: $VIG_OS_VERSION" >&2
         exit 1
     fi
-    echo "Pinning DEVCONTAINER_VERSION=${VIG_OS_VERSION} in .vig-os..."
-    sed -i "s/^DEVCONTAINER_VERSION=.*/DEVCONTAINER_VERSION=${VIG_OS_VERSION}/" "$WORKSPACE_DIR/.vig-os"
+    echo "Pinning DEVKIT_VERSION=${VIG_OS_VERSION} in .vig-os..."
+    # Rewrite whichever version key the manifest carries to the renamed
+    # DEVKIT_VERSION, so a stray legacy DEVCONTAINER_VERSION line is migrated
+    # rather than left stale (#781).
+    sed -i -E "s/^(DEVKIT_VERSION|DEVCONTAINER_VERSION)=.*/DEVKIT_VERSION=${VIG_OS_VERSION}/" "$WORKSPACE_DIR/.vig-os"
 fi
 
 # Interactive origin resolution (the renovate.json owner/repo prompt) runs here,

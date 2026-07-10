@@ -219,7 +219,7 @@ jobs:
           client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: vig-os
-          repositories: devcontainer-smoke-test
+          repositories: devkit-smoke-test
 
       - name: Verify downstream published final release
         env:
@@ -233,7 +233,7 @@ jobs:
           LAST_ERROR=""
           for i in $(seq 1 "$RETRIES"); do
             API_OUTPUT=""
-            if API_OUTPUT=$(gh api "repos/vig-os/devcontainer-smoke-test/releases/tags/$VERSION" 2>&1); then
+            if API_OUTPUT=$(gh api "repos/vig-os/devkit-smoke-test/releases/tags/$VERSION" 2>&1); then
               RELEASE_JSON="$API_OUTPUT"
               break
             fi
@@ -262,7 +262,7 @@ jobs:
             exit 1
           done
           if [ -z "$RELEASE_JSON" ]; then
-            echo "ERROR: No downstream release for tag $VERSION on devcontainer-smoke-test"
+            echo "ERROR: No downstream release for tag $VERSION on devkit-smoke-test"
             if [ -n "$LAST_ERROR" ]; then
               echo "$LAST_ERROR"
             fi

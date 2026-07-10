@@ -85,11 +85,11 @@ Deployment history is tracked through:
 If this repository is lost or needs to be rebuilt, recreate it from the
 `vig-os/devcontainer` image/template:
 
-1. Create a new empty repository (for example `vig-os/devcontainer-smoke-test`).
+1. Create a new empty repository (for example `vig-os/devkit-smoke-test`).
 2. Clone it locally and run the installer with smoke-test assets enabled:
 
    ```bash
-   curl -sSf https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --smoke-test .
+   curl -sSfL https://raw.githubusercontent.com/vig-os/devcontainer/main/install.sh | bash -s -- --smoke-test .
    ```
 
 3. Commit the generated files and push to `main`.
