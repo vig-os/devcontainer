@@ -1031,9 +1031,9 @@
             in
             pkgs.dockerTools.buildLayeredImage {
               # Name matches the published repo so the portable testinfra
-              # (#635), which targets ghcr.io/vig-os/devcontainer:<tag>, runs
+              # (#635), which targets ghcr.io/vig-os/devkit:<tag>, runs
               # unchanged against the loaded image under a unique tag.
-              name = "ghcr.io/vig-os/devcontainer";
+              name = "ghcr.io/vig-os/devkit";
               # Disposable discovery tag, matching the CI workflow's
               # INDEX_TAG (.github/workflows/nix-image.yml). The versioned
               # / :latest cutover is handled separately (#639).

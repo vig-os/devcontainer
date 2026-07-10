@@ -7,7 +7,7 @@
 # ===============================================================================
 # Allow TEST_REGISTRY to override REPO for testing (e.g., localhost:5000/test/)
 
-repo := env("TEST_REGISTRY", "ghcr.io/vig-os/devcontainer")
+repo := env("TEST_REGISTRY", "ghcr.io/vig-os/devkit")
 
 # ===============================================================================
 # INFO
