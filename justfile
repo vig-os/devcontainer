@@ -222,7 +222,7 @@ test version="dev":
 #      - Builds and tests container images; creates X.Y.Z tag; pushes versioned GHCR images
 #      - Creates draft GitHub Release; dispatches smoke-test (not :latest yet)
 #      - On failure: automatic rollback and issue creation
-#   7. Wait for devcontainer-smoke-test to publish its final release for X.Y.Z
+#   7. Wait for devkit-smoke-test to publish its final release for X.Y.Z
 #   8. just promote-release X.Y.Z    - Triggers promote-release.yml that:
 #      - Updates GHCR :latest, publishes the draft GitHub Release, merges release PR to main
 #      - Merging to main triggers sync-main-to-dev.yml (PR main -> dev, auto-merge if clean)
