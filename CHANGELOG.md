@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `worktree_pr` PR title format aligned with `pr_create`: no manual issue number in title.
   - Obsolete `.claude/commands/` wrappers deleted (superseded by skills providing `/X` directly).
 
+### Security
+
+- **Accept the openssh 10.3p1 client use-after-free (CVE-2026-60002) in the vulnix register pending the nixpkgs bump to 10.4p1** ([#963](https://github.com/vig-os/devcontainer/issues/963))
+  - The 2026-07-10 nightly security scan went red at the blocking vulnix gate on CVE-2026-60002 (CVSS 7.7 HIGH per MITRE, 9.4 CRITICAL per NVD): a use-after-free in the OpenSSH **client** (`ssh(1)`, not `sshd`) triggered when a malicious/compromised server changes its host key during key re-exchange. `openssh` is in the image closure and the client is reachable, but exploitation requires connecting out to an attacker-controlled SSH server that mutates its host key mid-rekey — bounded by the single-user dev model — so this is a time-boxed risk acceptance, not a dismissal.
+  - Fixed upstream in openssh 10.4p1 (2026-07-06), but the bump has not reached the pinned `nixos-26.05` channel (still 10.3p1, as are `release-26.05`, `staging-26.05`, `master`, `nixpkgs-unstable`); it is merged into the 26.05 staging pipeline (nixpkgs [#539452](https://github.com/NixOS/nixpkgs/pull/539452), backport [#539933](https://github.com/NixOS/nixpkgs/pull/539933)). Added a short-dated `.vulnixignore` exception (expires 2026-07-24) to unblock the gate; the block is dropped and the pin advanced once 10.4p1 lands in `nixos-26.05`.
+
 ## [0.5.0](https://github.com/vig-os/devcontainer/releases/tag/0.5.0) - 2026-07-09
 
 ### Added
