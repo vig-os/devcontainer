@@ -70,10 +70,17 @@ EOF
 
 # ── devc-upgrade honors the .vig-os pin (#854) ────────────────────────────────
 # The scaffolded devc-upgrade recipe used to always curl install.sh from `main`,
-# silently moving a pinned consumer to HEAD. It must read DEVCONTAINER_VERSION
-# from .vig-os and upgrade to THAT generation instead.
+# silently moving a pinned consumer to HEAD. It must read the pin (DEVKIT_VERSION,
+# or legacy DEVCONTAINER_VERSION, #781) from .vig-os and upgrade to THAT
+# generation instead.
 
-@test "devc-upgrade reads DEVCONTAINER_VERSION from .vig-os (#854)" {
+@test "devc-upgrade reads DEVKIT_VERSION from .vig-os (#854, #781)" {
+    run grep -q 'DEVKIT_VERSION' \
+        assets/workspace/.devcontainer/justfile.devc
+    assert_success
+}
+
+@test "devc-upgrade still honors a legacy DEVCONTAINER_VERSION pin (#781)" {
     run grep -q 'DEVCONTAINER_VERSION' \
         assets/workspace/.devcontainer/justfile.devc
     assert_success

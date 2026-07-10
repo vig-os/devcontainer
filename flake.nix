@@ -882,8 +882,8 @@
                     # Bake the devcontainer version into the scaffolded `.vig-os`,
                     # replacing the {{IMAGE_TAG}} placeholder. The Debian build
                     # relied on the IMAGE_TAG build-arg; the reproducible Nix image
-                    # reads the repo's pinned DEVCONTAINER_VERSION, so a scaffolded
-                    # workspace pins the devcontainer release it was built from. #642.
+                    # reads the repo's pinned DEVKIT_VERSION, so a scaffolded
+                    # workspace pins the devkit release it was built from. #642.
                     sed -i "s/{{IMAGE_TAG}}/$imageVersion/g" "$out/root/assets/workspace/.vig-os"
 
                     # Bake the build-time placeholder manifest so
