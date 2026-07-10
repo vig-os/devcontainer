@@ -134,13 +134,13 @@ graph TB
 1. **Preparation** (`prepare-release`): Freeze CHANGELOG on dev, create release branch, reset Unreleased on dev, open draft PR
 2. **Review & Testing**: CI validation, fix issues, publish candidates to verify; mark PR ready and get approvals last (this is the final-release gate, not the candidate gate)
 3. **Candidate Publish** (`publish-candidate`): Build/test/publish `X.Y.Z-rcN` and dispatch cross-repo validation workflow
-4. **Cross-Repo Validation**: Smoke-test runs asynchronously after candidate and final publish; see `docs/CROSS_REPO_RELEASE_GATE.md`. Before promotion, **`promote-release.yml`** requires a published **final** (non-draft, non-prerelease) GitHub Release for the version tag on `devcontainer-smoke-test` so human acceptance downstream is reflected before `:latest` and the draft release are published.
+4. **Cross-Repo Validation**: Smoke-test runs asynchronously after candidate and final publish; see `docs/CROSS_REPO_RELEASE_GATE.md`. Before promotion, **`promote-release.yml`** requires a published **final** (non-draft, non-prerelease) GitHub Release for the version tag on `devkit-smoke-test` so human acceptance downstream is reflected before `:latest` and the draft release are published.
 5. **Finalization & Post-Release**: Publish final image/tag, open a **draft** GitHub Release for human review, then merge PR to `main` and let sync automation update `dev`
 6. **Promote & cleanup**: `promote-release.yml` updates `:latest`, publishes the draft release, merges the release PR, then runs a **best-effort** cleanup job (Refs [#463](https://github.com/vig-os/devcontainer/issues/463), [#583](https://github.com/vig-os/devcontainer/issues/583)): deletes GHCR RC image versions for `${VERSION}-rc*` (per-arch tags included) and matching RC cosign signatures, and deletes remote git RC tags for that base version when **no** GitHub Release is linked. GHCR deletes use **`GITHUB_TOKEN`** with **repo Admin** on the `devcontainer` package (see [Registry and cleanup tokens](#registry-and-cleanup-tokens-upstream)); the cleanup step fails loudly when RC tags remain. The cleanup job uses `continue-on-error`, so promote still completes. **Before this cleanup runs, migrate any consumers still pinned to an RC tag** (via `DEVCONTAINER_VERSION` in their `.vig-os` file) **to the final tag** — see [Phase 5](#phase-5-post-release-cleanup) ([#880](https://github.com/vig-os/devcontainer/issues/880)).
 
 ## Immutable releases, tag rulesets, and forward-fix policy
 
-This section applies to **`vig-os/devcontainer`** (this repo) and, for matching supply-chain posture, **`vig-os/devcontainer-smoke-test`**. It does **not** describe release workflows in consumer projects; those are documented in [Downstream release workflows](DOWNSTREAM_RELEASE.md).
+This section applies to **`vig-os/devcontainer`** (this repo) and, for matching supply-chain posture, **`vig-os/devkit-smoke-test`**. It does **not** describe release workflows in consumer projects; those are documented in [Downstream release workflows](DOWNSTREAM_RELEASE.md).
 
 **GitHub immutability (organization settings):** With **immutable releases** enabled, a **published** GitHub Release (including a published **pre-release**) locks its **linked** tag and release assets. A git tag with **no** linked published release is **not** immutable via that feature. **Tag rulesets** are separate: they can restrict creating, updating, or deleting tags regardless of releases.
 
@@ -150,7 +150,7 @@ This section applies to **`vig-os/devcontainer`** (this repo) and, for matching 
 - **Candidates (`X.Y.Z-rcN`)**: Candidate mode creates and pushes the **git tag**, publishes **GHCR** images (and related signing/attestations), and triggers smoke-test dispatch. It does **not** create a GitHub **Release** object for the RC—only **final** runs use `gh release create` (as a draft). The RC tag is therefore **not** locked by immutable releases until/unless you add a published release or a tag ruleset applies.
 - **Forward-fix (automation)**: Rollback **does not** delete remote tags—this is a **workflow choice** to avoid rewriting history, not GitHub declaring the tag immutable. Recovery is **forward-fix** (new RC, then final when ready). If a retry publishes the same tag, the workflow skips re-creating the tag when it already points at the finalized commit.
 - **Post-promote RC cleanup**: After a successful **`promote-release`** merge to `main`, automation may delete stale **git** RC tags (only when no GitHub Release is associated) and matching **GHCR** RC package versions for that base semver; see step 6 under [Release Phases](#release-phases). Tags tied to a published or draft GitHub Release are not removed by this job.
-- **Repository settings** (manual; not stored in git): enable **immutable releases** and **tag rulesets** as appropriate for `vig-os/devcontainer` and `vig-os/devcontainer-smoke-test`. See GitHub: [Preventing changes to your releases](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/preventing-changes-to-your-releases). Use **RELEASE_APP** in bypass lists only where tag creation requires it.
+- **Repository settings** (manual; not stored in git): enable **immutable releases** and **tag rulesets** as appropriate for `vig-os/devcontainer` and `vig-os/devkit-smoke-test`. See GitHub: [Preventing changes to your releases](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/preventing-changes-to-your-releases). Use **RELEASE_APP** in bypass lists only where tag creation requires it.
 
 ---
 
@@ -575,7 +575,7 @@ Release automation relies on two GitHub Apps with different scopes:
 
 Additional requirement:
 - `COMMIT_APP` must be allowed in branch protection bypass rules for `dev` so sync commits can be pushed by automation.
-- `RELEASE_APP` must be installed on the validation repository (`vig-os/devcontainer-smoke-test`) with Contents read and Actions read/write permissions so `release.yml` can send `repository_dispatch` and `repository-dispatch.yml` can trigger workflow runs there for candidate and final release validation.
+- `RELEASE_APP` must be installed on the validation repository (`vig-os/devkit-smoke-test`) with Contents read and Actions read/write permissions so `release.yml` can send `repository_dispatch` and `repository-dispatch.yml` can trigger workflow runs there for candidate and final release validation.
 
 #### prepare-release.yml (Release Preparation Workflow)
 
@@ -657,7 +657,7 @@ gh workflow run prepare-release.yml --ref dev -f "version=1.0.0" -f "dry-run=tru
    - Updates `latest` only in final mode
    - Verifies manifests exist
 
-5. **smoke-test** (runs after publish) - Triggers `repository_dispatch` on `vig-os/devcontainer-smoke-test` (validation repo)
+5. **smoke-test** (runs after publish) - Triggers `repository_dispatch` on `vig-os/devkit-smoke-test` (validation repo)
    - Candidate and final modes trigger cross-repository validation `repository_dispatch` with `client_payload[tag]=<publish-tag>`
    - Dispatch failures mark the workflow as failed and create a targeted issue
    - Dispatch failures do **not** rollback branch/tag: publish outputs are already public. Only a **published** GitHub Release locks its tag via **immutable releases**; RC tags in this repo have no release object. Automation still avoids tag deletion (forward-fix policy).
@@ -757,7 +757,7 @@ gh workflow run release.yml \
 ## Related documentation
 
 - **[Downstream release workflows](DOWNSTREAM_RELEASE.md)** — release process for **consumer projects** that deploy templates from `assets/workspace/` (prepare-release, release orchestration, extension hook, publish). This guide does not duplicate that material.
-- **[Cross-repo release validation gate](CROSS_REPO_RELEASE_GATE.md)** — contract between this repo’s `release.yml` and `vig-os/devcontainer-smoke-test` (`repository_dispatch`, RC/final gates).
+- **[Cross-repo release validation gate](CROSS_REPO_RELEASE_GATE.md)** — contract between this repo’s `release.yml` and `vig-os/devkit-smoke-test` (`repository_dispatch`, RC/final gates).
 
 ## QMS and Compliance
 

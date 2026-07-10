@@ -29,6 +29,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     key (soft cutover). The docker-compose `.env` interpolation variable is
     unchanged in this slice.
 
+- **Release dispatch targets the renamed `devkit-smoke-test` repo** ([#781](https://github.com/vig-os/devcontainer/issues/781))
+  - The cross-repo smoke-test validation repository was renamed
+    `devcontainer-smoke-test` → `devkit-smoke-test`. `release.yml` /
+    `promote-release.yml` now target the new name for the `repository_dispatch`,
+    the scoped app token, and the downstream published-release gate — GitHub's API
+    does not reliably redirect `POST …/dispatches` across a rename. The smoke-test
+    template mirror (`assets/smoke-test/`) and the release docs are updated to
+    match. The source repository name is unchanged in this slice.
+
 - **Documented `install.sh` one-liners follow redirects (`curl -sSfL`)** ([#781](https://github.com/vig-os/devcontainer/issues/781))
   - Pre-rename hardening: every documented `curl … | bash` install/upgrade
     one-liner (README, `install.sh` help text, `MIGRATION.md`, the smoke-test

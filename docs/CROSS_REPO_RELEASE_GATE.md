@@ -17,7 +17,7 @@ This gate exists to:
 
 ### Triggering
 
-During release publish, the orchestrator sends a `repository_dispatch` event to `vig-os/devcontainer-smoke-test`.
+During release publish, the orchestrator sends a `repository_dispatch` event to `vig-os/devkit-smoke-test`.
 
 Payload contract:
 
@@ -66,7 +66,7 @@ If the validation repository also runs the shipped workspace `release.yml` workf
 
 **`vig-os/devcontainer` `release.yml`:** Dispatches downstream validation during publish but does **not** block on downstream GitHub Release state for RC or final tags. The former validate step that required a published downstream pre-release for the latest RC before finalization was **removed**; it duplicated concerns now owned by promotion.
 
-**`vig-os/devcontainer` `promote-release.yml`:** Before updating GHCR `:latest`, publishing the draft GitHub Release, and merging the release PR, the `validate` job requires a **published** downstream release for the final version tag on `vig-os/devcontainer-smoke-test` that is **not** a draft and **not** a pre-release (`Verify downstream published final release`). For the canonical smoke-test flow, the receiver dispatches downstream `promote-release.yml` after `release.yml` and required release PR checks succeed, which publishes the downstream final release so this gate is satisfied without a manual publish step on the smoke-test repo.
+**`vig-os/devcontainer` `promote-release.yml`:** Before updating GHCR `:latest`, publishing the draft GitHub Release, and merging the release PR, the `validate` job requires a **published** downstream release for the final version tag on `vig-os/devkit-smoke-test` that is **not** a draft and **not** a pre-release (`Verify downstream published final release`). For the canonical smoke-test flow, the receiver dispatches downstream `promote-release.yml` after `release.yml` and required release PR checks succeed, which publishes the downstream final release so this gate is satisfied without a manual publish step on the smoke-test repo.
 
 If promote validation fails, retry after the downstream release is in the expected state; `release.yml` rollback handling applies only to failures within that workflow.
 
@@ -112,9 +112,9 @@ Common failure patterns:
 Examples for manual inspection:
 
 ```bash
-gh -R vig-os/devcontainer-smoke-test run list --workflow repository-dispatch.yml --limit 5
-gh -R vig-os/devcontainer-smoke-test run view <RUN_ID>
-gh -R vig-os/devcontainer-smoke-test release view <TAG>
+gh -R vig-os/devkit-smoke-test run list --workflow repository-dispatch.yml --limit 5
+gh -R vig-os/devkit-smoke-test run view <RUN_ID>
+gh -R vig-os/devkit-smoke-test release view <TAG>
 ```
 
 ## Source of Truth
