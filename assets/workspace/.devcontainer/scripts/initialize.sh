@@ -17,32 +17,45 @@ DEVCONTAINER_DIR="$(dirname "$SCRIPT_DIR")"
 load_vig_os_config() {
     local config_file="$DEVCONTAINER_DIR/../.vig-os"
     local env_file="$DEVCONTAINER_DIR/.env"
+    local devkit_version=""
+    local legacy_version=""
     local devcontainer_version=""
 
     if [[ ! -f "$config_file" ]]; then
         return 0
     fi
 
+    # Prefer the renamed DEVKIT_VERSION key, falling back to the legacy
+    # DEVCONTAINER_VERSION so un-migrated pins keep resolving (#781). Both keys
+    # are captured and preferred after the read, so DEVKIT_VERSION wins
+    # regardless of line order.
     while IFS= read -r line || [[ -n "${line:-}" ]]; do
         [[ -z "${line//[[:space:]]/}" ]] && continue
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
 
         case "$line" in
-            DEVCONTAINER_VERSION=*)
-                devcontainer_version="${line#*=}"
-                devcontainer_version="${devcontainer_version#"${devcontainer_version%%[![:space:]]*}"}"
-                devcontainer_version="${devcontainer_version%"${devcontainer_version##*[![:space:]]}"}"
+            DEVKIT_VERSION=*|DEVCONTAINER_VERSION=*)
+                local key="${line%%=*}"
+                local value="${line#*=}"
+                value="${value#"${value%%[![:space:]]*}"}"
+                value="${value%"${value##*[![:space:]]}"}"
 
-                if [[ "$devcontainer_version" =~ ^\".*\"$ ]]; then
-                    devcontainer_version="${devcontainer_version:1:-1}"
-                elif [[ "$devcontainer_version" =~ ^\'.*\'$ ]]; then
-                    devcontainer_version="${devcontainer_version:1:-1}"
+                if [[ "$value" =~ ^\".*\"$ ]]; then
+                    value="${value:1:-1}"
+                elif [[ "$value" =~ ^\'.*\'$ ]]; then
+                    value="${value:1:-1}"
                 fi
-                break
+
+                if [[ "$key" == "DEVKIT_VERSION" ]]; then
+                    devkit_version="$value"
+                else
+                    legacy_version="$value"
+                fi
                 ;;
         esac
     done < "$config_file"
 
+    devcontainer_version="${devkit_version:-$legacy_version}"
     if [[ -z "$devcontainer_version" ]]; then
         return 0
     fi

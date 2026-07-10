@@ -37,6 +37,25 @@ DEVKIT_FUTURE_FLAG=whatever
 EOF
 }
 
+# The rename (#781) moves the pin key to DEVKIT_VERSION. Write a manifest that
+# carries only the new key to $1.
+_devkit_only_manifest() {
+    cat > "$1" <<'EOF'
+# vig-os devkit configuration
+DEVKIT_VERSION=1.2.3
+EOF
+}
+
+# Write a manifest carrying BOTH keys with different values to $1 — the parser
+# must prefer DEVKIT_VERSION over the legacy DEVCONTAINER_VERSION (#781).
+_dual_key_manifest() {
+    cat > "$1" <<'EOF'
+# vig-os devkit configuration
+DEVCONTAINER_VERSION=0.4.0
+DEVKIT_VERSION=1.2.3
+EOF
+}
+
 # Build a minimal consumer fixture tree at $1 (root with .vig-os written by
 # $2, .devcontainer/scripts with the real initialize.sh/version-check.sh and
 # a stubbed copy-host-user-conf.sh).
@@ -93,4 +112,38 @@ _fixture_tree() {
     full_out="$(bash "$full/.devcontainer/scripts/version-check.sh" config \
         | sed "s|$full|ROOT|")"
     [ "$legacy_out" = "$full_out" ]
+}
+
+@test "initialize.sh reads the renamed DEVKIT_VERSION pin (#781)" {
+    root="$BATS_TEST_TMPDIR/init-devkit"
+    _fixture_tree "$root" _devkit_only_manifest
+    run bash "$root/.devcontainer/scripts/initialize.sh"
+    assert_success
+    run grep -x 'DEVCONTAINER_VERSION=1.2.3' "$root/.devcontainer/.env"
+    assert_success
+}
+
+@test "initialize.sh prefers DEVKIT_VERSION over legacy pin (#781)" {
+    root="$BATS_TEST_TMPDIR/init-dual"
+    _fixture_tree "$root" _dual_key_manifest
+    run bash "$root/.devcontainer/scripts/initialize.sh"
+    assert_success
+    run grep -x 'DEVCONTAINER_VERSION=1.2.3' "$root/.devcontainer/.env"
+    assert_success
+}
+
+@test "version-check.sh reads the renamed DEVKIT_VERSION pin (#781)" {
+    root="$BATS_TEST_TMPDIR/vc-devkit"
+    _fixture_tree "$root" _devkit_only_manifest
+    run bash "$root/.devcontainer/scripts/version-check.sh" config
+    assert_success
+    assert_output --partial "Current ver:    1.2.3"
+}
+
+@test "version-check.sh prefers DEVKIT_VERSION over legacy pin (#781)" {
+    root="$BATS_TEST_TMPDIR/vc-dual"
+    _fixture_tree "$root" _dual_key_manifest
+    run bash "$root/.devcontainer/scripts/version-check.sh" config
+    assert_success
+    assert_output --partial "Current ver:    1.2.3"
 }
