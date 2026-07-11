@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-23T22:58:38Z
-updated: 2026-06-23T06:56:40Z
+updated: 2026-07-08T08:14:07Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/162
-comments: 1
+url: https://github.com/vig-os/devkit/issues/162
+comments: 2
 labels: refactor
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:56.625Z
+synced: 2026-07-11T13:34:26.317Z
 ---
 
-# [Issue 162]: [[REFACTOR] Replace hand-rolled CI polling in worktree_ci-check with gh pr checks --watch](https://github.com/vig-os/devcontainer/issues/162)
+# [Issue 162]: [[REFACTOR] Replace hand-rolled CI polling in worktree_ci-check with gh pr checks --watch](https://github.com/vig-os/devkit/issues/162)
 
 ### Description
 
@@ -82,4 +82,12 @@ Token cost concern: the current polling approach generates ~5-10 `gh pr checks` 
 _Posted on June 23, 2026 at 06:56 AM_
 
 Touches the worktree pipeline being migrated in #625: #626 moves the skill paths and #627 swaps `cursor-agent` → `claude`. The `gh pr checks --watch` refactor is a good companion to land alongside the CLI swap. Coordinate.
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:14 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl) — valid but dormant, no work in progress since the Nix migration. Reopen or refile fresh if picked up.
 

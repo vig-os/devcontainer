@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-03-27T10:34:16Z
-updated: 2026-03-27T11:15:57Z
+updated: 2026-07-08T08:13:43Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/465
-comments: 0
+url: https://github.com/vig-os/devkit/issues/465
+comments: 1
 labels: none
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-03-28T04:26:12.916Z
+synced: 2026-07-11T13:34:20.770Z
 ---
 
-# [Issue 465]: [feat(security): enforce SSH key security policy in devc-remote](https://github.com/vig-os/devcontainer/issues/465)
+# [Issue 465]: [feat(security): enforce SSH key security policy in devc-remote](https://github.com/vig-os/devkit/issues/465)
 
 ## Summary
 
@@ -168,3 +168,11 @@ PubkeyAcceptedAlgorithms sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@opens
 
 - #464 (secure secret resolution — complementary)
 - #70 (parent: remote devcontainer orchestration)
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:13 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl). The remote-devcontainer / `devc-remote` / Tailscale initiative predates the Nix + Claude-native migration (#625) and has had no activity since Feb–Mar 2026. If remote provisioning is wanted again it will be re-planned from scratch after the devkit rename (#781). Reopen/refile if revived.
+

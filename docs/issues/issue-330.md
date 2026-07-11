@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-03-16T16:54:15Z
-updated: 2026-03-16T16:54:15Z
+updated: 2026-07-08T08:14:14Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/330
-comments: 0
+url: https://github.com/vig-os/devkit/issues/330
+comments: 1
 labels: feature, priority:medium, area:ci, area:workflow, effort:medium, semver:minor
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-03-17T04:24:04.826Z
+synced: 2026-07-11T13:34:21.838Z
 ---
 
-# [Issue 330]: [[FEATURE] Allow downstream release extension to pass assets and release notes to publish workflow](https://github.com/vig-os/devcontainer/issues/330)
+# [Issue 330]: [[FEATURE] Allow downstream release extension to pass assets and release notes to publish workflow](https://github.com/vig-os/devkit/issues/330)
 
 ## Description
 
@@ -77,3 +77,11 @@ This is a backward-compatible enhancement to downstream release customization bo
 ## Changelog Category
 
 Changed
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:14 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl) — valid but dormant, no work in progress since the Nix migration. Reopen or refile fresh if picked up.
+

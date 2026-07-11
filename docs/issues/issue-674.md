@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-24T10:59:40Z
-updated: 2026-06-24T10:59:40Z
+updated: 2026-06-30T07:42:01Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/674
-comments: 0
+url: https://github.com/vig-os/devkit/issues/674
+comments: 1
 labels: chore, priority:medium, area:ci, area:image
 assignees: none
 milestone: none
 projects: none
 parent: 625
 children: none
-synced: 2026-06-26T06:17:58.817Z
+synced: 2026-07-11T13:34:08.389Z
 ---
 
-# [Issue 674]: [[CHORE] Nix flake quality gates: nixfmt formatter + nix flake check in CI](https://github.com/vig-os/devcontainer/issues/674)
+# [Issue 674]: [[CHORE] Nix flake quality gates: nixfmt formatter + nix flake check in CI](https://github.com/vig-os/devkit/issues/674)
 
 ### Chore Type
 
@@ -66,4 +66,12 @@ Medium
 ### Changelog Category
 
 Added
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on June 30, 2026 at 07:42 AM_
+
+Resolved by #680 (8e81d98) on the Nix-migration branch (epic #625, PR #670). Closing as part of post-merge backlog hygiene (#677).
 

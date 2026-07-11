@@ -1,21 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-20T13:03:35Z
-updated: 2026-02-24T19:00:54Z
+updated: 2026-07-08T08:13:55Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/113
-comments: 4
+url: https://github.com/vig-os/devkit/issues/113
+comments: 6
 labels: feature, area:workflow, area:docs, effort:large, semver:minor
 assignees: gerchowl
 milestone: none
 projects: none
-relationship: none
-synced: 2026-02-25T04:25:59.112Z
+parent: none
+children: none
+synced: 2026-07-11T13:34:28.223Z
 ---
 
-# [Issue 113]: [[FEATURE] Declarative diagram-as-code tooling with model-renderer separation](https://github.com/vig-os/devcontainer/issues/113)
+# [Issue 113]: [[FEATURE] Declarative diagram-as-code tooling with model-renderer separation](https://github.com/vig-os/devkit/issues/113)
 
 ### Description
 
@@ -174,4 +175,20 @@ These layouts would stress-test each tool's **grouping**, **parallel node placem
 - **Structurizr**: Model-view separation means the same model can emit different view layouts — test multiple views from one `.dsl`
 
 Refs: #113
+
+---
+
+# [Comment #5]() by [c-vigo]()
+
+_Posted on July 7, 2026 at 09:32 AM_
+
+@gerchowl proposing to close: big-idea issue with no traction since February; nothing in the current roadmap (0.4.1 fallout fixes → 0.5 scaffold hardening → 1.0 devkit rename) touches it. If revived it should start as a design doc under docs/rfcs/. **Branch to prune:** `feature/113-diagram-as-code-tooling` (no open PR).
+
+---
+
+# [Comment #6]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:13 AM_
+
+Dormant since Feb 2026 with no traction; closing as part of an agreed backlog cleanup (with @gerchowl). Reopen/refile if it becomes relevant.
 

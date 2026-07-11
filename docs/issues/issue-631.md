@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T06:54:02Z
-updated: 2026-06-23T06:55:20Z
+updated: 2026-07-01T11:19:03Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/631
-comments: 0
+url: https://github.com/vig-os/devkit/issues/631
+comments: 1
 labels: feature, area:ci, area:image
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:51.483Z
+synced: 2026-07-11T13:34:14.596Z
 ---
 
-# [Issue 631]: [T1.1 — De-duplicate the flake into the real SSoT](https://github.com/vig-os/devcontainer/issues/631)
+# [Issue 631]: [T1.1 — De-duplicate the flake into the real SSoT](https://github.com/vig-os/devkit/issues/631)
 
 Tracking: #625
 
@@ -88,4 +88,12 @@ lays the reusable flake outputs the rest of the migration builds on.
 - **#545** (bake agent-CLI toolkit) — its tool list (rg/fd/bat/eza/delta/lazygit/zoxide/
   starship/freeze/expect/nvim + claude) should be **absorbed into `devTools`** rather than
   apt/curl-installed; the `EXPECTED_VERSIONS` drift #27 calls out is what this issue removes.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 11:19 AM_
+
+Delivered on `dev` via the Nix-migration epic PR #670 (merged 2026-06-30). `flake.nix` is the single SSoT: one `devTools` list with a dev-shell/image parity test (`tests/test_flake_devshell.py`), pinned nixpkgs + `nixpkgs-unstable` overlay, `overlays.default`, and Cachix wired into CI. Closing as complete — this stayed open only because the epic merged to `dev` (not `main`) and these T/C-track issues carry `Tracking: #625` but were never linked as GitHub sub-issues, so sync-issues auto-close never fired (tracked by #677). Refs #625.
 

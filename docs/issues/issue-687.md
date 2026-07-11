@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-24T14:08:10Z
-updated: 2026-06-24T14:08:10Z
+updated: 2026-07-01T11:17:52Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/687
-comments: 0
+url: https://github.com/vig-os/devkit/issues/687
+comments: 1
 labels: bug, priority:high, area:workspace, effort:small, semver:patch
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-26T06:17:56.870Z
+synced: 2026-07-11T13:34:05.949Z
 ---
 
-# [Issue 687]: [[BUG] just test fails on NixOS hosts: #!/bin/bash shebang in host scripts (install.sh, initialize.sh, version-check.sh)](https://github.com/vig-os/devcontainer/issues/687)
+# [Issue 687]: [[BUG] just test fails on NixOS hosts: #!/bin/bash shebang in host scripts (install.sh, initialize.sh, version-check.sh)](https://github.com/vig-os/devkit/issues/687)
 
 ## Description
 
@@ -95,4 +95,12 @@ Run the scripts through an explicit interpreter, e.g. `bash install.sh ...`, or 
 ## Changelog Category
 
 Fixed
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 11:17 AM_
+
+Resolved on `dev` by PR #690 (`fix(setup): use portable #!/usr/bin/env bash in host scripts`). `install.sh`, `initialize.sh`, and `version-check.sh` now use `#!/usr/bin/env bash`, with a bats assertion enforcing the portable shebang.
 

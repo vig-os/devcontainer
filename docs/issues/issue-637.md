@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T06:54:12Z
-updated: 2026-06-23T06:54:58Z
+updated: 2026-07-01T11:19:15Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/637
-comments: 0
+url: https://github.com/vig-os/devkit/issues/637
+comments: 1
 labels: docs, area:image, security
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:48.662Z
+synced: 2026-07-11T13:34:12.326Z
 ---
 
-# [Issue 637]: [T3.1 — vulnix + SBOM CVE scanning; re-author security policy](https://github.com/vig-os/devcontainer/issues/637)
+# [Issue 637]: [T3.1 — vulnix + SBOM CVE scanning; re-author security policy](https://github.com/vig-os/devkit/issues/637)
 
 Tracking: #625
 
@@ -89,4 +89,12 @@ replaced with `vulnix` (a nixpkgs-native CVE scanner) plus SBOM-based scanning.
   overlaps this thread; resolve together.
 - **#27** (Adopt Nix/devenv) — provides the SBOM / IEC 62304 / air-gapped framing this issue
   realizes (`nix derivation show`, `nix flake archive`).
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 11:19 AM_
+
+Delivered on `dev` via the Nix-migration epic PR #670 (merged 2026-06-30) + PR #660 (commit 343234a0). Nightly `security-scan.yml` runs vulnix (primary) + Trivy CycloneDX SBOM; `vulnix_gate.py` is a blocking gate over `.vulnixignore`; `docs/CONTAINER_SECURITY.md` re-authored. (Its CVE gate feeds the #639 cutover.) Closing as complete — this stayed open only because the epic merged to `dev` (not `main`) and these T/C-track issues carry `Tracking: #625` but were never linked as GitHub sub-issues, so sync-issues auto-close never fired (tracked by #677). Refs #625.
 

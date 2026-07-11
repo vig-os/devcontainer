@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-24T12:27:01Z
-updated: 2026-06-24T12:27:01Z
+updated: 2026-06-30T07:42:08Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/683
-comments: 0
+url: https://github.com/vig-os/devkit/issues/683
+comments: 1
 labels: bug, priority:high, area:workspace, effort:medium, semver:patch
 assignees: none
 milestone: none
 projects: none
 parent: 625
 children: none
-synced: 2026-06-26T06:17:57.511Z
+synced: 2026-07-11T13:34:06.736Z
 ---
 
-# [Issue 683]: [[BUG] just init fails on NixOS hosts: uv downloads a generic CPython NixOS can't execute](https://github.com/vig-os/devcontainer/issues/683)
+# [Issue 683]: [[BUG] just init fails on NixOS hosts: uv downloads a generic CPython NixOS can't execute](https://github.com/vig-os/devkit/issues/683)
 
 ## Description
 
@@ -79,3 +79,11 @@ Have the dev-shell use a Nix-provided interpreter instead of (or in addition to)
 - [ ] TDD compliance (see .claude/skills/tdd/SKILL.md)
 
 **Changelog Category:** Fixed
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on June 30, 2026 at 07:42 AM_
+
+Resolved by #684 (c9e119b) on the Nix-migration branch (epic #625, PR #670). Closing as part of post-merge backlog hygiene (#677).
+

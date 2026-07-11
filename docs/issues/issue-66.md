@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-18T00:32:43Z
-updated: 2026-06-23T06:56:44Z
+updated: 2026-07-08T08:14:04Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/66
-comments: 1
+url: https://github.com/vig-os/devkit/issues/66
+comments: 2
 labels: feature, priority:low, area:workspace, effort:medium, semver:minor
 assignees: none
-milestone: 0.4
+milestone: Backlog
 projects: none
 parent: 71
 children: none
-synced: 2026-06-23T08:02:59.031Z
+synced: 2026-07-11T13:34:30.661Z
 ---
 
-# [Issue 66]: [[FEATURE] Improve workspace init: global just command and better non-empty error output](https://github.com/vig-os/devcontainer/issues/66)
+# [Issue 66]: [[FEATURE] Improve workspace init: global just command and better non-empty error output](https://github.com/vig-os/devkit/issues/66)
 
 ### Description
 
@@ -67,4 +67,12 @@ Added
 _Posted on June 23, 2026 at 06:56 AM_
 
 Same install/init entrypoint as #641 (part of #625), which adds a `devcontainer | direnv | both` mode picker. Land the mode picker and these init UX improvements together.
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:14 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl) — valid but dormant, no work in progress since the Nix migration. Reopen or refile fresh if picked up.
 

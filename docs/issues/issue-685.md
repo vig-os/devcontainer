@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-24T12:53:46Z
-updated: 2026-06-24T12:53:46Z
+updated: 2026-06-30T07:42:10Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/685
-comments: 0
+url: https://github.com/vig-os/devkit/issues/685
+comments: 1
 labels: bug, priority:high, area:workspace, semver:patch
 assignees: none
 milestone: none
 projects: none
 parent: 625
 children: none
-synced: 2026-06-26T06:17:57.194Z
+synced: 2026-07-11T13:34:06.375Z
 ---
 
-# [Issue 685]: [[BUG] just build fails: missing containers policy.json when podman comes from the dev-shell (NixOS)](https://github.com/vig-os/devcontainer/issues/685)
+# [Issue 685]: [[BUG] just build fails: missing containers policy.json when podman comes from the dev-shell (NixOS)](https://github.com/vig-os/devkit/issues/685)
 
 ## Description
 
@@ -78,4 +78,12 @@ printf '{ "default": [ { "type": "insecureAcceptAnything" } ] }\n' > ~/.config/c
 ```
 
 Refs: #625
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on June 30, 2026 at 07:42 AM_
+
+Resolved by #686 (0cafe29) on the Nix-migration branch (epic #625, PR #670). Closing as part of post-merge backlog hygiene (#677).
 

@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-24T10:59:44Z
-updated: 2026-06-24T10:59:44Z
+updated: 2026-06-30T07:42:04Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/676
-comments: 0
+url: https://github.com/vig-os/devkit/issues/676
+comments: 1
 labels: docs, priority:medium
 assignees: none
 milestone: none
 projects: none
 parent: 625
 children: none
-synced: 2026-06-26T06:17:58.167Z
+synced: 2026-07-11T13:34:07.489Z
 ---
 
-# [Issue 676]: [[DOCS] Reconcile the CHANGELOG ## Unreleased section to the Nix end-state](https://github.com/vig-os/devcontainer/issues/676)
+# [Issue 676]: [[DOCS] Reconcile the CHANGELOG ## Unreleased section to the Nix end-state](https://github.com/vig-os/devkit/issues/676)
 
 ### Description
 
@@ -62,4 +62,12 @@ No changelog needed
 
 Part of the Nix migration epic #625. Should be done last, after the sibling
 follow-up PRs have landed their own Unreleased entries.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on June 30, 2026 at 07:42 AM_
+
+Resolved by #682 (abc3a00) on the Nix-migration branch (epic #625, PR #670). Closing as part of post-merge backlog hygiene (#677).
 

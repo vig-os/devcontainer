@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T05:39:25Z
-updated: 2026-06-23T05:43:44Z
+updated: 2026-07-02T11:41:43Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/623
-comments: 0
+url: https://github.com/vig-os/devkit/issues/623
+comments: 1
 labels: bug, area:ci, semver:patch
 assignees: c-vigo
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T06:15:16.658Z
+synced: 2026-07-11T13:34:17.327Z
 ---
 
-# [Issue 623]: [promote-release cleanup deletes RC tag but fails to delete the RC draft pre-release (orphans it permanently)](https://github.com/vig-os/devcontainer/issues/623)
+# [Issue 623]: [promote-release cleanup deletes RC tag but fails to delete the RC draft pre-release (orphans it permanently)](https://github.com/vig-os/devkit/issues/623)
 
 ## Description
 
@@ -85,4 +85,12 @@ Clean up the two already-stranded drafts (`0.3.7-rc1`, `0.3.8-rc1`) in the smoke
 ## Changelog Category
 
 Fixed
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 2, 2026 at 11:41 AM_
+
+Fixed by #601 + #624 (both on `dev`). Cleanup deletes RC draft pre-releases by release id (seeded from the list-releases endpoint, so orphaned drafts are reclaimed), gates git-tag removal on the release still being attached, and fails loudly if any RC draft survives — in both the upstream and scaffold `promote-release.yml`.
 

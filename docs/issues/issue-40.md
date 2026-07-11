@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-02T08:56:09Z
-updated: 2026-06-24T16:19:13Z
+updated: 2026-07-03T11:22:10Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/40
-comments: 4
+url: https://github.com/vig-os/devkit/issues/40
+comments: 5
 labels: feature, priority:backlog, area:workflow
 assignees: none
 milestone: Backlog
 projects: none
 parent: none
 children: none
-synced: 2026-06-26T06:18:00.511Z
+synced: 2026-07-11T13:34:31.041Z
 ---
 
-# [Issue 40]: [[DISCUSSION] Migration to prek](https://github.com/vig-os/devcontainer/issues/40)
+# [Issue 40]: [[DISCUSSION] Migration to prek](https://github.com/vig-os/devkit/issues/40)
 
 Should we migrate from `pre-commit` to [`prek`](https://github.com/j178/prek)?
 ---
@@ -82,4 +82,12 @@ runner **after** #697/#698 land," with a concrete spike (package `prek` from the
 flake, run the suite, compare wall-clock and behaviour). Could be pulled under
 #625 if we want it in the migration epic.
 
+
+---
+
+# [Comment #5]() by [c-vigo]()
+
+_Posted on July 3, 2026 at 11:22 AM_
+
+Closed in #791 
 

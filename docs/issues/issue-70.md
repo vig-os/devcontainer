@@ -1,21 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-18T01:45:43Z
-updated: 2026-03-08T10:46:57Z
+updated: 2026-07-08T08:13:18Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/70
-comments: 3
+url: https://github.com/vig-os/devkit/issues/70
+comments: 4
 labels: feature, priority:low, area:workspace, effort:large, semver:minor
 assignees: gerchowl
 milestone: Backlog
 projects: none
-relationship: none
-synced: 2026-03-09T04:23:41.703Z
+parent: none
+children: 85, 152, 153, 204, 206, 208
+synced: 2026-07-11T13:34:30.216Z
 ---
 
-# [Issue 70]: [[FEATURE] Remote devcontainer orchestration via just recipe](https://github.com/vig-os/devcontainer/issues/70)
+# [Issue 70]: [[FEATURE] Remote devcontainer orchestration via just recipe](https://github.com/vig-os/devkit/issues/70)
 
 ### Description
 
@@ -556,4 +557,12 @@ For future reference, other auth-related vars from the binary:
 Replace `ANTHROPIC_API_KEY` injection with `CLAUDE_CODE_OAUTH_TOKEN` injection. This lets users authenticate with their existing subscription — no Console API key needed, no extra billing. The `setup-token` flow is the official Anthropic-supported path for headless auth.
 
 Next step: manually test `claude setup-token` to confirm output format, then redesign `setup-claude.sh` and `inject_claude_auth()`.
+
+---
+
+# [Comment #4]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:13 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl). The remote-devcontainer / `devc-remote` / Tailscale initiative predates the Nix + Claude-native migration (#625) and has had no activity since Feb–Mar 2026. If remote provisioning is wanted again it will be re-planned from scratch after the devkit rename (#781). Reopen/refile if revived.
 

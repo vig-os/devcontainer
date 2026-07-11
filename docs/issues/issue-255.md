@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-03-11T07:37:14Z
-updated: 2026-06-24T11:00:44Z
+updated: 2026-06-30T07:42:06Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/255
-comments: 1
+url: https://github.com/vig-os/devkit/issues/255
+comments: 2
 labels: docs, priority:low, effort:small, area:docs
 assignees: none
 milestone: none
 projects: none
 parent: 625
 children: none
-synced: 2026-06-26T06:18:00.169Z
+synced: 2026-07-11T13:34:22.189Z
 ---
 
-# [Issue 255]: [[DOCS] Consolidated docs/NIX.md (flake architecture + onboarding)](https://github.com/vig-os/devcontainer/issues/255)
+# [Issue 255]: [[DOCS] Consolidated docs/NIX.md (flake architecture + onboarding)](https://github.com/vig-os/devkit/issues/255)
 
 ### Description
 
@@ -73,4 +73,12 @@ scope (done in #633).
 _Posted on June 23, 2026 at 06:56 AM_
 
 Superseded by #633 (part of #625), which switches `.envrc` to nix-direnv and documents the clone → `direnv allow` flow + the Cachix substituter in `docs/templates/CONTRIBUTE.md.j2`, plus enabling the `nix-command`/`flakes` experimental features. Will close when #633 lands.
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on June 30, 2026 at 07:42 AM_
+
+Resolved by #681 (40f78e6) on the Nix-migration branch (epic #625, PR #670). Closing as part of post-merge backlog hygiene (#677).
 

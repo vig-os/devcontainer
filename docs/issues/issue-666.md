@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T20:46:21Z
-updated: 2026-06-23T20:46:21Z
+updated: 2026-07-01T11:19:18Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/666
-comments: 0
+url: https://github.com/vig-os/devkit/issues/666
+comments: 1
 labels: none
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-24T06:13:08.176Z
+synced: 2026-07-11T13:34:09.574Z
 ---
 
-# [Issue 666]: [T2.4 — Nix image toolchain parity: pass the full testinfra suite](https://github.com/vig-os/devcontainer/issues/666)
+# [Issue 666]: [T2.4 — Nix image toolchain parity: pass the full testinfra suite](https://github.com/vig-os/devkit/issues/666)
 
 ## Context
 
@@ -51,3 +51,11 @@ suite was made portable (#635), but the image still **fails 32 of 63 `tests/test
 - No regression to the dev-shell (`nix develop`) or the multi-arch build.
 
 Refs: #625, #634, #635
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 11:19 AM_
+
+Delivered on `dev` via the Nix-migration epic PR #670 (merged 2026-06-30) + PR #667 (commit 142e405f). The Nix image passes the full `test_image.py` suite (63/63) and `nix-image.yml` is a real gate (not `continue-on-error`). Closing as complete — this stayed open only because the epic merged to `dev` (not `main`) and these T/C-track issues carry `Tracking: #625` but were never linked as GitHub sub-issues, so sync-issues auto-close never fired (tracked by #677). Refs #625.
+

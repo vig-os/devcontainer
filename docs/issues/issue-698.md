@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-24T16:18:52Z
-updated: 2026-06-24T17:01:21Z
+updated: 2026-06-30T07:42:17Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/698
-comments: 1
+url: https://github.com/vig-os/devkit/issues/698
+comments: 2
 labels: bug, priority:medium, area:workflow, semver:patch
 assignees: c-vigo
 milestone: none
 projects: none
 parent: 625
 children: none
-synced: 2026-06-26T06:17:54.782Z
+synced: 2026-07-11T13:34:03.620Z
 ---
 
-# [Issue 698]: [[BUG] pre-commit: make the pymarkdown hook (pyjson5 C-extension / libstdc++) run on NixOS](https://github.com/vig-os/devcontainer/issues/698)
+# [Issue 698]: [[BUG] pre-commit: make the pymarkdown hook (pyjson5 C-extension / libstdc++) run on NixOS](https://github.com/vig-os/devkit/issues/698)
 
 ## Description
 
@@ -89,4 +89,12 @@ Refs: #625
 _Posted on June 24, 2026 at 05:01 PM_
 
 Fixed and merged into the epic branch `feature/625-nix-claude-migration` via #700 (merge `77a8f4a`). Verified in the dev-shell: `pre-commit run pymarkdown` passes (the `pyjson5` C extension resolves `libstdc++` via the dev-shell `LD_LIBRARY_PATH`). Left open to match the epic's sub-issue convention (cf. #695).
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on June 30, 2026 at 07:42 AM_
+
+Resolved by #700 (c59f932) on the Nix-migration branch (epic #625, PR #670). Closing as part of post-merge backlog hygiene (#677).
 

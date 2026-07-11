@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T06:54:10Z
-updated: 2026-06-23T06:55:03Z
+updated: 2026-07-01T11:19:13Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/636
-comments: 0
+url: https://github.com/vig-os/devkit/issues/636
+comments: 1
 labels: area:ci, area:image
-assignees: none
+assignees: c-vigo
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:49.136Z
+synced: 2026-07-11T13:34:12.683Z
 ---
 
-# [Issue 636]: [T2.3 — Multi-arch Nix image (amd64 + arm64)](https://github.com/vig-os/devcontainer/issues/636)
+# [Issue 636]: [T2.3 — Multi-arch Nix image (amd64 + arm64)](https://github.com/vig-os/devkit/issues/636)
 
 Tracking: #625
 
@@ -66,4 +66,12 @@ and linux/arm64, built natively to avoid slow/brittle cross-compilation or emula
 
 - Verify the index digest shape matches what downstream digest-pinning expects (top-level
   index, not a single-arch manifest).
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 11:19 AM_
+
+Delivered on `dev` via the Nix-migration epic PR #670 (merged 2026-06-30) + PR #659 (commit a31e55e5). `nix-image.yml` builds native amd64 + arm64 on a runner matrix, with per-arch tags and an `imagetools create` index. Closing as complete — this stayed open only because the epic merged to `dev` (not `main`) and these T/C-track issues carry `Tracking: #625` but were never linked as GitHub sub-issues, so sync-issues auto-close never fired (tracked by #677). Refs #625.
 

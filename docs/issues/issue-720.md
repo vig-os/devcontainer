@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-26T08:14:20Z
-updated: 2026-06-26T08:14:20Z
+updated: 2026-07-03T07:46:36Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/720
-comments: 0
+url: https://github.com/vig-os/devkit/issues/720
+comments: 1
 labels: priority:low, area:ci
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-27T05:58:59.204Z
+synced: 2026-07-11T13:33:58.953Z
 ---
 
-# [Issue 720]: [ci: automate the uv version sync between flake.nix and setup-env](https://github.com/vig-os/devcontainer/issues/720)
+# [Issue 720]: [ci: automate the uv version sync between flake.nix and setup-env](https://github.com/vig-os/devkit/issues/720)
 
 ## Context
 
@@ -32,3 +32,11 @@ If the nixpkgs `uv` advances and these are not bumped together, the download-met
 - Derive the version from a single source (e.g. read it from the nixpkgs `uv` at build time), or add a Renovate rule / CI check that keeps the two pins in sync.
 
 Refs: #625
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 3, 2026 at 07:46 AM_
+
+Resolved by #801 (merged to `dev`). Reframed from 'automate the uv version sync' to eliminating the drift at its root: CI now provisions every job from the flake and the second, hardcoded `uv` pin in `setup-env` was deleted, so the version flows from a single source (`flake.lock` via `pkgs.uv.version`).
+

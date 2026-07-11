@@ -1,21 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-21T21:57:13Z
-updated: 2026-02-23T23:48:00Z
+updated: 2026-07-08T08:13:57Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/145
-comments: 4
+url: https://github.com/vig-os/devkit/issues/145
+comments: 5
 labels: feature, area:workflow, effort:large, semver:minor
 assignees: none
 milestone: none
 projects: none
-relationship: none
-synced: 2026-02-24T04:24:10.279Z
+parent: none
+children: 143, 157, 159, 174
+synced: 2026-07-11T13:34:27.437Z
 ---
 
-# [Issue 145]: [[FEATURE] Rewrite gh-issues dashboard — Polars + Typer + responsive layout](https://github.com/vig-os/devcontainer/issues/145)
+# [Issue 145]: [[FEATURE] Rewrite gh-issues dashboard — Polars + Typer + responsive layout](https://github.com/vig-os/devkit/issues/145)
 
 ### Description
 
@@ -278,4 +279,12 @@ Recommend path 1 first (YAGNI), with the architecture designed to support path 2
 - [Toad](https://github.com/batrachianai/toad) — Textual-based agent TUI by Will McGugan
 - [Textual testing docs](https://textual.textualize.io/guide/testing/)
 - [Agent Client Protocol](https://agentclientprotocol.com/overview/introduction) — protocol Toad uses for multi-agent support
+
+---
+
+# [Comment #5]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:13 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl) — valid but dormant, no work in progress since the Nix migration. Reopen or refile fresh if picked up.
 

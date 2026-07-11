@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-22T09:52:12Z
-updated: 2026-06-23T06:56:42Z
+updated: 2026-07-08T08:14:02Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/157
-comments: 4
+url: https://github.com/vig-os/devkit/issues/157
+comments: 6
 labels: feature
 assignees: gerchowl
 milestone: none
 projects: none
 parent: 145
 children: none
-synced: 2026-06-23T08:02:57.077Z
+synced: 2026-07-11T13:34:26.696Z
 ---
 
-# [Issue 157]: [[FEATURE] Show pipeline phase (progress) per issue in gh-issues dashboard](https://github.com/vig-os/devcontainer/issues/157)
+# [Issue 157]: [[FEATURE] Show pipeline phase (progress) per issue in gh-issues dashboard](https://github.com/vig-os/devkit/issues/157)
 
 ### Description
 
@@ -260,4 +260,20 @@ Refs: #157
 _Posted on June 23, 2026 at 06:56 AM_
 
 Built on the worktree pipeline migrated in #625 (#626 paths, #627 CLI swap). Coordinate so the dashboard reflects the new paths/CLI.
+
+---
+
+# [Comment #5]() by [c-vigo]()
+
+_Posted on July 7, 2026 at 09:32 AM_
+
+@gerchowl proposing to close: feature request against the current gh-issues dashboard, which #145 proposes to rewrite wholesale — if the rewrite happens this should be folded into #145's spec instead of standing alone. Dormant since February. No branch to prune.
+
+---
+
+# [Comment #6]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:14 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl) — valid but dormant, no work in progress since the Nix migration. Reopen or refile fresh if picked up.
 

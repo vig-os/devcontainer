@@ -1,21 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-22T09:20:59Z
-updated: 2026-02-22T09:53:29Z
+updated: 2026-07-08T08:13:25Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/152
-comments: 3
+url: https://github.com/vig-os/devkit/issues/152
+comments: 4
 labels: feature, area:workspace, effort:medium, semver:minor
 assignees: gerchowl
 milestone: none
 projects: none
-relationship: none
-synced: 2026-02-23T04:30:08.054Z
+parent: 70
+children: 202
+synced: 2026-07-11T13:34:27.107Z
 ---
 
-# [Issue 152]: [[FEATURE] devc-remote.sh — bash orchestrator for remote devcontainer](https://github.com/vig-os/devcontainer/issues/152)
+# [Issue 152]: [[FEATURE] devc-remote.sh — bash orchestrator for remote devcontainer](https://github.com/vig-os/devkit/issues/152)
 
 ### Description
 
@@ -221,4 +222,12 @@ _Posted on February 22, 2026 at 09:53 AM_
 - Verify: BATS tests pass, lint pass (precommit hadolint skipped — Docker daemon not running locally)
 - PR: https://github.com/vig-os/devcontainer/pull/156
 - CI: PR Title Check pass (full CI runs on dev/release/main targets; this PR targets feature/70-remote-devc-orchestration)
+
+---
+
+# [Comment #4]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:13 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl). The remote-devcontainer / `devc-remote` / Tailscale initiative predates the Nix + Claude-native migration (#625) and has had no activity since Feb–Mar 2026. If remote provisioning is wanted again it will be re-planned from scratch after the devkit rename (#781). Reopen/refile if revived.
 

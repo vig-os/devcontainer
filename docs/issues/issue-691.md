@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-24T14:37:01Z
-updated: 2026-06-24T15:20:53Z
+updated: 2026-07-01T14:36:00Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/691
-comments: 0
+url: https://github.com/vig-os/devkit/issues/691
+comments: 1
 labels: bug, priority:low, area:ci, effort:small, semver:patch
 assignees: c-vigo
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-26T06:17:56.202Z
+synced: 2026-07-11T13:34:05.159Z
 ---
 
-# [Issue 691]: [[BUG] pytest 10 will break install-script tests: class-scoped fixture defined as instance method](https://github.com/vig-os/devcontainer/issues/691)
+# [Issue 691]: [[BUG] pytest 10 will break install-script tests: class-scoped fixture defined as instance method](https://github.com/vig-os/devkit/issues/691)
 
 ## Description
 
@@ -92,4 +92,12 @@ TEST_CONTAINER_TAG=dev uv run pytest tests/test_install_script.py \
 ## Changelog Category
 
 Fixed
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 02:36 PM_
+
+Already resolved on `dev`. `tests/test_install_script.py` now decorates `install_workspace` with `@staticmethod` under `@pytest.fixture(scope="class")` (landed in `d99765c6`, fix(ci): make install_workspace a staticmethod fixture), so the class-scoped-instance-method pattern is gone and the suite is pytest-10-safe. Closing as done.
 

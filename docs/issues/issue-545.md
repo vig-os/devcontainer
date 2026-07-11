@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-05-15T13:50:24Z
-updated: 2026-06-23T06:56:33Z
+updated: 2026-07-02T11:41:39Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/545
-comments: 1
+url: https://github.com/vig-os/devkit/issues/545
+comments: 2
 labels: feature, priority:medium, area:image, semver:minor
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:54.564Z
+synced: 2026-07-11T13:34:18.393Z
 ---
 
-# [Issue 545]: [[FEATURE] Bake agent-CLI toolkit + Claude Code into image (rg/fd/bat/eza/delta/lazygit/zoxide/starship/freeze/expect/nvim + IS_SANDBOX=1)](https://github.com/vig-os/devcontainer/issues/545)
+# [Issue 545]: [[FEATURE] Bake agent-CLI toolkit + Claude Code into image (rg/fd/bat/eza/delta/lazygit/zoxide/starship/freeze/expect/nvim + IS_SANDBOX=1)](https://github.com/vig-os/devkit/issues/545)
 
 ### Description
 
@@ -69,4 +69,12 @@ Added
 _Posted on June 23, 2026 at 06:56 AM_
 
 Re-scoped by the Nix migration epic #625: the install *mechanism* (apt/curl) is replaced by the Nix `devTools` path (#631 / #634); the tool list is absorbed into `devTools` (#631), and the image-level requirements (`claude` on PATH, `IS_SANDBOX=1`, `cc`/`cld` aliases) carry into #634. Suggest treating this as a **requirements checklist** consumed by #631 / #634 / #627 / #628.
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on July 2, 2026 at 11:41 AM_
+
+Delivered via #631 (on `dev` through PR #670): the agent-CLI toolkit (rg/fd/bat/eza/delta/lazygit/zoxide/starship/freeze/expect/nvim) plus `claude`, `IS_SANDBOX=1`, and the `cc`/`cld` aliases are baked into the flake `devTools`/image (flake.nix:110-150, 715-716, 878). Two minor gaps to track as follow-ups: `fzf` was not carried over, and there is no image test asserting these tools / `IS_SANDBOX`. Closing the core deliverable.
 

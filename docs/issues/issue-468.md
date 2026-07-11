@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-03-27T11:51:44Z
-updated: 2026-03-27T11:51:44Z
+updated: 2026-07-08T08:13:47Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/468
-comments: 0
+url: https://github.com/vig-os/devkit/issues/468
+comments: 1
 labels: none
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-03-28T04:26:12.402Z
+synced: 2026-07-11T13:34:20.025Z
 ---
 
-# [Issue 468]: [feat(remote): auto-detect GPU and configure passthrough in devc-remote.sh](https://github.com/vig-os/devcontainer/issues/468)
+# [Issue 468]: [feat(remote): auto-detect GPU and configure passthrough in devc-remote.sh](https://github.com/vig-os/devkit/issues/468)
 
 ## Summary
 
@@ -144,3 +144,11 @@ For projects that *always* need GPU, they can add it to `docker-compose.project.
 - #70 (parent: remote devcontainer orchestration)
 - #467 (auto-scaffold and image resolution)
 - #464 (secure secret resolution)
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:13 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl). The remote-devcontainer / `devc-remote` / Tailscale initiative predates the Nix + Claude-native migration (#625) and has had no activity since Feb–Mar 2026. If remote provisioning is wanted again it will be re-planned from scratch after the devkit rename (#781). Reopen/refile if revived.
+

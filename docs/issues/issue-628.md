@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T06:53:57Z
-updated: 2026-06-23T06:55:33Z
+updated: 2026-07-01T11:19:24Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/628
-comments: 0
+url: https://github.com/vig-os/devkit/issues/628
+comments: 1
 labels: area:image, security
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:52.556Z
+synced: 2026-07-11T13:34:15.750Z
 ---
 
-# [Issue 628]: [C3 — Remove `cursor-agent` install from the image](https://github.com/vig-os/devcontainer/issues/628)
+# [Issue 628]: [C3 — Remove `cursor-agent` install from the image](https://github.com/vig-os/devkit/issues/628)
 
 Tracking: #625
 
@@ -71,4 +71,12 @@ materially simplifies the Nix migration (precedes #634).
   `claude` becomes the baked agent CLI. The install *mechanism* in #545 (apt/curl) is replaced
   by the Nix `devTools` path (#631/#634); its `IS_SANDBOX=1` + `cc`/`cld` aliases carry into
   #634. Coordinate so cursor-agent removal and claude bake-in are consistent.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 11:19 AM_
+
+Delivered on `dev` via the Nix-migration epic PR #670 (merged 2026-06-30) (commit 065bb665). The `cursor-agent` install block is gone; the toolchain is all-nixpkgs with `claude-code` in `devTools`. Closing as complete — this stayed open only because the epic merged to `dev` (not `main`) and these T/C-track issues carry `Tracking: #625` but were never linked as GitHub sub-issues, so sync-issues auto-close never fired (tracked by #677). Refs #625.
 
