@@ -1,21 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-03-06T21:57:36Z
-updated: 2026-03-09T09:31:02Z
+updated: 2026-07-08T08:13:35Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/236
-comments: 2
+url: https://github.com/vig-os/devkit/issues/236
+comments: 3
 labels: feature, area:workflow, effort:large
 assignees: gerchowl
 milestone: none
 projects: none
-relationship: none
-synced: 2026-03-10T04:14:46.802Z
+parent: none
+children: none
+synced: 2026-07-11T13:34:22.933Z
 ---
 
-# [Issue 236]: [devc-remote gh:org/repo:branch — clone project repo and start devcontainer](https://github.com/vig-os/devcontainer/issues/236)
+# [Issue 236]: [devc-remote gh:org/repo:branch — clone project repo and start devcontainer](https://github.com/vig-os/devkit/issues/236)
 
 ## Context
 
@@ -138,4 +139,12 @@ Branch: `feature/236-remote-gh-clone-target`
 - [x] Task 10: Wire `remote_clone_project` into `main()` between `check_ssh` and `remote_preflight` — `scripts/devc-remote.sh` — verify: `just test-bats` (GREEN)
 - [x] Task 11: Update help text and usage examples with `gh:` syntax — `scripts/devc-remote.sh` — verify: `just test-bats`
 - [x] Task 12: Update CHANGELOG.md `## Unreleased` — `CHANGELOG.md` — verify: visual review
+
+---
+
+# [Comment #3]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:13 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl). The remote-devcontainer / `devc-remote` / Tailscale initiative predates the Nix + Claude-native migration (#625) and has had no activity since Feb–Mar 2026. If remote provisioning is wanted again it will be re-planned from scratch after the devkit rename (#781). Reopen/refile if revived.
 

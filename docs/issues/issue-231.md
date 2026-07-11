@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-03-06T20:44:36Z
-updated: 2026-06-23T06:56:31Z
+updated: 2026-07-08T08:13:29Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/231
-comments: 1
+url: https://github.com/vig-os/devkit/issues/231
+comments: 2
 labels: feature, area:workspace, effort:small, semver:minor
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:55.829Z
+synced: 2026-07-11T13:34:24.054Z
 ---
 
-# [Issue 231]: [[FEATURE] IDE-agnostic remote connection wrappers (cursor-remote, code-remote)](https://github.com/vig-os/devcontainer/issues/231)
+# [Issue 231]: [[FEATURE] IDE-agnostic remote connection wrappers (cursor-remote, code-remote)](https://github.com/vig-os/devkit/issues/231)
 
 ## Summary
 
@@ -82,4 +82,12 @@ code --remote "ssh-remote+root@${1}" "${2:-/workspace}"
 _Posted on June 23, 2026 at 06:56 AM_
 
 Scope update from the Nix/Claude migration (#625, #629): Cursor **editor** support is being dropped along with `cursor-agent`, so this should be **de-scoped to `code-remote` only** (VS Code `vscode-remote://` URI). The `cursor-remote` half is no longer wanted — #153 has been closed for that reason.
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:13 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl). The remote-devcontainer / `devc-remote` / Tailscale initiative predates the Nix + Claude-native migration (#625) and has had no activity since Feb–Mar 2026. If remote provisioning is wanted again it will be re-planned from scratch after the devkit rename (#781). Reopen/refile if revived.
 

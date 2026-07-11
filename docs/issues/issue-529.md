@@ -2,10 +2,10 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-06-27T01:41:56Z
+updated: 2026-07-10T23:12:44Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
-url: https://github.com/vig-os/devcontainer/issues/529
+url: https://github.com/vig-os/devkit/issues/529
 comments: 0
 labels: none
 assignees: none
@@ -13,75 +13,42 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-27T05:59:00.594Z
+synced: 2026-07-11T13:34:18.774Z
 ---
 
-# [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devcontainer/issues/529)
+# [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devkit/issues/529)
 
-This issue lists Renovate updates and detected dependencies. Read the [Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) docs to learn more.<br>[View this repository on the Mend.io Web Portal](https://developer.mend.io/github/vig-os/devcontainer).
+This issue lists Renovate updates and detected dependencies. Read the [Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) docs to learn more.<br>[View this repository on the Mend.io Web Portal](https://developer.mend.io/github/vig-os/devkit).
 
 ## Awaiting Schedule
 
 The following updates are awaiting their schedule. To get an update now, click on a checkbox below.
 
- - [ ] <!-- unschedule-branch=renovate/python-3.14-slim-bookworm -->build(docker): update python:3.14-slim-bookworm docker digest to 4ff4b92
- - [ ] <!-- unschedule-branch=renovate/actions-setup-python-digest -->chore(deps): update actions/setup-python digest to ece7cb0
- - [ ] <!-- unschedule-branch=renovate/taiki-e-install-action-digest -->chore(deps): update taiki-e/install-action digest to 316032d
- - [ ] <!-- unschedule-branch=renovate/python-(minor-and-patch) -->build(pip): update dependency ruff to v0.15.20
- - [ ] <!-- unschedule-branch=renovate/github-actions-(minor-and-patch) -->ci(actions): update github-actions (minor and patch) (`actions/attest`, `actions/attest-build-provenance`, `actions/cache`, `astral-sh/uv`)
- - [ ] <!-- unschedule-branch=renovate/bats-file-0.x-lockfile -->build(npm): update dependency bats-file to v0.4.0
- - [ ] <!-- unschedule-branch=renovate/actions-cache-6.x -->ci(actions): update actions/cache action to v6
+ - [ ] <!-- unschedule-branch=renovate/github-actions-(minor-and-patch) -->ci(actions): update cachix/install-nix-action action to v31.10.7
+ - [ ] <!-- unschedule-branch=renovate/lock-file-maintenance -->build(pip): lock file maintenance
  - [ ] <!-- create-all-awaiting-schedule-prs -->🔐 **Create all awaiting schedule PRs at once** 🔐
 
 
 ---
 
 > [!WARNING]
-> Renovate failed to look up the following dependencies: `Could not determine new digest for update (github-tags package bats-core/bats-action)`, `Could not determine new digest for update (github-tags package sigstore/cosign-installer)`.
+> Renovate failed to look up the following dependencies: `Could not determine new digest for update (github-tags package sigstore/cosign-installer)`.
 > 
-> Files affected: `.github/actions/setup-env/action.yml`, `.github/workflows/promote-release.yml`, `.github/workflows/release.yml`
+> Files affected: `.github/workflows/promote-release.yml`, `.github/workflows/release.yml`
 
 ---
 
 
 ## Detected Dependencies
 
-<details><summary>dockerfile (1)</summary>
+<details><summary>github-actions (36)</summary>
 <blockquote>
 
-<details><summary>Containerfile (1)</summary>
+<details><summary>.github/actions/setup-env/action.yml (3)</summary>
 
- - `python 3.14-slim-bookworm@sha256:7e2f3044e0eccc2d61476a63a9ff0564dacc7064b4e514e3e6fce7bf80b3cf0d` → [Updates: `3.14-slim-bookworm`]
-
-</details>
-
-</blockquote>
-</details>
-
-<details><summary>github-actions (31)</summary>
-<blockquote>
-
-<details><summary>.github/actions/build-image/action.yml (5)</summary>
-
- - `docker/login-action v4.2.0@650006c6eb7dba73a995cc03b0b2d7f5ca915bee`
- - `docker/setup-buildx-action v4.1.0@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5`
- - `docker/metadata-action v6.1.0@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9`
- - `docker/build-push-action v7.2.0@f9f3042f7e2789586610d6e8b85c8f03e5195baf`
- - `docker/build-push-action v7.2.0@f9f3042f7e2789586610d6e8b85c8f03e5195baf`
-
-</details>
-
-<details><summary>.github/actions/setup-env/action.yml (9)</summary>
-
- - `actions/setup-python v6@a309ff8b426b58ec0e2a45f0f869d46889d02405` → [Updates: `v6`]
- - `actions/setup-python v6@a309ff8b426b58ec0e2a45f0f869d46889d02405` → [Updates: `v6`]
- - `astral-sh/setup-uv v8.2.0@fac544c07dec837d0ccb6301d7b5580bf5edae39`
- - `astral-sh/setup-uv v8.2.0@fac544c07dec837d0ccb6301d7b5580bf5edae39`
+ - `cachix/install-nix-action v31.10.6@8aa03977d8d733052d78f4e008a241fd1dbf36b3` → [Updates: `v31.10.7`]
+ - `cachix/cachix-action v17@5f2d7c5294214f71b873db4b969586b980625e71`
  - `actions/setup-node v6.4.0@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e`
- - `taiki-e/install-action just@ab08a3b50948bd57d91bd2980f025da7e0a88231` → [Updates: `just`]
- - `bats-core/bats-action v4.0.0@77d6fb60505b4d0d1d73e48bd035b55074bbfb43`
- - `astral-sh/uv 0.11.23` → [Updates: `0.11.25`]
- - `astral-sh/uv 0.11.23` → [Updates: `0.11.25`]
 
 </details>
 
@@ -100,12 +67,12 @@ The following updates are awaiting their schedule. To get an update now, click o
 <details><summary>.github/actions/test-project/action.yml (3)</summary>
 
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
- - `actions/cache v5.0.5@27d5ce7f107fe9357f9df03efb73ab90386fccae` → [Updates: `v5.1.0`, `v6.1.0`]
+ - `actions/cache v6.1.0@55cc8345863c7cc4c66a329aec7e433d2d1c52a9`
  - `actions/upload-artifact v7.0.1@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`
 
 </details>
 
-<details><summary>.github/workflows/ci.yml (31)</summary>
+<details><summary>.github/workflows/ci.yml (27)</summary>
 
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `actions/upload-artifact v7.0.1@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`
@@ -119,8 +86,6 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `actions/upload-artifact v7.0.1@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `actions/download-artifact v8.0.1@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c`
- - `aquasecurity/trivy-action v0.36.0@ed142fd0673e97e23eac54620cfb913e5ce36c25`
- - `aquasecurity/trivy-action v0.36.0@ed142fd0673e97e23eac54620cfb913e5ce36c25`
  - `aquasecurity/trivy-action v0.36.0@ed142fd0673e97e23eac54620cfb913e5ce36c25`
  - `aquasecurity/trivy-action v0.36.0@ed142fd0673e97e23eac54620cfb913e5ce36c25`
  - `actions/upload-artifact v7.0.1@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`
@@ -132,10 +97,8 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `ubuntu 24.04`
  - `ubuntu 24.04`
  - `ubuntu 24.04`
- - `aquasecurity/trivy v0.71.2`
- - `aquasecurity/trivy v0.71.2`
- - `aquasecurity/trivy v0.71.2`
- - `aquasecurity/trivy v0.71.2`
+ - `aquasecurity/trivy v0.72.0`
+ - `aquasecurity/trivy v0.72.0`
  - `ubuntu 24.04`
  - `ubuntu 24.04`
 
@@ -144,8 +107,40 @@ The following updates are awaiting their schedule. To get an update now, click o
 <details><summary>.github/workflows/codeql.yml (4)</summary>
 
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
- - `github/codeql-action v4@8aad20d150bbac5944a9f9d289da16a4b0d87c1e`
- - `github/codeql-action v4@8aad20d150bbac5944a9f9d289da16a4b0d87c1e`
+ - `github/codeql-action v4@99df26d4f13ea111d4ec1a7dddef6063f76b97e9`
+ - `github/codeql-action v4@99df26d4f13ea111d4ec1a7dddef6063f76b97e9`
+ - `ubuntu 24.04`
+
+</details>
+
+<details><summary>.github/workflows/home-matrix.yml (7)</summary>
+
+ - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
+ - `cachix/install-nix-action v31.10.6@8aa03977d8d733052d78f4e008a241fd1dbf36b3` → [Updates: `v31.10.7`]
+ - `cachix/cachix-action v17@5f2d7c5294214f71b873db4b969586b980625e71`
+ - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
+ - `cachix/install-nix-action v31.10.6@8aa03977d8d733052d78f4e008a241fd1dbf36b3` → [Updates: `v31.10.7`]
+ - `cachix/cachix-action v17@5f2d7c5294214f71b873db4b969586b980625e71`
+ - `ubuntu 24.04-arm`
+
+</details>
+
+<details><summary>.github/workflows/nix-cachix.yml (4)</summary>
+
+ - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
+ - `cachix/install-nix-action v31.10.6@8aa03977d8d733052d78f4e008a241fd1dbf36b3` → [Updates: `v31.10.7`]
+ - `cachix/cachix-action v17@5f2d7c5294214f71b873db4b969586b980625e71`
+ - `ubuntu 24.04`
+
+</details>
+
+<details><summary>.github/workflows/nix-image.yml (6)</summary>
+
+ - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
+ - `cachix/install-nix-action v31.10.6@8aa03977d8d733052d78f4e008a241fd1dbf36b3` → [Updates: `v31.10.7`]
+ - `cachix/cachix-action v17@5f2d7c5294214f71b873db4b969586b980625e71`
+ - `docker/login-action v4.4.0@af1e73f918a031802d376d3c8bbc3fe56130a9b0`
+ - `docker/login-action v4.4.0@af1e73f918a031802d376d3c8bbc3fe56130a9b0`
  - `ubuntu 24.04`
 
 </details>
@@ -166,12 +161,12 @@ The following updates are awaiting their schedule. To get an update now, click o
 <details><summary>.github/workflows/promote-release.yml (15)</summary>
 
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
- - `docker/login-action v4.2.0@650006c6eb7dba73a995cc03b0b2d7f5ca915bee`
+ - `docker/login-action v4.4.0@af1e73f918a031802d376d3c8bbc3fe56130a9b0`
  - `sigstore/cosign-installer v4@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
- - `docker/login-action v4.2.0@650006c6eb7dba73a995cc03b0b2d7f5ca915bee`
+ - `docker/login-action v4.4.0@af1e73f918a031802d376d3c8bbc3fe56130a9b0`
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
@@ -183,7 +178,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 </details>
 
-<details><summary>.github/workflows/release.yml (33)</summary>
+<details><summary>.github/workflows/release.yml (35)</summary>
 
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
@@ -193,18 +188,19 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `aquasecurity/trivy-action v0.36.0@ed142fd0673e97e23eac54620cfb913e5ce36c25`
  - `actions/upload-artifact v7.0.1@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`
+ - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `sigstore/cosign-installer v4@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003`
- - `docker/login-action v4.2.0@650006c6eb7dba73a995cc03b0b2d7f5ca915bee`
+ - `docker/login-action v4.4.0@af1e73f918a031802d376d3c8bbc3fe56130a9b0`
  - `actions/download-artifact v8.0.1@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c`
  - `anchore/sbom-action v0.24.0@e22c389904149dbc22b58101806040fa8d37a610`
  - `anchore/sbom-action v0.24.0@e22c389904149dbc22b58101806040fa8d37a610`
  - `actions/upload-artifact v7.0.1@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`
- - `actions/attest-build-provenance v4.1.0@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32` → [Updates: `v4.1.1`]
- - `actions/attest-build-provenance v4.1.0@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32` → [Updates: `v4.1.1`]
- - `actions/attest v4.1.0@59d89421af93a897026c735860bf21b6eb4f7b26` → [Updates: `v4.1.1`]
- - `actions/attest v4.1.0@59d89421af93a897026c735860bf21b6eb4f7b26` → [Updates: `v4.1.1`]
+ - `actions/attest-build-provenance v4.1.1@0f67c3f4856b2e3261c31976d6725780e5e4c373`
+ - `actions/attest-build-provenance v4.1.1@0f67c3f4856b2e3261c31976d6725780e5e4c373`
+ - `actions/attest v4.1.1@a1948c3f048ba23858d222213b7c278aabede763`
+ - `actions/attest v4.1.1@a1948c3f048ba23858d222213b7c278aabede763`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `actions/github-script v9.0.0@3a2844b7e9c422d3c10d287c895573f7108da1b3`
@@ -214,7 +210,8 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `actions/github-script v9.0.0@3a2844b7e9c422d3c10d287c895573f7108da1b3`
  - `ubuntu 24.04`
  - `ubuntu 24.04`
- - `aquasecurity/trivy v0.71.2`
+ - `aquasecurity/trivy v0.72.0`
+ - `ubuntu 24.04`
  - `ubuntu 24.04`
  - `ubuntu 24.04`
  - `ubuntu 24.04`
@@ -253,25 +250,21 @@ The following updates are awaiting their schedule. To get an update now, click o
 
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `ossf/scorecard-action v2.4.3@4eaacf0543bb3f2c246792bd56e8cdeffafb205a`
- - `github/codeql-action v4@8aad20d150bbac5944a9f9d289da16a4b0d87c1e`
+ - `github/codeql-action v4@99df26d4f13ea111d4ec1a7dddef6063f76b97e9`
  - `ubuntu 24.04`
 
 </details>
 
-<details><summary>.github/workflows/security-scan.yml (12)</summary>
+<details><summary>.github/workflows/security-scan.yml (8)</summary>
 
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
- - `aquasecurity/trivy-action v0.36.0@ed142fd0673e97e23eac54620cfb913e5ce36c25`
- - `aquasecurity/trivy-action v0.36.0@ed142fd0673e97e23eac54620cfb913e5ce36c25`
+ - `actions/cache v6.1.0@55cc8345863c7cc4c66a329aec7e433d2d1c52a9`
  - `aquasecurity/trivy-action v0.36.0@ed142fd0673e97e23eac54620cfb913e5ce36c25`
  - `aquasecurity/trivy-action v0.36.0@ed142fd0673e97e23eac54620cfb913e5ce36c25`
  - `actions/upload-artifact v7.0.1@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`
- - `github/codeql-action v4@8aad20d150bbac5944a9f9d289da16a4b0d87c1e`
  - `ubuntu 24.04`
- - `aquasecurity/trivy v0.71.2`
- - `aquasecurity/trivy v0.71.2`
- - `aquasecurity/trivy v0.71.2`
- - `aquasecurity/trivy v0.71.2`
+ - `aquasecurity/trivy v0.72.0`
+ - `aquasecurity/trivy v0.72.0`
 
 </details>
 
@@ -280,10 +273,10 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
- - `actions/cache v5.0.5@27d5ce7f107fe9357f9df03efb73ab90386fccae` → [Updates: `v5.1.0`, `v6.1.0`]
+ - `actions/cache v6.1.0@55cc8345863c7cc4c66a329aec7e433d2d1c52a9`
  - `vig-os/sync-issues-action v0.2.2@bad447d330526a7313ffddae084010c39b335fc1`
  - `vig-os/commit-action v0.2.0@1bc004353d08d9332a0cb54920b148256220c8e0`
- - `actions/cache v5.0.5@27d5ce7f107fe9357f9df03efb73ab90386fccae` → [Updates: `v5.1.0`, `v6.1.0`]
+ - `actions/cache v6.1.0@55cc8345863c7cc4c66a329aec7e433d2d1c52a9`
  - `ubuntu 24.04`
  - `ubuntu 24.04`
 
@@ -298,6 +291,17 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `ubuntu 24.04`
  - `ubuntu 24.04`
+ - `ubuntu 24.04`
+
+</details>
+
+<details><summary>.github/workflows/update-nixpkgs-unstable.yml (6)</summary>
+
+ - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
+ - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
+ - `cachix/install-nix-action v31.10.6@8aa03977d8d733052d78f4e008a241fd1dbf36b3` → [Updates: `v31.10.7`]
+ - `vig-os/commit-action v0.2.0@1bc004353d08d9332a0cb54920b148256220c8e0`
+ - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `ubuntu 24.04`
 
 </details>
@@ -329,6 +333,32 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 </details>
 
+<details><summary>assets/workspace-bare/.github/workflows/ci.yml (7)</summary>
+
+ - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
+ - `astral-sh/setup-uv v8.3.2@11f9893b081a58869d3b5fccaea48c9e9e46f990`
+ - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
+ - `astral-sh/setup-uv v8.3.2@11f9893b081a58869d3b5fccaea48c9e9e46f990`
+ - `ubuntu 24.04`
+ - `ubuntu 24.04`
+ - `ubuntu 24.04`
+
+</details>
+
+<details><summary>assets/workspace-direnv/.github/workflows/ci.yml (9)</summary>
+
+ - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
+ - `cachix/install-nix-action v31.10.6@8aa03977d8d733052d78f4e008a241fd1dbf36b3` → [Updates: `v31.10.7`]
+ - `cachix/cachix-action v17@5f2d7c5294214f71b873db4b969586b980625e71`
+ - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
+ - `cachix/install-nix-action v31.10.6@8aa03977d8d733052d78f4e008a241fd1dbf36b3` → [Updates: `v31.10.7`]
+ - `cachix/cachix-action v17@5f2d7c5294214f71b873db4b969586b980625e71`
+ - `ubuntu 24.04`
+ - `ubuntu 24.04`
+ - `ubuntu 24.04`
+
+</details>
+
 <details><summary>assets/workspace/.github/workflows/ci.yml (7)</summary>
 
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
@@ -344,8 +374,8 @@ The following updates are awaiting their schedule. To get an update now, click o
 <details><summary>assets/workspace/.github/workflows/codeql.yml (4)</summary>
 
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
- - `github/codeql-action v4@8aad20d150bbac5944a9f9d289da16a4b0d87c1e`
- - `github/codeql-action v4@8aad20d150bbac5944a9f9d289da16a4b0d87c1e`
+ - `github/codeql-action v4@99df26d4f13ea111d4ec1a7dddef6063f76b97e9`
+ - `github/codeql-action v4@99df26d4f13ea111d4ec1a7dddef6063f76b97e9`
  - `ubuntu 24.04`
 
 </details>
@@ -446,7 +476,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `ossf/scorecard-action v2.4.3@4eaacf0543bb3f2c246792bd56e8cdeffafb205a`
- - `github/codeql-action v4@8aad20d150bbac5944a9f9d289da16a4b0d87c1e`
+ - `github/codeql-action v4@99df26d4f13ea111d4ec1a7dddef6063f76b97e9`
  - `ubuntu 24.04`
 
 </details>
@@ -456,10 +486,10 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `actions/create-github-app-token v3@bcd2ba49218906704ab6c1aa796996da409d3eb1`
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
- - `actions/cache v5.0.5@27d5ce7f107fe9357f9df03efb73ab90386fccae` → [Updates: `v5.1.0`, `v6.1.0`]
+ - `actions/cache v6.1.0@55cc8345863c7cc4c66a329aec7e433d2d1c52a9`
  - `vig-os/sync-issues-action v0.2.2@bad447d330526a7313ffddae084010c39b335fc1`
  - `vig-os/commit-action v0.2.0@1bc004353d08d9332a0cb54920b148256220c8e0`
- - `actions/cache v5.0.5@27d5ce7f107fe9357f9df03efb73ab90386fccae` → [Updates: `v5.1.0`, `v6.1.0`]
+ - `actions/cache v6.1.0@55cc8345863c7cc4c66a329aec7e433d2d1c52a9`
  - `ubuntu 24.04`
  - `ubuntu 24.04`
 
@@ -484,13 +514,9 @@ The following updates are awaiting their schedule. To get an update now, click o
 <details><summary>npm (1)</summary>
 <blockquote>
 
-<details><summary>package.json (5)</summary>
+<details><summary>package.json (1)</summary>
 
  - `@devcontainers/cli 0.87.0`
- - `bats 1.13.0`
- - `bats-support v0.3.0`
- - `bats-assert v2.2.4`
- - `bats-file v0.4.0` → [Updates: `v0.4.0`]
 
 </details>
 
@@ -500,45 +526,22 @@ The following updates are awaiting their schedule. To get an update now, click o
 <details><summary>pep621 (3)</summary>
 <blockquote>
 
-<details><summary>assets/workspace/pyproject.toml (11)</summary>
+<details><summary>packages/vig-utils/pyproject.toml</summary>
 
- - `python ==3.14.6`
- - `hatchling ==1.30.1`
- - `rich ==15.0.0`
- - `pytest ==9.1.1`
- - `pytest-cov ==7.1.0`
- - `ipykernel ==7.3.0`
- - `jupyter ==1.1.1`
- - `numpy ==2.5.0`
- - `scipy ==1.18.0`
- - `pandas ==3.0.3`
- - `matplotlib ==3.11.0`
 
 </details>
 
-<details><summary>packages/vig-utils/pyproject.toml (1)</summary>
+<details><summary>pyproject.toml (18)</summary>
 
- - `python ==3.14.6`
-
-</details>
-
-<details><summary>pyproject.toml (24)</summary>
-
- - `python ==3.14.6`
- - `github-backup ==0.63.0`
+ - `github-backup ==0.64.0`
  - `jinja2 ==3.1.6`
  - `pexpect ==4.9.0`
- - `pre-commit ==4.6.0`
  - `pytest ==9.1.1`
  - `pyyaml ==6.0.3`
  - `testinfra ==6.0.0`
  - `rich ==15.0.0`
- - `pre-commit ==4.6.0`
- - `ruff ==0.15.18` → [Updates: `==0.15.20`]
  - `pip-licenses ==5.5.5`
  - `bandit ==1.9.4`
- - `pre-commit ==4.6.0`
- - `ruff ==0.15.18` → [Updates: `==0.15.20`]
  - `pip-licenses ==5.5.5`
  - `bandit ==1.9.4`
  - `pytest ==9.1.1`
@@ -548,6 +551,25 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `pexpect ==4.9.0`
  - `testcontainers ==4.14.2`
  - `bcrypt ==5.0.0`
+
+</details>
+
+<details><summary>templates/python/pyproject.toml (2)</summary>
+
+ - `pytest ==9.1.1`
+ - `pytest-cov ==7.1.0`
+
+</details>
+
+</blockquote>
+</details>
+
+<details><summary>regex (1)</summary>
+<blockquote>
+
+<details><summary>flake.nix (1)</summary>
+
+ - `pip-licenses 5.5.5`
 
 </details>
 

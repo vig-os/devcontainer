@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-05-15T13:52:28Z
-updated: 2026-06-23T06:56:34Z
+updated: 2026-07-04T20:01:52Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/546
-comments: 1
+url: https://github.com/vig-os/devkit/issues/546
+comments: 3
 labels: feature, priority:medium, area:workspace, semver:minor
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:54.120Z
+synced: 2026-07-11T13:34:18.042Z
 ---
 
-# [Issue 546]: [[FEATURE] Slim Claude Code OAuth-token forwarding (replace setup-claude.sh + sed-YAML editing)](https://github.com/vig-os/devcontainer/issues/546)
+# [Issue 546]: [[FEATURE] Slim Claude Code OAuth-token forwarding (replace setup-claude.sh + sed-YAML editing)](https://github.com/vig-os/devkit/issues/546)
 
 ### Description
 
@@ -67,4 +67,20 @@ Changed (replaces existing flow)
 _Posted on June 23, 2026 at 06:56 AM_
 
 Cross-link: overlaps the editor/auth scripts touched by #629 in the Nix/Claude migration (#625). Mostly independent (remote-devcontainer OAuth forwarding), but coordinate the `setup-claude.sh` / non-root-user removal with #629.
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on July 4, 2026 at 06:30 PM_
+
+The slim token path landed as part of B2 (#823, PR #844, draft PR #846): the devcontainer scaffold bind-mounts the canonical per-user secrets dir (`~/.config/vigos/secrets`, read-only) and a post-create hook exports each file as an env var in the container shell — no YAML editing, no setup-claude.sh. Claude picks up `CLAUDE_CODE_OAUTH_TOKEN` from the environment. Suggest closing this issue pointing at #823 once #846 merges.
+
+---
+
+# [Comment #3]() by [c-vigo]()
+
+_Posted on July 4, 2026 at 08:01 PM_
+
+Superseded/implemented by #823 (merged to dev in #846): the devcontainer scaffold bind-mounts the canonical per-user secrets dir read-only and a post-create hook exports the files as env vars — no setup-claude.sh, no YAML editing.
 

@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-24T09:24:47Z
-updated: 2026-06-24T09:24:47Z
+updated: 2026-06-30T07:41:57Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/671
-comments: 0
+url: https://github.com/vig-os/devkit/issues/671
+comments: 1
 labels: feature, area:workspace, area:workflow, semver:minor
 assignees: none
 milestone: none
 projects: none
 parent: 625
 children: none
-synced: 2026-06-26T06:17:59.487Z
+synced: 2026-07-11T13:34:09.075Z
 ---
 
-# [Issue 671]: [feat(scripts): make just init Nix-first; retire requirements.yaml](https://github.com/vig-os/devcontainer/issues/671)
+# [Issue 671]: [feat(scripts): make just init Nix-first; retire requirements.yaml](https://github.com/vig-os/devkit/issues/671)
 
 Tracking: #625
 
@@ -92,4 +92,12 @@ sub-issue covers reworking `just init`.
 - Strict TDD: failing tests first (`test:` commit), then implementation.
 - Confirm `just test` parity (testinfra + bats + renovate validation) before PR.
 - PR targets the epic branch `feature/625-nix-claude-migration`.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on June 30, 2026 at 07:41 AM_
+
+Resolved by #672 (aef2fca) on the Nix-migration branch (epic #625, PR #670). Closing as part of post-merge backlog hygiene (#677).
 

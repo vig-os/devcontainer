@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-21T21:45:19Z
-updated: 2026-06-23T06:56:37Z
+updated: 2026-07-02T11:41:47Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/144
-comments: 1
+url: https://github.com/vig-os/devkit/issues/144
+comments: 2
 labels: bug, priority:low, area:ci, effort:small, semver:patch
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:57.882Z
+synced: 2026-07-11T13:34:27.831Z
 ---
 
-# [Issue 144]: [[BUG] generate-docs pre-commit hook misses new skill directories](https://github.com/vig-os/devcontainer/issues/144)
+# [Issue 144]: [[BUG] generate-docs pre-commit hook misses new skill directories](https://github.com/vig-os/devkit/issues/144)
 
 ### Description
 
@@ -59,4 +59,12 @@ Prevents a class of CI failures where generated docs are stale after adding or m
 _Posted on June 23, 2026 at 06:56 AM_
 
 #626 (part of #625) moves skills from `.cursor/skills/` to `.claude/skills/`, changing **both** `docs/generate.py`'s scan path and the pre-commit hook's `files` filter — which absorbs this fix. Will close/redirect when #626 lands.
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on July 2, 2026 at 11:41 AM_
+
+Fixed — the `generate-docs` hook's `files:` filter now matches `.claude/skills/.*/SKILL.md`, so adding/modifying a skill directory triggers regeneration of `docs/SKILL_PIPELINE.md` locally (generator scans `.claude/skills/*/SKILL.md`). New skill dirs are no longer missed. Closing.
 

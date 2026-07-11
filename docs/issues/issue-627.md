@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T06:53:55Z
-updated: 2026-06-23T06:55:31Z
+updated: 2026-07-01T11:19:22Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/627
-comments: 0
+url: https://github.com/vig-os/devkit/issues/627
+comments: 1
 labels: feature, area:workflow
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:52.921Z
+synced: 2026-07-11T13:34:16.114Z
 ---
 
-# [Issue 627]: [C2 — Replace `cursor-agent` with the `claude` CLI in worktree pipelines](https://github.com/vig-os/devcontainer/issues/627)
+# [Issue 627]: [C2 — Replace `cursor-agent` with the `claude` CLI in worktree pipelines](https://github.com/vig-os/devkit/issues/627)
 
 Tracking: #625
 
@@ -76,4 +76,12 @@ change, not a rename.
   worktree skills; a good companion refactor to land alongside the CLI swap.
 - **#178 / #157** (worktree idle mode / pipeline-phase dashboard) — built on the same
   pipeline; verify they still work once driven by `claude`.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 11:19 AM_
+
+Delivered on `dev` via the Nix-migration epic PR #670 (merged 2026-06-30) / PR #669. `justfile.worktree` drives the `claude` CLI (no `cursor-agent`); agent config reads from the `.claude` SSoT. Closing as complete — this stayed open only because the epic merged to `dev` (not `main`) and these T/C-track issues carry `Tracking: #625` but were never linked as GitHub sub-issues, so sync-issues auto-close never fired (tracked by #677). Refs #625.
 

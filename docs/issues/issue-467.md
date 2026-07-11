@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-03-27T11:29:46Z
-updated: 2026-03-27T11:29:46Z
+updated: 2026-07-08T08:13:45Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/467
-comments: 0
+url: https://github.com/vig-os/devkit/issues/467
+comments: 1
 labels: none
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-03-28T04:26:12.663Z
+synced: 2026-07-11T13:34:20.392Z
 ---
 
-# [Issue 467]: [feat(remote): auto-scaffold .devcontainer and smart image resolution](https://github.com/vig-os/devcontainer/issues/467)
+# [Issue 467]: [feat(remote): auto-scaffold .devcontainer and smart image resolution](https://github.com/vig-os/devkit/issues/467)
 
 ## Summary
 
@@ -129,3 +129,11 @@ just remote-devc ksb-meatgrinder
 - #70 (parent: remote devcontainer orchestration)
 - #464 (secure secret resolution)
 - #465 (SSH key security enforcement)
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:13 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl). The remote-devcontainer / `devc-remote` / Tailscale initiative predates the Nix + Claude-native migration (#625) and has had no activity since Feb–Mar 2026. If remote provisioning is wanted again it will be re-planned from scratch after the devkit rename (#781). Reopen/refile if revived.
+

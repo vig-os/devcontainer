@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T06:54:13Z
-updated: 2026-06-23T06:55:00Z
+updated: 2026-07-01T11:19:16Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/638
-comments: 0
+url: https://github.com/vig-os/devkit/issues/638
+comments: 1
 labels: area:ci, security
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:48.271Z
+synced: 2026-07-11T13:34:11.922Z
 ---
 
-# [Issue 638]: [T3.2 — Renovate `nix` manager for `flake.lock`](https://github.com/vig-os/devcontainer/issues/638)
+# [Issue 638]: [T3.2 — Renovate `nix` manager for `flake.lock`](https://github.com/vig-os/devkit/issues/638)
 
 Tracking: #625
 
@@ -69,4 +69,12 @@ can bump the flake inputs through the normal PR/CI gate. The remaining `pep621`,
 - **#604** (consolidate Trivy scan categories) — replacing the `dockerfile` base-digest update
   loop with `flake.lock` maintenance changes what Renovate produces; keep the scan-config SSoT
   documentation in #604 consistent with the new manager set.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 11:19 AM_
+
+Delivered on `dev` via the Nix-migration epic PR #670 (merged 2026-06-30). `renovate.json` `enabledManagers` now includes `nix` + `lockFileMaintenance` for `flake.lock`, retaining pep621/npm/github-actions. Closing as complete — this stayed open only because the epic merged to `dev` (not `main`) and these T/C-track issues carry `Tracking: #625` but were never linked as GitHub sub-issues, so sync-issues auto-close never fired (tracked by #677). Refs #625.
 

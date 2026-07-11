@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-24T13:19:01Z
-updated: 2026-06-23T06:56:41Z
+updated: 2026-07-08T08:14:09Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/178
-comments: 1
+url: https://github.com/vig-os/devkit/issues/178
+comments: 2
 labels: feature, area:workflow, effort:small
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:56.227Z
+synced: 2026-07-11T13:34:25.641Z
 ---
 
-# [Issue 178]: [Add [IDLE] status to worktree-list and idle mode to worktree-clean](https://github.com/vig-os/devcontainer/issues/178)
+# [Issue 178]: [Add [IDLE] status to worktree-list and idle mode to worktree-clean](https://github.com/vig-os/devkit/issues/178)
 
 ## Problem
 
@@ -48,4 +48,12 @@ synced: 2026-06-23T08:02:56.227Z
 _Posted on June 23, 2026 at 06:56 AM_
 
 Built on the worktree pipeline migrated in #625 (#626 paths, #627 CLI swap). Verify idle mode still works once the pipeline is driven by `claude`. Coordinate — not superseded.
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:14 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl) — valid but dormant, no work in progress since the Nix migration. Reopen or refile fresh if picked up.
 

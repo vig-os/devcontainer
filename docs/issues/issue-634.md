@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T06:54:07Z
-updated: 2026-06-23T06:55:02Z
+updated: 2026-07-01T11:19:09Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/634
-comments: 0
+url: https://github.com/vig-os/devkit/issues/634
+comments: 1
 labels: feature, area:image
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:49.968Z
+synced: 2026-07-11T13:34:13.461Z
 ---
 
-# [Issue 634]: [T2.1 — Nix-built devcontainer image (`buildLayeredImage`), non-publishing](https://github.com/vig-os/devcontainer/issues/634)
+# [Issue 634]: [T2.1 — Nix-built devcontainer image (`buildLayeredImage`), non-publishing](https://github.com/vig-os/devkit/issues/634)
 
 Tracking: #625
 
@@ -93,4 +93,12 @@ downstream production images. This is the discovery phase for FHS breakage and s
   replaced by the Nix closure.
 - **#40** (Migration to prek) — the pre-commit cache layer is rebuilt here; this is the moment
   to decide `pre-commit` vs `prek` (both packaged in nixpkgs).
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 11:19 AM_
+
+Delivered on `dev` via the Nix-migration epic PR #670 (merged 2026-06-30). `packages.devcontainerImage` builds via `dockerTools.buildLayeredImage` (Nix in-closure, no `FROM`); `nix-image.yml` builds and tests it. Closing as complete — this stayed open only because the epic merged to `dev` (not `main`) and these T/C-track issues carry `Tracking: #625` but were never linked as GitHub sub-issues, so sync-issues auto-close never fired (tracked by #677). Refs #625.
 

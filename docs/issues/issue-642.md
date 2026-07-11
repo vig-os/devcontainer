@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T06:54:20Z
-updated: 2026-06-23T06:55:14Z
+updated: 2026-07-08T07:54:38Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/642
-comments: 0
-labels: chore, area:image
+url: https://github.com/vig-os/devkit/issues/642
+comments: 1
+labels: chore, priority:low, area:image, effort:small
 assignees: none
-milestone: none
+milestone: 0.4.1
 projects: none
-parent: none
+parent: 625
 children: none
-synced: 2026-06-23T08:02:46.901Z
+synced: 2026-07-11T13:34:10.455Z
 ---
 
-# [Issue 642]: [T4.4 — Decommission the Debian path](https://github.com/vig-os/devcontainer/issues/642)
+# [Issue 642]: [T4.4 — Decommission the Debian path](https://github.com/vig-os/devkit/issues/642)
 
 Tracking: #625
 
@@ -72,4 +72,12 @@ fallback can be removed. This closes the migration and leaves a single, Nix-base
   takes over (with #637).
 - **#604** (stale Trivy alerts) — removing the Debian build retires the apt-based scan
   categories referenced there; ensure the dead categories are dismissed as part of cleanup.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 07:54 AM_
+
+Implemented in **0.4.1** (released 2026-07-08) — see the `## [0.4.1]` CHANGELOG entry. Closing as completed.
 

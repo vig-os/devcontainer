@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T06:54:00Z
-updated: 2026-06-23T06:55:27Z
+updated: 2026-07-01T11:19:28Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/630
-comments: 0
+url: https://github.com/vig-os/devkit/issues/630
+comments: 1
 labels: area:workflow, area:testing, security
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:51.829Z
+synced: 2026-07-11T13:34:14.982Z
 ---
 
-# [Issue 630]: [C5 — Adapt Cursor-coupled tests & keep the AI blocklist](https://github.com/vig-os/devcontainer/issues/630)
+# [Issue 630]: [C5 — Adapt Cursor-coupled tests & keep the AI blocklist](https://github.com/vig-os/devkit/issues/630)
 
 Tracking: #625
 
@@ -69,4 +69,12 @@ name an AI in history" rule, not a Cursor dependency).
 
 - TDD — write the blocklist test first (it should pass; it guards against a regression that
   drops the cursor entries while removing Cursor).
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 11:19 AM_
+
+Delivered on `dev` via the Nix-migration epic PR #670 (merged 2026-06-30). `test_cursor_agent_installed` removed; worktree tests run on `claude`; the AI blocklist still asserts both `cursor` and `claude` are blocked (`agent-blocklist.toml` retains both). Closing as complete — this stayed open only because the epic merged to `dev` (not `main`) and these T/C-track issues carry `Tracking: #625` but were never linked as GitHub sub-issues, so sync-issues auto-close never fired (tracked by #677). Refs #625.
 

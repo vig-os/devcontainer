@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-24T10:59:38Z
-updated: 2026-06-24T10:59:38Z
+updated: 2026-06-30T07:41:59Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/673
-comments: 0
+url: https://github.com/vig-os/devkit/issues/673
+comments: 1
 labels: docs, priority:high, area:docs
 assignees: none
 milestone: none
 projects: none
 parent: 625
 children: none
-synced: 2026-06-26T06:17:59.155Z
+synced: 2026-07-11T13:34:08.731Z
 ---
 
-# [Issue 673]: [[DOCS] README advertises the decommissioned Debian python:3.12-slim base image](https://github.com/vig-os/devcontainer/issues/673)
+# [Issue 673]: [[DOCS] README advertises the decommissioned Debian python:3.12-slim base image](https://github.com/vig-os/devkit/issues/673)
 
 ### Description
 
@@ -62,4 +62,12 @@ Changed
 ### Additional Context
 
 Part of the Nix migration epic #625.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on June 30, 2026 at 07:41 AM_
+
+Resolved by #678 (07ba671) on the Nix-migration branch (epic #625, PR #670). Closing as part of post-merge backlog hygiene (#677).
 

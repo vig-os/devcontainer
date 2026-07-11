@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-24T16:18:19Z
-updated: 2026-06-24T17:01:19Z
+updated: 2026-06-30T07:42:15Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/697
-comments: 1
+url: https://github.com/vig-os/devkit/issues/697
+comments: 2
 labels: bug, priority:high, area:workflow, semver:patch
 assignees: c-vigo
 milestone: none
 projects: none
 parent: 625
 children: none
-synced: 2026-06-26T06:17:55.166Z
+synced: 2026-07-11T13:34:03.992Z
 ---
 
-# [Issue 697]: [[BUG] pre-commit: source binary hooks (ruff, ruff-format, typos) from the flake for NixOS compatibility](https://github.com/vig-os/devcontainer/issues/697)
+# [Issue 697]: [[BUG] pre-commit: source binary hooks (ruff, ruff-format, typos) from the flake for NixOS compatibility](https://github.com/vig-os/devkit/issues/697)
 
 ## Description
 
@@ -113,4 +113,12 @@ Refs: #625
 _Posted on June 24, 2026 at 05:01 PM_
 
 Fixed and merged into the epic branch `feature/625-nix-claude-migration` via #699 (merge `f30f4f9`). Verified in the dev-shell: `ruff`/`ruff-format`/`typos` hooks pass resolving the flake tools; `ruff` removed from the venv so it is no longer shadowed under `uv run`; `just lint`/`format` repointed to the flake `ruff`. Left open to match the epic's sub-issue convention (cf. #695).
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on June 30, 2026 at 07:42 AM_
+
+Resolved by #699 (e588e4f) on the Nix-migration branch (epic #625, PR #670). Closing as part of post-merge backlog hygiene (#677).
 

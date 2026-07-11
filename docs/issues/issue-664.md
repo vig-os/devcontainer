@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T19:44:57Z
-updated: 2026-06-23T19:44:57Z
+updated: 2026-07-01T11:17:53Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/664
-comments: 0
+url: https://github.com/vig-os/devkit/issues/664
+comments: 1
 labels: bug
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-24T06:13:08.526Z
+synced: 2026-07-11T13:34:10.016Z
 ---
 
-# [Issue 664]: [bugfix: Nix image scaffolds dangling, read-only symlinks into a new workspace](https://github.com/vig-os/devcontainer/issues/664)
+# [Issue 664]: [bugfix: Nix image scaffolds dangling, read-only symlinks into a new workspace](https://github.com/vig-os/devkit/issues/664)
 
 ## Context
 
@@ -54,3 +54,11 @@ ls -la /tmp/dummy/flake.nix   # => symlink into /nix/store (dangling on host)
 - The install/scaffold flow is exercised against the Nix image in CI so this cannot regress.
 
 Refs: #625, #634, #639
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 11:17 AM_
+
+Resolved on `dev` by PR #665 (`fix(scripts): Nix image scaffolds real writable files, not store symlinks`). `assets/init-workspace.sh` now dereferences Nix-store symlinks (`rsync -avL`) and restores write/exec perms (`chmod -R u+w`, `+x` on `*.sh`/`.githooks`), so scaffolding no longer plants dangling read-only symlinks.
+

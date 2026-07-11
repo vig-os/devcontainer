@@ -1,21 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-03-06T21:57:19Z
-updated: 2026-03-06T22:01:02Z
+updated: 2026-07-08T08:13:31Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/235
-comments: 0
+url: https://github.com/vig-os/devkit/issues/235
+comments: 1
 labels: feature, area:workflow, effort:large
-assignees: none
+assignees: gerchowl
 milestone: none
 projects: none
-relationship: none
-synced: 2026-03-07T04:05:36.943Z
+parent: none
+children: none
+synced: 2026-07-11T13:34:23.304Z
 ---
 
-# [Issue 235]: [devc-remote --bootstrap: one-time remote host setup with config file](https://github.com/vig-os/devcontainer/issues/235)
+# [Issue 235]: [devc-remote --bootstrap: one-time remote host setup with config file](https://github.com/vig-os/devkit/issues/235)
 
 ## Context
 
@@ -88,3 +89,11 @@ Forward local container registry credentials to the remote:
 - [ ] Devcontainer image built locally on remote
 - [ ] Re-running bootstrap reads existing config without re-prompting
 - [ ] Tests for config creation and re-run idempotency
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:13 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl). The remote-devcontainer / `devc-remote` / Tailscale initiative predates the Nix + Claude-native migration (#625) and has had no activity since Feb–Mar 2026. If remote provisioning is wanted again it will be re-planned from scratch after the devkit rename (#781). Reopen/refile if revived.
+

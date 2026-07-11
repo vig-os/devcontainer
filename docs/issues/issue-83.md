@@ -1,21 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-18T16:28:59Z
-updated: 2026-02-18T16:50:07Z
+updated: 2026-07-08T08:13:52Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/83
-comments: 0
+url: https://github.com/vig-os/devkit/issues/83
+comments: 2
 labels: feature
 assignees: none
 milestone: Backlog
 projects: none
-relationship: none
-synced: 2026-02-19T00:08:06.417Z
+parent: none
+children: none
+synced: 2026-07-11T13:34:29.428Z
 ---
 
-# [Issue 83]: [[FEATURE] Integrate GitHub Projects into triage skill for board-level tracking](https://github.com/vig-os/devcontainer/issues/83)
+# [Issue 83]: [[FEATURE] Integrate GitHub Projects into triage skill for board-level tracking](https://github.com/vig-os/devkit/issues/83)
 
 ### Description
 
@@ -60,3 +61,19 @@ Add a new optional Phase 5.5 (after labels/milestones, before summary) that:
 ### Changelog Category
 
 Added
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 7, 2026 at 09:32 AM_
+
+@gerchowl proposing to close: dormant since February and the premise didn't materialize — we never adopted GitHub Projects; triage runs on labels/milestones/sub-issues (see the 0.4.1/0.5/1.0 triage just applied). Re-file if Projects ever enters the workflow. No branch to prune.
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:13 AM_
+
+Dormant since Feb 2026 with no traction; closing as part of an agreed backlog cleanup (with @gerchowl). Reopen/refile if it becomes relevant.
+

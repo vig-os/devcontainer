@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-25T10:09:15Z
-updated: 2026-06-25T10:09:15Z
+updated: 2026-07-01T11:17:50Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/703
-comments: 0
+url: https://github.com/vig-os/devkit/issues/703
+comments: 1
 labels: bug, priority:high, area:image, semver:patch
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-26T06:17:54.055Z
+synced: 2026-07-11T13:34:02.846Z
 ---
 
-# [Issue 703]: [Nix dev-shell leaks the Nix C++ runtime onto LD_LIBRARY_PATH, breaking `just` on non-NixOS hosts](https://github.com/vig-os/devcontainer/issues/703)
+# [Issue 703]: [Nix dev-shell leaks the Nix C++ runtime onto LD_LIBRARY_PATH, breaking `just` on non-NixOS hosts](https://github.com/vig-os/devkit/issues/703)
 
 ## Description
 
@@ -84,4 +84,12 @@ only where it is both required and ABI-compatible. On every FHS host it becomes 
 no-op, so the system `libstdc++` serves the wheel and nothing leaks into host
 binaries. Update the #698 dev-shell tests accordingly (the injection becomes
 NixOS-only) and add an FHS leak-guard.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 11:17 AM_
+
+Resolved on `dev` by PR #704 (`fix(setup): gate dev-shell C++ runtime LD_LIBRARY_PATH injection to NixOS`). The dev-shell `LD_LIBRARY_PATH` export is now guarded behind `[ -e /etc/NIXOS ]`, so it is never injected on FHS/non-NixOS hosts, and uses the append-not-clobber form. An FHS-leak guard test was added alongside.
 

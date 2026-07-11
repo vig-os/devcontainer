@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T06:54:08Z
-updated: 2026-06-23T06:55:06Z
+updated: 2026-07-01T11:19:11Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/635
-comments: 0
+url: https://github.com/vig-os/devkit/issues/635
+comments: 1
 labels: area:image, area:testing
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:49.530Z
+synced: 2026-07-11T13:34:13.060Z
 ---
 
-# [Issue 635]: [T2.2 — Make the testinfra suite portable (TEST ADAPTATION)](https://github.com/vig-os/devcontainer/issues/635)
+# [Issue 635]: [T2.2 — Make the testinfra suite portable (TEST ADAPTATION)](https://github.com/vig-os/devkit/issues/635)
 
 Tracking: #625
 
@@ -68,4 +68,12 @@ and the Nix image — it is the linchpin that lets #634 go green.
 
 - Pure refactor — run against the current Debian image first to prove no regression, then it
   is ready for #634.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 11:19 AM_
+
+Delivered on `dev` via the Nix-migration epic PR #670 (merged 2026-06-30). `tests/test_image.py` was made path-agnostic (`--version`/`assert_tool_runs`); dpkg/`/usr/local/bin`/`DEBIAN_FRONTEND` assertions removed. Closing as complete — this stayed open only because the epic merged to `dev` (not `main`) and these T/C-track issues carry `Tracking: #625` but were never linked as GitHub sub-issues, so sync-issues auto-close never fired (tracked by #677). Refs #625.
 

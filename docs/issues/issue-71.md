@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-18T01:46:51Z
-updated: 2026-06-23T06:56:46Z
+updated: 2026-07-08T08:13:50Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/71
-comments: 5
+url: https://github.com/vig-os/devkit/issues/71
+comments: 7
 labels: feature, priority:medium, area:workspace, effort:large, semver:minor
 assignees: gerchowl
-milestone: 0.4
+milestone: Backlog
 projects: none
 parent: none
 children: 73, 66
-synced: 2026-06-23T08:02:58.673Z
+synced: 2026-07-11T13:34:29.792Z
 ---
 
-# [Issue 71]: [[FEATURE] Expand justfile.base with devcontainer, quality, security, docs, info, and git recipes](https://github.com/vig-os/devcontainer/issues/71)
+# [Issue 71]: [[FEATURE] Expand justfile.base with devcontainer, quality, security, docs, info, and git recipes](https://github.com/vig-os/devkit/issues/71)
 
 ### Description
 
@@ -187,4 +187,20 @@ _Posted on February 22, 2026 at 09:33 AM_
 _Posted on June 23, 2026 at 06:56 AM_
 
 Coordinate with #625: the scaffolded modes (#641) should expose a consistent recipe set so direnv-only repos still get the relevant `justfile.base` recipes.
+
+---
+
+# [Comment #6]() by [c-vigo]()
+
+_Posted on July 7, 2026 at 09:32 AM_
+
+@gerchowl proposing to close: the 0.4.0 scaffold redesign retired `justfile.base` entirely — recipes now live in the managed `justfile.devc`/`justfile.gh`/`justfile.worktree` plus team-owned `justfile.project`, which covers the quality/security/info/git groups this issue asked for. Remaining gaps would be new issues against the new layout. No branch to prune.
+
+---
+
+# [Comment #7]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:13 AM_
+
+Obsolete: `justfile.base` was retired by the 0.4.0 scaffold redesign (now `justfile.devc`/`gh`/`worktree` + `justfile.project`). Closing as not planned.
 

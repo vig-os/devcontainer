@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-24T14:08:12Z
-updated: 2026-06-24T14:08:12Z
+updated: 2026-07-01T14:36:02Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/688
-comments: 0
+url: https://github.com/vig-os/devkit/issues/688
+comments: 1
 labels: bug, priority:medium, area:ci, effort:small, semver:patch
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-26T06:17:56.526Z
+synced: 2026-07-11T13:34:05.548Z
 ---
 
-# [Issue 688]: [[BUG] allowed-signers test rejects valid ECDSA SSH keys](https://github.com/vig-os/devcontainer/issues/688)
+# [Issue 688]: [[BUG] allowed-signers test rejects valid ECDSA SSH keys](https://github.com/vig-os/devkit/issues/688)
 
 ## Description
 
@@ -79,4 +79,12 @@ assert any(k in content for k in key_types), (
 ## Changelog Category
 
 Fixed
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 02:36 PM_
+
+Already resolved on `dev`. `tests/test_integration.py` `test_allowed_signers_file_exists` now accepts `ssh-ed25519`, `ssh-rsa`, `ecdsa-sha2-nistp*` and security-key types (landed in `8a1f0d73`, fix(ci): accept ECDSA and security-key types in allowed-signers test). ECDSA signing keys no longer trip a spurious failure. Closing as done.
 

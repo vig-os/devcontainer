@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-24T18:27:32Z
-updated: 2026-06-24T18:33:04Z
+updated: 2026-06-30T07:42:19Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/701
-comments: 0
+url: https://github.com/vig-os/devkit/issues/701
+comments: 1
 labels: bug, priority:medium, area:ci, area:testing
 assignees: c-vigo
 milestone: none
 projects: none
 parent: 625
 children: none
-synced: 2026-06-26T06:17:54.399Z
+synced: 2026-07-11T13:34:03.219Z
 ---
 
-# [Issue 701]: [[BUG] Integration tests run the published image (DEVCONTAINER_VERSION), not the freshly-built one](https://github.com/vig-os/devcontainer/issues/701)
+# [Issue 701]: [[BUG] Integration tests run the published image (DEVCONTAINER_VERSION), not the freshly-built one](https://github.com/vig-os/devkit/issues/701)
 
 ## Description
 
@@ -56,4 +56,12 @@ Separately, pointing the test at the **fresh Nix image** (`DEVCONTAINER_VERSION=
 - Once (2) lands, the scaffolded config could even be reconsidered (the decoupling in #697 is the current compensating control).
 
 Refs: #625
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on June 30, 2026 at 07:42 AM_
+
+Resolved by #702 (baa4637) on the Nix-migration branch (epic #625, PR #670). Closing as part of post-merge backlog hygiene (#677).
 

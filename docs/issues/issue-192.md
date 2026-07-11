@@ -1,21 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-24T17:23:00Z
-updated: 2026-02-24T17:24:54Z
+updated: 2026-07-08T08:14:11Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/192
-comments: 0
+url: https://github.com/vig-os/devkit/issues/192
+comments: 1
 labels: refactor, area:workflow, effort:small
 assignees: gerchowl
 milestone: none
 projects: none
-relationship: none
-synced: 2026-02-25T04:25:50.766Z
+parent: none
+children: none
+synced: 2026-07-11T13:34:25.237Z
 ---
 
-# [Issue 192]: [[REFACTOR] Add pull-latest-dev-and-merge step to PR-creating skills](https://github.com/vig-os/devcontainer/issues/192)
+# [Issue 192]: [[REFACTOR] Add pull-latest-dev-and-merge step to PR-creating skills](https://github.com/vig-os/devkit/issues/192)
 
 ### Description
 
@@ -60,3 +61,11 @@ No changelog needed
 ### Additional Context
 
 Currently `pr_create` fetches and pulls the current branch but does not merge the base branch. `worktree_pr` fetches and pushes but similarly skips merging the base. `pr_solve` handles merge conflicts as "manual action required" but doesn't proactively pull latest before fixing. This refactoring makes the "pull latest base, resolve conflicts" step a consistent pre-PR gate across all five skills.
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:14 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl) — valid but dormant, no work in progress since the Nix migration. Reopen or refile fresh if picked up.
+

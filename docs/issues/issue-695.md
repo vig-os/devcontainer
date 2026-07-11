@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-24T15:52:47Z
-updated: 2026-06-24T15:55:19Z
+updated: 2026-06-30T07:42:13Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/695
-comments: 0
+url: https://github.com/vig-os/devkit/issues/695
+comments: 1
 labels: bug, area:testing, semver:patch
 assignees: c-vigo
 milestone: none
 projects: none
 parent: 625
 children: none
-synced: 2026-06-26T06:17:55.512Z
+synced: 2026-07-11T13:34:04.382Z
 ---
 
-# [Issue 695]: [[BUG] BATS suite fails locally on Nix branch: bats helper libs unresolved (node_modules not installed)](https://github.com/vig-os/devcontainer/issues/695)
+# [Issue 695]: [[BUG] BATS suite fails locally on Nix branch: bats helper libs unresolved (node_modules not installed)](https://github.com/vig-os/devkit/issues/695)
 
 ## Description
 
@@ -83,4 +83,12 @@ Option 1 aligns better with the #625 migration goal; option 2 is a quick unblock
 Fixed
 
 Refs: #625
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on June 30, 2026 at 07:42 AM_
+
+Resolved by #696 (36ee161) on the Nix-migration branch (epic #625, PR #670). Closing as part of post-merge backlog hygiene (#677).
 

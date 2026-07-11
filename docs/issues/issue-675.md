@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-24T10:59:42Z
-updated: 2026-06-24T10:59:42Z
+updated: 2026-06-30T07:42:02Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/675
-comments: 0
+url: https://github.com/vig-os/devkit/issues/675
+comments: 1
 labels: chore, priority:low, area:image, effort:small, area:testing
 assignees: none
 milestone: none
 projects: none
 parent: 625
 children: none
-synced: 2026-06-26T06:17:58.497Z
+synced: 2026-07-11T13:34:07.927Z
 ---
 
-# [Issue 675]: [[CHORE] Smoke-test that nix/direnv work inside the built Nix image](https://github.com/vig-os/devcontainer/issues/675)
+# [Issue 675]: [[CHORE] Smoke-test that nix/direnv work inside the built Nix image](https://github.com/vig-os/devkit/issues/675)
 
 ### Chore Type
 
@@ -60,4 +60,12 @@ Low
 ### Changelog Category
 
 Added
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on June 30, 2026 at 07:42 AM_
+
+Resolved by #679 (f14687d) on the Nix-migration branch (epic #625, PR #670). Closing as part of post-merge backlog hygiene (#677).
 

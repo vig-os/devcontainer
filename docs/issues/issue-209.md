@@ -1,21 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-26T12:01:01Z
-updated: 2026-02-26T12:01:01Z
+updated: 2026-07-07T09:32:30Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/209
-comments: 0
+url: https://github.com/vig-os/devkit/issues/209
+comments: 1
 labels: feature
 assignees: none
 milestone: none
 projects: none
-relationship: none
-synced: 2026-02-27T04:19:04.769Z
+parent: none
+children: none
+synced: 2026-07-11T13:34:24.851Z
 ---
 
-# [Issue 209]: [[FEATURE] Graceful degradation when no internet connection is available](https://github.com/vig-os/devcontainer/issues/209)
+# [Issue 209]: [[FEATURE] Graceful degradation when no internet connection is available](https://github.com/vig-os/devkit/issues/209)
 
 ## Description
 
@@ -55,3 +56,11 @@ Added
 - [ ] `just sync` prints a warning and exits cleanly when offline
 - [ ] Container starts without errors in an offline environment
 - [ ] TDD compliance (see .cursor/rules/tdd.mdc)
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 7, 2026 at 09:32 AM_
+
+Closing as part of the remote/offline-work backlog consolidation (see the summary on #232): dormant since February and pre-dates the Nix migration — offline behavior needs re-evaluation against the Nix store/cachix model anyway. No branch to prune. Re-file against the post-devkit architecture if still wanted.
+

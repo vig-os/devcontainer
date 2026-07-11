@@ -1,21 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-02-24T12:58:52Z
-updated: 2026-02-24T13:08:57Z
+updated: 2026-07-08T08:14:00Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/176
-comments: 4
+url: https://github.com/vig-os/devkit/issues/176
+comments: 5
 labels: bug, area:workflow, effort:small, semver:patch
 assignees: gerchowl
 milestone: none
 projects: none
-relationship: none
-synced: 2026-02-25T04:25:54.051Z
+parent: none
+children: none
+synced: 2026-07-11T13:34:25.985Z
 ---
 
-# [Issue 176]: [[BUG] gh-issues CI status counts duplicate/superseded check runs](https://github.com/vig-os/devcontainer/issues/176)
+# [Issue 176]: [[BUG] gh-issues CI status counts duplicate/superseded check runs](https://github.com/vig-os/devkit/issues/176)
 
 ## Bug
 
@@ -112,4 +113,12 @@ _Posted on February 24, 2026 at 01:08 PM_
 - **Verify:** gh_issues tests pass, lint pass, pre-commit pass (hadolint skipped locally — Docker not running)
 - **PR:** https://github.com/vig-os/devcontainer/pull/177
 - **CI:** Build Container Image ✓, Python Security Scan ✓, Dependency Review ✓, Validate PR Title ✓. CodeQL Analysis (python) ✗ — pre-existing config conflict (see CI Diagnosis above). Project Checks ✗ — logs not yet available; our changes (scripts/gh_issues.py, tests) do not affect Project Checks pytest suite (test_utils, vig-utils).
+
+---
+
+# [Comment #5]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:14 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl) — valid but dormant, no work in progress since the Nix migration. Reopen or refile fresh if picked up.
 

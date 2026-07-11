@@ -1,21 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-03-06T20:44:19Z
-updated: 2026-03-06T20:51:27Z
+updated: 2026-07-08T08:13:27Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/230
-comments: 0
+url: https://github.com/vig-os/devkit/issues/230
+comments: 1
 labels: feature, area:workspace, effort:medium, semver:minor
 assignees: none
 milestone: none
 projects: none
-relationship: none
-synced: 2026-03-07T04:05:37.824Z
+parent: none
+children: none
+synced: 2026-07-11T13:34:24.499Z
 ---
 
-# [Issue 230]: [[FEATURE] Tailscale auth key injection in devc-remote.sh](https://github.com/vig-os/devcontainer/issues/230)
+# [Issue 230]: [[FEATURE] Tailscale auth key injection in devc-remote.sh](https://github.com/vig-os/devkit/issues/230)
 
 ## Summary
 
@@ -66,3 +67,11 @@ This issue covers only the infra side — key generation + injection + container
 - [Tailscale OAuth clients](https://tailscale.com/kb/1215/oauth-clients)
 - [Tailscale API — create key](https://tailscale.com/kb/1101/api)
 - Design doc: `docs/designs/tailscale-ssh.md`
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:13 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl). The remote-devcontainer / `devc-remote` / Tailscale initiative predates the Nix + Claude-native migration (#625) and has had no activity since Feb–Mar 2026. If remote provisioning is wanted again it will be re-planned from scratch after the devkit rename (#781). Reopen/refile if revived.
+

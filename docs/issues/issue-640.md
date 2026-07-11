@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T06:54:16Z
-updated: 2026-06-23T06:55:10Z
+updated: 2026-07-02T11:41:37Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/640
-comments: 0
+url: https://github.com/vig-os/devkit/issues/640
+comments: 1
 labels: feature, area:image, area:workspace
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:47.586Z
+synced: 2026-07-11T13:34:11.211Z
 ---
 
-# [Issue 640]: [T4.2 — Downstream pattern: minimal flake stub (non-overwriting) + `nix2container` production builder](https://github.com/vig-os/devcontainer/issues/640)
+# [Issue 640]: [T4.2 — Downstream pattern: minimal flake stub (non-overwriting) + `nix2container` production builder](https://github.com/vig-os/devkit/issues/640)
 
 Tracking: #625
 
@@ -81,4 +81,12 @@ language shells are future work.
 ## Test notes
 
 - Add a sync test asserting never-overwrite behaviour for the flake / `.envrc` file class.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 2, 2026 at 11:41 AM_
+
+Done via PR #662 (landed on `dev` through the #625 epic PR #670). Ships `assets/workspace/flake.nix` + `.envrc` (toolchain as a flake input, marked never-overwrite in `init-workspace.sh` PRESERVE_FILES), the `nix2container` production-builder pattern (`docs/NIX2CONTAINER.md` + buildable `examples/nix2container-production/`), and a `tests/test_downstream_flake.py` CI gate.
 

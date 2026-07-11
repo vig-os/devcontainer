@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-26T08:14:06Z
-updated: 2026-06-26T08:14:06Z
+updated: 2026-07-03T07:46:38Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/718
-comments: 0
+url: https://github.com/vig-os/devkit/issues/718
+comments: 1
 labels: priority:low, area:workspace
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-27T05:58:59.893Z
+synced: 2026-07-11T13:33:59.744Z
 ---
 
-# [Issue 718]: [perf: bake the build-time placeholder manifest into the Nix image](https://github.com/vig-os/devcontainer/issues/718)
+# [Issue 718]: [perf: bake the build-time placeholder manifest into the Nix image](https://github.com/vig-os/devkit/issues/718)
 
 ## Context
 
@@ -28,3 +28,11 @@ Follow-up from #625 / PR #670. `init-workspace.sh` substitutes template placehol
 - Functional-only optimization; the runtime fallback already produces correct output.
 
 Refs: #625
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 3, 2026 at 07:46 AM_
+
+Resolved by #802 (merged to `dev`). The Nix image build now bakes `.placeholder-manifest.txt` into the bootstrap layer (deterministic `grep -rl` + sort), so `init-workspace.sh` takes the fast substitution path instead of the slow runtime find+grep. Guarded by a new `test_placeholder_manifest_baked` image test.
+

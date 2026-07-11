@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-04-15T06:53:58Z
-updated: 2026-04-15T06:53:58Z
+updated: 2026-07-08T08:14:16Z
 author: gerchowl
 author_url: https://github.com/gerchowl
-url: https://github.com/vig-os/devcontainer/issues/522
-comments: 0
+url: https://github.com/vig-os/devkit/issues/522
+comments: 1
 labels: none
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-04-16T04:56:51.029Z
+synced: 2026-07-11T13:34:19.248Z
 ---
 
-# [Issue 522]: [Missing per-repo bootstrap guide for vigOS branching convention on non-Enterprise orgs](https://github.com/vig-os/devcontainer/issues/522)
+# [Issue 522]: [Missing per-repo bootstrap guide for vigOS branching convention on non-Enterprise orgs](https://github.com/vig-os/devkit/issues/522)
 
 ## Problem
 
@@ -74,3 +74,11 @@ Any repo scaffolded onto a non-Enterprise org hits this wall and has to reverse-
 - #170 — manual smoke-test bootstrap
 - \`docs/RELEASE_CYCLE.md\` — branch model + app config
 - \`docs/DOWNSTREAM_RELEASE.md\` — required secrets list
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 08:14 AM_
+
+Closing as part of an agreed backlog cleanup (with @gerchowl) — valid but dormant, no work in progress since the Nix migration. Reopen or refile fresh if picked up.
+

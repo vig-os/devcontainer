@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T06:53:52Z
-updated: 2026-06-23T06:55:22Z
+updated: 2026-07-08T11:54:20Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/625
-comments: 0
+url: https://github.com/vig-os/devkit/issues/625
+comments: 2
 labels: priority:high
 assignees: none
 milestone: none
 projects: none
 parent: none
-children: none
-synced: 2026-06-23T08:02:53.734Z
+children: 671, 673, 674, 675, 676, 677, 255, 683, 685, 692, 695, 697, 698, 701, 723, 727, 728, 729, 735, 736, 737, 738, 739, 740, 749, 752, 753, 754, 755, 756, 757, 758, 759, 760, 761, 762, 773, 774, 784, 639, 642
+synced: 2026-07-11T13:34:16.949Z
 ---
 
-# [Issue 625]: [[MASTER] Migrate devcontainer to a Nix toolchain + Claude-native setup](https://github.com/vig-os/devcontainer/issues/625)
+# [Issue 625]: [[MASTER] Migrate devcontainer to a Nix toolchain + Claude-native setup](https://github.com/vig-os/devkit/issues/625)
 
 
 
@@ -140,4 +140,48 @@ Scan of open repo issues (as of 2026-06-22) and how this epic relates to each.
 | **#162 / #178 / #157** worktree-skill features | Built on the `.cursor/skills/` + `cursor-agent` pipeline; **#626** moves the paths and **#627** swaps the CLI. | **Path/CLI changes** — coordinate, not superseded. |
 | **#231 / #153** Cursor *editor* remote wrappers | **Scope resolved: VS Code only.** Cursor IDE support is dropped along with `cursor-agent`. | **Close #153; de-scope #231 to `code-remote` only** (see #629). |
 
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 3, 2026 at 12:11 PM_
+
+**Reproducible-build AC — evidence.**
+
+Local verification on commit `5bcd7d89` (branch `feature/639-cutover-readiness`, tip of dev + PR #808):
+
+```
+$ nix build .#devcontainerImage            # first build (layers assembled, manifests added)
+$ nix build .#devcontainerImage --rebuild  # force full rebuild, compare against existing output
+checking outputs of '/nix/store/2zzln8vyz5794wvcwryq6q01pkklp2m8-devcontainer.tar.gz.drv'...
+→ exit 0 (outputs identical)
+```
+
+- Output: `/nix/store/ffy74m5xd5jadr5ckgpm81dm5p0xm90c-devcontainer.tar.gz`
+- `nix hash file`: `sha256-ZGHaXClfnwGaz3I3CpRq5vC/Xzsqc+BL/locfIEqf7I=`
+- Nix 2.34.7, amd64
+
+`--rebuild` re-runs the derivation from scratch and fails if the output differs from the store copy, so this demonstrates bit-identical rebuild from the same `flake.lock` on the same host/arch. The AC's stronger cross-host form gets confirmed for free at the 0.4.0 RC: `release.yml` builds each arch on a separate native runner and the promoted digests are recorded in the release — comparing a second run of the same RC ref is the cross-host check if wanted.
+
+**Cursor-grep AC status:** `grep -ri cursor` over the tree returns only (a) the intentional agent-blocklist entries + their tests, (b) CHANGELOG history, and (c) machine-synced issue/PR archives under `docs/issues//docs/pull-requests/` plus one historical plan doc (`docs/plans/2026-02-18-sync-workspace-templates-plan.md`) — no live tooling references. AC met (archives are history, per the criterion's intent).
+
+---
+
+# [Comment #2]() by [c-vigo]()
+
+_Posted on July 8, 2026 at 11:54 AM_
+
+## Closing — epic complete, all acceptance criteria met
+
+All 17 sub-issues are closed and every acceptance criterion is satisfied:
+
+- **All sub-issues closed** — Track C (#626–#630), Track 1 (#631–#633), Track 2 (#634–#636), Track 3 (#637–#638), Track 4 (#639–#642) all CLOSED.
+- **Debian path decommissioned** — #642 CLOSED.
+- **`grep -ri cursor`** returns only CHANGELOG/docs-archive history plus the intentional commit-msg AI blocklist (`vig_utils/validate_commit_msg.py`) — no live tooling references.
+- **Reproducible identical-digest rebuild** — confirmed via `nix build --rebuild` (bit-identical output); see the evidence comment above.
+
+Every "related existing issue" this epic tracked is also resolved: #27, #255, #545, #546, #604, #602, #521, #144, #40, #162, #178, #157, #231, #153 — all CLOSED.
+
+Nix toolchain (flake as SSoT), Nix-built multi-arch image, vulnix/SBOM CVE posture, and the Claude-native agent setup are all shipped. Follow-on work (devkit rename #781, dogfooding #822, home-manager modules #814) is tracked in its own issues.
 

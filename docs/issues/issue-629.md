@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T06:53:58Z
-updated: 2026-06-23T06:55:25Z
+updated: 2026-07-01T11:19:26Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/629
-comments: 0
+url: https://github.com/vig-os/devkit/issues/629
+comments: 1
 labels: chore, area:workspace, area:workflow
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:52.217Z
+synced: 2026-07-11T13:34:15.356Z
 ---
 
-# [Issue 629]: [C4 — Migrate templates & editor glue off Cursor](https://github.com/vig-os/devcontainer/issues/629)
+# [Issue 629]: [C4 — Migrate templates & editor glue off Cursor](https://github.com/vig-os/devkit/issues/629)
 
 Tracking: #625
 
@@ -82,4 +82,12 @@ needs the template and editor glue cleaned up.
   URI), since the Cursor half is no longer wanted.
 - **#546** (slim Claude OAuth forwarding) — removes `setup-claude.sh` + the non-root `claude`
   user; overlaps with the editor/auth scripts this issue touches. Coordinate.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 11:19 AM_
+
+Delivered on `dev` via the Nix-migration epic PR #670 (merged 2026-06-30). `assets/workspace/.cursor/` → `.claude/`; cursor remote-SSH socket handling and `command -v cursor` fallbacks removed. Closing as complete — this stayed open only because the epic merged to `dev` (not `main`) and these T/C-track issues carry `Tracking: #625` but were never linked as GitHub sub-issues, so sync-issues auto-close never fired (tracked by #677). Refs #625.
 

@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-24T15:22:18Z
-updated: 2026-06-24T15:25:40Z
+updated: 2026-06-30T07:42:12Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/692
-comments: 0
+url: https://github.com/vig-os/devkit/issues/692
+comments: 1
 labels: bug, priority:high, area:testing
 assignees: c-vigo
 milestone: none
 projects: none
 parent: 625
 children: none
-synced: 2026-06-26T06:17:55.858Z
+synced: 2026-07-11T13:34:04.798Z
 ---
 
-# [Issue 692]: [[BUG] testinfra init fixture times out on uv sync of heavy extras (30s 'completed' wait)](https://github.com/vig-os/devcontainer/issues/692)
+# [Issue 692]: [[BUG] testinfra init fixture times out on uv sync of heavy extras (30s 'completed' wait)](https://github.com/vig-os/devkit/issues/692)
 
 ## Description
 
@@ -116,4 +116,12 @@ Prefer (1) for an immediate unblock; (2) for the durable fix under the Nix image
 ## Changelog Category
 
 No changelog needed (test infrastructure).
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on June 30, 2026 at 07:42 AM_
+
+Resolved by #694 (23a3bf2) on the Nix-migration branch (epic #625, PR #670). Closing as part of post-merge backlog hygiene (#677).
 

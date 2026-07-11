@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T06:53:53Z
-updated: 2026-06-23T06:55:29Z
+updated: 2026-07-01T11:19:20Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/626
-comments: 0
+url: https://github.com/vig-os/devkit/issues/626
+comments: 1
 labels: chore, docs, area:workflow
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:53.291Z
+synced: 2026-07-11T13:34:16.522Z
 ---
 
-# [Issue 626]: [C1 — Make `.claude/` the SSoT for rules & skills](https://github.com/vig-os/devcontainer/issues/626)
+# [Issue 626]: [C1 — Make `.claude/` the SSoT for rules & skills](https://github.com/vig-os/devkit/issues/626)
 
 Tracking: #625
 
@@ -85,4 +85,12 @@ avoids bloating always-on context with procedural content.
   makes #144's narrow fix moot. Close/redirect #144 when this lands.
 - **#162 / #178 / #157** (worktree-skill features) reference `.cursor/skills/<skill>/SKILL.md`
   paths that move under this issue — coordinate so those issues point at the new paths.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 1, 2026 at 11:19 AM_
+
+Delivered on `dev` via the Nix-migration epic PR #670 (merged 2026-06-30). Root `.cursor/` deleted; `.claude/skills/**` + `CLAUDE.md` are the rules/skills SSoT. Closing as complete — this stayed open only because the epic merged to `dev` (not `main`) and these T/C-track issues carry `Tracking: #625` but were never linked as GitHub sub-issues, so sync-issues auto-close never fired (tracked by #677). Refs #625.
 

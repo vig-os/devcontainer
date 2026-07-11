@@ -1,22 +1,22 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-23T06:54:18Z
-updated: 2026-06-23T06:55:08Z
+updated: 2026-07-02T11:41:35Z
 author: c-vigo
 author_url: https://github.com/c-vigo
-url: https://github.com/vig-os/devcontainer/issues/641
-comments: 0
+url: https://github.com/vig-os/devkit/issues/641
+comments: 1
 labels: feature, area:workspace
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-06-23T08:02:47.243Z
+synced: 2026-07-11T13:34:10.827Z
 ---
 
-# [Issue 641]: [T4.3 — Install/init UX: choose devcontainer / direnv / both](https://github.com/vig-os/devcontainer/issues/641)
+# [Issue 641]: [T4.3 — Install/init UX: choose devcontainer / direnv / both](https://github.com/vig-os/devkit/issues/641)
 
 Tracking: #625
 
@@ -75,4 +75,12 @@ repos want just direnv; orchestrated repos want the container; some want both.
   same install/init entrypoint; land the mode picker and its UX improvements together.
 - **#71** (expand `justfile.base` recipes) — the scaffolded modes should expose a consistent
   recipe set; coordinate so direnv-only repos still get the relevant recipes.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 2, 2026 at 11:41 AM_
+
+Done via PR #663 (landed on `dev` through the #625 epic PR #670). Both `install.sh` and `assets/init-workspace.sh` support `--mode devcontainer|direnv|both` (interactive prompt when unset, default `both`), and each mode prunes to exactly the right file set after scaffold.
 
