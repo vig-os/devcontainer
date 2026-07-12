@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-06-30T12:52:12Z
-updated: 2026-07-10T22:58:56Z
+updated: 2026-07-11T13:53:12Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devkit/issues/781
-comments: 8
+comments: 9
 labels: chore, priority:high, area:image, effort:medium, semver:major
 assignees: none
 milestone: 1.0
 projects: none
 parent: none
 children: none
-synced: 2026-07-11T13:33:47.311Z
+synced: 2026-07-12T05:35:49.804Z
 ---
 
 # [Issue 781]: [[CHORE] Rename devcontainer → devkit (after publish-cutover #639)](https://github.com/vig-os/devkit/issues/781)
@@ -326,4 +326,12 @@ _Posted on July 10, 2026 at 10:58 PM_
 - Merge #979 + #235. After #979 lands on `main`, re-confirm the scheduled Security Scan shows a next run.
 - **Stage 4:** announce; consumers re-scaffold at leisure (no image migration); close this issue after the first green scheduled vulnix nightly on `main` under the renamed repo.
 
+
+---
+
+# [Comment #9]() by [c-vigo]()
+
+_Posted on July 11, 2026 at 01:53 PM_
+
+**Rename complete.** devkit 1.0.0 released; repos renamed `vig-os/devcontainer`→`vig-os/devkit` and `…-smoke-test`→`vig-os/devkit-smoke-test`; source-repo refs + cosign signing identity + OCI source label flipped (#979) with the smoke-test lockstep (#235). Per the course-correction, the **published image stays `ghcr.io/vig-os/devcontainer`**, so consumers need no image migration — a re-scaffold at leisure only refreshes source URLs. The release-critical scheduled vulnix scan (`security-scan`) is green on `main` under the renamed repo — the close criterion. Closing.
 
