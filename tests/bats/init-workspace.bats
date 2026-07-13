@@ -1927,6 +1927,7 @@ _upgrade_legacy() {
         run grep -q './.github/actions/setup-devkit-toolchain' "$f"
         assert_success
         # the container is selected by the resolved-image expression
+        # shellcheck disable=SC2016  # literal GitHub expression, not a shell one
         run grep -Fq 'image: ${{ needs.resolve-toolchain.outputs.image }}' "$f"
         assert_success
         # no hardcoded devcontainer image literal anywhere (only the expression)
