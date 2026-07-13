@@ -126,6 +126,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     Both are pure aliases: the dev-shell and home-manager activation derivations
     are byte-identical before and after.
 
+- **A scaffolded consumer's `nix develop` is warning-free too** ([#1021](https://github.com/vig-os/devkit/issues/1021))
+  - The shared consumer overlay (`vigos.overlays.default`) still read the
+    renamed-away `final.system`, so every consumer that applied it and forced a
+    fast-mover package saw the `'system' has been renamed to/replaced by
+    'stdenv.hostPlatform.system'` warning that [#1017](https://github.com/vig-os/devkit/issues/1017)
+    had already cleared from the devkit's own dev-shell. The overlay now reads
+    `final.stdenv.hostPlatform.system`; the resolved derivations are unchanged.
+
 - **Scaffolded flake stub references the renamed `github:vig-os/devkit` input** ([#1009](https://github.com/vig-os/devkit/issues/1009))
   - The preserved `assets/workspace/flake.nix` stub (active input and pin-example
     comment) still pointed at `github:vig-os/devcontainer`, which only resolved
