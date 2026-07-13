@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`actionlint` GitHub Actions workflow linter adopted** ([#995](https://github.com/vig-os/devkit/issues/995))
+  - `actionlint` joins the vigOS toolchain (dev-shell, image, and `vigos.packages` home module), so it is available in every consumer environment.
+  - The devkit lints its own `.github/workflows/` through a pre-commit hook, and its bats suite runs `actionlint` over the per-mode scaffold output (devcontainer, direnv, bare, both) plus the smoke-test template — a semantically broken rendered workflow now fails in the devkit instead of silently in a consumer repo.
+
 ### Changed
 
 - **Renovate: update `cachix/install-nix-action` from `v31.10.6` to `v31.10.7`** ([#984](https://github.com/vig-os/devkit/pull/984))
