@@ -116,7 +116,8 @@
       # fixpoint; the in-flake path below uses the hoisted importUnstable.
       overlay =
         final: prev:
-        (mkFastMoverOverlay (importUnstable final.system) final prev) // (vigUtilsOverlay final prev);
+        (mkFastMoverOverlay (importUnstable final.stdenv.hostPlatform.system) final prev)
+        // (vigUtilsOverlay final prev);
 
       # ---------------------------------------------------------------------
       # vigos home environment (#819): self-pkgs + the ci homeConfigurations.
