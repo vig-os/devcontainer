@@ -130,7 +130,7 @@ jobs:
           if [ -n "$CACHE_ID" ]; then
             echo "Found cache ID: $CACHE_ID, attempting deletion..."
             retry --retries 3 --backoff 3 --max-backoff 15 -- \
-              gh api repos/${{ github.repository }}/actions/caches/$CACHE_ID -X DELETE && echo "Cache deleted successfully" || echo "Cache deletion failed (may be locked or already deleted)"
+              gh api repos/${{ github.repository }}/actions/caches/"$CACHE_ID" -X DELETE && echo "Cache deleted successfully" || echo "Cache deletion failed (may be locked or already deleted)"
           else
             echo "No cache found with key: $CACHE_KEY (this is OK for first run)"
           fi

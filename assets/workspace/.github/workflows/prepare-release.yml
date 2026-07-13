@@ -312,6 +312,7 @@ jobs:
           PR_BODY="${HEADER}${CHANGELOG_CONTENT}"$'\n'
 
           if [ "${#PR_BODY}" -gt "$MAX_BODY" ]; then
+            # shellcheck disable=SC2016  # backticks are literal Markdown code spans, not command substitution
             NOTE=$(printf '\n\n_Changelog truncated to fit GitHub'"'"'s %s-char PR-body limit; see `CHANGELOG.md` on `%s` for the full entry._' "$MAX_BODY" "$RELEASE_BRANCH")
             budget=$(( MAX_BODY - ${#HEADER} - ${#NOTE} ))
             TRUNCATED="${CHANGELOG_CONTENT:0:budget}"

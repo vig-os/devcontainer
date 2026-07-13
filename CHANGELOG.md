@@ -76,6 +76,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     choreography (step logic, ordering, inputs/outputs, rollback semantics) is
     unchanged.
 - **Renovate: update `cachix/install-nix-action` from `v31.10.6` to `v31.10.7`** ([#984](https://github.com/vig-os/devkit/pull/984))
+- **`actionlint` shellcheck integration re-enabled; workflow `run:` blocks hardened** ([#1003](https://github.com/vig-os/devkit/issues/1003))
+  - The bundled `shellcheck` pass that #995 deferred is now active in both the
+    devkit's own `actionlint` pre-commit hook and the bats fixtures that lint the
+    per-mode scaffold output. The scaffolded template workflows shipped to
+    consumers had their `run:` blocks hardened to pass it — quoting redirect
+    targets and shell variables, grouping consecutive `>> "$GITHUB_OUTPUT"`
+    writes, and quoting pattern expansions — so a consumer's rendered workflows
+    now lint clean under `actionlint`'s shellcheck. A handful of intentional
+    patterns (literal Markdown backticks, whitelist substring matches, deliberate
+    word-splitting) carry justified `# shellcheck disable` directives.
 
 ### Deprecated
 

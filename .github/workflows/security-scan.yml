@@ -126,6 +126,7 @@ jobs:
               sleep $((60 * attempt))
             fi
           done
+          # shellcheck disable=SC2015  # the error branch is meant to fire whenever the scan-ok check fails, not as if-then-else
           [ "$rc" -le 2 ] && jq -e . vulnix-findings.json > /dev/null 2>&1 \
             || { echo "::error::vulnix scan failed after 3 attempts (exit $rc)"; exit 1; }
           rc=0

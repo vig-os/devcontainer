@@ -127,16 +127,18 @@ jobs:
             EFFECTIVE_SOURCE_RUN_URL="${GITHUB_SERVER_URL}/${SOURCE_REPO}/actions/runs/${SOURCE_RUN_ID}"
           fi
 
-          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
-          echo "base_version=${BASE_VERSION}" >> "${GITHUB_OUTPUT}"
-          echo "rc_number=${RC_NUMBER}" >> "${GITHUB_OUTPUT}"
-          echo "release_kind=${EFFECTIVE_RELEASE_KIND}" >> "${GITHUB_OUTPUT}"
-          echo "source_repo=${SOURCE_REPO}" >> "${GITHUB_OUTPUT}"
-          echo "source_workflow=${SOURCE_WORKFLOW}" >> "${GITHUB_OUTPUT}"
-          echo "source_run_id=${SOURCE_RUN_ID}" >> "${GITHUB_OUTPUT}"
-          echo "source_run_url=${EFFECTIVE_SOURCE_RUN_URL}" >> "${GITHUB_OUTPUT}"
-          echo "source_sha=${SOURCE_SHA}" >> "${GITHUB_OUTPUT}"
-          echo "correlation_id=${CORRELATION_ID}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "tag=${TAG}"
+            echo "base_version=${BASE_VERSION}"
+            echo "rc_number=${RC_NUMBER}"
+            echo "release_kind=${EFFECTIVE_RELEASE_KIND}"
+            echo "source_repo=${SOURCE_REPO}"
+            echo "source_workflow=${SOURCE_WORKFLOW}"
+            echo "source_run_id=${SOURCE_RUN_ID}"
+            echo "source_run_url=${EFFECTIVE_SOURCE_RUN_URL}"
+            echo "source_sha=${SOURCE_SHA}"
+            echo "correlation_id=${CORRELATION_ID}"
+          } >> "${GITHUB_OUTPUT}"
 
   deploy:
     name: Deploy tag and open PR to dev

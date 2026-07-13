@@ -157,9 +157,11 @@ jobs:
           fi
 
           RELEASE_DATE=$(date -u +%Y-%m-%d)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "release_kind=$RELEASE_KIND" >> "$GITHUB_OUTPUT"
-          echo "release_date=$RELEASE_DATE" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=$VERSION"
+            echo "release_kind=$RELEASE_KIND"
+            echo "release_date=$RELEASE_DATE"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Checkout release branch
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -220,12 +222,12 @@ jobs:
               if [ -n "$EXISTING_TAGS" ]; then
                 while IFS= read -r tag; do
                   [ -z "$tag" ] && continue
-                  if [ "${tag#${VERSION}-rc}" = "$tag" ]; then
+                  if [ "${tag#"${VERSION}"-rc}" = "$tag" ]; then
                     echo "ERROR: Malformed candidate tag detected: $tag"
                     echo "Expected format: ${VERSION}-rcN"
                     exit 1
                   fi
-                  rc_num="${tag#${VERSION}-rc}"
+                  rc_num="${tag#"${VERSION}"-rc}"
                   if ! echo "$rc_num" | grep -qE '^[0-9]+$'; then
                     echo "ERROR: Malformed candidate tag detected: $tag"
                     echo "Expected format: ${VERSION}-rcN"
