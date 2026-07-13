@@ -99,6 +99,18 @@ runs:
 
         # Missing DEVKIT_MODE defaults to `both` (today's container behavior).
         MODE="${MODE:-both}"
+
+        # Refuse an unknown/corrupt mode loudly (mirrors the init-workspace.sh
+        # persisted-mode guard): a typo'd value must never be silently
+        # classified as a host mode and flip a container repo's CI onto host
+        # runners.
+        case "$MODE" in
+          devcontainer|direnv|both|bare) ;;
+          *)
+            echo "::error::Invalid DEVKIT_MODE in .vig-os: $MODE (expected: devcontainer | direnv | both | bare)"
+            exit 1
+            ;;
+        esac
         echo "mode=$MODE" >> "$GITHUB_OUTPUT"
 
         # Resolve the version tag: explicit override wins, else DEVKIT_VERSION,
@@ -118,10 +130,11 @@ runs:
             fi
             IMAGE="ghcr.io/vig-os/devcontainer:${TAG}"
             ;;
-          *)
-            # Host modes (direnv/bare): no container image. Emit an EXPLICIT
-            # empty string (never omit) so the downstream `container:` runs on
-            # the host (ADR Option A).
+          direnv|bare)
+            # Host modes: no container image. Emit an EXPLICIT empty string
+            # (never omit) so the downstream `container:` runs on the host
+            # (ADR Option A). Explicit arm — unknown modes were rejected above,
+            # so the statement is closed.
             IMAGE=""
             ;;
         esac
