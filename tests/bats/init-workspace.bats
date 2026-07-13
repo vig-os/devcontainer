@@ -63,6 +63,18 @@ setup() {
     assert_success
 }
 
+@test "downstream flake stub references the renamed github:vig-os/devkit input (#1009)" {
+    # #781 renamed the repo devcontainer -> devkit; the old URL only works via
+    # GitHub's redirect, so the scaffolded stub (a preserved file) must point new
+    # consumers at the canonical name — both the active input and the pin example.
+    run grep -q 'vigos.url = "github:vig-os/devkit"' "$TEMPLATE_DIR/flake.nix"
+    assert_success
+    run grep -q 'github:vig-os/devkit?ref=<tag>' "$TEMPLATE_DIR/flake.nix"
+    assert_success
+    run grep -q 'github:vig-os/devcontainer' "$TEMPLATE_DIR/flake.nix"
+    assert_failure
+}
+
 @test "flake.nix and .envrc are preserved on --force upgrade (#640)" {
     # shellcheck disable=SC2016
     run grep -E '"flake\.nix"' "$INIT_WORKSPACE_SH"

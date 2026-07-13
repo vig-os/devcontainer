@@ -83,6 +83,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Scaffolded flake stub references the renamed `github:vig-os/devkit` input** ([#1009](https://github.com/vig-os/devkit/issues/1009))
+  - The preserved `assets/workspace/flake.nix` stub (active input and pin-example
+    comment) still pointed at `github:vig-os/devcontainer`, which only resolved
+    via GitHub's post-rename redirect; new consumers now scaffold the canonical
+    `github:vig-os/devkit`. `docs/MIGRATION.md` documents the by-hand update for
+    existing `direnv`/`both` consumers, whose stub is never overwritten on upgrade.
+
 - **direnv/bare scaffolds no longer ship container-only artifacts** ([#989](https://github.com/vig-os/devkit/issues/989))
   - `docs/container-ci-quirks.md` (in-image CI notes) is now mode-filtered like
     `.devcontainer/`: excluded from container-less scaffolds, pruned from a

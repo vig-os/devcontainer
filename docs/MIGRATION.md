@@ -20,7 +20,7 @@ two ways:
   distro, no `Dockerfile FROM`), bit-reproducible, and built natively for
   `amd64` and `arm64`. Published as `ghcr.io/vig-os/devcontainer`.
 - **Bare-nix dev-shell** — the same toolchain via `nix develop` / `direnv`,
-  consumed as a flake input (`vigos.url = "github:vig-os/devcontainer"`).
+  consumed as a flake input (`vigos.url = "github:vig-os/devkit"`).
 
 The toolchain is defined once, in `flake.nix`'s `devTools` list. A parity test
 guarantees the dev-shell and the image never drift. There is no second
@@ -543,3 +543,15 @@ commands keep working with no change. A re-scaffold (`install.sh --force`) only
 refreshes the `install.sh` source URL and templated files; it does not change the
 image you pull. The `.vig-os` version-pin key is `DEVKIT_VERSION` (the legacy
 `DEVCONTAINER_VERSION` is still accepted).
+
+**Existing `direnv`/`both` consumers: update the flake input by hand.** The
+scaffolded `flake.nix` is a preserved file — a re-scaffold never overwrites it —
+so a repo scaffolded before the rename keeps
+`vigos.url = "github:vig-os/devcontainer"`. That URL keeps resolving via
+GitHub's repository redirect, so nothing breaks, but new stubs now reference the
+canonical `github:vig-os/devkit`. Update your input (and any pin-example comment)
+to match, then `nix flake update vigos`:
+
+```nix
+vigos.url = "github:vig-os/devkit"; # was github:vig-os/devcontainer
+```

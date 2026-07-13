@@ -10,9 +10,9 @@
     # project works before its first pin. Once you depend on stability
     # (especially the vigos.* home-manager module options), pin a release
     # tag instead and bump deliberately:
-    #   vigos.url = "github:vig-os/devcontainer?ref=<tag>";
+    #   vigos.url = "github:vig-os/devkit?ref=<tag>";
     # Policy: docs/NIX.md "Home-manager modules - versioning & release policy".
-    vigos.url = "github:vig-os/devcontainer";
+    vigos.url = "github:vig-os/devkit";
     # Follow vigos's pinned nixpkgs + flake-utils so your tools match the
     # toolchain exactly (one resolved nixpkgs, no drift).
     nixpkgs.follows = "vigos/nixpkgs";
