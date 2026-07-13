@@ -48,6 +48,11 @@ VERSION_FLAG_OVERRIDES: dict[str, list[str]] = {
     # argument"); it is a subcommand CLI. `--help` exits 0 and proves the binary
     # is runnable in the dev-shell, which is what this parity check asserts.
     "statix": ["--help"],
+    # vig-utils is a subcommand CLI (its `main` requires a subcommand, so
+    # `--version` exits 2); `--help` exits 0 and proves the binary runs. The
+    # release console scripts it ships (prepare-changelog,
+    # renovate-changelog-pr) get their own dedicated PATH test above. Refs #993.
+    "vig-utils": ["--help"],
 }
 
 pytestmark = pytest.mark.skipif(
