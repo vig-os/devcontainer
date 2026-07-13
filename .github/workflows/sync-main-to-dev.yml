@@ -39,31 +39,9 @@ permissions:
   contents: read
 
 jobs:
-  resolve-image:
-    name: Resolve image tag
-    runs-on: ubuntu-24.04
-    timeout-minutes: 2
-    outputs:
-      image-tag: ${{ steps.resolve.outputs.image-tag }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-        with:
-          sparse-checkout: |
-            .vig-os
-            .github/actions/resolve-image
-          sparse-checkout-cone-mode: false
-
-      - name: Resolve container image
-        id: resolve
-        uses: ./.github/actions/resolve-image
-
   check:
     name: Check if dev is up to date
-    needs: [resolve-image]
     runs-on: ubuntu-24.04
-    container:
-      image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 5
     defaults:
       run:
@@ -77,8 +55,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fix git safe.directory
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Set up environment
+        uses: ./.github/actions/setup-env
+        with:
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Check if dev is up to date with main
         id: check
@@ -104,11 +85,9 @@ jobs:
 
   sync:
     name: Merge main into dev via PR
-    needs: [resolve-image, check]
+    needs: [check]
     if: needs.check.outputs.up_to_date != 'true'
     runs-on: ubuntu-24.04
-    container:
-      image: ghcr.io/vig-os/devcontainer:${{ needs.resolve-image.outputs.image-tag }}
     timeout-minutes: 10
     defaults:
       run:
@@ -135,8 +114,11 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.commit-app-token.outputs.token }}
 
-      - name: Fix git safe.directory
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Set up environment
+        uses: ./.github/actions/setup-env
+        with:
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Re-check if dev is still behind main
         id: recheck
