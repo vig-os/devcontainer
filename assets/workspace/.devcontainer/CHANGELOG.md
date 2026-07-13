@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [1.1.0] - TBD
+
+### Added
+
 - **`actionlint` GitHub Actions workflow linter adopted** ([#995](https://github.com/vig-os/devkit/issues/995))
   - `actionlint` joins the vigOS toolchain (dev-shell, image, and `vigos.packages` home module), so it is available in every consumer environment.
   - The devkit lints its own `.github/workflows/` through a pre-commit hook, and its bats suite runs `actionlint` over the per-mode scaffold output (devcontainer, direnv, bare, both) plus the smoke-test template — a semantically broken rendered workflow now fails in the devkit instead of silently in a consumer repo.
@@ -87,10 +101,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     patterns (literal Markdown backticks, whitelist substring matches, deliberate
     word-splitting) carry justified `# shellcheck disable` directives.
 
-### Deprecated
-
-### Removed
-
 ### Fixed
 
 - **Scaffolded flake stub references the renamed `github:vig-os/devkit` input** ([#1009](https://github.com/vig-os/devkit/issues/1009))
@@ -111,8 +121,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Pin `sigstore/cosign-installer` to `v4.1.2` so Renovate can resolve its digest** ([#986](https://github.com/vig-os/devkit/issues/986))
   - The previous pin's `# v4` comment named a floating tag that `sigstore/cosign-installer` never published, so Renovate's digest lookup failed on the dependency dashboard
-
-### Security
 
 ## [1.0.1](https://github.com/vig-os/devkit/releases/tag/1.0.1) - 2026-07-11
 
