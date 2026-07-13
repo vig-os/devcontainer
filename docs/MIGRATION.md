@@ -385,6 +385,41 @@ It prints the add/overwrite/preserve/delete file report and exits without
 touching the tree (unlike `--dry-run`, which only prints the container command
 and computes no file report).
 
+### Migrating a `devcontainer`/`both` repo to `direnv` or `bare`
+
+By default a mode switch is **non-destructive** toward a populated pre-existing
+`.devcontainer/`: switching a container repo to `direnv`/`bare` keeps the old
+container next to the new flake ([#738](https://github.com/vig-os/devkit/issues/738)).
+That is right for coexistence, but on a genuine **container → direnv/bare
+migration** it strands a now-stale container. `--prune-devcontainer` opts into
+removing it (`direnv`/`bare` modes only; rejected in `devcontainer`/`both`).
+
+Because a mode switch never happens implicitly (see
+[the `.vig-os` manifest](#the-vig-os-project-manifest) above), the migration is a
+deliberate, reviewable branch:
+
+1. On a clean upgrade branch, set `DEVKIT_MODE=direnv` (or `bare`) in `.vig-os`
+   and commit it.
+2. **Preview the cleanup first** — confirm the `.devcontainer/` moves into the
+   `DELETED` listing (and nothing else you rely on does):
+
+   ```bash
+   curl -sSfL https://raw.githubusercontent.com/vig-os/devkit/main/install.sh \
+     | bash -s -- --force --preview --mode direnv --prune-devcontainer .
+   ```
+
+3. Run the upgrade with the flag to apply it:
+
+   ```bash
+   curl -sSfL https://raw.githubusercontent.com/vig-os/devkit/main/install.sh \
+     | bash -s -- --force --mode direnv --prune-devcontainer .
+   ```
+
+Interactive runs (no `--no-prompts`) that detect a populated pre-existing
+`.devcontainer/` in a container-less mode prompt once
+(`Prune existing .devcontainer/? (y/N)`, default No). Omit the flag entirely to
+keep the #738 default and preserve the container.
+
 ## Upgrading an existing 0.3.x consumer — manual steps
 
 `install.sh --version <X> --force` refreshes the scaffold and pins `<X>` in

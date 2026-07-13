@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Opt-in `--prune-devcontainer` for container → direnv/bare migrations** ([#990](https://github.com/vig-os/devkit/issues/990))
+  - Switching a container repo to `direnv`/`bare` keeps a populated pre-existing
+    `.devcontainer/` by default (non-destructive, [#738](https://github.com/vig-os/devkit/issues/738)).
+    On a real migration that strands the stale container next to the new flake,
+    so `install.sh` / `init-workspace.sh` now accept `--prune-devcontainer` to
+    remove it. The flag is rejected in `devcontainer`/`both` modes; `--preview`
+    lists the `.devcontainer/` under `DELETED` when it is set; and interactive
+    runs prompt once (`Prune existing .devcontainer/? (y/N)`, default No) when a
+    populated pre-existing `.devcontainer/` is detected in a container-less mode.
+    `docs/MIGRATION.md` documents the preview-then-apply cleanup runbook.
+
 ### Changed
 
 - **Renovate: update `cachix/install-nix-action` from `v31.10.6` to `v31.10.7`** ([#984](https://github.com/vig-os/devkit/pull/984))
