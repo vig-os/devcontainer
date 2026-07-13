@@ -76,8 +76,8 @@ jobs:
           fi
 
           RELEASE_BRANCH="release/$VERSION"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "release_branch=$RELEASE_BRANCH" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "release_branch=$RELEASE_BRANCH" >> "$GITHUB_OUTPUT"
           echo "✓ Version format validated: $VERSION"
 
       - name: Verify release branch does not exist
@@ -315,6 +315,7 @@ jobs:
           PR_BODY="${HEADER}${CHANGELOG_CONTENT}"$'\n'
 
           if [ "${#PR_BODY}" -gt "$MAX_BODY" ]; then
+            # shellcheck disable=SC2016  # backticks are literal Markdown code spans, not command substitution
             NOTE=$(printf '\n\n_Changelog truncated to fit GitHub'"'"'s %s-char PR-body limit; see `CHANGELOG.md` on `%s` for the full entry._' "$MAX_BODY" "$RELEASE_BRANCH")
             budget=$(( MAX_BODY - ${#HEADER} - ${#NOTE} ))
             TRUNCATED="${CHANGELOG_CONTENT:0:budget}"
@@ -331,8 +332,8 @@ jobs:
             --draft)
 
           PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
-          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
           echo "✓ Draft PR created: $PR_URL (#$PR_NUMBER)"
 
       - name: Roll back prepare-release side effects on failure

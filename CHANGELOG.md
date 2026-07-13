@@ -19,6 +19,140 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [1.1.0](https://github.com/vig-os/devkit/releases/tag/1.1.0) - 2026-07-13
+
+### Added
+
+- **`actionlint` GitHub Actions workflow linter adopted** ([#995](https://github.com/vig-os/devkit/issues/995))
+  - `actionlint` joins the vigOS toolchain (dev-shell, image, and `vigos.packages` home module), so it is available in every consumer environment.
+  - The devkit lints its own `.github/workflows/` through a pre-commit hook, and its bats suite runs `actionlint` over the per-mode scaffold output (devcontainer, direnv, bare, both) plus the smoke-test template — a semantically broken rendered workflow now fails in the devkit instead of silently in a consumer repo.
+- **Opt-in `--prune-devcontainer` for container → direnv/bare migrations** ([#990](https://github.com/vig-os/devkit/issues/990))
+  - Switching a container repo to `direnv`/`bare` keeps a populated pre-existing
+    `.devcontainer/` by default (non-destructive, [#738](https://github.com/vig-os/devkit/issues/738)).
+    On a real migration that strands the stale container next to the new flake,
+    so `install.sh` / `init-workspace.sh` now accept `--prune-devcontainer` to
+    remove it. The flag is rejected in `devcontainer`/`both` modes; `--preview`
+    lists the `.devcontainer/` under `DELETED` when it is set; and interactive
+    runs prompt once (`Prune existing .devcontainer/? (y/N)`, default No) when a
+    populated pre-existing `.devcontainer/` is detected in a container-less mode.
+    `docs/MIGRATION.md` documents the preview-then-apply cleanup runbook.
+- **Mode-aware toolchain composite actions** ([#994](https://github.com/vig-os/devkit/issues/994))
+  - New scaffolded `resolve-toolchain` composite action (evolves
+    `resolve-image`): reads `.vig-os` and emits `mode`, `image`, and `image-tag`.
+    Container-ish modes (`devcontainer`/`both`) get the `ghcr.io/vig-os/devcontainer`
+    image and keep the `docker manifest inspect` accessibility probe; the host
+    modes (`direnv`/`bare`) get an explicit empty `image` so the downstream job
+    runs on the host runner (Option A, `docs/rfcs/ADR-conditional-container-toolchain.md`).
+  - New scaffolded `setup-devkit-toolchain` composite action: the single
+    step-level toolchain preamble for every mode. Branches on `DEVKIT_MODE` —
+    in-container jobs export the image-relative env (`UV_PROJECT_ENVIRONMENT`,
+    `PREK_HOME`) + `safe.directory` fix; `direnv` provisions the repo flake
+    dev-shell via Nix + Cachix; `bare` installs the pinned toolchain (`just`,
+    `prek`, `vig-utils`) with `uv`. Both host modes install a self-contained
+    `retry` shim. Preserves the per-mode `prek` version-skew guards (#854).
+- **`vig-utils` console scripts available in the dev-shell** ([#993](https://github.com/vig-os/devkit/issues/993))
+  - `prepare-changelog`, `renovate-changelog-pr`, and the other
+    `packages/vig-utils` console scripts are now on the toolchain SSoT
+    (`nix/devtools.nix`), so every `nix develop` shell — the devkit's own and any
+    consumer `mkProjectShell` (direnv mode) — exposes them on PATH, matching the
+    image. This unblocks mode-aware release workflows for the container-less
+    modes.
+  - Bare mode (no flake) gets a documented, version-pinned host-native install
+    path: `uv tool install "vig-utils @ git+https://github.com/vig-os/devkit@<DEVKIT_VERSION>#subdirectory=packages/vig-utils"`
+    (see `docs/MIGRATION.md`).
+
+### Changed
+
+- **Single mode-aware `ci.yml` replaces the per-mode overlays** ([#991](https://github.com/vig-os/devkit/issues/991))
+  - The container-based `ci.yml` and the separate `direnv`/`bare` overlay
+    variants collapse into one managed workflow. A leading `resolve-toolchain`
+    job resolves `DEVKIT_MODE` + image from `.vig-os`; every job runs
+    `container: image: ${{ needs.resolve-toolchain.outputs.image }}` (empty ⇒
+    host runner, per the Option A ADR) and calls the `setup-devkit-toolchain`
+    composite to provision its toolchain, so `just sync|precommit|test` runs
+    identically in every mode. The `assets/workspace-direnv/` and
+    `assets/workspace-bare/` overlay trees and their `init-workspace.sh`
+    deployment blocks are removed.
+- **Mode-aware release & automation workflows** ([#991](https://github.com/vig-os/devkit/issues/991))
+  - The scaffolded release/automation set (`release.yml` + reusable
+    `release-core.yml` / `release-publish.yml`, `prepare-release.yml`,
+    `promote-release.yml`, `sync-main-to-dev.yml`, `renovate-changelog-build.yml`,
+    `sync-issues.yml`) is converted off the container-only `resolve-image` job
+    onto the mode-aware pattern: a leading `resolve-toolchain` job (used inline in
+    `prepare-release.yml`'s host `validate` job) selects the image — empty in the
+    `direnv`/`bare` modes so jobs run on the runner (ADR Option A) — and every job
+    runs the `setup-devkit-toolchain` composite as its toolchain preamble. A
+    `direnv`/`bare` consumer no longer needs to delete or disable these workflows.
+  - The orchestrator resolves the toolchain **once** and threads it into the
+    reusable workflows via new `toolchain_mode` / `toolchain_image` /
+    `devkit_version` `workflow_call` inputs; `release-core.yml` /
+    `release-publish.yml` no longer run their own resolve jobs. Release
+    choreography (step logic, ordering, inputs/outputs, rollback semantics) is
+    unchanged.
+- **Renovate: update `cachix/install-nix-action` from `v31.10.6` to `v31.10.7`** ([#984](https://github.com/vig-os/devkit/pull/984))
+- **`actionlint` shellcheck integration re-enabled; workflow `run:` blocks hardened** ([#1003](https://github.com/vig-os/devkit/issues/1003))
+  - The bundled `shellcheck` pass that #995 deferred is now active in both the
+    devkit's own `actionlint` pre-commit hook and the bats fixtures that lint the
+    per-mode scaffold output. The scaffolded template workflows shipped to
+    consumers had their `run:` blocks hardened to pass it — quoting redirect
+    targets and shell variables, grouping consecutive `>> "$GITHUB_OUTPUT"`
+    writes, and quoting pattern expansions — so a consumer's rendered workflows
+    now lint clean under `actionlint`'s shellcheck. A handful of intentional
+    patterns (literal Markdown backticks, whitelist substring matches, deliberate
+    word-splitting) carry justified `# shellcheck disable` directives.
+
+### Fixed
+
+- **`install.sh` next-steps message is mode-aware** ([#1015](https://github.com/vig-os/devkit/issues/1015))
+  - A `direnv` deploy printed *"Open in VS Code — it will detect `.devcontainer/`"*,
+    pointing at a directory the direnv scaffold never creates (and that
+    `--prune-devcontainer` may have just removed). The message now branches over
+    every validated mode: `direnv` points at `direnv allow` (with `nix develop` as
+    the hook-free fallback), `both` offers each entrypoint, and `bare`/`devcontainer`
+    are unchanged.
+
+- **Scaffolded `workflow_call` workflows declare the secrets they inherit** ([#1016](https://github.com/vig-os/devkit/issues/1016))
+  - `release-core.yml` and `release-publish.yml` read `GHCR_PULL_TOKEN`,
+    `RELEASE_APP_*` and `COMMIT_APP_*` without declaring them in their
+    `workflow_call: secrets:` block. A reusable workflow has a *closed* secrets set,
+    so `actionlint` correctly reported each one as undefined and every scaffolded
+    consumer inherited a dirty lint run. The secrets are now declared (`required:`
+    set from real usage), and the bats suite no longer suppresses the diagnostic —
+    it asserts that every referenced secret is declared.
+
+- **Dev-shell entry is warning-free** ([#1017](https://github.com/vig-os/devkit/issues/1017))
+  - `nix develop` emitted two upstream rename warnings (`nixfmt-rfc-style` →
+    `nixfmt`, and home-manager's `programs.neovim.extraLuaConfig` → `initLua`).
+    Both are pure aliases: the dev-shell and home-manager activation derivations
+    are byte-identical before and after.
+
+- **A scaffolded consumer's `nix develop` is warning-free too** ([#1021](https://github.com/vig-os/devkit/issues/1021))
+  - The shared consumer overlay (`vigos.overlays.default`) still read the
+    renamed-away `final.system`, so every consumer that applied it and forced a
+    fast-mover package saw the `'system' has been renamed to/replaced by
+    'stdenv.hostPlatform.system'` warning that [#1017](https://github.com/vig-os/devkit/issues/1017)
+    had already cleared from the devkit's own dev-shell. The overlay now reads
+    `final.stdenv.hostPlatform.system`; the resolved derivations are unchanged.
+
+- **Scaffolded flake stub references the renamed `github:vig-os/devkit` input** ([#1009](https://github.com/vig-os/devkit/issues/1009))
+  - The preserved `assets/workspace/flake.nix` stub (active input and pin-example
+    comment) still pointed at `github:vig-os/devcontainer`, which only resolved
+    via GitHub's post-rename redirect; new consumers now scaffold the canonical
+    `github:vig-os/devkit`. `docs/MIGRATION.md` documents the by-hand update for
+    existing `direnv`/`both` consumers, whose stub is never overwritten on upgrade.
+
+- **direnv/bare scaffolds no longer ship container-only artifacts** ([#989](https://github.com/vig-os/devkit/issues/989))
+  - `docs/container-ci-quirks.md` (in-image CI notes) is now mode-filtered like
+    `.devcontainer/`: excluded from container-less scaffolds, pruned from a
+    previously scaffolded tree on upgrade, and reflected truthfully in the
+    `--preview` report. The `resolve-image` action and `container:` workflow
+    coupling were already retired by the mode-aware toolchain work
+    ([#991](https://github.com/vig-os/devkit/issues/991)).
+  - The devkit's own `.vig-os` now declares its delivery mode (`direnv`).
+
+- **Pin `sigstore/cosign-installer` to `v4.1.2` so Renovate can resolve its digest** ([#986](https://github.com/vig-os/devkit/issues/986))
+  - The previous pin's `# v4` comment named a floating tag that `sigstore/cosign-installer` never published, so Renovate's digest lookup failed on the dependency dashboard
+
 ## [1.0.1](https://github.com/vig-os/devkit/releases/tag/1.0.1) - 2026-07-11
 
 ### Changed

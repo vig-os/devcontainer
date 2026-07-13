@@ -17,7 +17,11 @@
 #   --smoke-test      Deploy smoke-test-specific assets
 #   --preview         Print the add/overwrite/preserve/delete file report for an
 #                     upgrade and exit without changing anything
+#   --prune-devcontainer  In direnv/bare mode, remove a pre-existing .devcontainer/
+#                     (container->direnv/bare migration cleanup; default keeps it)
 #   --skip-preflight  Bypass the upgrade preflight guard (branch + clean-tree checks)
+#   --skip-pull       Use the already-present local image for --version (skip the
+#                     registry pull); e.g. a locally built :dev tag
 #   --dry-run         Show the container command that would run without executing
 #   -h, --help        Show this help message
 #
@@ -44,6 +48,7 @@ GITHUB_REPO_OVERRIDE=""
 MODE=""
 SMOKE_TEST=""
 PREVIEW=""
+PRUNE_DEVCONTAINER=""
 SKIP_PREFLIGHT=false
 
 # Colors (disabled if not a tty)
@@ -84,8 +89,14 @@ OPTIONS:
     --smoke-test      Deploy smoke-test-specific assets
     --preview         Preview an upgrade: print the add/overwrite/preserve/delete
                       file report and exit without changing any files
+    --prune-devcontainer
+                      In direnv/bare mode, also remove a pre-existing
+                      .devcontainer/ (a container->direnv/bare migration cleanup).
+                      The default is non-destructive and keeps it (#738).
     --skip-preflight  Bypass the upgrade preflight guard (--force refuses on
                       main/dev/release/*/detached HEAD and on a dirty tree)
+    --skip-pull       Use the already-present local image for --version (skip the
+                      registry pull); e.g. a locally built :dev tag
     --dry-run         Show the container command that would run (unlike
                       --preview, no file report is computed)
     -h, --help        Show this help
@@ -442,6 +453,10 @@ while [ $# -gt 0 ]; do
             PREVIEW="--preview"
             shift
             ;;
+        --prune-devcontainer)
+            PRUNE_DEVCONTAINER="--prune-devcontainer"
+            shift
+            ;;
         --skip-preflight)
             SKIP_PREFLIGHT=true
             shift
@@ -699,6 +714,10 @@ if [ -n "$MODE" ]; then
     CMD+=(--mode "$MODE")
 fi
 
+if [ -n "$PRUNE_DEVCONTAINER" ]; then
+    CMD+=(--prune-devcontainer)
+fi
+
 if [ "$DRY_RUN" = true ]; then
     info "Would execute:"
     # Derive the shown command from the real CMD array (built above, including
@@ -870,9 +889,22 @@ success "Devcontainer deployed to $PROJECT_PATH"
 echo ""
 echo "Next steps:"
 echo "  1. cd $PROJECT_PATH"
-if [ "$MODE" = "bare" ]; then
-    echo "  2. Run 'just help' to list the shipped recipes (host-native: no container)"
-else
-    echo "  2. Open in VS Code - it will detect .devcontainer/ and offer to reopen in container"
-fi
+# The next step is mode-specific: only the container modes scaffold a
+# .devcontainer/ for VS Code to detect, so direnv (which scaffolds only the
+# flake + .envrc) must be pointed at its own entrypoint instead (#1015).
+case "$MODE" in
+    bare)
+        echo "  2. Run 'just help' to list the shipped recipes (host-native: no container)"
+        ;;
+    direnv)
+        echo "  2. Run 'direnv allow' to load the flake dev-shell (or 'nix develop' without direnv)"
+        ;;
+    both)
+        echo "  2. Open in VS Code - it will detect .devcontainer/ and offer to reopen in container"
+        echo "     (or run 'direnv allow' on the host to load the flake dev-shell)"
+        ;;
+    *)
+        echo "  2. Open in VS Code - it will detect .devcontainer/ and offer to reopen in container"
+        ;;
+esac
 echo ""

@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-07-11T12:19:18Z
-updated: 2026-07-11T12:19:18Z
+updated: 2026-07-11T13:53:10Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devkit/issues/980
-comments: 0
+comments: 1
 labels: bug
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-07-11T13:33:14.280Z
+synced: 2026-07-12T05:35:23.576Z
 ---
 
 # [Issue 980]: [sync-issues: cache miss triggers full epoch re-sync, exhausting API rate limit](https://github.com/vig-os/devkit/issues/980)
@@ -37,3 +37,11 @@ On a cache miss, pass a **bounded look-back** `updated-since` instead of epoch, 
 Deeper defense-in-depth (rate-limit-aware checkpointing) belongs in `vig-os/sync-issues-action` — separate, lower priority.
 
 Refs: #781
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 11, 2026 at 01:53 PM_
+
+Fixed by #981 and **validated in a real run**: a `workflow_dispatch --ref dev` exercised the fixed workflow — the cache-miss path took the bounded 14-day look-back, completed without hitting the rate limit, and saved state (cache `sync-issues-state-vig-os/devkit` now exists). Production self-healed (scheduled runs from main now get a cache hit → incremental). Ships to main with the next release. Defense-in-depth checkpointing remains a separate, lower-priority item for `vig-os/sync-issues-action`.
+

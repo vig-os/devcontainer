@@ -373,6 +373,23 @@ let
         excludes = [ shellcheckExclude ];
       };
     };
+    # GitHub Actions workflow linter (#995). Runner-only and devkit-only: it
+    # lints THIS repo's own .github/workflows/ via actionlint's auto-discovery
+    # (pass_filenames = false). Not scaffolded to consumers and not in the
+    # sandbox gate — the per-mode RENDERED consumer templates are validated in
+    # tests/bats instead, because linting them in-place resolves the
+    # reusable-workflow siblings against the wrong root (the devkit itself).
+    # actionlint's bundled shellcheck pass over run-block scripts is enabled
+    # (#1003); the standalone shellcheck hook above still covers .sh scripts.
+    actionlint = {
+      yaml = {
+        name = "actionlint (lint GitHub Actions workflows)";
+        entry = "actionlint";
+        language = "system";
+        files = "^\\.github/workflows/.*\\.ya?ml$";
+        pass_filenames = false;
+      };
+    };
     # Markdown lint — runner-only everywhere: pymarkdown is not in nixpkgs,
     # so neither the sandbox gate nor the consumer generation can resolve
     # it (documented residual, docs/NIX.md).
@@ -433,7 +450,7 @@ let
       consumer = pkgs: {
         enable = true;
         name = "nixfmt";
-        entry = "${pkgs.nixfmt-rfc-style}/bin/nixfmt --check";
+        entry = "${pkgs.nixfmt}/bin/nixfmt --check";
         language = "system";
         files = "\\.nix$";
       };

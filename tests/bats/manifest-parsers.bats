@@ -7,8 +7,8 @@
 # DEVCONTAINER_VERSION=* and skips everything else, so the new keys must be
 # invisible to them: these tests run the real template scripts against a
 # version-only and a full-manifest .vig-os and assert byte-identical results.
-# (The third parser, the resolve-image composite action, is covered by
-# tests/test_resolve_image_manifest.py.)
+# (The devkit's own root resolve-image composite action was removed in #996; the
+# scaffold's mode-aware resolve-toolchain parser is covered under assets/workspace.)
 
 setup() {
     load test_helper

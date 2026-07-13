@@ -80,16 +80,24 @@ class TestRenovateChangelogTemplateNoMirrorLeak:
     lockstep with the root CHANGELOG.md, but consumers of the template have no
     assets/workspace/ tree. Under ``set -euo pipefail`` the mirror copies hard-fail
     on every consumer Renovate changelog run, so they must be stripped from the
-    synced template while the consumer-facing logic is preserved.
+    template while the consumer-facing logic is preserved.
+
+    ``renovate-changelog-build.yml`` is de-coupled from the sync manifest (#996):
+    the root workflow runs host+Nix via ``setup-env`` while the scaffold copy is
+    the mode-aware ``resolve-toolchain`` variant, authored directly under
+    ``assets/workspace/``. The no-mirror-leak guard therefore reads the committed
+    scaffold file rather than a freshly-synced copy.
     """
 
-    def test_build_workflow_drops_workspace_mirror(self, tmp_path):
-        """build.yml must not reference assets/workspace but keep the consumer copy."""
-        sync_manifest = _load_sync_manifest()
-        sync_manifest.sync(project_root, tmp_path)
-
+    def test_build_workflow_drops_workspace_mirror(self):
+        """The committed scaffold build.yml must not reference assets/workspace."""
         build = (
-            tmp_path / ".github" / "workflows" / "renovate-changelog-build.yml"
+            project_root
+            / "assets"
+            / "workspace"
+            / ".github"
+            / "workflows"
+            / "renovate-changelog-build.yml"
         ).read_text()
 
         # The upstream-only mirror tree must not leak into the consumer template.

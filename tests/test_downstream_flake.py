@@ -1,7 +1,7 @@
 """Downstream flake-stub quality gate (issue #640).
 
 The scaffolded ``assets/workspace/flake.nix`` consumes the shared toolchain as a
-flake input (``vigos.url = github:vig-os/devcontainer``). A change to the vigOS
+flake input (``vigos.url = github:vig-os/devkit``). A change to the vigOS
 flake API (e.g. ``lib.mkProjectShell`` or ``overlays.default``) can silently
 break a downstream repo's ``direnv allow`` even while this repo's own
 ``nix flake check`` stays green, because the stub resolves ``vigos`` from the

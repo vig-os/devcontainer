@@ -62,19 +62,20 @@ src = ".github/pull_request_template.md"
 [[entries]]
 src = ".github/ISSUE_TEMPLATE/"
 
-[[entries]]
-src = ".github/actions/resolve-image/"
+# The retired `resolve-image` action is NOT synced into the scaffold: consumers
+# get the mode-aware `resolve-toolchain` + `setup-devkit-toolchain` composites
+# (authored directly under assets/workspace/.github/actions/, #994/#991) instead.
 
-# Consumers of the template have no assets/workspace/ mirror tree, so the
-# upstream-only lockstep copies of that mirror hard-fail under `set -euo pipefail`
-# on every consumer Renovate changelog run. Strip the mirror plumbing from the
-# template while preserving the consumer-facing CHANGELOG.md handling (#914).
-[[entries]]
-src = ".github/workflows/renovate-changelog-build.yml"
-transforms = [
-  { type = "RemoveBlock", start_pattern = '# Keep the preserved-on-upgrade mirror', end_pattern = 'cp CHANGELOG\.md assets/workspace/\.devcontainer/CHANGELOG\.md' },
-  { type = "RemoveBlock", start_pattern = 'mkdir -p changelog-artifact/assets/workspace', end_pattern = 'changelog-artifact/assets/workspace/\.devcontainer/CHANGELOG\.md' },
-]
+# renovate-changelog-build.yml is de-coupled from this manifest (#996). The root
+# workflow now runs host+Nix via `./.github/actions/setup-env` (no resolve-image,
+# no container:), while the scaffold copy at
+# assets/workspace/.github/workflows/renovate-changelog-build.yml is the mode-aware
+# `resolve-toolchain` + `setup-devkit-toolchain` variant. The two no longer share a
+# structure that ReplaceBlock/Sed transforms could bridge — deriving the scaffold
+# variant from the converted root would mean re-synthesizing the resolve-toolchain
+# job and the container: block the root no longer has — so the scaffold copy is
+# maintained as an independently-authored file rather than derived from root
+# (precedent: #991 dropped the resolve-image action sync entry).
 
 [[entries]]
 src = ".github/workflows/renovate-changelog-commit.yml"
