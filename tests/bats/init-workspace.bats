@@ -2049,3 +2049,18 @@ _upgrade_legacy() {
     run grep -q 'retry()' "$f"
     assert_success
 }
+
+@test "resolve-toolchain rejects an unknown DEVKIT_MODE loudly (#994)" {
+    # A typo'd manifest value (e.g. a misspelled `container`) must fail the
+    # resolve step, not
+    # silently fall through to the host branch (empty image) and flip a
+    # container repo's CI onto host runners. Mirrors the init-workspace.sh
+    # corrupt-persisted-mode guard.
+    f="$TEMPLATE_DIR/.github/actions/resolve-toolchain/action.yml"
+    run grep -q 'Invalid DEVKIT_MODE' "$f"
+    assert_success
+    # the image case statement is closed: an explicit direnv|bare arm, no
+    # catch-all that would classify unknown modes as host.
+    run grep -q 'direnv|bare)' "$f"
+    assert_success
+}
