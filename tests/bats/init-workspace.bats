@@ -330,6 +330,109 @@ _scaffold() {
     assert_success
 }
 
+# ── opt-in .devcontainer/ prune on container-less mode upgrade (#990) ──────────
+# The #738 default is non-destructive: a container→direnv/bare re-scaffold keeps
+# a populated pre-existing .devcontainer/. On a real container→direnv migration
+# that strands a stale container next to the new flake, so `--prune-devcontainer`
+# opts into removing it. The flag applies only to direnv/bare modes; in
+# devcontainer/both it is rejected loudly. The default (no flag) stays #738.
+
+# Like _scaffold, but forwards extra args (e.g. --prune-devcontainer).
+_scaffold_ex() {
+    local mode="$1" ws="$2"
+    shift 2
+    local stub="$BATS_TEST_TMPDIR/stub-bin"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/just"
+    env PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=testproj \
+        GITHUB_REPOSITORY=test/repo \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts --mode "$mode" "$@"
+}
+
+@test "init-workspace --mode=direnv --prune-devcontainer removes a pre-existing .devcontainer/ (#990)" {
+    ws="$BATS_TEST_TMPDIR/e2e-990-direnv-prune"
+    mkdir -p "$ws/.devcontainer"
+    printf '{ "name": "stale devcontainer" }\n' >"$ws/.devcontainer/devcontainer.json"
+    run _scaffold_ex direnv "$ws" --prune-devcontainer
+    assert_success
+    run test -e "$ws/.devcontainer"
+    assert_failure
+    # ...and the direnv stub was still scaffolded.
+    run test -f "$ws/flake.nix"
+    assert_success
+}
+
+@test "init-workspace --mode=bare --prune-devcontainer removes a pre-existing .devcontainer/ (#990)" {
+    ws="$BATS_TEST_TMPDIR/e2e-990-bare-prune"
+    mkdir -p "$ws/.devcontainer"
+    printf '{ "name": "stale devcontainer" }\n' >"$ws/.devcontainer/devcontainer.json"
+    run _scaffold_ex bare "$ws" --prune-devcontainer
+    assert_success
+    run test -e "$ws/.devcontainer"
+    assert_failure
+}
+
+@test "init-workspace --mode=direnv without the flag still preserves .devcontainer/ (#990 keeps #738)" {
+    ws="$BATS_TEST_TMPDIR/e2e-990-direnv-keep"
+    mkdir -p "$ws/.devcontainer"
+    printf '{ "name": "SENTINEL-990 kept" }\n' >"$ws/.devcontainer/devcontainer.json"
+    run _scaffold direnv "$ws"
+    assert_success
+    run grep -q 'SENTINEL-990 kept' "$ws/.devcontainer/devcontainer.json"
+    assert_success
+}
+
+@test "init-workspace --prune-devcontainer is rejected in devcontainer mode (#990)" {
+    ws="$BATS_TEST_TMPDIR/e2e-990-reject-devc"
+    mkdir -p "$ws"
+    run _scaffold_ex devcontainer "$ws" --prune-devcontainer
+    assert_failure
+    assert_output --partial "--prune-devcontainer only applies to direnv/bare modes"
+}
+
+@test "init-workspace --prune-devcontainer is rejected in both mode (#990)" {
+    ws="$BATS_TEST_TMPDIR/e2e-990-reject-both"
+    mkdir -p "$ws"
+    run _scaffold_ex both "$ws" --prune-devcontainer
+    assert_failure
+    assert_output --partial "--prune-devcontainer only applies to direnv/bare modes"
+}
+
+@test "init-workspace prompts to prune a pre-existing .devcontainer/ in a container-less mode (#990)" {
+    # Interactive runs (no --no-prompts) prompt once, default No = preserve; the
+    # prompt is guarded to direnv/bare, a pre-existing .devcontainer/, and no
+    # explicit flag. Asserted structurally (the suite has no pty harness).
+    run grep -q 'Prune existing .devcontainer/? (y/N)' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+@test "init-workspace --preview --prune-devcontainer lists .devcontainer/ as DELETED without deleting (#990)" {
+    ws="$BATS_TEST_TMPDIR/e2e-990-preview-prune"
+    mkdir -p "$ws/.devcontainer"
+    printf '{ "name": "stale devcontainer" }\n' >"$ws/.devcontainer/devcontainer.json"
+    run _preview "$ws" --mode direnv --prune-devcontainer
+    assert_success
+    assert_output --partial "DELETED"
+    assert_output --partial ".devcontainer/"
+    # side-effect-free: the preview left the dir in place
+    run test -d "$ws/.devcontainer"
+    assert_success
+}
+
+@test "init-workspace --preview without the flag lists a pre-existing .devcontainer/ as PRESERVED (#990)" {
+    ws="$BATS_TEST_TMPDIR/e2e-990-preview-keep"
+    mkdir -p "$ws/.devcontainer"
+    printf '{ "name": "stale devcontainer" }\n' >"$ws/.devcontainer/devcontainer.json"
+    run _preview "$ws" --mode direnv
+    assert_success
+    assert_output --partial "PRESERVED"
+    assert_output --partial "pre-existing, kept"
+}
+
 # ── upgrade preview/report follows template symlinks (#949) ───────────────────
 # The Nix image bakes assets/workspace as a tree of symlinks into the nix store,
 # so the --preview/--force classifier's `find -type f` matched ZERO files and the
@@ -1941,6 +2044,66 @@ _upgrade_legacy() {
         run grep -q 'nix develop -c just' "$ws/.github/workflows/ci.yml"
         assert_failure
     done
+}
+
+# ── actionlint over the per-mode RENDERED workflows (#995) ─────────────────────
+# Each mode scaffolds a full .github/workflows/ tree (reusable release
+# choreography + the mode-specific ci.yml). actionlint validates the rendered
+# YAML semantically — job/needs/outputs wiring, expression syntax, action
+# inputs — so a broken render fails here in the devkit, not silently in a
+# consumer repo. Linting the templates in-place is impossible (actionlint
+# resolves `./.github/workflows/<reusable>` against the devkit root, where the
+# reusable release files do not exist); the faithful check is over the fully
+# rendered tree, which is what these fixtures do.
+#
+# The invocation disables actionlint's bundled shellcheck (`-shellcheck=`): its
+# run-block findings on the authored templates are pre-existing info/style/
+# warning noise, tracked for a separate hardening pass — the dedicated
+# shell-lint hook already covers `.sh` scripts. The reusable release workflows
+# read secrets (GHCR_PULL_TOKEN, *_APP_CLIENT_ID/PRIVATE_KEY) passed by the
+# caller via `secrets: inherit`, which actionlint cannot see statically; those
+# false positives are ignored by message.
+ACTIONLINT_INHERITED_SECRETS='property "(ghcr_pull_token|release_app_client_id|release_app_private_key|commit_app_client_id|commit_app_private_key)" is not defined'
+
+_actionlint_rendered() {
+    local mode="$1" ws="$2"
+    mkdir -p "$ws"
+    _scaffold "$mode" "$ws" || return 1
+    # actionlint locates the project root (for reusable-workflow resolution)
+    # via git; a scaffolded consumer repo is a git repo, so mirror that.
+    (
+        cd "$ws" &&
+            git init -q &&
+            actionlint -shellcheck= -ignore "$ACTIONLINT_INHERITED_SECRETS"
+    )
+}
+
+@test "actionlint passes over the devcontainer-mode rendered workflows (#995)" {
+    run _actionlint_rendered devcontainer "$BATS_TEST_TMPDIR/al-devcontainer"
+    assert_success
+}
+
+@test "actionlint passes over the direnv-mode rendered workflows (#995)" {
+    run _actionlint_rendered direnv "$BATS_TEST_TMPDIR/al-direnv"
+    assert_success
+}
+
+@test "actionlint passes over the bare-mode rendered workflows (#995)" {
+    run _actionlint_rendered bare "$BATS_TEST_TMPDIR/al-bare"
+    assert_success
+}
+
+@test "actionlint passes over the both-mode rendered workflows (#995)" {
+    run _actionlint_rendered both "$BATS_TEST_TMPDIR/al-both"
+    assert_success
+}
+
+@test "actionlint passes over the smoke-test workflow template (#995)" {
+    # The smoke-test template ships a single, standalone workflow (no reusable
+    # siblings), so it is linted in-place by explicit path from the repo root.
+    run actionlint -shellcheck= \
+        "$PROJECT_ROOT/assets/smoke-test/.github/workflows/repository-dispatch.yml"
+    assert_success
 }
 
 # ── #994: shared resolve-toolchain + setup-devkit-toolchain composites ─────────

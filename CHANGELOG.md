@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`actionlint` GitHub Actions workflow linter adopted** ([#995](https://github.com/vig-os/devkit/issues/995))
+  - `actionlint` joins the vigOS toolchain (dev-shell, image, and `vigos.packages` home module), so it is available in every consumer environment.
+  - The devkit lints its own `.github/workflows/` through a pre-commit hook, and its bats suite runs `actionlint` over the per-mode scaffold output (devcontainer, direnv, bare, both) plus the smoke-test template — a semantically broken rendered workflow now fails in the devkit instead of silently in a consumer repo.
+- **Opt-in `--prune-devcontainer` for container → direnv/bare migrations** ([#990](https://github.com/vig-os/devkit/issues/990))
+  - Switching a container repo to `direnv`/`bare` keeps a populated pre-existing
+    `.devcontainer/` by default (non-destructive, [#738](https://github.com/vig-os/devkit/issues/738)).
+    On a real migration that strands the stale container next to the new flake,
+    so `install.sh` / `init-workspace.sh` now accept `--prune-devcontainer` to
+    remove it. The flag is rejected in `devcontainer`/`both` modes; `--preview`
+    lists the `.devcontainer/` under `DELETED` when it is set; and interactive
+    runs prompt once (`Prune existing .devcontainer/? (y/N)`, default No) when a
+    populated pre-existing `.devcontainer/` is detected in a container-less mode.
+    `docs/MIGRATION.md` documents the preview-then-apply cleanup runbook.
 - **Mode-aware toolchain composite actions** ([#994](https://github.com/vig-os/devkit/issues/994))
   - New scaffolded `resolve-toolchain` composite action (evolves
     `resolve-image`): reads `.vig-os` and emits `mode`, `image`, and `image-tag`.
