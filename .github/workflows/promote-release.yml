@@ -77,6 +77,7 @@ jobs:
           VALIDATED_ARCHS=()
           for arch in "${ARCH_ARRAY[@]}"; do
             [ -z "$arch" ] && continue
+            # shellcheck disable=SC2076  # literal substring match against the space-padded whitelist is intentional
             if [[ " $VALID_ARCHS " =~ " $arch " ]]; then
               VALIDATED_ARCHS+=("$arch")
             else
@@ -84,6 +85,7 @@ jobs:
               exit 1
             fi
           done
+          # shellcheck disable=SC2207  # deliberate word-splitting of the space-free arch tokens; mapfile is overkill
           UNIQUE_ARCHS=($(echo "${VALIDATED_ARCHS[@]}" | tr ' ' '\n' | sort -u))
           if [ ${#UNIQUE_ARCHS[@]} -ne ${#VALIDATED_ARCHS[@]} ]; then
             echo "ERROR: Duplicate architectures found"

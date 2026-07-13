@@ -48,9 +48,11 @@ jobs:
           set -euo pipefail
           # shellcheck disable=SC1091
           source metadata.env
-          echo "modified=${MODIFIED}" >> "$GITHUB_OUTPUT"
-          echo "pr_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
-          echo "head_ref=${HEAD_REF}" >> "$GITHUB_OUTPUT"
+          {
+            echo "modified=${MODIFIED}"
+            echo "pr_number=${PR_NUMBER}"
+            echo "head_ref=${HEAD_REF}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Commit changelog via API
         if: steps.metadata.outputs.modified == 'true'
