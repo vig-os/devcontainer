@@ -93,6 +93,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Scaffolded references resolve to shipped or absolute docs** ([#1056](https://github.com/vig-os/devkit/issues/1056))
+  - Two more instances of the #1046 dangling-reference class: the scaffolded `ci.yml` header pointed at `docs/rfcs/ADR-conditional-container-toolchain.md`, and the synced `docs/DOWNSTREAM_RELEASE.md` cross-linked `docs/RELEASE_CYCLE.md`, `docs/CROSS_REPO_RELEASE_GATE.md`, `docs/MIGRATION.md`, and the same ADR — none of which the scaffold ships, so every consumer carried dead pointers. These now use absolute `https://github.com/vig-os/devkit/blob/main/docs/...` URLs (rewritten in the root `DOWNSTREAM_RELEASE.md` SSoT, which resolve from both devkit and a consumer checkout); links that resolve within the scaffold stay relative. Structurally guarded by the #1057 scaffold lint.
 - **Scaffold ships `docs/DOWNSTREAM_RELEASE.md`** ([#1046](https://github.com/vig-os/devkit/issues/1046))
   - The scaffolded `promote-release.yml` header points at `docs/DOWNSTREAM_RELEASE.md` — the consumer's primary release-process documentation — but the scaffold never shipped it, leaving every consumer with a dangling reference. The doc is now a manifest-synced managed file (root copy is the SSoT), so the reference resolves inside consumer repos and refreshes on scaffold upgrades.
 - **Interim transitive npm vulnerability coverage via weekly lockfile maintenance** ([#1041](https://github.com/vig-os/devkit/issues/1041))
