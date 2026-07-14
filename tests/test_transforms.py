@@ -120,6 +120,134 @@ class TestRenovateChangelogTemplateNoMirrorLeak:
         assert "FILE_PATHS: CHANGELOG.md\n" in commit
 
 
+class TestBannerTransform:
+    """The Banner transform stamps the generated provenance banner (#1036).
+
+    Two byte-stable, version-free variants (managed vs preserved) are derived
+    from ``PRESERVE_FILES``; the transform inserts them at the correct position
+    for the file's comment style and is idempotent.
+    """
+
+    def test_managed_hash_inserts_two_comment_lines_at_top(self, tmp_path):
+        transforms = _load_transforms()
+        f = tmp_path / "ci.yml"
+        f.write_text("# CI Workflow\non: push\n")
+
+        transforms.Banner(preserved=False, style="hash").apply(f)
+
+        lines = f.read_text().splitlines()
+        assert lines[0] == "# " + transforms.MANAGED_BANNER[0]
+        assert lines[1] == "# " + transforms.MANAGED_BANNER[1]
+        assert lines[2] == ""
+        assert "# CI Workflow" in lines
+        assert "on: push" in f.read_text()
+
+    def test_preserved_hash_uses_preserved_text(self, tmp_path):
+        transforms = _load_transforms()
+        f = tmp_path / "justfile.project"
+        f.write_text("# PROJECT RECIPES\n")
+
+        transforms.Banner(preserved=True, style="hash").apply(f)
+
+        text = f.read_text()
+        assert "# " + transforms.PRESERVED_BANNER[0] in text
+        assert "# " + transforms.PRESERVED_BANNER[1] in text
+        # The managed variant must not leak into a preserved file.
+        assert transforms.MANAGED_BANNER[0] not in text
+
+    def test_banner_carries_no_version_string(self):
+        transforms = _load_transforms()
+        import re
+
+        for variant in (transforms.MANAGED_BANNER, transforms.PRESERVED_BANNER):
+            for line in variant:
+                assert not re.search(r"\d+\.\d+", line), (
+                    f"banner must stay byte-stable across releases: {line!r}"
+                )
+            # A pointer to where issues go, not a policy restatement.
+            assert any("github.com/vig-os/devkit/issues" in line for line in variant)
+
+    def test_html_variant_inserts_after_front_matter(self, tmp_path):
+        transforms = _load_transforms()
+        f = tmp_path / "SKILL.md"
+        f.write_text("---\nname: tdd\ndescription: x\n---\n\n# TDD\n\nbody\n")
+
+        transforms.Banner(preserved=False, style="html").apply(f)
+
+        lines = f.read_text().splitlines()
+        # Front matter must stay first.
+        assert lines[0] == "---"
+        assert lines[3] == "---"
+        assert lines[4] == "<!-- " + transforms.MANAGED_BANNER[0] + " -->"
+        assert lines[5] == "<!-- " + transforms.MANAGED_BANNER[1] + " -->"
+        assert "# TDD" in f.read_text()
+
+    def test_html_variant_no_front_matter_goes_to_top(self, tmp_path):
+        transforms = _load_transforms()
+        f = tmp_path / "README.md"
+        f.write_text("# Title\n\nbody\n")
+
+        transforms.Banner(preserved=True, style="html").apply(f)
+
+        lines = f.read_text().splitlines()
+        assert lines[0] == "<!-- " + transforms.PRESERVED_BANNER[0] + " -->"
+        assert lines[1] == "<!-- " + transforms.PRESERVED_BANNER[1] + " -->"
+        assert lines[2] == ""
+        assert lines[3] == "# Title"
+
+    def test_banner_inserts_after_shebang(self, tmp_path):
+        transforms = _load_transforms()
+        f = tmp_path / "post-create.sh"
+        f.write_text("#!/bin/bash\n\n# real comment\necho hi\n")
+
+        transforms.Banner(preserved=False, style="hash").apply(f)
+
+        lines = f.read_text().splitlines()
+        assert lines[0] == "#!/bin/bash"
+        assert lines[1] == "# " + transforms.MANAGED_BANNER[0]
+        assert lines[2] == "# " + transforms.MANAGED_BANNER[1]
+        assert "# real comment" in lines
+
+    def test_banner_inserts_after_yaml_document_start(self, tmp_path):
+        transforms = _load_transforms()
+        f = tmp_path / "docker-compose.yml"
+        f.write_text("---\nservices:\n  a: {}\n")
+
+        transforms.Banner(preserved=True, style="hash").apply(f)
+
+        lines = f.read_text().splitlines()
+        assert lines[0] == "---"
+        assert lines[1] == "# " + transforms.PRESERVED_BANNER[0]
+        assert lines[2] == "# " + transforms.PRESERVED_BANNER[1]
+        assert "services:" in lines
+
+    def test_banner_is_idempotent(self, tmp_path):
+        transforms = _load_transforms()
+        f = tmp_path / "ci.yml"
+        f.write_text("# CI Workflow\non: push\n")
+
+        transforms.Banner(preserved=False, style="hash").apply(f)
+        once = f.read_text()
+        transforms.Banner(preserved=False, style="hash").apply(f)
+        twice = f.read_text()
+
+        assert once == twice
+
+    def test_banner_replaces_stale_variant(self, tmp_path):
+        transforms = _load_transforms()
+        f = tmp_path / "ci.yml"
+        f.write_text("# CI Workflow\non: push\n")
+
+        transforms.Banner(preserved=True, style="hash").apply(f)
+        transforms.Banner(preserved=False, style="hash").apply(f)
+
+        text = f.read_text()
+        assert "# " + transforms.MANAGED_BANNER[0] in text
+        # The old preserved banner must be gone, not stacked.
+        assert transforms.PRESERVED_BANNER[0] not in text
+        assert text.count("vig-os/devkit/issues") == 1
+
+
 class TestRemovePrecommitHooks:
     """Tests for RemovePrecommitHooks transform."""
 
