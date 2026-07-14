@@ -78,6 +78,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Scaffold ships `docs/DOWNSTREAM_RELEASE.md`** ([#1046](https://github.com/vig-os/devkit/issues/1046))
+  - The scaffolded `promote-release.yml` header points at `docs/DOWNSTREAM_RELEASE.md` — the consumer's primary release-process documentation — but the scaffold never shipped it, leaving every consumer with a dangling reference. The doc is now a manifest-synced managed file (root copy is the SSoT), so the reference resolves inside consumer repos and refreshes on scaffold upgrades.
 - **`sync-main-to-dev` no longer deadlocks on new local actions** ([#1034](https://github.com/vig-os/devkit/issues/1034))
   - The `sync` job checked out `ref: dev` and then invoked a local `uses: ./.github/actions/...` composite, which GitHub resolves against the checked-out workspace. When `main` added or renamed a local action absent from `dev`, the job died on its first run — and the only PR that would carry the action onto `dev` was the very sync PR the job could no longer open. Dropping `ref: dev` builds against the triggering `main` SHA, where the action is guaranteed to exist; every downstream step already operates on `origin/main`/`origin/dev` or the API, so behavior is otherwise unchanged.
 - **`setup-devkit-toolchain` no longer forces Python/uv env on non-Python consumers** ([#1028](https://github.com/vig-os/devkit/issues/1028))
