@@ -1,4 +1,7 @@
 #!/bin/bash
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
+
 set -e
 
 # One-time setup of git configuration inside the dev container.

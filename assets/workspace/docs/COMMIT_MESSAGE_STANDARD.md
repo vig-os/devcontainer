@@ -1,3 +1,6 @@
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
+
 # Commit Message Standard
 
 This document defines the commit message format used in this repository. Commit messages are treated as **quality records** and must follow this standard to ensure consistency, traceability, and compliance with QMS expectations (e.g. IEC 62304, ISO 13485, MDR change control).

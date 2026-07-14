@@ -3,6 +3,8 @@ name: worktree_ci-fix
 description: Autonomous CI fix — diagnoses failure, posts diagnosis, fixes, pushes, re-checks.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Autonomous CI Fix
 

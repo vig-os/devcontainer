@@ -3,6 +3,8 @@ name: git_commit
 description: Executes the commit workflow following the project's commit message conventions.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Git Commit Workflow
 

@@ -3,6 +3,8 @@ name: tdd
 description: TDD discipline and test scenario guidance when writing code. Use when implementing features or fixes that have testable behavior.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # TDD
 

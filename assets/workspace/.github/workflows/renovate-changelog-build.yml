@@ -1,3 +1,6 @@
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
+
 # Append Keep-a-Changelog Unreleased entries for Renovate dependency PRs (Refs: #506, #562, #863).
 # Read-only build on pull_request; privileged commit runs via workflow_run from default branch.
 # The sender-login guard skips synchronize events raised by the changelog commit bot's own

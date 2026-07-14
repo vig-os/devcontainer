@@ -3,6 +3,8 @@ name: pr_post-merge
 description: Performs cleanup and branch switching after a PR merge.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # After PR merge: cleanup and switch branch
 

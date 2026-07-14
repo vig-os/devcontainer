@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Provenance banner in scaffolded assets** ([#1036](https://github.com/vig-os/devkit/issues/1036))
+  - Every comment-capable file scaffolded into a downstream repo now carries a two-line banner stating that devkit manages the file, whether an upgrade overwrites it, and where to file bugs / missing tools. The banner comes in two variants — **managed** (regenerated on upgrade) and **preserved** (seeded once, yours to edit) — chosen automatically from `PRESERVE_FILES` (the SSoT in `init-workspace.sh`) by a new `Banner` transform wired into `sync_manifest.py`, so the classification cannot drift from a hand-typed copy. The `sync-manifest` pre-commit hook regenerates the banners on every commit and fails on any hand-edited or missing one.
+  - The banner carries **no version string** (`.vig-os` remains the version SSoT), so it stays byte-stable across releases and never floods upgrade diffs. Strict-JSON files (`renovate.json`, `.github/renovate-default.json`, `.claude/worktrees.json`, `.pymarkdown`) and a small documented set of other files (JSONC under the strict `check-json` hook, the render-gated `.pre-commit-config.yaml`, changelogs, `.vig-os`, `LICENSE`) are explicitly skipped; coverage is knowingly partial.
+  - The stale `justfile.devc` banner — which pointed at the root `justfile` that an upgrade overwrites — is corrected to point at `justfile.project`.
 - **Opt-in floating major/minor tags at promote (`DEVKIT_FLOATING_TAGS`)** ([#1045](https://github.com/vig-os/devkit/issues/1045))
   - New optional `.vig-os` key (comma-separated subset of `major,minor`; empty =
     off) makes the scaffolded `promote-release.yml` force-move `<prefix>X` and/or

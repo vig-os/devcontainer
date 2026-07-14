@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
+
 ###############################################################################
 # version-check.sh - Devcontainer Update Checker
 #

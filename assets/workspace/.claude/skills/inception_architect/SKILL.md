@@ -3,6 +3,8 @@ name: inception_architect
 description: Architecture evaluation — validate design against established patterns.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Inception: Architect
 

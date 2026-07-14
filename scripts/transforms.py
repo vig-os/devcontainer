@@ -19,6 +19,120 @@ class Transform(Protocol):
     def apply(self, file_path: Path) -> None: ...
 
 
+# ── Provenance banner (issue #1036) ───────────────────────────────────────────
+#
+# Two byte-stable, version-free variants stamped into comment-capable scaffold
+# assets. The managed/preserved choice is derived from PRESERVE_FILES (the SSoT
+# in assets/init-workspace.sh) by sync_manifest.py — never hand-written per file.
+# The version deliberately lives only in .vig-os (DEVKIT_VERSION), so banners do
+# not churn on every release.
+
+MANAGED_BANNER: tuple[str, str] = (
+    "Managed by vigOS devkit — regenerated on upgrade; local edits are lost.",
+    "Customize in justfile.project. "
+    "Bugs / missing tools: https://github.com/vig-os/devkit/issues",
+)
+
+PRESERVED_BANNER: tuple[str, str] = (
+    "Seeded by vigOS devkit — yours to edit; upgrades never overwrite this file.",
+    "Bugs / missing tools: https://github.com/vig-os/devkit/issues",
+)
+
+# Comment styles: (line prefix, line suffix). Strict-JSON files carry no comment
+# syntax and are skip-listed by sync_manifest.py rather than handled here.
+_COMMENT_STYLES: dict[str, tuple[str, str]] = {
+    "hash": ("# ", ""),
+    "html": ("<!-- ", " -->"),
+}
+
+# Every banner sentence, style-independent — used to recognise (and strip) an
+# existing banner so the transform is idempotent and switches variants cleanly.
+_BANNER_TEXTS: frozenset[str] = frozenset(MANAGED_BANNER + PRESERVED_BANNER)
+
+
+def _banner_inner(line: str) -> str | None:
+    """Return a comment line's inner text, or None if it is not a comment."""
+    stripped = line.strip()
+    if stripped.startswith("<!--") and stripped.endswith("-->"):
+        return stripped[4:-3].strip()
+    if stripped.startswith("//"):
+        return stripped[2:].strip()
+    if stripped.startswith("#"):
+        return stripped.lstrip("#").strip()
+    return None
+
+
+def _split_header(lines: list[str], style: str) -> tuple[list[str], list[str]]:
+    """Split off a leading region the banner must sit *after*.
+
+    Shebangs, a YAML document-start marker (``---``) and markdown front matter
+    all carry positional meaning, so the banner goes after them, not before.
+    """
+    if not lines:
+        return [], []
+    if style == "html":
+        if lines[0].strip() == "---":
+            for i in range(1, len(lines)):
+                if lines[i].strip() == "---":
+                    return lines[: i + 1], lines[i + 1 :]
+        return [], lines
+    # hash style
+    idx = 1 if lines[0].startswith("#!") else 0
+    probe = idx
+    while probe < len(lines) and lines[probe].strip() == "":
+        probe += 1
+    if probe < len(lines) and lines[probe].strip() == "---":
+        return lines[: probe + 1], lines[probe + 1 :]
+    return lines[:idx], lines[idx:]
+
+
+def _strip_banner_block(rest: list[str]) -> list[str]:
+    """Drop a leading run of banner lines (any style) plus one trailing blank."""
+    i = 0
+    saw = False
+    while i < len(rest) and _banner_inner(rest[i]) in _BANNER_TEXTS:
+        i += 1
+        saw = True
+    if saw and i < len(rest) and rest[i].strip() == "":
+        i += 1
+    return rest[i:]
+
+
+@dataclass
+class Banner:
+    """Stamp the generated provenance banner (#1036) for the given variant.
+
+    Idempotent: an existing banner (of either variant/style) is stripped before
+    the current one is inserted, so re-running the sync never stacks or drifts.
+    """
+
+    preserved: bool
+    style: str = "hash"
+    target: str = ""
+
+    def apply(self, file_path: Path) -> None:
+        path = _resolve(file_path, self.target)
+        if path is None:
+            return
+        prefix, suffix = _COMMENT_STYLES[self.style]
+        texts = PRESERVED_BANNER if self.preserved else MANAGED_BANNER
+        banner = [f"{prefix}{t}{suffix}\n" for t in texts]
+
+        original = path.read_text()
+        header, rest = _split_header(original.splitlines(keepends=True), self.style)
+        rest = _strip_banner_block(rest)
+        while rest and rest[0].strip() == "":
+            rest.pop(0)
+
+        new_lines = header + banner
+        if rest:
+            new_lines += ["\n", *rest]
+        result = "".join(new_lines)
+        if original.endswith("\n") and not result.endswith("\n"):
+            result += "\n"
+        path.write_text(result)
+
+
 def _resolve(file_path: Path, target: str) -> Path | None:
     """Resolve a transform target path, returning None if it doesn't exist."""
     path = file_path / target if target else file_path

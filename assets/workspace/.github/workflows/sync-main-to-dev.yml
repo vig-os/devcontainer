@@ -1,3 +1,6 @@
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
+
 # Sync main to dev
 #
 # Keeps dev up to date with main by opening a PR from a disposable sync branch.

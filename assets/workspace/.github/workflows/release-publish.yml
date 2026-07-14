@@ -1,3 +1,6 @@
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
+
 # Publishes git tag and optionally a GitHub Release. Final releases always get a draft release.
 # Candidates get a draft pre-release only when create_release is true (workflow_dispatch input).
 name: Release Publish

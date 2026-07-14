@@ -3,6 +3,8 @@ name: inception_explore
 description: Divergent exploration — understand the problem space before jumping to solutions.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Inception: Explore
 

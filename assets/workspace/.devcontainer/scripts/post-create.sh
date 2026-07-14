@@ -1,4 +1,6 @@
 #!/bin/bash
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
 
 # Post-create script - runs once when container is created for the first time.
 # This script is called from postCreateCommand in devcontainer.json.
