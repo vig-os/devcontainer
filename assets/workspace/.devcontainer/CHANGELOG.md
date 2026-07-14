@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Language-aware scaffold `.gitignore`** ([#1024](https://github.com/vig-os/devkit/issues/1024))
+  - `init-workspace.sh` now detects the consumer's language from marker files
+    (`pyproject.toml` → Python, `package.json` → Node, `Cargo.toml` → Rust) and
+    assembles the managed `.gitignore` as a language-neutral base plus the
+    matching per-language fragment on every (re)scaffold, so the correct ignore
+    set is upgrade-persistent.
+  - Node consumers now ignore `node_modules/`, `*.tsbuildinfo`, `coverage/` and
+    `.nyc_output/`, and no longer get a blanket `dist/` ignore (a JS Action
+    commits its bundled `dist/index.js`). Python consumers keep their existing
+    ignore set.
+
 ### Security
 
 ## [1.1.0](https://github.com/vig-os/devkit/releases/tag/1.1.0) - 2026-07-13
