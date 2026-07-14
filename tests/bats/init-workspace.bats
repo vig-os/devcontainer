@@ -2232,6 +2232,24 @@ _referenced_secrets() {
     assert_success
 }
 
+@test "setup-devkit-toolchain gates the python/uv env on pyproject.toml (#1028)" {
+    # The uv/CPython plumbing (UV_PROJECT_ENVIRONMENT, the Nix-CPython PATH
+    # filter, and the UV_PYTHON_DOWNLOADS_JSON_URL forward) only applies on a
+    # Python consumer; presence of pyproject.toml is the gate, so the composite
+    # is a no-op for those steps on a non-Python repo.
+    f="$TEMPLATE_DIR/.github/actions/setup-devkit-toolchain/action.yml"
+    # The pyproject.toml gate is present in more than one branch (container env
+    # + the direnv PATH/URL plumbing).
+    run bash -lc "[ \"\$(grep -c 'pyproject.toml' '$f')\" -ge 2 ]"
+    assert_success
+    # UV_PROJECT_ENVIRONMENT and the uv download URL are still exported — only
+    # behind the gate now.
+    run grep -q 'UV_PROJECT_ENVIRONMENT' "$f"
+    assert_success
+    run grep -q 'UV_PYTHON_DOWNLOADS_JSON_URL' "$f"
+    assert_success
+}
+
 @test "resolve-toolchain rejects an unknown DEVKIT_MODE loudly (#994)" {
     # A typo'd manifest value (e.g. a misspelled `container`) must fail the
     # resolve step, not
@@ -2335,6 +2353,30 @@ _RELEASE_RESOLVERS_991=(
         run grep -q "$input" "$f"
         assert_success
     done
+}
+
+@test "release/CI workflows carry no stale python-shaped step labels (#1029)" {
+    # The sync/test steps run language-neutral `just` recipes; their labels and
+    # comments must not name Python (misleading on a Node/TS consumer).
+    run grep -q 'Sync Python dependencies' "$TEMPLATE_DIR/.github/workflows/release-core.yml"
+    assert_failure
+    run grep -q 'Pytest' "$TEMPLATE_DIR/.github/workflows/ci.yml"
+    assert_failure
+}
+
+@test "release-core builds+commits an opt-in bundle when a bundle recipe exists (#1029)" {
+    # A repo that ships a committed build artifact (e.g. a JS action's ncc
+    # dist/) defines a `bundle` just recipe; the release finalize flow detects
+    # it via `just --summary`, runs `just bundle`, and commits dist/ as part of
+    # the finalization commit. Language-neutral: no bundle recipe -> no-op.
+    f="$TEMPLATE_DIR/.github/workflows/release-core.yml"
+    run grep -q 'just --summary' "$f"
+    assert_success
+    run grep -q 'just bundle' "$f"
+    assert_success
+    # dist/ joins CHANGELOG.md in the finalization commit's FILE_PATHS.
+    run grep -q 'CHANGELOG.md,dist' "$f"
+    assert_success
 }
 
 @test "resolve-image action is removed from every rendered mode tree (#991)" {

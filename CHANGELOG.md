@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Opt-in release artifact/bundle step for repos that ship a committed build** ([#1029](https://github.com/vig-os/devkit/issues/1029))
+  - `release-core.yml` now detects a `bundle` just recipe via `just --summary` in the finalize job; when present it runs `just bundle` and commits `dist/` alongside `CHANGELOG.md` in the finalization commit, so a JS Action (or any repo shipping a committed `@vercel/ncc` artifact) tags a fresh bundle instead of a stale one. Repos without a `bundle` recipe (e.g. a pure-Python consumer) are unaffected — no new config surface, the recipe's presence is the flag.
 - **Commit messages are validated in CI** ([#1019](https://github.com/vig-os/devkit/issues/1019))
   - New `commit-checks` job (devkit and scaffolded repos) runs `validate-commit-range` over every commit a pull request adds, plus the **pull request title** — which becomes the merge commit's subject under `--no-ff`. `validate-commit-msg` is a `commit-msg`-stage hook, so `prek run --all-files` never ran it: until now the standard was enforced only by a local hook, and only on a machine whose `core.hooksPath` was intact.
   - Merge commits and bot-authored commits (`…[bot]`) are exempt. Renovate and Dependabot emit `build(pip): …` / `ci(actions): …` with no `Refs:` line, so without the exemption the new gate would fail every dependency PR. The exemption is keyed on the author — the same message from a human is still rejected.
@@ -28,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`setup-devkit-toolchain` no longer forces Python/uv env on non-Python consumers** ([#1028](https://github.com/vig-os/devkit/issues/1028))
+  - The scaffolded CI toolchain composite applied `UV_PROJECT_ENVIRONMENT`, forwarded `UV_PYTHON_DOWNLOADS_JSON_URL`, and filtered the Nix CPython out of `$GITHUB_PATH` unconditionally. These are now gated on the consumer being Python (a `pyproject.toml` at the repo root), so the composite is a no-op for those steps on a Node/TS repo and keeps the Nix python on PATH there.
+- **Neutral release/CI step labels** ([#1029](https://github.com/vig-os/devkit/issues/1029))
+  - The release sync step is renamed "Sync Python dependencies" -> "Sync dependencies" and the `ci.yml` job comment "Pytest" -> "Run tests"; both run language-neutral `just` recipes, so the Python-shaped labels were misleading on a Node/TS consumer.
 - **Language-aware scaffold `.gitignore`** ([#1024](https://github.com/vig-os/devkit/issues/1024))
   - `init-workspace.sh` now detects the consumer's language from marker files
     (`pyproject.toml` → Python, `package.json` → Node, `Cargo.toml` → Rust) and

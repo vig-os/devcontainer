@@ -418,6 +418,33 @@ jobs:
           set -euo pipefail
           prepare-changelog finalize "$VERSION" "$RELEASE_DATE" CHANGELOG.md
 
+      # Language-neutral, opt-in release artifact. A repo that ships a committed
+      # build artifact (e.g. a JS Action's @vercel/ncc `dist/`) exposes a
+      # `bundle` just recipe; we detect it via `just --summary` so the step is a
+      # no-op for repos without one (e.g. a pure-Python consumer). No new config
+      # surface — the recipe's presence is the flag (#1029).
+      - name: Detect release bundle recipe
+        id: bundle
+        if: ${{ inputs.release_kind == 'final' }}
+        run: |
+          set -euo pipefail
+          if just --summary 2>/dev/null | grep -qw bundle; then
+            echo "has_bundle=true" >> "$GITHUB_OUTPUT"
+            echo "Bundle recipe detected; will build and commit dist/ in the finalization commit."
+          else
+            echo "has_bundle=false" >> "$GITHUB_OUTPUT"
+            echo "No bundle recipe; skipping artifact build (language-neutral release)."
+          fi
+
+      - name: Build release artifact
+        if: ${{ inputs.release_kind == 'final' && steps.bundle.outputs.has_bundle == 'true' }}
+        run: |
+          set -euo pipefail
+          # Rebuild the committed artifact from the finalized sources so the tag
+          # ships a fresh bundle, not a stale one. Output (dist/) is committed
+          # alongside CHANGELOG.md below.
+          just bundle
+
       - name: Commit and push finalization changes via API
         if: ${{ inputs.release_kind == 'final' }}
         uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
@@ -432,7 +459,9 @@ jobs:
             Set release date to ${{ needs.validate.outputs.release_date }} in CHANGELOG.md
 
             Refs: #${{ needs.validate.outputs.pr_number }}
-          FILE_PATHS: CHANGELOG.md
+          # dist/ joins the finalization commit only when a bundle was built, so
+          # the tagged commit carries the fresh artifact (#1029).
+          FILE_PATHS: ${{ steps.bundle.outputs.has_bundle == 'true' && 'CHANGELOG.md,dist' || 'CHANGELOG.md' }}
 
       - name: Trigger sync-issues workflow
         if: ${{ inputs.release_kind == 'final' }}
@@ -589,7 +618,7 @@ jobs:
           mode: ${{ inputs.toolchain_mode }}
           devkit-version: ${{ inputs.devkit_version }}
 
-      - name: Sync Python dependencies
+      - name: Sync dependencies
         run: just sync
 
       - name: Run tests
