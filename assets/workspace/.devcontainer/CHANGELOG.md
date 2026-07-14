@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Opt-in release artifact/bundle step for repos that ship a committed build** ([#1029](https://github.com/vig-os/devkit/issues/1029))
+  - `release-core.yml` now detects a `bundle` just recipe via `just --summary` in the finalize job; when present it runs `just bundle` and commits `dist/` alongside `CHANGELOG.md` in the finalization commit, so a JS Action (or any repo shipping a committed `@vercel/ncc` artifact) tags a fresh bundle instead of a stale one. Repos without a `bundle` recipe (e.g. a pure-Python consumer) are unaffected — no new config surface, the recipe's presence is the flag.
 - **Commit messages are validated in CI** ([#1019](https://github.com/vig-os/devkit/issues/1019))
   - New `commit-checks` job (devkit and scaffolded repos) runs `validate-commit-range` over every commit a pull request adds, plus the **pull request title** — which becomes the merge commit's subject under `--no-ff`. `validate-commit-msg` is a `commit-msg`-stage hook, so `prek run --all-files` never ran it: until now the standard was enforced only by a local hook, and only on a machine whose `core.hooksPath` was intact.
   - Merge commits and bot-authored commits (`…[bot]`) are exempt. Renovate and Dependabot emit `build(pip): …` / `ci(actions): …` with no `Refs:` line, so without the exemption the new gate would fail every dependency PR. The exemption is keyed on the author — the same message from a human is still rejected.
@@ -30,6 +32,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`sync-main-to-dev` no longer deadlocks on new local actions** ([#1034](https://github.com/vig-os/devkit/issues/1034))
   - The `sync` job checked out `ref: dev` and then invoked a local `uses: ./.github/actions/...` composite, which GitHub resolves against the checked-out workspace. When `main` added or renamed a local action absent from `dev`, the job died on its first run — and the only PR that would carry the action onto `dev` was the very sync PR the job could no longer open. Dropping `ref: dev` builds against the triggering `main` SHA, where the action is guaranteed to exist; every downstream step already operates on `origin/main`/`origin/dev` or the API, so behavior is otherwise unchanged.
+- **`setup-devkit-toolchain` no longer forces Python/uv env on non-Python consumers** ([#1028](https://github.com/vig-os/devkit/issues/1028))
+  - The scaffolded CI toolchain composite applied `UV_PROJECT_ENVIRONMENT`, forwarded `UV_PYTHON_DOWNLOADS_JSON_URL`, and filtered the Nix CPython out of `$GITHUB_PATH` unconditionally. These are now gated on the consumer being Python (a `pyproject.toml` at the repo root), so the composite is a no-op for those steps on a Node/TS repo and keeps the Nix python on PATH there.
+- **Neutral release/CI step labels** ([#1029](https://github.com/vig-os/devkit/issues/1029))
+  - The release sync step is renamed "Sync Python dependencies" -> "Sync dependencies" and the `ci.yml` job comment "Pytest" -> "Run tests"; both run language-neutral `just` recipes, so the Python-shaped labels were misleading on a Node/TS consumer.
+- **Language-aware scaffold `.gitignore`** ([#1024](https://github.com/vig-os/devkit/issues/1024))
+  - `init-workspace.sh` now detects the consumer's language from marker files
+    (`pyproject.toml` → Python, `package.json` → Node, `Cargo.toml` → Rust) and
+    assembles the managed `.gitignore` as a language-neutral base plus the
+    matching per-language fragment on every (re)scaffold, so the correct ignore
+    set is upgrade-persistent.
+  - Node consumers now ignore `node_modules/`, `*.tsbuildinfo`, `coverage/` and
+    `.nyc_output/`, and no longer get a blanket `dist/` ignore (a JS Action
+    commits its bundled `dist/index.js`). Python consumers keep their existing
+    ignore set.
+- **Language-aware scaffold CodeQL matrix** ([#1025](https://github.com/vig-os/devkit/issues/1025))
+  - `init-workspace.sh` now rewrites the managed `codeql.yml` language matrix
+    from the same language detection (#1024): Python → `python`, Node →
+    `javascript-typescript`, Rust omits its leg (no first-class CodeQL Rust
+    analyzer); `actions` is always analyzed. This fixes the hardcoded
+    `['python', 'actions']` matrix failing the `python` leg on repos with no
+    Python.
+  - The scaffolded `codeql.yml` and an install-time note now document that this
+    advanced config conflicts with GitHub's default code-scanning setup (which
+    must be disabled). The installer never changes the code-scanning API setting.
 
 ### Security
 
