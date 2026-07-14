@@ -69,6 +69,10 @@ PRESERVE_FILES=(
     "LICENSE"
     ".github/CODEOWNERS"
     ".github/workflows/release-extension.yml"
+    # Mutating counterpart to release-extension.yml (#1059): consumers replace
+    # this no-op with release-branch preparation, so an upgrade must never
+    # clobber their implementation — same preserved class as release-extension.
+    ".github/workflows/prepare-release-extension.yml"
     "justfile.project"
     # Personal, gitignored recipes (#1054): the file's own header promises it is
     # preserved on upgrade, but it was absent here — so a re-scaffold silently
