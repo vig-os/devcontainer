@@ -40,6 +40,7 @@ Only the following types are allowed:
 | `docs`     | Documentation only |
 | `chore`    | Maintenance, tooling, config (no code/docs behavior change) |
 | `refactor` | Code refactoring, no new behavior |
+| `perf`     | Performance improvements, no behavior change |
 | `test`     | Tests, test infrastructure |
 | `ci`       | CI/CD, workflows, automation |
 | `build`    | Commits that affect build components like build scripts and makefiles |

@@ -67,7 +67,7 @@ type(scope)!: short description
 Refs: #<issue>
 ```
 
-- **Types:** `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `ci`, `build`, `revert`, `style`
+- **Types:** `feat`, `fix`, `docs`, `chore`, `refactor`, `perf`, `test`, `ci`, `build`, `revert`, `style`
 - Scope optional; `!` only for breaking changes
 - Imperative mood, no period
 - **Refs line mandatory** (at least one GitHub issue, e.g. `Refs: #36`). Exception: `chore` commits may omit `Refs:` when no issue is related.

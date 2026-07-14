@@ -138,6 +138,15 @@ repos:
         stages: [prepare-commit-msg]
         pass_filenames: true
 
+  # AI agent identity: reject author/committer matching blocklist (Refs: #163)
+  - repo: local
+    hooks:
+      - id: check-agent-identity
+        name: check agent identity
+        entry: uv run check-agent-identity
+        language: system
+        pass_filenames: false
+
   # Commit message validation (commit-msg stage). Scope is free-form
   # ("alphanumeric and hyphens only" per docs/COMMIT_MESSAGE_STANDARD.md);
   # only the type, the Refs line and the agent blocklist are enforced.
@@ -149,7 +158,7 @@ repos:
         language: system
         stages: [commit-msg]
         args: [
-          "--types", "feat,fix,docs,chore,refactor,test,ci,build,revert,style",
+          "--types", "feat,fix,docs,chore,refactor,perf,test,ci,build,revert,style",
           "--refs-optional-types", "chore",
           "--blocked-patterns", ".github/agent-blocklist.toml",
         ]

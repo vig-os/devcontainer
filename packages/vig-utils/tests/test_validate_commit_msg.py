@@ -49,6 +49,19 @@ class TestValidateCommitMessage:
             assert valid is True, f"Type {ctype} should be valid: {err}"
             assert err is None
 
+    def test_perf_is_an_approved_type(self):
+        """`perf` is a standard Conventional Commits type. Refs #1030.
+
+        CI's ``validate-commit-range`` runs with no ``--types`` override, so
+        ``DEFAULT_APPROVED_TYPES`` is the effective allowlist there; a
+        ``perf(...)`` commit must validate against it.
+        """
+        assert "perf" in DEFAULT_APPROVED_TYPES
+        msg = "perf(image): speed up manifest bake\n\nRefs: #1030\n"
+        valid, err = validate_commit_message(msg)
+        assert valid is True, f"perf should be valid: {err}"
+        assert err is None
+
     def test_valid_scope_with_hyphens(self):
         msg = "chore(deps): bump pre-commit\n\nRefs: #37\n"
         valid, err = validate_commit_message(msg)
