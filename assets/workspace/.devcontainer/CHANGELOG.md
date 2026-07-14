@@ -34,6 +34,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The scaffolded CI toolchain composite applied `UV_PROJECT_ENVIRONMENT`, forwarded `UV_PYTHON_DOWNLOADS_JSON_URL`, and filtered the Nix CPython out of `$GITHUB_PATH` unconditionally. These are now gated on the consumer being Python (a `pyproject.toml` at the repo root), so the composite is a no-op for those steps on a Node/TS repo and keeps the Nix python on PATH there.
 - **Neutral release/CI step labels** ([#1029](https://github.com/vig-os/devkit/issues/1029))
   - The release sync step is renamed "Sync Python dependencies" -> "Sync dependencies" and the `ci.yml` job comment "Pytest" -> "Run tests"; both run language-neutral `just` recipes, so the Python-shaped labels were misleading on a Node/TS consumer.
+- **Language-aware scaffold `.gitignore`** ([#1024](https://github.com/vig-os/devkit/issues/1024))
+  - `init-workspace.sh` now detects the consumer's language from marker files
+    (`pyproject.toml` → Python, `package.json` → Node, `Cargo.toml` → Rust) and
+    assembles the managed `.gitignore` as a language-neutral base plus the
+    matching per-language fragment on every (re)scaffold, so the correct ignore
+    set is upgrade-persistent.
+  - Node consumers now ignore `node_modules/`, `*.tsbuildinfo`, `coverage/` and
+    `.nyc_output/`, and no longer get a blanket `dist/` ignore (a JS Action
+    commits its bundled `dist/index.js`). Python consumers keep their existing
+    ignore set.
+- **Language-aware scaffold CodeQL matrix** ([#1025](https://github.com/vig-os/devkit/issues/1025))
+  - `init-workspace.sh` now rewrites the managed `codeql.yml` language matrix
+    from the same language detection (#1024): Python → `python`, Node →
+    `javascript-typescript`, Rust omits its leg (no first-class CodeQL Rust
+    analyzer); `actions` is always analyzed. This fixes the hardcoded
+    `['python', 'actions']` matrix failing the `python` leg on repos with no
+    Python.
+  - The scaffolded `codeql.yml` and an install-time note now document that this
+    advanced config conflicts with GitHub's default code-scanning setup (which
+    must be disabled). The installer never changes the code-scanning API setting.
 
 ### Security
 
