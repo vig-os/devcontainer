@@ -159,6 +159,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The scaffolded `codeql.yml` and an install-time note now document that this
     advanced config conflicts with GitHub's default code-scanning setup (which
     must be disabled). The installer never changes the code-scanning API setting.
+- **`prepare-release` rolls back on workflow cancellation** ([#1078](https://github.com/vig-os/devkit/issues/1078))
+  - The `rollback` job's guard only matched `needs.<job>.result == 'failure'` for the `prepare`, `extension` and `open-pr` phases, so cancelling a run after the freeze commit landed skipped the rollback and stranded the partial `release/X.Y.Z` branch plus the freeze commit on `dev`. Each phase guard now also matches `result == 'cancelled'` (the job already used `always()`, which keeps it eligible to run after a cancellation), in both the devkit workflow and the scaffolded consumer copy.
 
 ### Security
 
