@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Opt-in floating major/minor tags at promote (`DEVKIT_FLOATING_TAGS`)** ([#1045](https://github.com/vig-os/devkit/issues/1045))
+  - New optional `.vig-os` key (comma-separated subset of `major,minor`; empty =
+    off) makes the scaffolded `promote-release.yml` force-move `<prefix>X` and/or
+    `<prefix>X.Y` to the promoted final-release commit, giving Action consumers the
+    standard `uses: owner/repo@v0` pinning contract with promote-gated moves.
+  - A new `floating-tags` job runs only after the Release is published and the
+    release PR is merged (the post-acceptance gate); it is idempotent (skips when a
+    tag already points at the release commit), final-only, composes with
+    `DEVKIT_TAG_PREFIX`, and pushes with the RELEASE_APP token so a tag ruleset can
+    make floating-tag moves app-exclusive. Off by default — no change for devkit or
+    existing consumers.
 - **Per-repo release tag prefix (`DEVKIT_TAG_PREFIX`)** ([#1044](https://github.com/vig-os/devkit/issues/1044))
   - New optional `.vig-os` key threads a tag prefix through the scaffolded release
     pipeline, applied **only at the publishing edge** — the pushed git tag name and

@@ -35,6 +35,7 @@ jobs:
       image: ${{ steps.resolve.outputs.image }}
       image-tag: ${{ steps.resolve.outputs.image-tag }}
       tag-prefix: ${{ steps.resolve.outputs.tag-prefix }}
+      floating-tags: ${{ steps.resolve.outputs.floating-tags }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -539,3 +540,112 @@ jobs:
             exit 1
           fi
           echo "✓ RC draft pre-release and git RC tag cleanup complete for $VERSION"
+
+  floating-tags:
+    # Opt-in floating major/minor tags (#1045). Runs at the post-acceptance gate
+    # — after the GitHub Release is published (promote) AND the release PR is
+    # merged to main (merge) — mirroring where the upstream image moves GHCR
+    # `:latest`. RC candidates never reach promote, so this is final-only. Off
+    # unless DEVKIT_FLOATING_TAGS is set; the tag ruleset can then deny tag
+    # update/delete to everyone but the RELEASE_APP, making moves app-exclusive.
+    name: Move floating tags
+    needs: [resolve-toolchain, validate, promote, merge]
+    runs-on: ubuntu-24.04
+    container:
+      image: ${{ needs.resolve-toolchain.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_PULL_TOKEN || github.token }}
+    timeout-minutes: 10
+    if: ${{ needs.merge.result == 'success' && needs.resolve-toolchain.outputs.floating-tags != '' }}
+    permissions:
+      contents: write
+      packages: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up devkit toolchain
+        uses: ./.github/actions/setup-devkit-toolchain
+        with:
+          mode: ${{ needs.resolve-toolchain.outputs.mode }}
+          devkit-version: ${{ needs.resolve-toolchain.outputs.image-tag }}
+
+      - name: Generate release app token
+        id: release_app_token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Move floating major/minor tags
+        env:
+          GH_TOKEN: ${{ steps.release_app_token.outputs.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          TAG_PREFIX: ${{ needs.resolve-toolchain.outputs.tag-prefix }}
+          FLOATING_TAGS: ${{ needs.resolve-toolchain.outputs.floating-tags }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          RELEASE_TAG="${TAG_PREFIX}${VERSION}"
+
+          # Resolve the commit the release tag points at. release-publish.yml
+          # creates an ANNOTATED tag, so peel it (object.type == "tag") to the
+          # underlying commit; floating tags then point straight at the commit.
+          REF_JSON=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")
+          TARGET_SHA=$(printf '%s' "$REF_JSON" | jq -r '.object.sha')
+          OBJ_TYPE=$(printf '%s' "$REF_JSON" | jq -r '.object.type')
+          if [ "$OBJ_TYPE" = "tag" ]; then
+            TARGET_SHA=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
+              gh api "repos/${GITHUB_REPOSITORY}/git/tags/${TARGET_SHA}" --jq '.object.sha')
+          fi
+          if [ -z "$TARGET_SHA" ] || [ "$TARGET_SHA" = "null" ]; then
+            echo "ERROR: Could not resolve commit for release tag ${RELEASE_TAG}"
+            exit 1
+          fi
+
+          MAJOR="${VERSION%%.*}"
+          REST="${VERSION#*.}"
+          MINOR="${REST%%.*}"
+
+          # Create-or-update a lightweight floating tag at the release commit,
+          # idempotently (skip when it already points there). Force is required
+          # because a floating tag is mutable by design (#1045).
+          move_tag() {
+            name="$1"
+            current=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${name}" --jq '.object.sha' 2>/dev/null || echo "")
+            if [ "$current" = "$TARGET_SHA" ]; then
+              echo "Floating tag ${name} already at ${TARGET_SHA}; skipping"
+              return 0
+            fi
+            if [ -n "$current" ]; then
+              retry --retries 3 --backoff 5 --max-backoff 30 -- \
+                gh api -X PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${name}" \
+                -f sha="$TARGET_SHA" -F force=true >/dev/null
+              echo "Moved floating tag ${name} -> ${TARGET_SHA}"
+            else
+              retry --retries 3 --backoff 5 --max-backoff 30 -- \
+                gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
+                -f ref="refs/tags/${name}" -f sha="$TARGET_SHA" >/dev/null
+              echo "Created floating tag ${name} -> ${TARGET_SHA}"
+            fi
+          }
+
+          IFS=',' read -ra LEVELS <<< "$FLOATING_TAGS"
+          for level in "${LEVELS[@]}"; do
+            level="${level//[[:space:]]/}"
+            case "$level" in
+              major) move_tag "${TAG_PREFIX}${MAJOR}" ;;
+              minor) move_tag "${TAG_PREFIX}${MAJOR}.${MINOR}" ;;
+              "") ;;
+              *) echo "::warning::Unknown DEVKIT_FLOATING_TAGS level '$level' (expected major or minor); skipping" ;;
+            esac
+          done
+          echo "✓ Floating tag move complete for ${RELEASE_TAG}"
