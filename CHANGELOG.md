@@ -9,7 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Commit messages are validated in CI** ([#1019](https://github.com/vig-os/devkit/issues/1019))
+  - New `commit-checks` job (devkit and scaffolded repos) runs `validate-commit-range` over every commit a pull request adds, plus the **pull request title** — which becomes the merge commit's subject under `--no-ff`. `validate-commit-msg` is a `commit-msg`-stage hook, so `prek run --all-files` never ran it: until now the standard was enforced only by a local hook, and only on a machine whose `core.hooksPath` was intact.
+  - Merge commits and bot-authored commits (`…[bot]`) are exempt. Renovate and Dependabot emit `build(pip): …` / `ci(actions): …` with no `Refs:` line, so without the exemption the new gate would fail every dependency PR. The exemption is keyed on the author — the same message from a human is still rejected.
+- **Scaffolded repos can enforce the commit standard** ([#1019](https://github.com/vig-os/devkit/issues/1019))
+  - `validate-commit-msg` and `prepare-commit-msg-strip-trailers` now reach the consumer pre-commit config. Scaffolded repos already shipped a `.githooks/commit-msg` shim and a `COMMIT_MESSAGE_STANDARD.md`, but had no `commit-msg`-stage hooks for the shim to run — the documented standard was unenforceable in every consumer repo.
+
 ### Changed
+
+- **Commit scopes are free-form** ([#1019](https://github.com/vig-os/devkit/issues/1019))
+  - The `validate-commit-msg` hook no longer pins an allowlist of commit scopes. The previous five-scope list (`agent,ci,setup,image,vigutils`) rejected 594 of the 1206 scoped commits in history (~49%), including the scopes used by our own bots, and contradicted `docs/COMMIT_MESSAGE_STANDARD.md`, which defines a scope as free-form "alphanumeric and hyphens only". The commit **type**, the `Refs:` line and the agent blocklist remain enforced; only the scope vocabulary is open.
 
 ### Deprecated
 
