@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`node` capability module with selectable Node version** ([#1027](https://github.com/vig-os/devkit/issues/1027))
+  - `mkProjectShell` gains a `node` capability module: `modules = [ "node" ]`
+    puts `nodejs` (which bundles `npm`) in the dev-shell, replacing the
+    hand-wired `extraPackages = [ pkgs.nodejs ]` every TS-action consumer copied.
+  - Lands the per-module-options mechanism the capability-modules ADR deferred:
+    a `modules` entry may now be an attrset `{ name = "node"; version = 22; }`
+    (selecting `pkgs.nodejs_<major>`) alongside the plain `"node"` string;
+    unknown option keys and unavailable/insecure majors fail at eval time. A
+    pinned version is prepended on PATH so it wins over the `nodejs` the
+    toolchain SSoT already ships. `modules = [ ]` is byte-identical to before.
+  - Node-detected repos get npm-mapped `justfile.project` recipes seeded at
+    their first scaffold (`sync` = `npm ci`, plus `lint`/`test`/`build`/`bundle`)
+    instead of the uv template, so `just sync` / `just test` work under Node; an
+    existing `justfile.project` is never touched. The module ships shell packages
+    only — eslint/prettier hooks and the codeql language stay out of scope.
 - **Opt-in release artifact/bundle step for repos that ship a committed build** ([#1029](https://github.com/vig-os/devkit/issues/1029))
   - `release-core.yml` now detects a `bundle` just recipe via `just --summary` in the finalize job; when present it runs `just bundle` and commits `dist/` alongside `CHANGELOG.md` in the finalization commit, so a JS Action (or any repo shipping a committed `@vercel/ncc` artifact) tags a fresh bundle instead of a stale one. Repos without a `bundle` recipe (e.g. a pure-Python consumer) are unaffected — no new config surface, the recipe's presence is the flag.
 - **Commit messages are validated in CI** ([#1019](https://github.com/vig-os/devkit/issues/1019))
