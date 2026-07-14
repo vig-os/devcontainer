@@ -645,7 +645,7 @@ let
         stages = [ "commit-msg" ];
         args = [
           "--types"
-          "feat,fix,docs,chore,refactor,test,ci,build,revert,style"
+          "feat,fix,docs,chore,refactor,perf,test,ci,build,revert,style"
           "--refs-optional-types"
           "chore"
           "--blocked-patterns"

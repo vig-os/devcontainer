@@ -37,6 +37,7 @@ DEFAULT_APPROVED_TYPES = frozenset[str](
         "docs",
         "chore",
         "refactor",
+        "perf",
         "test",
         "ci",
         "build",
@@ -272,7 +273,7 @@ def main() -> int:
         "--types",
         type=str,
         default=None,
-        help="Comma-separated list of allowed commit types (default: feat,fix,docs,chore,refactor,test,ci,build,revert,style)",
+        help="Comma-separated list of allowed commit types (default: feat,fix,docs,chore,refactor,perf,test,ci,build,revert,style)",
     )
     parser.add_argument(
         "--scopes",
