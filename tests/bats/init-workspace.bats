@@ -2232,6 +2232,24 @@ _referenced_secrets() {
     assert_success
 }
 
+@test "setup-devkit-toolchain gates the python/uv env on pyproject.toml (#1028)" {
+    # The uv/CPython plumbing (UV_PROJECT_ENVIRONMENT, the Nix-CPython PATH
+    # filter, and the UV_PYTHON_DOWNLOADS_JSON_URL forward) only applies on a
+    # Python consumer; presence of pyproject.toml is the gate, so the composite
+    # is a no-op for those steps on a non-Python repo.
+    f="$TEMPLATE_DIR/.github/actions/setup-devkit-toolchain/action.yml"
+    # The pyproject.toml gate is present in more than one branch (container env
+    # + the direnv PATH/URL plumbing).
+    run bash -lc "[ \"\$(grep -c 'pyproject.toml' '$f')\" -ge 2 ]"
+    assert_success
+    # UV_PROJECT_ENVIRONMENT and the uv download URL are still exported — only
+    # behind the gate now.
+    run grep -q 'UV_PROJECT_ENVIRONMENT' "$f"
+    assert_success
+    run grep -q 'UV_PYTHON_DOWNLOADS_JSON_URL' "$f"
+    assert_success
+}
+
 @test "resolve-toolchain rejects an unknown DEVKIT_MODE loudly (#994)" {
     # A typo'd manifest value (e.g. a misspelled `container`) must fail the
     # resolve step, not
