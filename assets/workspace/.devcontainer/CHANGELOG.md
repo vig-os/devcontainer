@@ -107,6 +107,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `perf` joins the approved commit-type allowlist in `nix/hooks.nix` (both rendered `.pre-commit-config.yaml` files), `DEFAULT_APPROVED_TYPES` (the default CI's `validate-commit-range` uses), and `docs/COMMIT_MESSAGE_STANDARD.md`. It is a standard [Conventional Commits](https://www.conventionalcommits.org/) type and was already used once in history; before this the live `commit-checks` job would reject the next `perf(...)` commit.
 - **Commit scopes are free-form** ([#1019](https://github.com/vig-os/devkit/issues/1019))
   - The `validate-commit-msg` hook no longer pins an allowlist of commit scopes. The previous five-scope list (`agent,ci,setup,image,vigutils`) rejected 594 of the 1206 scoped commits in history (~49%), including the scopes used by our own bots, and contradicted `docs/COMMIT_MESSAGE_STANDARD.md`, which defines a scope as free-form "alphanumeric and hyphens only". The commit **type**, the `Refs:` line and the agent blocklist remain enforced; only the scope vocabulary is open.
+- **`prepare-release`'s `open-pr` job runs on a bare checkout** ([#1079](https://github.com/vig-os/devkit/issues/1079))
+  - The job's only real work is `gh pr create` (gh is preinstalled on GitHub-hosted runners), yet it stood up the full `setup-env` composite (Nix + `uv sync`) on the release critical path just to reach the `uv run retry` wrapper. It now uses a bare shallow checkout and sources the canonical bash `retry()` helper (`.github/scripts/retry.sh`) instead, keeping the same retry semantics while shaving minutes off every prepare run.
 
 ### Fixed
 
