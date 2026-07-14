@@ -434,3 +434,55 @@ class TestJustfileDevcBanner:
         # The stale, actively-wrong banner is gone.
         assert "DEVCONTAINER RECIPES - DO NOT EDIT" not in devc
         assert "Managed by vigOS devcontainer" not in devc
+
+
+class TestManifestTransformedFlagCoversBanners:
+    """Entries whose dest gets a banner must be flagged transformed (#1036).
+
+    The image gate (tests/test_image.py::TestFileStructure::test_manifest_files)
+    checksums every NON-transformed manifest entry against its repo-root src;
+    the banner pass rewrites the dest, so a bannered entry that still claims
+    ``is_transformed == False`` fails that gate only once the image is built.
+    These local mirrors catch the mismatch pre-push.
+    """
+
+    def test_non_transformed_entries_stay_byte_identical_after_sync(self, tmp_path):
+        """Local mirror of the image identity check: src == dest byte-for-byte."""
+        sync_manifest = _load_sync_manifest()
+        sync_manifest.sync(project_root, tmp_path)
+
+        for entry in sync_manifest.MANIFEST:
+            if entry.is_transformed:
+                continue
+            src = project_root / entry.src
+            if src.is_file():
+                pairs = [(src, tmp_path / entry.dest)]
+            else:
+                pairs = [
+                    (f, tmp_path / entry.dest / f.relative_to(src))
+                    for f in sorted(src.rglob("*"))
+                    if f.is_file()
+                ]
+            for src_file, dest_file in pairs:
+                assert dest_file.read_bytes() == src_file.read_bytes(), (
+                    f"manifest entry {entry.src!r} is not flagged transformed but "
+                    f"its synced copy {dest_file} differs from {src_file} — "
+                    "flag it (or the banner pass) as a transform"
+                )
+
+    def test_bannered_file_entry_is_flagged_transformed(self):
+        sync_manifest = _load_sync_manifest()
+        by_src = {entry.src: entry for entry in sync_manifest.MANIFEST}
+        # A markdown doc gets an HTML-comment banner -> transformed.
+        assert by_src["docs/COMMIT_MESSAGE_STANDARD.md"].is_transformed
+        # A directory whose files all get banners -> transformed.
+        assert by_src[".github/ISSUE_TEMPLATE/"].is_transformed
+
+    def test_skip_listed_entry_keeps_identity_flag(self):
+        """Genuinely untransformed entries must keep the strict identity check."""
+        sync_manifest = _load_sync_manifest()
+        by_src = {entry.src: entry for entry in sync_manifest.MANIFEST}
+        assert not by_src[".claude/worktrees.json"].is_transformed
+        assert not by_src[".gitmessage"].is_transformed
+        assert not by_src[".vscode/settings.json"].is_transformed
+        assert not by_src["CHANGELOG.md"].is_transformed
