@@ -98,14 +98,44 @@ devShells.default = vigos.lib.mkProjectShell {
   byte-identical to the pre-module builder — pure-Python consumers are
   untouched, and the **published image stays base-only** (modules are a
   direnv-mode/devshell feature).
-- **Shipped:** `native` — `stdenv.cc`, `cmake`, `gnumake`, `pkg-config` plus
-  generic `CC=cc`/`CXX=c++` exports; the curated form of the
-  [native-build contract](./MIGRATION.md#the-native-build-contract)'s
-  preferred tier. **Candidates (ask-gated, not shipped):** `geant4`, `rust`,
-  `fortran`/`f2py`, `root`.
+- **Shipped:**
+  - `native` — `stdenv.cc`, `cmake`, `gnumake`, `pkg-config` plus generic
+    `CC=cc`/`CXX=c++` exports; the curated form of the
+    [native-build contract](./MIGRATION.md#the-native-build-contract)'s
+    preferred tier.
+  - `node` ([#1027](https://github.com/vig-os/devkit/issues/1027)) — the
+    Node/TypeScript capability: `nodejs` (which bundles `npm`) in the shell,
+    for consumers who previously hand-wired `extraPackages = [ pkgs.nodejs ]`.
+  - **Candidates (ask-gated, not shipped):** `geant4`, `rust`, `fortran`/`f2py`,
+    `root`.
+- **Per-module options (the `node` version).** A `modules` entry is either a
+  plain name string or an attrset `{ name = "<name>"; <options> }` — additive,
+  the string form is unchanged. `node` takes one option, `version` (a Node
+  major), selecting `pkgs.nodejs_<major>`; omitted, it uses the nixpkgs default:
+
+  ```nix
+  modules = [ { name = "node"; version = 22; } ]; # pin Node 22; plain "node" = default
+  ```
+
+  Unknown option keys and unavailable majors throw at eval time. Note the
+  toolchain SSoT (`nix/devtools.nix`) already ships `nodejs` for the
+  `@devcontainers/cli`, and the composition orders devTools before module
+  packages — so a pinned `version` is prepended in the module's shellHook to
+  actually win `node`/`npm` on PATH. An **EOL major** nixpkgs marks insecure
+  (e.g. `nodejs_20`) throws unless the consumer opts into
+  `permittedInsecurePackages`; prefer a maintained LTS for local dev.
+- **What `node` does NOT do (v1 contract):** it contributes shell packages
+  only — no eslint/prettier pre-commit hooks (that is the #883 consumer-hooks
+  seam), no `.gitignore`/`codeql` language (those are the language-aware
+  scaffold, [#1024](https://github.com/vig-os/devkit/issues/1024)/[#1025](https://github.com/vig-os/devkit/issues/1025)).
+  Separately, a repo whose `package.json` is detected at its **first** scaffold
+  gets npm-mapped `justfile.project` recipes seeded (`sync` = `npm ci`, plus
+  `lint`/`test`/`build`/`bundle`) instead of the uv template, so `just sync` /
+  `just test` work under Node; an existing `justfile.project` is never touched.
 - Each shipped module gets a `checks.<system>.module-<name>` devshell build
-  and, for `native`, the uv C-extension sdist smoke test in
-  `tests/test_flake_modules.py`.
+  and a `tests/test_flake_modules.py` smoke test (for `native`, the uv
+  C-extension sdist; for `node`, that `node`/`npm` resolve and the versioned
+  form pins the major).
 
 ## Home-manager modules — versioning & release policy
 

@@ -3,6 +3,8 @@ name: inception_scope
 description: Convergent scoping — define what to build and what not to build.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Inception: Scope
 

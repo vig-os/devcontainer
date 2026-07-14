@@ -3,6 +3,8 @@ name: solve-and-pr
 description: Launches the autonomous worktree pipeline for an issue via just worktree-start.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Solve and PR (Autonomous Launcher)
 

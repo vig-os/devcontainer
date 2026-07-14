@@ -1333,6 +1333,29 @@ EOF
     assert_failure
 }
 
+# ── justfile.local must be preserved on upgrade (#1054) ───────────────────────
+# The scaffolded justfile.local (personal, gitignored recipes) claims in its
+# header to be preserved on upgrade, but it was absent from PRESERVE_FILES, so a
+# re-scaffold silently overwrote personal recipes. Add it to PRESERVE_FILES so
+# the mechanism matches the promise (same silent-clobber class as #878/#913).
+
+@test "justfile.local is in PRESERVE_FILES (#1054)" {
+    # shellcheck disable=SC2016
+    run grep -E '"justfile\.local"' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+@test "upgrade preserves a customized justfile.local (#1054)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1054-preserve"
+    mkdir -p "$ws"
+    printf '# SENTINEL-1054 personal recipes\nmy-local:\n\t@echo mine\n' \
+        >"$ws/justfile.local"
+    run _upgrade both "$ws"
+    assert_success
+    run grep -q 'SENTINEL-1054' "$ws/justfile.local"
+    assert_success
+}
+
 # ── pre-commit reference scan must cover preserved workflows (#916) ────────────
 # The #881 scan only looked at justfile.project and .githooks/, but a consumer
 # CI workflow that still invokes the retired `pre-commit` binary breaks the same
@@ -2232,6 +2255,24 @@ _referenced_secrets() {
     assert_success
 }
 
+@test "setup-devkit-toolchain gates the python/uv env on pyproject.toml (#1028)" {
+    # The uv/CPython plumbing (UV_PROJECT_ENVIRONMENT, the Nix-CPython PATH
+    # filter, and the UV_PYTHON_DOWNLOADS_JSON_URL forward) only applies on a
+    # Python consumer; presence of pyproject.toml is the gate, so the composite
+    # is a no-op for those steps on a non-Python repo.
+    f="$TEMPLATE_DIR/.github/actions/setup-devkit-toolchain/action.yml"
+    # The pyproject.toml gate is present in more than one branch (container env
+    # + the direnv PATH/URL plumbing).
+    run bash -lc "[ \"\$(grep -c 'pyproject.toml' '$f')\" -ge 2 ]"
+    assert_success
+    # UV_PROJECT_ENVIRONMENT and the uv download URL are still exported — only
+    # behind the gate now.
+    run grep -q 'UV_PROJECT_ENVIRONMENT' "$f"
+    assert_success
+    run grep -q 'UV_PYTHON_DOWNLOADS_JSON_URL' "$f"
+    assert_success
+}
+
 @test "resolve-toolchain rejects an unknown DEVKIT_MODE loudly (#994)" {
     # A typo'd manifest value (e.g. a misspelled `container`) must fail the
     # resolve step, not
@@ -2337,6 +2378,30 @@ _RELEASE_RESOLVERS_991=(
     done
 }
 
+@test "release/CI workflows carry no stale python-shaped step labels (#1029)" {
+    # The sync/test steps run language-neutral `just` recipes; their labels and
+    # comments must not name Python (misleading on a Node/TS consumer).
+    run grep -q 'Sync Python dependencies' "$TEMPLATE_DIR/.github/workflows/release-core.yml"
+    assert_failure
+    run grep -q 'Pytest' "$TEMPLATE_DIR/.github/workflows/ci.yml"
+    assert_failure
+}
+
+@test "release-core builds+commits an opt-in bundle when a bundle recipe exists (#1029)" {
+    # A repo that ships a committed build artifact (e.g. a JS action's ncc
+    # dist/) defines a `bundle` just recipe; the release finalize flow detects
+    # it via `just --summary`, runs `just bundle`, and commits dist/ as part of
+    # the finalization commit. Language-neutral: no bundle recipe -> no-op.
+    f="$TEMPLATE_DIR/.github/workflows/release-core.yml"
+    run grep -q 'just --summary' "$f"
+    assert_success
+    run grep -q 'just bundle' "$f"
+    assert_success
+    # dist/ joins CHANGELOG.md in the finalization commit's FILE_PATHS.
+    run grep -q 'CHANGELOG.md,dist' "$f"
+    assert_success
+}
+
 @test "resolve-image action is removed from every rendered mode tree (#991)" {
     for mode in devcontainer direnv both bare; do
         ws="$BATS_TEST_TMPDIR/e2e-991-$mode"
@@ -2410,4 +2475,217 @@ _RELEASE_RESOLVERS_991=(
     run _preview "$ws" --mode direnv
     assert_success
     refute_output --partial "docs/container-ci-quirks.md"
+}
+
+# ── language-aware managed .gitignore (#1024) ─────────────────────────────────
+# .gitignore is a managed/overwritten scaffold file, so a consumer's hand-fix
+# never survives an upgrade. The stock Python template blanket-ignored dist/
+# (which breaks a JS Action that commits its bundled dist/index.js) and shipped
+# no Node ignores at all. init-workspace.sh now detects the consumer language
+# from marker files (package.json → node, pyproject.toml → python, Cargo.toml →
+# rust) and assembles a language-neutral base + the matching per-language
+# fragment on every (re)scaffold, so the correct ignore set is upgrade-persistent.
+
+@test "scaffold .gitignore for a Node consumer ignores node_modules et al, never dist/ (#1024)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1024-node-gi"
+    mkdir -p "$ws"
+    printf '{ "name": "probe" }\n' >"$ws/package.json"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/.gitignore"
+    assert_success
+    assert_line 'node_modules/'
+    assert_line '*.tsbuildinfo'
+    assert_line 'coverage/'
+    assert_line '.nyc_output/'
+    # A JS Action commits its bundled dist/index.js — no blanket dist/ ignore.
+    refute_line 'dist/'
+}
+
+@test "scaffold .gitignore for a Python consumer keeps the Python ignores incl. dist/ (#1024)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1024-py-gi"
+    mkdir -p "$ws"
+    printf '[project]\nname = "probe"\n' >"$ws/pyproject.toml"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/.gitignore"
+    assert_success
+    assert_line 'dist/'
+    assert_line '__pycache__/'
+    # Python must not receive the Node-only ignore set.
+    refute_line 'node_modules/'
+}
+
+@test "scaffold .gitignore for a language-neutral consumer is base-only (#1024)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1024-neutral-gi"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/.gitignore"
+    assert_success
+    # Base entries every repo gets, regardless of language.
+    assert_line '.direnv/'
+    assert_line 'justfile.local'
+    # No language-specific leakage without a marker file.
+    refute_line 'node_modules/'
+    refute_line 'dist/'
+}
+
+# ── language-aware codeql matrix (#1025) ──────────────────────────────────────
+# .github/workflows/codeql.yml is a managed/overwritten scaffold file whose
+# matrix was hardcoded to ['python', 'actions']. On a repo with no Python the
+# python leg fails ("no source code seen"). init-workspace.sh now rewrites the
+# matrix from the SAME language detection as the .gitignore (#1024): python →
+# python, node → javascript-typescript, rust → omitted (CodeQL rust caveat);
+# `actions` is always analyzed. The conflict with GitHub's default code-scanning
+# setup is documented in the rendered workflow.
+
+@test "scaffold codeql matrix for a Node consumer is javascript-typescript + actions (#1025)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1025-node-cq"
+    mkdir -p "$ws"
+    printf '{ "name": "probe" }\n' >"$ws/package.json"
+    run _scaffold both "$ws"
+    assert_success
+    run grep -E '^[[:space:]]*language:' "$ws/.github/workflows/codeql.yml"
+    assert_success
+    assert_output --partial "'javascript-typescript'"
+    assert_output --partial "'actions'"
+    refute_output --partial "'python'"
+}
+
+@test "scaffold codeql matrix for a Python consumer is python + actions (#1025)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1025-py-cq"
+    mkdir -p "$ws"
+    printf '[project]\nname = "probe"\n' >"$ws/pyproject.toml"
+    run _scaffold both "$ws"
+    assert_success
+    run grep -E '^[[:space:]]*language:' "$ws/.github/workflows/codeql.yml"
+    assert_success
+    assert_output --partial "'python'"
+    assert_output --partial "'actions'"
+    refute_output --partial "'javascript-typescript'"
+}
+
+@test "scaffold codeql matrix for a Rust consumer omits the language leg, keeps actions (#1025)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1025-rust-cq"
+    mkdir -p "$ws"
+    printf '[package]\nname = "probe"\n' >"$ws/Cargo.toml"
+    run _scaffold both "$ws"
+    assert_success
+    run grep -E '^[[:space:]]*language:' "$ws/.github/workflows/codeql.yml"
+    assert_success
+    assert_output --partial "'actions'"
+    refute_output --partial "'rust'"
+    refute_output --partial "'python'"
+}
+
+@test "scaffold codeql.yml documents the GitHub default code-scanning conflict (#1025)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1025-doc"
+    mkdir -p "$ws"
+    printf '{ "name": "probe" }\n' >"$ws/package.json"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/.github/workflows/codeql.yml"
+    assert_success
+    assert_output --partial "default code-scanning setup"
+}
+
+# ── first-scaffold npm justfile.project recipes for Node consumers (#1027) ─────
+# justfile.project is a PRESERVE_FILE: the stock template ships uv/pyproject
+# recipes, which no-op for a Node repo whose CI still calls `just sync|test`.
+# On the FIRST scaffold of a Node consumer (package.json present, no existing
+# justfile.project) init-workspace.sh seeds npm-mapped recipes instead of the
+# default template, so `just sync` = `npm ci`, plus lint/test/build/bundle. An
+# EXISTING justfile.project is consumer-owned and never touched.
+
+@test "first scaffold of a Node consumer seeds npm justfile.project recipes (#1027)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1027-node-seed"
+    mkdir -p "$ws"
+    printf '{ "name": "probe" }\n' >"$ws/package.json"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/justfile.project"
+    assert_success
+    # sync = npm ci (the CI contract recipe every mode calls).
+    assert_output --partial 'npm ci'
+    # The npm-mapped quality/build recipes are present by name.
+    assert_output --partial 'sync'
+    assert_output --partial 'test'
+    assert_output --partial 'build'
+    assert_output --partial 'bundle'
+    # ncc (bundle) and tsc (build) are the Action-runtime mappings.
+    assert_output --partial 'ncc'
+    # The Python default template must NOT have been used.
+    refute_output --partial 'uv sync'
+}
+
+@test "first scaffold of a Node consumer substitutes the project placeholder (#1027)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1027-node-subst"
+    mkdir -p "$ws"
+    printf '{ "name": "probe" }\n' >"$ws/package.json"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/justfile.project"
+    assert_success
+    # The seed carries the {{SHORT_NAME}} token, resolved by the substitution
+    # pass like every managed file (SHORT_NAME=testproj in the _scaffold helper).
+    assert_output --partial 'testproj'
+    refute_output --partial '{{SHORT_NAME}}'
+}
+
+@test "an existing justfile.project is never replaced by the Node seed (#1027)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1027-node-preserve"
+    mkdir -p "$ws"
+    printf '{ "name": "probe" }\n' >"$ws/package.json"
+    printf '# consumer-owned recipes\nmy-custom-recipe:\n\t@echo mine\n' \
+        >"$ws/justfile.project"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/justfile.project"
+    assert_success
+    # The consumer file is preserved verbatim — the seed must not clobber it.
+    assert_output --partial 'my-custom-recipe'
+    refute_output --partial 'npm ci'
+}
+
+@test "first scaffold of a Python consumer keeps the uv template, not npm (#1027)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1027-py-notseeded"
+    mkdir -p "$ws"
+    printf '[project]\nname = "probe"\n' >"$ws/pyproject.toml"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/justfile.project"
+    assert_success
+    # No package.json marker, so the Node seed must not apply.
+    assert_output --partial 'uv sync'
+    refute_output --partial 'npm ci'
+}
+
+@test "first scaffold of a language-neutral consumer keeps the default template (#1027)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1027-neutral-notseeded"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/justfile.project"
+    assert_success
+    refute_output --partial 'npm ci'
+}
+
+# ── the Node justfile.project seed carries the preserved banner (#1055) ────────
+# The node.justfile.project seed lives outside assets/workspace/, so the #1036
+# banner pass never touched it — a first-scaffold Node justfile.project lacked
+# the preserved banner every other consumer-owned file carries (and that the uv
+# template it replaces does carry). The banner is stamped into the seed by the
+# sync-manifest banner pass, so a first-scaffolded Node justfile.project opens
+# with it.
+
+@test "a first-scaffolded Node justfile.project carries the preserved banner (#1055)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1055-node-banner"
+    mkdir -p "$ws"
+    printf '{ "name": "probe" }\n' >"$ws/package.json"
+    run _scaffold both "$ws"
+    assert_success
+    run head -1 "$ws/justfile.project"
+    assert_success
+    assert_output --partial 'Seeded by vigOS devkit'
 }

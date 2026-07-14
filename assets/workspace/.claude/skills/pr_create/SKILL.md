@@ -3,13 +3,15 @@ name: pr_create
 description: Prepares and submits a pull request for feature or bugfix work.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Submit Pull Request
 
 Prepare and submit a pull request for **feature or bugfix work**.
 
 > **Note:** This workflow is for regular development PRs (feature/bugfix branches to `dev`).
-> For **release PRs**, see [../../../docs/RELEASE_CYCLE.md](../../../docs/RELEASE_CYCLE.md) — releases are automated via `prepare-release.sh`.
+> For **release PRs**, see [`docs/RELEASE_CYCLE.md`](https://github.com/vig-os/devkit/blob/main/docs/RELEASE_CYCLE.md) — releases are automated via `prepare-release.sh`.
 
 ## Workflow Steps
 

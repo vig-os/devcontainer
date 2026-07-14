@@ -3,6 +3,8 @@ name: git_commit
 description: Executes the commit workflow following the project's commit message conventions.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Git Commit Workflow
 
@@ -25,7 +27,7 @@ git status && echo "=== STAGED CHANGES ===" && git diff --cached
 - Break down into smaller commits if no common type and scope
 
 3. **Write accurate commit message** based on staged changes only:
-- Follow rules in [commit-messages.mdc](../../../CLAUDE.md)
+- Follow rules in [commit-messages.mdc](https://github.com/vig-os/devkit/blob/main/CLAUDE.md)
 - Include details in list form if helpful for larger commits
 
 4. **Present the commit for review** using exactly this format:

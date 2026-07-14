@@ -3,6 +3,8 @@ name: code_execute
 description: Works through an implementation plan in batches with human checkpoints.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Execute Plan
 
@@ -42,7 +44,7 @@ Before doing anything else, verify you are on an issue branch:
 - Work through **unchecked** tasks sequentially, 2-3 tasks per batch.
 - For each task:
   1. Announce which task you're starting.
-  2. Implement the change (following [coding-principles](../../../CLAUDE.md) and [tdd.mdc](../tdd/SKILL.md)). Commit each phase via [git_commit](../git_commit/SKILL.md).
+  2. Implement the change (following [coding-principles](https://github.com/vig-os/devkit/blob/main/CLAUDE.md) and [tdd.mdc](../tdd/SKILL.md)). Commit each phase via [git_commit](../git_commit/SKILL.md).
   3. Run the task's verification step.
   4. Report result (pass/fail with evidence).
 

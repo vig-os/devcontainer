@@ -8,7 +8,6 @@ Derived containers can inherit from these test classes to verify that
 devcontainer functionality works correctly in their containers too.
 """
 
-import json
 import os
 import re
 import subprocess
@@ -19,7 +18,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from .conftest import _build_podman_cmd, _run_noninteractive_init
+from .conftest import _build_podman_cmd, _load_jsonc, _run_noninteractive_init
 
 
 class TestHostGitSignatureSetup:
@@ -281,8 +280,7 @@ class TestDevContainerJson:
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
 
-        with devcontainer_json.open() as f:
-            config = json.load(f)
+        config = _load_jsonc(devcontainer_json)
 
         assert isinstance(config, dict), "devcontainer.json is not a valid JSON object"
 
@@ -292,8 +290,7 @@ class TestDevContainerJson:
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
 
-        with devcontainer_json.open() as f:
-            config = json.load(f)
+        config = _load_jsonc(devcontainer_json)
 
         assert "name" in config, "devcontainer.json missing 'name' field"
 
@@ -311,8 +308,7 @@ class TestDevContainerJson:
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
 
-        with devcontainer_json.open() as f:
-            config = json.load(f)
+        config = _load_jsonc(devcontainer_json)
 
         assert "dockerComposeFile" in config, (
             "devcontainer.json missing 'dockerComposeFile' field"
@@ -341,8 +337,7 @@ class TestDevContainerJson:
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
 
-        with devcontainer_json.open() as f:
-            config = json.load(f)
+        config = _load_jsonc(devcontainer_json)
 
         assert "service" in config, "devcontainer.json missing 'service' field"
         # Service name is derived from SHORT_NAME (test_project in tests)
@@ -356,8 +351,7 @@ class TestDevContainerJson:
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
 
-        with devcontainer_json.open() as f:
-            config = json.load(f)
+        config = _load_jsonc(devcontainer_json)
 
         assert "workspaceFolder" in config, (
             "devcontainer.json missing 'workspaceFolder' field"
@@ -380,8 +374,7 @@ class TestDevContainerJson:
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
 
-        with devcontainer_json.open() as f:
-            config = json.load(f)
+        config = _load_jsonc(devcontainer_json)
 
         assert "customizations" in config, (
             "devcontainer.json missing 'customizations' field"
@@ -403,8 +396,7 @@ class TestDevContainerJson:
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
 
-        with devcontainer_json.open() as f:
-            config = json.load(f)
+        config = _load_jsonc(devcontainer_json)
 
         assert "settings" in config["customizations"]["vscode"], (
             "devcontainer.json missing 'settings' in vscode customizations"
@@ -427,8 +419,7 @@ class TestDevContainerJson:
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
 
-        with devcontainer_json.open() as f:
-            config = json.load(f)
+        config = _load_jsonc(devcontainer_json)
 
         assert "initializeCommand" in config, (
             "devcontainer.json missing 'initializeCommand' field"
@@ -444,8 +435,7 @@ class TestDevContainerJson:
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
 
-        with devcontainer_json.open() as f:
-            config = json.load(f)
+        config = _load_jsonc(devcontainer_json)
 
         assert "postAttachCommand" in config, (
             "devcontainer.json missing 'postAttachCommand' field"
@@ -465,8 +455,7 @@ class TestDevContainerJson:
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
 
-        with devcontainer_json.open() as f:
-            config = json.load(f)
+        config = _load_jsonc(devcontainer_json)
 
         assert "postCreateCommand" in config, (
             "devcontainer.json missing 'postCreateCommand' field"
@@ -486,8 +475,7 @@ class TestDevContainerJson:
             initialized_workspace / ".devcontainer" / "devcontainer.json"
         )
 
-        with devcontainer_json.open() as f:
-            config = json.load(f)
+        config = _load_jsonc(devcontainer_json)
 
         # containerEnv is allowed for podman socket configuration
         if "containerEnv" in config:

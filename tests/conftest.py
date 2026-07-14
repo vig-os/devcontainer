@@ -163,6 +163,23 @@ def get_host_path(container_path: Path) -> Path:
     return container_path
 
 
+def _load_jsonc(path: Path) -> dict:
+    """Parse a JSONC file, stripping `//` line comments.
+
+    The scaffolded ``.devcontainer/devcontainer.json`` carries a `//`
+    provenance banner (#1053) that VS Code and the devcontainer CLI accept but
+    strict ``json.load`` rejects. Drop whole-line ``//`` comments (the banner
+    format) before parsing; string values are never comment-prefixed so this is
+    safe for the scaffold files.
+    """
+    body = "\n".join(
+        line
+        for line in path.read_text().splitlines()
+        if not line.lstrip().startswith("//")
+    )
+    return json.loads(body)
+
+
 def get_compose_project_name() -> str:
     """Generate a unique compose project name for test isolation."""
     return f"test-{int(time.time())}"
@@ -662,8 +679,7 @@ def _prepare_devcontainer_env(
         and Path(env["SSH_AUTH_SOCK"]).exists()
     ):
         print("[DEBUG] Setting up SSH agent forwarding in devcontainer.json")
-        with devcontainer_json_path.open() as f:
-            config = json.load(f)
+        config = _load_jsonc(devcontainer_json_path)
         original_config = json.dumps(config, indent=4)
         if "mounts" not in config:
             config["mounts"] = []
@@ -805,8 +821,7 @@ def devcontainer_up(initialized_workspace, container_tag):
     )
     if not original_config:
         devcontainer_json_path = workspace_path / ".devcontainer" / "devcontainer.json"
-        with devcontainer_json_path.open() as f:
-            original_config = json.dumps(json.load(f), indent=4)
+        original_config = json.dumps(_load_jsonc(devcontainer_json_path), indent=4)
 
     project_yaml_path = workspace_path / ".devcontainer" / "docker-compose.project.yaml"
     if project_yaml_path.exists():

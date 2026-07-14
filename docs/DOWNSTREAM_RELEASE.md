@@ -1,6 +1,6 @@
 # Downstream Release Workflows
 
-This document is the **only** place that describes the release process for **consumer projects** that install workflows from `assets/workspace/`. The upstream devcontainer and smoke-test validation flow is documented in [`docs/RELEASE_CYCLE.md`](RELEASE_CYCLE.md) and [`docs/CROSS_REPO_RELEASE_GATE.md`](CROSS_REPO_RELEASE_GATE.md).
+This document is the **only** place that describes the release process for **consumer projects** that install workflows from `assets/workspace/`. The upstream devcontainer and smoke-test validation flow is documented in [`docs/RELEASE_CYCLE.md`](https://github.com/vig-os/devkit/blob/main/docs/RELEASE_CYCLE.md) and [`docs/CROSS_REPO_RELEASE_GATE.md`](https://github.com/vig-os/devkit/blob/main/docs/CROSS_REPO_RELEASE_GATE.md).
 
 ## Overview
 
@@ -28,7 +28,7 @@ Candidate mode keeps release branch content unchanged (no CHANGELOG date finaliz
 
 ## Immutable releases, tag rulesets, and forward-fix policy (downstream)
 
-- **Candidate (`X.Y.Z-rcN`)**: By default only the git tag is created. With **`create-release: true`**, `release-publish.yml` creates a **draft** GitHub **pre-release** (`gh release create --draft --prerelease`). Promote-time validation uses `gh api .../releases/tags/<tag>` and inspects `.draft` to ensure the expected draft pre-release exists; see [Cross-repo gate](CROSS_REPO_RELEASE_GATE.md) for upstream enforcement status. With **immutable releases** enabled, **publishing** a pre-release locks the **linked** tag and assets (see [upstream policy](RELEASE_CYCLE.md#immutable-releases-tag-rulesets-and-forward-fix-policy)); iterate with a **new** RC tag.
+- **Candidate (`X.Y.Z-rcN`)**: By default only the git tag is created. With **`create-release: true`**, `release-publish.yml` creates a **draft** GitHub **pre-release** (`gh release create --draft --prerelease`). Promote-time validation uses `gh api .../releases/tags/<tag>` and inspects `.draft` to ensure the expected draft pre-release exists; see [Cross-repo gate](https://github.com/vig-os/devkit/blob/main/docs/CROSS_REPO_RELEASE_GATE.md) for upstream enforcement status. With **immutable releases** enabled, **publishing** a pre-release locks the **linked** tag and assets (see [upstream policy](https://github.com/vig-os/devkit/blob/main/docs/RELEASE_CYCLE.md#immutable-releases-tag-rulesets-and-forward-fix-policy)); iterate with a **new** RC tag.
 - **Final (`X.Y.Z`)**: Automation creates a **draft** GitHub Release; **publishing** it (UI or `promote-release.yml`) applies immutable-release lock-in for the linked tag and assets when that setting is enabled. Enable **immutable releases** and **tag rulesets** on each consumer repository (and org policy) as needed; see [Preventing changes to your releases](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/preventing-changes-to-your-releases).
 - **Rollback**: The orchestrator resets the release branch and does **not** delete tags (forward-fix policy); recover with a new RC or a careful final retry per workflow logs.
 
@@ -41,7 +41,7 @@ After final `release.yml` has pushed tag `X.Y.Z` and created a **draft** GitHub 
 3. **Merge** — merge `release/X.Y.Z` → `main` (triggers `sync-main-to-dev` when configured)
 4. **Cleanup** (best-effort, does not fail the workflow) — delete remote git tags matching `${VERSION}-rc*` that have **no** GitHub Release
 
-**Upstream (`vig-os/devcontainer`) only:** Root `promote-release.yml` also prunes GHCR RC package versions via the org Packages API using **`GITHUB_TOKEN`** with **repo Admin** on the `devcontainer` package (one-time **Manage Actions access** grant). See [GitHub App Configuration](RELEASE_CYCLE.md#github-app-configuration) and [Registry and cleanup tokens](RELEASE_CYCLE.md#registry-and-cleanup-tokens-upstream) in `docs/RELEASE_CYCLE.md`.
+**Upstream (`vig-os/devcontainer`) only:** Root `promote-release.yml` also prunes GHCR RC package versions via the org Packages API using **`GITHUB_TOKEN`** with **repo Admin** on the `devcontainer` package (one-time **Manage Actions access** grant). See [GitHub App Configuration](https://github.com/vig-os/devkit/blob/main/docs/RELEASE_CYCLE.md#github-app-configuration) and [Registry and cleanup tokens](https://github.com/vig-os/devkit/blob/main/docs/RELEASE_CYCLE.md#registry-and-cleanup-tokens-upstream) in `docs/RELEASE_CYCLE.md`.
 
 This template does **not** implement upstream-only steps (GHCR `:latest`, cosign, cross-repo smoke-test gate). Projects that need registry or deploy promotion after merge should run separate automation or extend their `release-extension.yml` / own workflows; see [Extension Hook](#extension-hook).
 
@@ -62,7 +62,7 @@ There is no separate contract-version handshake; compatibility is defined by the
 Since [#991](https://github.com/vig-os/devkit/issues/991), the whole
 release/automation set provisions its toolchain per `DEVKIT_MODE`
 (`.vig-os`), following the conditional-`container:` pattern in
-[`docs/rfcs/ADR-conditional-container-toolchain.md`](rfcs/ADR-conditional-container-toolchain.md):
+[`docs/rfcs/ADR-conditional-container-toolchain.md`](https://github.com/vig-os/devkit/blob/main/docs/rfcs/ADR-conditional-container-toolchain.md):
 
 - Each `workflow_dispatch`/event-triggered workflow (`release.yml`,
   `prepare-release.yml`, `promote-release.yml`, `sync-issues.yml`,
@@ -91,7 +91,7 @@ choreography's bare `run:` invocations are identical in every mode. In `bare`
 mode the composite pins `vig-utils` to the `.vig-os` `DEVKIT_VERSION`
 (`renovate-changelog-pr` in `renovate-changelog-build.yml`, `prepare-changelog`
 in `prepare-release.yml` / `release-core.yml`); see
-[`docs/MIGRATION.md`](MIGRATION.md#bare-mode-vig-utils-release-console-scripts).
+[`docs/MIGRATION.md`](https://github.com/vig-os/devkit/blob/main/docs/MIGRATION.md#bare-mode-vig-utils-release-console-scripts).
 
 ## Required App Secrets
 
@@ -128,6 +128,96 @@ Default template behavior is no-op. Projects can customize this workflow for tas
 Extension contract inputs include both `release_kind` and `publish_version`, so custom logic can branch on candidate vs final behavior.
 
 `release.yml` requires extension success before publish, so extension failures block release publication.
+
+## Prepare-Release Extension Hook
+
+Project-specific **release-branch preparation** belongs in `.github/workflows/prepare-release-extension.yml` — the *mutating* counterpart to the read-only `release-extension.yml`. Default template behavior is no-op.
+
+`prepare-release.yml` calls it as a reusable workflow **after** the `release/X.Y.Z` branch is created (and the changelog-freeze commit pushed) and **before** the draft PR to `main` is opened, so any commits a consumer's extension pushes to the fresh release branch appear in the PR diff from the start. Because a `workflow_call` workflow is a job, the prepare phase is split into jobs (`prepare` creates the branch, `extension` runs the hook, `open-pr` opens the draft PR).
+
+Contract inputs:
+
+- `version` — the release version being prepared (`X.Y.Z`)
+- `release_branch` — the release branch just created (`release/X.Y.Z`)
+- `branch_sha` — the post-freeze head SHA the release branch was created from
+- `dry_run` — validate without making changes (extensions must honor it)
+- `git_user_name`, `git_user_email` — the git identity `prepare-release.yml` carries
+
+`prepare-release.yml` calls the hook with `secrets: inherit`, so an extension can mint the `COMMIT_APP` token to push to the write-protected release branch — the same bypass and identity the changelog-freeze commit already uses.
+
+Semantics:
+
+- **`dry_run: true`** ⇒ the default no-op prints its inputs and a consumer extension must not write. In the shipped `prepare-release.yml`, the whole prepare phase (including the `extension` job) is gated off on a dry run, so the hook only runs for real preparations.
+- **Rollback** ⇒ an extension failure fails the prepare phase, and a single `rollback` job (which lists `extension` in `needs`) deletes the partial `release/X.Y.Z` branch and restores `CHANGELOG.md` on `dev`. No new rollback machinery is required: every commit the extension pushes lives on the release branch the rollback deletes.
+- Anything the extension commits is ordinary release-branch history, re-validated by the rest of the pipeline (CI on the draft PR, RC candidates, finalize).
+
+### Example: rebuild a committed build artifact (`vig-os/commit-action`)
+
+An action-publishing repo must keep its committed `dist/index.js` fresh on every tagged commit. The prepare-time hook rebuilds it on the freshly cut release branch and commits it, so the release PR's `Dist Check` becomes pure verification:
+
+```yaml
+name: Prepare Release Extension
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      release_branch:
+        required: true
+        type: string
+      branch_sha:
+        required: true
+        type: string
+      dry_run:
+        required: false
+        default: false
+        type: boolean
+      git_user_name:
+        required: false
+        type: string
+      git_user_email:
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild-dist:
+    name: Rebuild and Commit dist/
+    runs-on: ubuntu-24.04
+    if: ${{ inputs.dry_run != true }}
+    steps:
+      - name: Generate Commit App Token
+        id: commit_app_token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.COMMIT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
+
+      - name: Checkout release branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_branch }}
+
+      - name: Build the action bundle
+        run: |
+          just sync
+          just bundle
+
+      - name: Commit dist/ if it changed
+        if: ${{ hashFiles('dist/index.js') != '' }}
+        uses: vig-os/commit-action@v0
+        env:
+          GH_TOKEN: ${{ steps.commit_app_token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TARGET_BRANCH: refs/heads/${{ inputs.release_branch }}
+          COMMIT_MESSAGE: |-
+            chore: rebuild dist for release ${{ inputs.version }}
+          FILE_PATHS: dist/index.js
+```
 
 ## Cross-Repo Validation Gate
 

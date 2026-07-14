@@ -1,3 +1,6 @@
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
+
 name: Prepare Release
 
 on:  # yamllint disable-line rule:truthy
@@ -92,14 +95,18 @@ jobs:
       - name: Verify tag does not exist
         env:
           VERSION: ${{ steps.vars.outputs.version }}
+          TAG_PREFIX: ${{ steps.resolve.outputs.tag-prefix }}
         run: |
           set -euo pipefail
-          if git rev-parse -q --verify "refs/tags/$VERSION" > /dev/null; then
-            echo "ERROR: Tag $VERSION already exists"
+          # The release will publish the prefixed tag name (#1044); validate that,
+          # not the bare version. Empty prefix => bare tag (today's behavior).
+          PUBLISH_TAG="${TAG_PREFIX}${VERSION}"
+          if git rev-parse -q --verify "refs/tags/$PUBLISH_TAG" > /dev/null; then
+            echo "ERROR: Tag $PUBLISH_TAG already exists"
             exit 1
           fi
-          if git ls-remote --exit-code --tags --refs origin "refs/tags/$VERSION" > /dev/null 2>&1; then
-            echo "ERROR: Tag $VERSION already exists on remote"
+          if git ls-remote --exit-code --tags --refs origin "refs/tags/$PUBLISH_TAG" > /dev/null 2>&1; then
+            echo "ERROR: Tag $PUBLISH_TAG already exists on remote"
             exit 1
           fi
 
@@ -149,8 +156,15 @@ jobs:
     if: ${{ inputs.dry-run != true }}
     permissions:
       contents: write
-      pull-requests: write
       packages: read
+    # Exposed to the extension, open-pr, and rollback jobs. The PR body (changelog)
+    # and the rollback anchors (pre-freeze/post-freeze SHAs) were step outputs when
+    # this job also opened the PR and rolled back inline; the extension hook (#1059)
+    # runs between branch creation and PR-open, so both moved to their own jobs.
+    outputs:
+      changelog: ${{ steps.changelog.outputs.changelog }}
+      prepare_start_sha: ${{ steps.pre_state.outputs.prepare_start_sha }}
+      dev_sha: ${{ steps.create_branch.outputs.dev_sha }}
 
     steps:
       - name: Generate Commit App Token
@@ -159,13 +173,6 @@ jobs:
         with:
           client-id: ${{ secrets.COMMIT_APP_CLIENT_ID }}
           private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
-
-      - name: Generate Release App Token
-        id: release_app_token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
-        with:
-          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
       - name: Checkout dev branch
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -289,13 +296,69 @@ jobs:
       # sync merge and can never be silently dropped (#590). Keep a Changelog
       # endorses an always-present Unreleased section.
 
+  # Project-specific release-branch preparation (#1059), the mutating counterpart
+  # to release-extension.yml. Runs AFTER the release branch exists and BEFORE the
+  # draft PR opens, so any commits it pushes to release/X.Y.Z are in the PR diff
+  # from the start. A reusable workflow is a job, so this sits between the
+  # branch-creating `prepare` job and the `open-pr` job. `secrets: inherit` lets a
+  # real extension mint the COMMIT_APP token to push to the write-protected branch.
+  extension:
+    name: Prepare Release Extension
+    needs: [validate, prepare]
+    if: ${{ inputs.dry-run != true }}
+    uses: ./.github/workflows/prepare-release-extension.yml
+    with:
+      version: ${{ needs.validate.outputs.version }}
+      release_branch: ${{ needs.validate.outputs.release_branch }}
+      branch_sha: ${{ needs.prepare.outputs.dev_sha }}
+      dry_run: ${{ inputs.dry-run }}
+      git_user_name: ${{ inputs.git-user-name }}
+      git_user_email: ${{ inputs.git-user-email }}
+    secrets: inherit
+
+  open-pr:
+    name: Open Draft Release PR
+    needs: [validate, prepare, extension]
+    runs-on: ubuntu-24.04
+    container:
+      image: ${{ needs.validate.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_PULL_TOKEN || github.token }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    if: ${{ inputs.dry-run != true }}
+    permissions:
+      contents: read
+      pull-requests: write
+      packages: read
+
+    steps:
+      - name: Generate Release App Token
+        id: release_app_token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up devkit toolchain
+        uses: ./.github/actions/setup-devkit-toolchain
+        with:
+          mode: ${{ needs.validate.outputs.mode }}
+          devkit-version: ${{ needs.validate.outputs.image-tag }}
+
       - name: Create draft PR to main
         id: pr
         env:
           GH_TOKEN: ${{ steps.release_app_token.outputs.token }}
           VERSION: ${{ needs.validate.outputs.version }}
           RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
-          CHANGELOG_CONTENT: ${{ steps.changelog.outputs.changelog }}
+          CHANGELOG_CONTENT: ${{ needs.prepare.outputs.changelog }}
         run: |
           set -euo pipefail
 
@@ -337,14 +400,71 @@ jobs:
           PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
           echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
-      - name: Roll back prepare-release side effects on failure
+  # Single rollback job across the whole prepare phase (mirrors release.yml's
+  # rollback job that watches release-extension). It deletes the partial release
+  # branch and restores CHANGELOG.md on dev — unchanged logic. Because every
+  # commit the extension pushes lives on release/X.Y.Z, deleting that branch
+  # erases the extension's work too, so an extension failure needs no new
+  # machinery beyond listing `extension` in `needs`.
+  rollback:
+    name: Roll Back Prepare Release on Failure or Cancellation
+    needs: [validate, prepare, extension, open-pr]
+    runs-on: ubuntu-24.04
+    container:
+      image: ${{ needs.validate.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_PULL_TOKEN || github.token }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    # `always()` (not `!cancelled()`) is load-bearing: it is what keeps this job
+    # eligible to run after the run itself is cancelled, and each phase guard
+    # also matches `cancelled` so a cancellation after the freeze commit rolls
+    # back exactly like a failure (#1078).
+    if: >-
+      ${{
+        always() &&
+        inputs.dry-run != true &&
+        needs.validate.result == 'success' &&
+        (
+          needs.prepare.result == 'failure' ||
+          needs.prepare.result == 'cancelled' ||
+          needs.extension.result == 'failure' ||
+          needs.extension.result == 'cancelled' ||
+          needs.open-pr.result == 'failure' ||
+          needs.open-pr.result == 'cancelled'
+        )
+      }}
+    permissions:
+      contents: write
+      packages: read
+
+    steps:
+      - name: Generate Commit App Token
+        id: commit_app_token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+        with:
+          client-id: ${{ secrets.COMMIT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up devkit toolchain
+        uses: ./.github/actions/setup-devkit-toolchain
+        with:
+          mode: ${{ needs.validate.outputs.mode }}
+          devkit-version: ${{ needs.validate.outputs.image-tag }}
+
+      - name: Roll back prepare-release side effects
         id: rollback_prepare
-        if: ${{ failure() }}
         env:
           GH_TOKEN: ${{ steps.commit_app_token.outputs.token }}
           RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
-          PREPARE_START_SHA: ${{ steps.pre_state.outputs.prepare_start_sha }}
-          POST_FREEZE_DEV_SHA: ${{ steps.create_branch.outputs.dev_sha }}
+          PREPARE_START_SHA: ${{ needs.prepare.outputs.prepare_start_sha }}
+          POST_FREEZE_DEV_SHA: ${{ needs.prepare.outputs.dev_sha }}
         run: |
           set -euo pipefail
           CHANGELOG_ROLLBACK_NEEDED=false
@@ -374,7 +494,7 @@ jobs:
           echo "changelog_rollback_needed=$CHANGELOG_ROLLBACK_NEEDED" >> "$GITHUB_OUTPUT"
 
       - name: Commit CHANGELOG rollback to dev via API
-        if: ${{ failure() && steps.rollback_prepare.outputs.changelog_rollback_needed == 'true' }}
+        if: ${{ steps.rollback_prepare.outputs.changelog_rollback_needed == 'true' }}
         uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
         env:
           GH_TOKEN: ${{ steps.commit_app_token.outputs.token }}

@@ -69,7 +69,16 @@ PRESERVE_FILES=(
     "LICENSE"
     ".github/CODEOWNERS"
     ".github/workflows/release-extension.yml"
+    # Mutating counterpart to release-extension.yml (#1059): consumers replace
+    # this no-op with release-branch preparation, so an upgrade must never
+    # clobber their implementation — same preserved class as release-extension.
+    ".github/workflows/prepare-release-extension.yml"
     "justfile.project"
+    # Personal, gitignored recipes (#1054): the file's own header promises it is
+    # preserved on upgrade, but it was absent here — so a re-scaffold silently
+    # overwrote personal recipes. Align the mechanism with the promise (same
+    # silent-clobber class as justfile.project/#878/#913).
+    "justfile.local"
     "renovate.json"
     # direnv/flake stub (#640): the user owns the extraPackages block, so a
     # dev-env upgrade must never clobber it — same class as justfile.project.
@@ -544,6 +553,101 @@ PRECOMMIT_CONFIG_PREEXISTED=false
 TYPOS_CONFIG_PREEXISTED=false
 [[ -f "$WORKSPACE_DIR/.typos.toml" ]] && TYPOS_CONFIG_PREEXISTED=true
 
+# ── consumer language detection (#1024/#1025) ─────────────────────────────────
+# Managed scaffold statics (.gitignore, .github/workflows/codeql.yml) are
+# Python-shaped by default, which is wrong for Node/Rust consumers and does not
+# survive an upgrade (both files are overwritten). Detect the consumer's
+# language(s) from marker files present in the workspace BEFORE the template
+# copy (rsync never removes them: pyproject.toml is preserved, package.json and
+# Cargo.toml are not in the template), then render those statics per-language
+# after the copy. Detection re-runs on every (re)scaffold, so the result is
+# upgrade-persistent. Empty when no marker is present (language-neutral repo).
+DETECTED_LANGUAGES=()
+[[ -f "$WORKSPACE_DIR/pyproject.toml" ]] && DETECTED_LANGUAGES+=("python")
+[[ -f "$WORKSPACE_DIR/package.json" ]] && DETECTED_LANGUAGES+=("node")
+[[ -f "$WORKSPACE_DIR/Cargo.toml" ]] && DETECTED_LANGUAGES+=("rust")
+
+# Seed npm-mapped justfile.project recipes on the FIRST scaffold of a Node
+# consumer (#1027). justfile.project is a PRESERVE_FILE: the stock template
+# ships uv/pyproject recipes, so a Node repo's `just sync` / `just test` (which
+# ci.yml calls in every mode) would no-op against `uv`. When `node` is detected
+# AND the consumer had no justfile.project before this scaffold (the template
+# copy above just placed the default), replace that fresh default with the Node
+# seed — `sync` = `npm ci`, plus lint/test/build (tsc)/bundle (ncc). Guarded on
+# JUSTFILE_PROJECT_PREEXISTED so an EXISTING consumer-owned justfile.project is
+# NEVER touched (same preserve semantics as the #877 repair path). The seed
+# lives beside init-workspace.sh in the image ($SCRIPT_DIR), so it is an
+# install-time input; it carries the same {{SHORT_NAME}} token the template
+# does and is placed BEFORE the substitution pass so that pass resolves it. A
+# full replacement (not an append like the .gitignore fragments): appending npm
+# recipes onto the uv template would redeclare recipe names and break `just`.
+seed_node_justfile_project() {
+    local seed="$SCRIPT_DIR/justfile.d/node.justfile.project"
+    local dst="$WORKSPACE_DIR/justfile.project"
+    # Only on a first scaffold (never over a consumer-owned file) of a Node repo.
+    [[ "$JUSTFILE_PROJECT_PREEXISTED" == "true" ]] && return 0
+    [[ -f "$seed" && -f "$dst" ]] || return 0
+    local lang is_node=false
+    for lang in ${DETECTED_LANGUAGES[@]+"${DETECTED_LANGUAGES[@]}"}; do
+        [[ "$lang" == "node" ]] && is_node=true
+    done
+    [[ "$is_node" == "true" ]] || return 0
+    echo "Seeding npm-mapped justfile.project recipes for the Node consumer (#1027)..."
+    cp "$seed" "$dst"
+}
+
+# Render the managed .gitignore as the language-neutral base (already copied
+# from the template) plus one appended fragment per detected language (#1024).
+# The fragments live beside init-workspace.sh in the image ($SCRIPT_DIR), never
+# under the template, so they are install-time inputs and never leak into the
+# consumer tree. No-op when the base or a fragment is absent.
+render_gitignore() {
+    local gi="$WORKSPACE_DIR/.gitignore"
+    [[ -f "$gi" ]] || return 0
+    local lang frag
+    for lang in ${DETECTED_LANGUAGES[@]+"${DETECTED_LANGUAGES[@]}"}; do
+        frag="$SCRIPT_DIR/gitignore.d/$lang.gitignore"
+        if [[ -f "$frag" ]]; then
+            printf '\n' >>"$gi"
+            cat "$frag" >>"$gi"
+        fi
+    done
+}
+
+# Rewrite the managed CodeQL language matrix to the detected language(s) (#1025):
+# python -> 'python', node -> 'javascript-typescript', rust -> omitted (CodeQL
+# ships no first-class Rust analyzer). 'actions' is always analyzed, so the
+# matrix is never empty (a marker-less repo analyzes just actions). No-op when
+# the workflow is absent (e.g. it was never scaffolded or was pruned).
+render_codeql_matrix() {
+    local cq="$WORKSPACE_DIR/.github/workflows/codeql.yml"
+    [[ -f "$cq" ]] || return 0
+    local -a langs=()
+    local lang
+    for lang in ${DETECTED_LANGUAGES[@]+"${DETECTED_LANGUAGES[@]}"}; do
+        case "$lang" in
+            python) langs+=("'python'") ;;
+            node) langs+=("'javascript-typescript'") ;;
+            rust) : ;; # CodeQL rust support caveat (#1025): omit the leg
+        esac
+    done
+    langs+=("'actions'")
+    local joined=""
+    for lang in "${langs[@]}"; do
+        joined="${joined:+$joined, }$lang"
+    done
+    sed -i -E "s|^([[:space:]]*language:).*|\1 [${joined}]|" "$cq"
+    echo "Rendered CodeQL language matrix: [${joined}]"
+    # Preflight note (#1025): the advanced CodeQL config the scaffold ships
+    # cannot coexist with GitHub's *default* code-scanning setup — its uploads
+    # are rejected while default setup is enabled. We never flip that API
+    # setting; the consumer disables default setup deliberately.
+    echo "Note: this advanced CodeQL config conflicts with GitHub's default"
+    echo "      code-scanning setup — disable default setup (Settings -> Code"
+    echo "      security -> Code scanning) or the uploads reject (#1025). This"
+    echo "      scaffold does not change your repo's code-scanning API setting."
+}
+
 # Warn if forcing (prompt user) - show which files would be overwritten
 if [[ "$FORCE" == "true" ]]; then
     echo ""
@@ -953,6 +1057,13 @@ if [[ "$NO_PROMPTS" != "true" ]]; then
     resolve_github_repository
 fi
 
+# Seed the Node justfile.project on a first scaffold BEFORE the substitution
+# pass below, so the seed's {{SHORT_NAME}} token is resolved like every other
+# managed file (the seed replaces the freshly-copied template at the same path,
+# which the manifest already lists as carrying the token). No-op for non-Node
+# consumers and for an existing (preserved) justfile.project. Refs #1027.
+seed_node_justfile_project
+
 # Replace placeholders in files (using pre-built manifest from image)
 echo "Replacing placeholders in files..."
 
@@ -982,6 +1093,14 @@ else
         fi
     done
 fi
+
+# Render the language-aware managed statics (#1024/#1025) from the freshly
+# copied template, keyed on the languages detected before the copy. Runs on
+# every (re)scaffold, so the correct .gitignore / codeql matrix is
+# upgrade-persistent. These files carry no placeholders, so ordering after the
+# substitution above is incidental.
+render_gitignore
+render_codeql_matrix
 
 # Persist the resolved manifest (#885). The scaffolded .vig-os is a managed
 # file (template-overwritten on upgrade), so the resolved delivery mode and

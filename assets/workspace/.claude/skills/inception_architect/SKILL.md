@@ -3,6 +3,8 @@ name: inception_architect
 description: Architecture evaluation — validate design against established patterns.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Inception: Architect
 
@@ -189,7 +191,7 @@ graph TD
 Create a new design document:
 
 1. **Create file**: `docs/designs/DES-XXX-YYYY-MM-DD-<kebab-case-title>.md`
-2. **Use template**: [DESIGN template](../../../docs/templates/DESIGN.md)
+2. **Use template**: [DESIGN template](https://github.com/vig-os/devkit/blob/main/docs/templates/DESIGN.md)
 3. **Fill sections**:
    - Overview: Link to RFC, summarize architecture approach
    - Architecture: System context, key decisions, pattern chosen

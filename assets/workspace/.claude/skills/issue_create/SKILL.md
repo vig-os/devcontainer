@@ -3,6 +3,8 @@ name: issue_create
 description: Creates a new GitHub issue using the appropriate issue template.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Create a GitHub Issue
 

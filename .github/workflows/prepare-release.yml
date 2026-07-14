@@ -155,6 +155,14 @@ jobs:
     if: ${{ github.event.inputs.dry-run != 'true' }}
     permissions:
       contents: read          # checkout dev branch
+    # Exposed to the extension, open-pr, and rollback jobs (#1059). The PR body
+    # (changelog) and the rollback anchors (pre-freeze/post-freeze SHAs) were step
+    # outputs when this job also opened the PR and rolled back inline; the extension
+    # hook runs between branch creation and PR-open, so both moved to their own jobs.
+    outputs:
+      changelog: ${{ steps.changelog.outputs.changelog }}
+      prepare_start_sha: ${{ steps.pre-state.outputs.prepare_start_sha }}
+      dev_sha: ${{ steps.create-branch.outputs.dev_sha }}
 
     steps:
       - name: Generate Commit App Token
@@ -163,13 +171,6 @@ jobs:
         with:
           client-id: ${{ secrets.COMMIT_APP_CLIENT_ID }}
           private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
-
-      - name: Generate Release App Token
-        id: release-app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
-        with:
-          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
       - name: Checkout dev branch
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -204,12 +205,6 @@ jobs:
           uv run prepare-changelog prepare "$VERSION" CHANGELOG.md
           echo "✓ CHANGELOG prepared (Unreleased → [${VERSION}] - TBD + fresh Unreleased)"
 
-      - name: Sync workspace manifest after changelog prepare
-        run: |
-          set -euo pipefail
-          uv run python scripts/sync_manifest.py sync assets/workspace/
-          echo "✓ Synced workspace manifest after changelog prepare"
-
       - name: Extract CHANGELOG content for PR body
         id: changelog
         env:
@@ -239,7 +234,7 @@ jobs:
 
             Move Unreleased content to [${{ needs.validate.outputs.version }}] - TBD
             and create fresh empty Unreleased section for continued development.
-          FILE_PATHS: CHANGELOG.md,assets/workspace/.devcontainer/CHANGELOG.md
+          FILE_PATHS: CHANGELOG.md
 
       - name: Create release branch from dev
         id: create-branch
@@ -293,15 +288,63 @@ jobs:
       # sync merge and can never be silently dropped (#590). Keep a Changelog
       # endorses an always-present Unreleased section.
 
+  # Project-specific release-branch preparation (#1059). Runs AFTER the release
+  # branch exists and BEFORE the draft PR opens, so its commit is in the PR diff
+  # from the start. This is devkit's dogfooding of the scaffolded hook: it holds
+  # the workspace-manifest sync step that used to be hardcoded inline here.
+  # `secrets: inherit` lets it mint the COMMIT_APP token to push to the branch.
+  extension:
+    name: Prepare Release Extension
+    needs: [validate, prepare]
+    if: ${{ github.event.inputs.dry-run != 'true' }}
+    uses: ./.github/workflows/prepare-release-extension.yml
+    with:
+      version: ${{ needs.validate.outputs.version }}
+      release_branch: ${{ needs.validate.outputs.release_branch }}
+      branch_sha: ${{ needs.prepare.outputs.dev_sha }}
+      dry_run: ${{ github.event.inputs.dry-run == 'true' }}
+      git_user_name: ${{ github.event.inputs.git-user-name }}
+      git_user_email: ${{ github.event.inputs.git-user-email }}
+    secrets: inherit
+
+  open-pr:
+    name: Open Draft Release PR
+    needs: [validate, prepare, extension]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    if: ${{ github.event.inputs.dry-run != 'true' }}
+    permissions:
+      contents: read          # PR is opened via the RELEASE_APP token
+
+    steps:
+      - name: Generate Release App Token
+        id: release-app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      # Bare shallow checkout only (#1079): the job's single piece of work is
+      # `gh pr create` — gh ships preinstalled on GitHub-hosted runners, and
+      # retries come from sourcing the canonical bash helper below, so the full
+      # setup-env composite (Nix + uv sync) has nothing to contribute here and
+      # only stretched the release critical path.
+      - name: Checkout dev branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          ref: dev
+
       - name: Create draft PR to main
         id: pr
         env:
           GH_TOKEN: ${{ steps.release-app-token.outputs.token }}
           VERSION: ${{ needs.validate.outputs.version }}
           RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
-          CHANGELOG_CONTENT: ${{ steps.changelog.outputs.changelog }}
+          CHANGELOG_CONTENT: ${{ needs.prepare.outputs.changelog }}
         run: |
           set -euo pipefail
+          # shellcheck source=/dev/null  # canonical retry() helper from the checkout
+          source .github/scripts/retry.sh
 
           # GitHub caps PR bodies at 65536 chars; a large frozen release
           # changelog can overflow it (#810). Truncate at a line boundary and
@@ -323,7 +366,7 @@ jobs:
             PR_BODY="${HEADER}${TRUNCATED}${NOTE}"
           fi
 
-          PR_URL=$(uv run retry --retries 3 --backoff 5 --max-backoff 60 -- \
+          PR_URL=$(retry --retries 3 --backoff 5 --max-backoff 60 -- \
             gh pr create \
             --base main \
             --head "$RELEASE_BRANCH" \
@@ -336,15 +379,92 @@ jobs:
           echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
           echo "✓ Draft PR created: $PR_URL (#$PR_NUMBER)"
 
-      - name: Roll back prepare-release side effects on failure
-        if: ${{ failure() }}
+      - name: Summary
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
+        run: |
+          echo "✓ Release branch prepared successfully!"
+          echo ""
+          echo "Release Summary:"
+          echo "  Version: $VERSION"
+          echo "  Branch: $RELEASE_BRANCH"
+          echo ""
+          echo "CHANGELOG state:"
+          echo "  dev:     ## Unreleased (empty) + ## [$VERSION] - TBD"
+          echo "  release: ## Unreleased (empty) + ## [$VERSION] - TBD"
+          echo ""
+          echo "Next steps:"
+          echo "  1. Test release: git checkout $RELEASE_BRANCH"
+          echo "  2. Review draft PR and monitor CI"
+          echo "  3. Fix any issues via bugfix PRs to $RELEASE_BRANCH"
+          echo "  4. Mark PR as ready for review (gh pr ready <PR_NUMBER>)"
+          echo "  5. Get PR approval from reviewer"
+          echo "  6. Publish candidate: just publish-candidate $VERSION"
+          echo "  7. Final release: just finalize-release $VERSION"
+
+  # Single rollback job across the whole prepare phase (#1059). It deletes the
+  # partial release branch and restores CHANGELOG.md on dev — unchanged logic.
+  # The sync_manifest rollback twin is gone: prepare no longer mutates dev's
+  # workspace mirror (that moved to the extension, which commits on the release
+  # branch), so restoring root CHANGELOG.md alone returns dev to a consistent
+  # pre-prepare state, and every commit the extension makes lives on the branch
+  # this job deletes.
+  rollback:
+    name: Roll Back Prepare Release on Failure or Cancellation
+    needs: [validate, prepare, extension, open-pr]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # `always()` (not `!cancelled()`) is load-bearing: it is what keeps this job
+    # eligible to run after the run itself is cancelled, and each phase guard
+    # also matches `cancelled` so a cancellation after the freeze commit rolls
+    # back exactly like a failure (#1078).
+    if: >-
+      ${{
+        always() &&
+        github.event.inputs.dry-run != 'true' &&
+        needs.validate.result == 'success' &&
+        (
+          needs.prepare.result == 'failure' ||
+          needs.prepare.result == 'cancelled' ||
+          needs.extension.result == 'failure' ||
+          needs.extension.result == 'cancelled' ||
+          needs.open-pr.result == 'failure' ||
+          needs.open-pr.result == 'cancelled'
+        )
+      }}
+    permissions:
+      contents: read          # writes go through the COMMIT_APP token
+
+    steps:
+      - name: Generate Commit App Token
+        id: commit-app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+        with:
+          client-id: ${{ secrets.COMMIT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
+
+      - name: Checkout dev branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Set up environment
+        uses: ./.github/actions/setup-env
+        with:
+          sync-dependencies: 'true'
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Roll back prepare-release side effects
         id: rollback-prepare
         env:
           GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
           VERSION: ${{ needs.validate.outputs.version }}
           RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
-          PREPARE_START_SHA: ${{ steps.pre-state.outputs.prepare_start_sha }}
-          POST_FREEZE_DEV_SHA: ${{ steps.create-branch.outputs.dev_sha }}
+          PREPARE_START_SHA: ${{ needs.prepare.outputs.prepare_start_sha }}
+          POST_FREEZE_DEV_SHA: ${{ needs.prepare.outputs.dev_sha }}
         run: |
           set -euo pipefail
 
@@ -388,7 +508,6 @@ jobs:
             echo "i dev CHANGELOG already matches pre-prepare state"
           else
             cp /tmp/changelog.pre-prepare.md CHANGELOG.md
-            uv run python scripts/sync_manifest.py sync assets/workspace/
             CHANGELOG_ROLLBACK_NEEDED=true
             echo "✓ Prepared CHANGELOG rollback content for dev"
           fi
@@ -397,7 +516,7 @@ jobs:
           echo "changelog_rollback_needed=$CHANGELOG_ROLLBACK_NEEDED" >> "$GITHUB_OUTPUT"
 
       - name: Commit CHANGELOG rollback to dev via API
-        if: ${{ failure() && steps.rollback-prepare.outputs.changelog_rollback_needed == 'true' }}
+        if: ${{ steps.rollback-prepare.outputs.changelog_rollback_needed == 'true' }}
         uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
         env:
           GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
@@ -408,10 +527,9 @@ jobs:
             chore: rollback failed prepare-release ${{ needs.validate.outputs.version }}
 
             Restore CHANGELOG.md on dev to pre-prepare state after prepare-release failed.
-          FILE_PATHS: CHANGELOG.md,assets/workspace/.devcontainer/CHANGELOG.md
+          FILE_PATHS: CHANGELOG.md
 
       - name: Rollback summary
-        if: ${{ failure() }}
         env:
           RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
           BRANCH_DELETED: ${{ steps.rollback-prepare.outputs.branch_deleted }}
@@ -421,28 +539,3 @@ jobs:
           echo "  Release branch: $RELEASE_BRANCH"
           echo "  Branch deleted: ${BRANCH_DELETED:-false}"
           echo "  CHANGELOG rollback attempted: ${CHANGELOG_ROLLBACK_NEEDED:-false}"
-
-      - name: Summary
-        if: ${{ success() }}
-        env:
-          VERSION: ${{ needs.validate.outputs.version }}
-          RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
-        run: |
-          echo "✓ Release branch prepared successfully!"
-          echo ""
-          echo "Release Summary:"
-          echo "  Version: $VERSION"
-          echo "  Branch: $RELEASE_BRANCH"
-          echo ""
-          echo "CHANGELOG state:"
-          echo "  dev:     ## Unreleased (empty) + ## [$VERSION] - TBD"
-          echo "  release: ## Unreleased (empty) + ## [$VERSION] - TBD"
-          echo ""
-          echo "Next steps:"
-          echo "  1. Test release: git checkout $RELEASE_BRANCH"
-          echo "  2. Review draft PR and monitor CI"
-          echo "  3. Fix any issues via bugfix PRs to $RELEASE_BRANCH"
-          echo "  4. Mark PR as ready for review (gh pr ready <PR_NUMBER>)"
-          echo "  5. Get PR approval from reviewer"
-          echo "  6. Publish candidate: just publish-candidate $VERSION"
-          echo "  7. Final release: just finalize-release $VERSION"

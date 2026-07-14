@@ -3,6 +3,8 @@ name: design_brainstorm
 description: Explores requirements and design before writing any code.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Brainstorm
 

@@ -1,0 +1,63 @@
+# Seeded by vigOS devkit — yours to edit; upgrades never overwrite this file.
+# Bugs / missing tools: https://github.com/vig-os/devkit/issues
+
+name: Prepare Release Extension
+
+on:  # yamllint disable-line rule:truthy
+  workflow_call:
+    inputs:
+      version:
+        description: "Release version being prepared (X.Y.Z)"
+        required: true
+        type: string
+      release_branch:
+        description: "Release branch just created (release/X.Y.Z)"
+        required: true
+        type: string
+      branch_sha:
+        description: "Post-freeze head SHA the release branch was created from"
+        required: true
+        type: string
+      dry_run:
+        description: "Validate without making changes (extensions must honor it)"
+        required: false
+        default: false
+        type: boolean
+      git_user_name:
+        description: "Git user name for commits"
+        required: false
+        default: "github-actions[bot]"
+        type: string
+      git_user_email:
+        description: "Git user email for commits"
+        required: false
+        default: "41898282+github-actions[bot]@users.noreply.github.com"
+        type: string
+
+# The orchestrator calls this workflow with `secrets: inherit`, so a real
+# extension can mint the COMMIT_APP token to push to the write-protected release
+# branch — the same bypass the changelog-freeze commit already uses.
+permissions:
+  contents: read
+
+jobs:
+  extension:
+    name: Prepare Extension Hook (Default No-op)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Default extension summary
+        env:
+          VERSION: ${{ inputs.version }}
+          RELEASE_BRANCH: ${{ inputs.release_branch }}
+          BRANCH_SHA: ${{ inputs.branch_sha }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          echo "No prepare-release extension configured."
+          echo "Version: $VERSION"
+          echo "Release branch: $RELEASE_BRANCH"
+          echo "Branch head SHA: $BRANCH_SHA"
+          echo "Dry-run: $DRY_RUN"
+          echo "Replace this file to prepare the release branch before the PR"
+          echo "opens (e.g. rebuild + commit a generated artifact). A real"
+          echo "extension must honor dry-run (no writes) and may push to"
+          echo "$RELEASE_BRANCH via the COMMIT_APP token (secrets: inherit)."

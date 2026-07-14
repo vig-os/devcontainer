@@ -1,4 +1,6 @@
 #!/bin/bash
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
 
 # Post-start script - runs every time the container starts (create + restart).
 # This script is called from postStartCommand in devcontainer.json.
