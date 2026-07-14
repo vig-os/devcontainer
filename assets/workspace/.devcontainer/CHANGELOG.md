@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Opt-in floating major/minor tags at promote (`DEVKIT_FLOATING_TAGS`)** ([#1045](https://github.com/vig-os/devkit/issues/1045))
+  - New optional `.vig-os` key (comma-separated subset of `major,minor`; empty =
+    off) makes the scaffolded `promote-release.yml` force-move `<prefix>X` and/or
+    `<prefix>X.Y` to the promoted final-release commit, giving Action consumers the
+    standard `uses: owner/repo@v0` pinning contract with promote-gated moves.
+  - A new `floating-tags` job runs only after the Release is published and the
+    release PR is merged (the post-acceptance gate); it is idempotent (skips when a
+    tag already points at the release commit), final-only, composes with
+    `DEVKIT_TAG_PREFIX`, and pushes with the RELEASE_APP token so a tag ruleset can
+    make floating-tag moves app-exclusive. Off by default — no change for devkit or
+    existing consumers.
+- **Per-repo release tag prefix (`DEVKIT_TAG_PREFIX`)** ([#1044](https://github.com/vig-os/devkit/issues/1044))
+  - New optional `.vig-os` key threads a tag prefix through the scaffolded release
+    pipeline, applied **only at the publishing edge** — the pushed git tag name and
+    the changelog release link. Absent/empty reproduces today's bare `X.Y.Z` tags
+    byte-for-byte (no change for devkit or existing consumers); Action-publishing
+    repos set `v` for the `actions/checkout@v5` ecosystem convention.
+  - `resolve-toolchain` reads the key and emits a `tag-prefix` output; `release.yml`
+    threads it into `release-core.yml`/`release-publish.yml`, and it composes into
+    the RC-discovery pattern, publish tag, `tag_state` check, `gh release create`,
+    the `prepare-release` tag-existence guard, and the `promote-release` release/RC
+    validation and cleanup. The `version` input, `release/X.Y.Z` branch name, and
+    `## [X.Y.Z]` freeze heading stay bare everywhere.
+  - `prepare-changelog finalize` gains `--tag-prefix`, prefixing both the release
+    link URL and the displayed heading (`## [v0.3.0](…/tag/v0.3.0) - DATE`); an
+    empty prefix is byte-identical to prior output.
 - **Scaffolded security-scan workflows skip on private repos** ([#1039](https://github.com/vig-os/devkit/issues/1039))
   - `codeql.yml` and `scorecard.yml` now guard their analysis job with
     `if: ${{ !github.event.repository.private }}`. Neither scan can ever succeed
@@ -61,6 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Scaffold ships `docs/DOWNSTREAM_RELEASE.md`** ([#1046](https://github.com/vig-os/devkit/issues/1046))
+  - The scaffolded `promote-release.yml` header points at `docs/DOWNSTREAM_RELEASE.md` — the consumer's primary release-process documentation — but the scaffold never shipped it, leaving every consumer with a dangling reference. The doc is now a manifest-synced managed file (root copy is the SSoT), so the reference resolves inside consumer repos and refreshes on scaffold upgrades.
 - **Interim transitive npm vulnerability coverage via weekly lockfile maintenance** ([#1041](https://github.com/vig-os/devkit/issues/1041))
   - The Renovate preset never touched transitive npm dependencies, so vulnerabilities in packages only reachable through a parent (12 of 21 alerts in the `commit-action` pilot, including the only critical) were neither reported nor remediated. The preset now enables `lockFileMaintenance` (weekly, same Monday cadence), which regenerates the lockfile and picks up in-range fixes for indirect dependencies. This is an **interim** mechanism, not a full fix: alert-driven transitive remediation is unimplemented upstream ([renovatebot/renovate#41825](https://github.com/renovatebot/renovate/discussions/41825)) and the former `transitiveRemediation` option was removed from Renovate. devkit's own `renovate.json` drops its now-duplicated `lockFileMaintenance` block and inherits it from the preset.
 
