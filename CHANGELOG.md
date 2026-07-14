@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Scaffolded repos reject AI-authored commits** ([#1031](https://github.com/vig-os/devkit/issues/1031))
+  - `check-agent-identity` now reaches the consumer pre-commit config. It is the only hook of the agent-identity pipeline ([#163](https://github.com/vig-os/devkit/issues/163)) that guards the commit **author/committer** — the one that catches `git commit --author="Claude <...>"`. After [#1026](https://github.com/vig-os/devkit/issues/1026) scaffolded repos rejected an AI-attributed commit *message* while accepting an AI-authored *commit*; the `COMMIT_MESSAGE_STANDARD.md` they ship promised the opposite. It runs at the pre-commit stage, so `prek run --all-files` enforces it in the scaffold's lint job too.
+
 ## [1.1.0](https://github.com/vig-os/devkit/releases/tag/1.1.0) - 2026-07-13
 
 ### Added

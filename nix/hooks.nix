@@ -608,7 +608,17 @@ let
         pass_filenames = true;
       };
     };
+    # Scaffolded: the two commit-msg hooks above guard the commit *message*,
+    # but this is the only #163 hook that guards the *author/committer* —
+    # the one that catches `git commit --author="Claude <...>"`. Without it
+    # in the consumer render, a scaffolded repo rejects an AI-attributed
+    # message while accepting an AI-authored commit, the exact false
+    # guarantee its COMMIT_MESSAGE_STANDARD.md warns against. It is
+    # pre-commit-stage, so `prek run --all-files` also enforces it in the
+    # scaffold's lint job. The blocklist it reads (.github/agent-blocklist.toml)
+    # is already manifest-synced into the scaffold. Refs #1031.
     check-agent-identity = {
+      scaffold = true;
       yaml = {
         name = "check agent identity";
         entry = "uv run check-agent-identity";
