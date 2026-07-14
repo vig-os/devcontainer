@@ -1,0 +1,121 @@
+# ===============================================================================
+# PROJECT RECIPES - Team-shared customizations (Node / TypeScript)
+# This file is git-tracked and preserved during devcontainer upgrades.
+# Add team-shared recipes here that everyone on the project should use.
+#
+# Seeded by init-workspace.sh on the FIRST scaffold of a Node consumer (a
+# package.json was detected). It maps the CI-contract recipe names the base
+# justfile and ci.yml expect (sync/lint/test/…) onto npm, so `just sync` and
+# `just test` work in a Node repo the same way they do in a Python one. The
+# bodies use `npm run <script>` (and `npm ci`/`npm test`) — ADAPT the script
+# names to your package.json. An EXISTING justfile.project is never replaced.
+# ===============================================================================
+# ===============================================================================
+# PROJECT VARIABLES
+# ===============================================================================
+
+project := "{{SHORT_NAME}}"
+# ===============================================================================
+# INFO
+# ===============================================================================
+
+# Show project information
+[group('info')]
+info:
+    @echo "Project: {{ project }}"
+
+# -------------------------------------------------------------------------------
+# CODE QUALITY
+# -------------------------------------------------------------------------------
+
+# Run all linters (adapt to your package.json "lint" script, e.g. eslint)
+[group('quality')]
+lint:
+    @if [ -f package.json ]; then npm run lint; fi
+
+# Format code (adapt to your package.json "format" script, e.g. prettier)
+[group('quality')]
+format:
+    @if [ -f package.json ]; then npm run format; fi
+
+# Run pre-commit hooks on all files
+[group('quality')]
+precommit:
+    prek run --all-files
+
+# -------------------------------------------------------------------------------
+# TESTING
+# -------------------------------------------------------------------------------
+
+# Run tests (npm test -> package.json "test" script, e.g. jest)
+[group('test')]
+test *args:
+    @if [ -f package.json ]; then npm test -- {{ args }}; fi
+
+# Run tests with coverage (adapt to your package.json "test:cov" script)
+[group('test')]
+test-cov *args:
+    @if [ -f package.json ]; then npm run test:cov -- {{ args }}; fi
+
+# -------------------------------------------------------------------------------
+# DEPENDENCIES
+# -------------------------------------------------------------------------------
+
+# Sync dependencies (clean, lockfile-faithful install)
+[group('deps')]
+sync *args:
+    @if [ -f package.json ]; then npm ci {{ args }}; fi
+
+# Update all dependencies (refreshes package-lock.json)
+[group('deps')]
+update:
+    npm update
+
+# -------------------------------------------------------------------------------
+# BUILD
+# -------------------------------------------------------------------------------
+
+# Compile TypeScript (adapt to your package.json "build" script, e.g. tsc)
+[group('build')]
+build:
+    @if [ -f package.json ]; then npm run build; fi
+
+# Bundle the action entrypoint into dist/ (adapt to your "bundle" script, e.g. ncc)
+[group('build')]
+bundle:
+    @if [ -f package.json ]; then npm run bundle; fi
+
+# Clean build artifacts
+[group('build')]
+clean-artifacts:
+    rm -rf dist coverage .nyc_output *.tsbuildinfo
+
+# ===============================================================================
+# PROJECT-SPECIFIC RECIPES
+# ===============================================================================
+# Uncomment and customize for your project:
+# # Run the application
+# [group('app')]
+# run *args:
+#     node dist/index.js {{args}}
+#
+# # Boot the local dev services declared in flake.nix (mkProjectServices,
+# # #795): daemonless process-compose stack, state in ./data (gitignore it).
+# [group('services')]
+# services *args:
+#     nix run .#services -- {{args}}
+#
+# # Prepare release branch (manual workflow dispatch helper)
+# [group('release')]
+# prepare-release version:
+#     gh workflow run prepare-release.yml --ref dev -f "version={{ version }}"
+#
+# # Finalize and publish release (manual workflow dispatch helper)
+# [group('release')]
+# finalize-release version:
+#     gh workflow run release.yml --ref release/{{ version }} -f "version={{ version }}" -f "release-kind=final" -f "dry-run=false"
+#
+# # Publish candidate release (manual workflow dispatch helper)
+# [group('release')]
+# publish-candidate version:
+#     gh workflow run release.yml --ref release/{{ version }} -f "version={{ version }}" -f "release-kind=candidate" -f "dry-run=false"
