@@ -57,8 +57,12 @@ runs:
         set -euo pipefail
         # Reuse the venv already present in the image instead of creating a new
         # one, and use the image-baked prek cache. These paths only exist inside
-        # the devcontainer image.
-        echo "UV_PROJECT_ENVIRONMENT=/root/assets/workspace/.venv" >> "$GITHUB_ENV"
+        # the devcontainer image. UV_PROJECT_ENVIRONMENT is Python/uv-specific,
+        # so gate it on the consumer actually being Python (pyproject.toml at the
+        # repo root); on a non-Python repo it is a no-op (#1028).
+        if [[ -f pyproject.toml ]]; then
+          echo "UV_PROJECT_ENVIRONMENT=/root/assets/workspace/.venv" >> "$GITHUB_ENV"
+        fi
         echo "PREK_HOME=/opt/prek-cache" >> "$GITHUB_ENV"
         # The workspace is bind-mounted with a different owner than the image
         # root user; mark it safe so git operations do not abort.
@@ -114,24 +118,32 @@ runs:
         SHELL_PATH="$(nix develop --profile "$RUNNER_TEMP/devkit-dev-profile" \
           --command bash -c 'printf "%s" "$PATH"')"
 
-        # Exclude the flake's podman (rootless podman on GitHub runners needs the
-        # host's setuid newuidmap/newgidmap, which the nix-store podman cannot
-        # see) and its bare CPython (`uv sync` must keep building the venv from a
-        # downloaded manylinux CPython, not the Nix loader — the #698/#703/#729
-        # libstdc++ regression). Library pkgs (python3.<ver>-<pkg>) are unaffected.
-        printf '%s' "$SHELL_PATH" | tr ':' '\n' \
+        # Always exclude the flake's podman (rootless podman on GitHub runners
+        # needs the host's setuid newuidmap/newgidmap, which the nix-store podman
+        # cannot see). For a Python consumer (pyproject.toml present) also exclude
+        # the bare CPython so `uv sync` keeps building the venv from a downloaded
+        # manylinux CPython, not the Nix loader — the #698/#703/#729 libstdc++
+        # regression. Library pkgs (python3.<ver>-<pkg>) are unaffected. On a
+        # non-Python repo the Nix python stays on PATH (#1028).
+        STORE_BINS="$(printf '%s' "$SHELL_PATH" | tr ':' '\n' \
           | grep '^/nix/store' \
-          | grep -v '/nix/store/[^/]*-podman[^/]*/bin' \
-          | grep -Ev '/nix/store/[^/]*-python3-[0-9][^/]*/bin' >> "$GITHUB_PATH"
+          | grep -v '/nix/store/[^/]*-podman[^/]*/bin')"
+        if [[ -f pyproject.toml ]]; then
+          STORE_BINS="$(printf '%s\n' "$STORE_BINS" \
+            | grep -Ev '/nix/store/[^/]*-python3-[0-9][^/]*/bin')"
+        fi
+        printf '%s\n' "$STORE_BINS" >> "$GITHUB_PATH"
 
         # Forward the dev-shell's uv Python-download metadata URL (GITHUB_PATH
         # carries PATH only): `uv sync` needs it to fetch the project's pinned
-        # CPython, which nixpkgs does not package.
-        UV_DL_JSON_URL="$(nix develop --profile "$RUNNER_TEMP/devkit-dev-profile" \
-          --command bash -c 'printf "UV_PYTHON_DOWNLOADS_JSON_URL=%s\n" "${UV_PYTHON_DOWNLOADS_JSON_URL:-}"' \
-          | grep '^UV_PYTHON_DOWNLOADS_JSON_URL=' | tail -n1 | cut -d= -f2-)"
-        if [ -n "$UV_DL_JSON_URL" ]; then
-          echo "UV_PYTHON_DOWNLOADS_JSON_URL=$UV_DL_JSON_URL" >> "$GITHUB_ENV"
+        # CPython, which nixpkgs does not package. Python consumers only (#1028).
+        if [[ -f pyproject.toml ]]; then
+          UV_DL_JSON_URL="$(nix develop --profile "$RUNNER_TEMP/devkit-dev-profile" \
+            --command bash -c 'printf "UV_PYTHON_DOWNLOADS_JSON_URL=%s\n" "${UV_PYTHON_DOWNLOADS_JSON_URL:-}"' \
+            | grep '^UV_PYTHON_DOWNLOADS_JSON_URL=' | tail -n1 | cut -d= -f2-)"
+          if [ -n "$UV_DL_JSON_URL" ]; then
+            echo "UV_PYTHON_DOWNLOADS_JSON_URL=$UV_DL_JSON_URL" >> "$GITHUB_ENV"
+          fi
         fi
         echo "Repo flake dev-shell provisioned; tools added to PATH."
 
