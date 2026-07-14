@@ -66,7 +66,13 @@ class TestWorkspaceInterpreterPath:
         sync_manifest = _load_sync_manifest()
         sync_manifest.sync(project_root, tmp_path)
 
-        settings = json.loads((tmp_path / ".vscode" / "settings.json").read_text())
+        raw = (tmp_path / ".vscode" / "settings.json").read_text()
+        # settings.json is now JSONC (#1053): it carries a `//` provenance
+        # banner, so strip comment lines before strict JSON parsing.
+        body = "\n".join(
+            line for line in raw.splitlines() if not line.lstrip().startswith("//")
+        )
+        settings = json.loads(body)
         interpreter = settings["python.defaultInterpreterPath"]
 
         assert interpreter == "${workspaceFolder}/.venv/bin/python3"
@@ -221,6 +227,31 @@ class TestBannerTransform:
         assert lines[2] == "# " + transforms.PRESERVED_BANNER[1]
         assert "services:" in lines
 
+    def test_jsonc_inserts_slash_comment_lines_at_top(self, tmp_path):
+        """JSONC files (#1053) get a `//`-comment banner above the root object."""
+        transforms = _load_transforms()
+        f = tmp_path / "settings.json"
+        f.write_text('{\n  "a": 1\n}\n')
+
+        transforms.Banner(preserved=False, style="jsonc").apply(f)
+
+        lines = f.read_text().splitlines()
+        assert lines[0] == "// " + transforms.MANAGED_BANNER[0]
+        assert lines[1] == "// " + transforms.MANAGED_BANNER[1]
+        assert lines[2] == ""
+        assert lines[3] == "{"
+        assert '"a": 1' in f.read_text()
+
+    def test_jsonc_banner_is_idempotent(self, tmp_path):
+        transforms = _load_transforms()
+        f = tmp_path / "devcontainer.json"
+        f.write_text('{\n  "name": "x"\n}\n')
+
+        transforms.Banner(preserved=True, style="jsonc").apply(f)
+        once = f.read_text()
+        transforms.Banner(preserved=True, style="jsonc").apply(f)
+        assert f.read_text() == once
+
     def test_banner_is_idempotent(self, tmp_path):
         transforms = _load_transforms()
         f = tmp_path / "ci.yml"
@@ -292,6 +323,8 @@ class TestPreserveFilesSource:
         assert "renovate.json" in preserve
         assert ".envrc" in preserve
         assert ".typos.toml" in preserve
+        # justfile.local is preserved now (#1054): its header's claim is real.
+        assert "justfile.local" in preserve
         # Interleaved comment lines are not mistaken for array entries.
         assert not any(entry.startswith("#") for entry in preserve)
 
@@ -313,6 +346,26 @@ class TestBannerApplication:
         assert ("# " + transforms.MANAGED_BANNER[0]) in managed.read_text()
         assert ("# " + transforms.PRESERVED_BANNER[0]) in preserved.read_text()
 
+    def test_stamps_jsonc_banner_on_devcontainer_settings_and_workspace(self, tmp_path):
+        """The three JSONC scaffold files get a `//` banner (#1053)."""
+        sync_manifest = _load_sync_manifest()
+        transforms = _load_transforms()
+        (tmp_path / ".devcontainer").mkdir()
+        (tmp_path / ".vscode").mkdir()
+        devc = tmp_path / ".devcontainer" / "devcontainer.json"
+        devc.write_text('{\n  "name": "x"\n}\n')
+        settings = tmp_path / ".vscode" / "settings.json"
+        settings.write_text('{\n  "a": 1\n}\n')
+        workspace = tmp_path / ".devcontainer" / "workspace.code-workspace.example"
+        workspace.write_text('{\n  "folders": []\n}\n')
+
+        sync_manifest.apply_banners(tmp_path, set())
+
+        for f in (devc, settings, workspace):
+            assert f.read_text().startswith("// " + transforms.MANAGED_BANNER[0]), (
+                f"{f.name} missing the JSONC banner"
+            )
+
     def test_skips_strict_json_and_generated_configs(self, tmp_path):
         sync_manifest = _load_sync_manifest()
         renovate = tmp_path / "renovate.json"
@@ -332,14 +385,19 @@ class TestBannerApplication:
         assert "vigOS devkit" not in precommit.read_text()
         assert "vigOS devkit" not in changelog.read_text()
 
-    def test_skips_contradictory_justfile_local(self, tmp_path):
+    def test_stamps_preserved_banner_on_justfile_local(self, tmp_path):
+        """justfile.local is a PRESERVE_FILE now (#1054): preserved banner, not skipped."""
         sync_manifest = _load_sync_manifest()
+        transforms = _load_transforms()
         local = tmp_path / "justfile.local"
         local.write_text("# LOCAL RECIPES\n")
 
-        sync_manifest.apply_banners(tmp_path, set())
+        sync_manifest.apply_banners(tmp_path, {"justfile.local"})
 
-        assert "vigOS devkit" not in local.read_text()
+        text = local.read_text()
+        assert ("# " + transforms.PRESERVED_BANNER[0]) in text
+        # The managed variant must not leak into this preserved file.
+        assert transforms.MANAGED_BANNER[0] not in text
 
     def test_apply_banners_is_idempotent(self, tmp_path):
         sync_manifest = _load_sync_manifest()
@@ -436,6 +494,52 @@ class TestJustfileDevcBanner:
         assert "Managed by vigOS devcontainer" not in devc
 
 
+class TestSeedBanners:
+    """Seed inputs outside assets/workspace/ get banners via an explicit map (#1055).
+
+    ``assets/justfile.d/node.justfile.project`` seeds a consumer's first-scaffold
+    ``justfile.project`` (a PRESERVE_FILE) for Node repos, but lives outside the
+    tree ``apply_banners`` walks. ``apply_seed_banners`` stamps it, deriving the
+    variant from the PRESERVE_FILES target it seeds — never hand-typed.
+    """
+
+    def test_node_seed_carries_the_preserved_banner(self):
+        transforms = _load_transforms()
+        seed = (
+            project_root / "assets" / "justfile.d" / "node.justfile.project"
+        ).read_text()
+        lines = seed.splitlines()
+        assert lines[0] == "# " + transforms.PRESERVED_BANNER[0]
+        assert lines[1] == "# " + transforms.PRESERVED_BANNER[1]
+
+    def test_apply_seed_banners_derives_variant_from_target(self, tmp_path):
+        sync_manifest = _load_sync_manifest()
+        transforms = _load_transforms()
+        seed_dir = tmp_path / "assets" / "justfile.d"
+        seed_dir.mkdir(parents=True)
+        seed = seed_dir / "node.justfile.project"
+        seed.write_text("# recipes\n")
+
+        # justfile.project is preserved -> the seed gets the preserved banner.
+        sync_manifest.apply_seed_banners(tmp_path, {"justfile.project"})
+
+        text = seed.read_text()
+        assert ("# " + transforms.PRESERVED_BANNER[0]) in text
+        assert transforms.MANAGED_BANNER[0] not in text
+
+    def test_apply_seed_banners_is_idempotent(self, tmp_path):
+        sync_manifest = _load_sync_manifest()
+        seed_dir = tmp_path / "assets" / "justfile.d"
+        seed_dir.mkdir(parents=True)
+        seed = seed_dir / "node.justfile.project"
+        seed.write_text("# recipes\n")
+
+        sync_manifest.apply_seed_banners(tmp_path, {"justfile.project"})
+        once = seed.read_text()
+        sync_manifest.apply_seed_banners(tmp_path, {"justfile.project"})
+        assert seed.read_text() == once
+
+
 class TestManifestTransformedFlagCoversBanners:
     """Entries whose dest gets a banner must be flagged transformed (#1036).
 
@@ -477,6 +581,8 @@ class TestManifestTransformedFlagCoversBanners:
         assert by_src["docs/COMMIT_MESSAGE_STANDARD.md"].is_transformed
         # A directory whose files all get banners -> transformed.
         assert by_src[".github/ISSUE_TEMPLATE/"].is_transformed
+        # A JSONC file gets a `//`-comment banner -> transformed (#1053).
+        assert by_src[".vscode/settings.json"].is_transformed
 
     def test_skip_listed_entry_keeps_identity_flag(self):
         """Genuinely untransformed entries must keep the strict identity check."""
@@ -484,5 +590,4 @@ class TestManifestTransformedFlagCoversBanners:
         by_src = {entry.src: entry for entry in sync_manifest.MANIFEST}
         assert not by_src[".claude/worktrees.json"].is_transformed
         assert not by_src[".gitmessage"].is_transformed
-        assert not by_src[".vscode/settings.json"].is_transformed
         assert not by_src["CHANGELOG.md"].is_transformed
