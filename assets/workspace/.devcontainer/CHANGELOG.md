@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Renovate preset groups npm updates instead of one PR per package** ([#1047](https://github.com/vig-os/devkit/issues/1047))
+  - The scaffolded `renovate-default.json` gave `github-actions` and `pep621` a `groupName` but left `npm` ungrouped, so npm consumers got one PR per package — each touching `package-lock.json` and `CHANGELOG.md`, so they conflicted pairwise and were effectively unlandable serially. npm now gets two grouping rules matching the other managers' style: `devDependencies` group across all update types ("npm dev dependencies"), and runtime `dependencies` minor/patch ("npm (minor and patch)") with majors staying as individual PRs. The existing `build(npm)` semantic-commit rule still applies to every npm PR (Renovate merges matching `packageRules` in order).
+
 - **`sync-main-to-dev` no longer deadlocks on new local actions** ([#1034](https://github.com/vig-os/devkit/issues/1034))
   - The `sync` job checked out `ref: dev` and then invoked a local `uses: ./.github/actions/...` composite, which GitHub resolves against the checked-out workspace. When `main` added or renamed a local action absent from `dev`, the job died on its first run — and the only PR that would carry the action onto `dev` was the very sync PR the job could no longer open. Dropping `ref: dev` builds against the triggering `main` SHA, where the action is guaranteed to exist; every downstream step already operates on `origin/main`/`origin/dev` or the API, so behavior is otherwise unchanged.
 - **`setup-devkit-toolchain` no longer forces Python/uv env on non-Python consumers** ([#1028](https://github.com/vig-os/devkit/issues/1028))

@@ -46,6 +46,19 @@
       "matchManagers": ["npm"],
       "semanticCommitType": "build",
       "semanticCommitScope": "npm"
+    },
+    {
+      "description": "npm — group dev dependencies (they never ship in the bundle)",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "groupName": "npm dev dependencies"
+    },
+    {
+      "description": "npm — group runtime minor/patch; majors stay separate",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["dependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "npm (minor and patch)"
     }
   ]
 }
