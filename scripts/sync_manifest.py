@@ -61,7 +61,17 @@ class Entry:
 
     @property
     def is_transformed(self) -> bool:
-        return len(self.transforms) > 0
+        """Whether the synced dest differs from the src.
+
+        True for entries with manifest transforms, and for entries whose dest
+        the provenance-banner pass (#1036) rewrites — derived from the same
+        banner-eligibility logic (``_banner_style``), so the classification
+        cannot drift from a hand-flagged copy. The image gate
+        (tests/test_image.py::test_manifest_files) checksums every
+        non-transformed entry against its src, so a bannered entry must never
+        claim to be untransformed.
+        """
+        return len(self.transforms) > 0 or _entry_gets_banner(self.src, self.dest)
 
 
 # ── Transform registry (type name -> constructor) ─────────────────────────────
@@ -199,6 +209,26 @@ def _banner_style(rel_path: str) -> str | None:
     ):
         return "hash"
     return None
+
+
+def _entry_gets_banner(src: str, dest: str) -> bool:
+    """Whether the banner pass rewrites this entry's synced dest (#1036).
+
+    Drives ``Entry.is_transformed``. Directory entries are classified by
+    walking the SOURCE tree (this repo's checkout, like sync's default
+    project root): the entry is banner-transformed if any file it syncs
+    would receive a banner at its dest-relative path.
+    """
+    src_path = Path(__file__).resolve().parent.parent / src
+    if src_path.is_dir():
+        dest_root = dest.strip("/")
+        return any(
+            _banner_style(f"{dest_root}/{f.relative_to(src_path).as_posix()}")
+            is not None
+            for f in src_path.rglob("*")
+            if f.is_file()
+        )
+    return _banner_style(dest) is not None
 
 
 def apply_banners(dest_base: Path, preserve_files: set[str]) -> None:
