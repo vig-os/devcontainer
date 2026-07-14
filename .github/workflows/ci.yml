@@ -8,8 +8,9 @@
 #   2. test-image - Run image tests
 #   3. test-integration - Run integration tests
 #   4. project-checks - Linters, utils, release cycle tests
-#   5. security-scan - Container image vulnerability scanning (Trivy)
-#   6. dependency-review - Dependency vulnerability check (PRs only)
+#   5. commit-checks - Commit message + PR title validation (PRs only)
+#   6. security-scan - Container image vulnerability scanning (Trivy)
+#   7. dependency-review - Dependency vulnerability check (PRs only)
 #
 # Triggers:
 #   - Pull requests to dev, release/**, and main (runs all suites)
@@ -231,6 +232,55 @@ jobs:
       - name: Check downstream flake stub
         run: nix flake check ./assets/workspace --override-input vigos "path:$PWD" --accept-flake-config
 
+  # Commit-message validation (#1019). `validate-commit-msg` is a commit-msg
+  # stage hook, so `prek run --all-files` (the project-checks lane) never runs
+  # it — and the only other enforcement path, the local core.hooksPath shim,
+  # was silently inert for hundreds of commits. A guard that only runs on
+  # healthy laptops is not a guard, so the standard is re-checked here against
+  # the commits the PR actually proposes to write into history.
+  commit-checks:
+    name: Commit Messages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # pull_request only: there is no base ref to diff against on dispatch.
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          # The default depth-1 clone has neither the base branch nor the PR's
+          # own commits, and validate-commit-range walks base..head.
+          fetch-depth: 0
+
+      - name: Set up environment
+        uses: ./.github/actions/setup-env
+        with:
+          sync-dependencies: 'true'
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      # The PR title is attacker-controlled text, so it reaches the validator as
+      # an environment variable — never interpolated into the shell command.
+      # The range starts at the merge-base with the *current* base branch, not
+      # at pull_request.base.sha: if the branch merged `dev` back in, base.sha
+      # would drag already-landed commits into the range and fail the PR for
+      # history it did not author.
+      - name: Validate commit messages and PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          BASE_SHA="$(git merge-base "origin/${BASE_REF}" "${HEAD_SHA}")"
+          echo "Validating ${BASE_SHA}..${HEAD_SHA} (base: ${BASE_REF})"
+          uv run validate-commit-range \
+            --base "${BASE_SHA}" \
+            --head "${HEAD_SHA}" \
+            --title "${PR_TITLE}" \
+            --blocked-patterns .github/agent-blocklist.toml
+
   python-security:
     name: Python Security Scan
     runs-on: ubuntu-24.04
@@ -430,6 +480,7 @@ jobs:
       - test-image
       - test-integration
       - project-checks
+      - commit-checks
       - python-security
       - security-scan
       - dependency-review
@@ -445,6 +496,7 @@ jobs:
           echo "Image Tests: ${{ needs.test-image.result }}"
           echo "Integration Tests: ${{ needs.test-integration.result }}"
           echo "Project Checks: ${{ needs.project-checks.result }}"
+          echo "Commit Messages: ${{ needs.commit-checks.result }}"
           echo "Python Security: ${{ needs.python-security.result }}"
           echo "Security Scan: ${{ needs.security-scan.result }}"
           echo "Dependency Review: ${{ needs.dependency-review.result }}"
@@ -470,6 +522,11 @@ jobs:
 
           if [ "${{ needs.project-checks.result }}" = "failure" ]; then
             echo "ERROR: Project checks failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.commit-checks.result }}" = "failure" ]; then
+            echo "ERROR: Commit message checks failed"
             FAILED=true
           fi
 
