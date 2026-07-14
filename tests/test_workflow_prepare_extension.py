@@ -205,6 +205,41 @@ def test_extension_failure_is_covered_by_rollback(path: Path) -> None:
 # --------------------------------------------------------------------------- #
 
 
+def test_devkit_open_pr_needs_no_toolchain() -> None:
+    """Devkit's open-pr job runs on a bare checkout — no setup-env (#1079).
+
+    The job's only real work is `gh pr create` (gh ships preinstalled on
+    GitHub-hosted runners), yet it stood up the full setup-env composite
+    (Nix + `uv sync`) on the release critical path just to reach the
+    `uv run retry` wrapper. Retries come from sourcing the canonical bash
+    helper (.github/scripts/retry.sh) instead, so the job must invoke no
+    local action and no `uv run`.
+    """
+    doc = _load(DEVKIT_PREPARE)
+    pr_name, pr_job = _job_with_step_run(doc, "gh pr create")
+    assert pr_name is not None, "could not locate the draft-PR-opening job"
+
+    local_actions = [
+        str(s.get("uses"))
+        for s in (pr_job.get("steps") or [])
+        if isinstance(s, dict) and str(s.get("uses", "")).startswith("./")
+    ]
+    assert not local_actions, (
+        f"devkit's `{pr_name}` job must not invoke local composite actions "
+        f"(found {local_actions}): a bare checkout plus the preinstalled gh "
+        "CLI suffices to open the draft PR (#1079)"
+    )
+    steps_text = _job_steps_text(pr_job)
+    assert "uv run" not in steps_text, (
+        f"devkit's `{pr_name}` job must not depend on the uv environment; "
+        "source .github/scripts/retry.sh for retries instead (#1079)"
+    )
+    assert "retry" in steps_text, (
+        f"devkit's `{pr_name}` job must keep retrying the gh call "
+        "(canonical bash retry helper)"
+    )
+
+
 def test_devkit_prepare_release_no_longer_syncs_manifest_inline() -> None:
     """Devkit's prepare-release.yml is scaffold-shaped: no hardcoded sync step."""
     assert "sync_manifest.py" not in DEVKIT_PREPARE.read_text(encoding="utf-8"), (
