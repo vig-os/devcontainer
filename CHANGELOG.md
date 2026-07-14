@@ -11,8 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Opt-in release artifact/bundle step for repos that ship a committed build** ([#1029](https://github.com/vig-os/devkit/issues/1029))
   - `release-core.yml` now detects a `bundle` just recipe via `just --summary` in the finalize job; when present it runs `just bundle` and commits `dist/` alongside `CHANGELOG.md` in the finalization commit, so a JS Action (or any repo shipping a committed `@vercel/ncc` artifact) tags a fresh bundle instead of a stale one. Repos without a `bundle` recipe (e.g. a pure-Python consumer) are unaffected — no new config surface, the recipe's presence is the flag.
+- **Commit messages are validated in CI** ([#1019](https://github.com/vig-os/devkit/issues/1019))
+  - New `commit-checks` job (devkit and scaffolded repos) runs `validate-commit-range` over every commit a pull request adds, plus the **pull request title** — which becomes the merge commit's subject under `--no-ff`. `validate-commit-msg` is a `commit-msg`-stage hook, so `prek run --all-files` never ran it: until now the standard was enforced only by a local hook, and only on a machine whose `core.hooksPath` was intact.
+  - Merge commits and bot-authored commits (`…[bot]`) are exempt. Renovate and Dependabot emit `build(pip): …` / `ci(actions): …` with no `Refs:` line, so without the exemption the new gate would fail every dependency PR. The exemption is keyed on the author — the same message from a human is still rejected.
+- **Scaffolded repos can enforce the commit standard** ([#1019](https://github.com/vig-os/devkit/issues/1019))
+  - `validate-commit-msg` and `prepare-commit-msg-strip-trailers` now reach the consumer pre-commit config. Scaffolded repos already shipped a `.githooks/commit-msg` shim and a `COMMIT_MESSAGE_STANDARD.md`, but had no `commit-msg`-stage hooks for the shim to run — the documented standard was unenforceable in every consumer repo.
 
 ### Changed
+
+- **`perf` is now an approved commit type** ([#1030](https://github.com/vig-os/devkit/issues/1030))
+  - `perf` joins the approved commit-type allowlist in `nix/hooks.nix` (both rendered `.pre-commit-config.yaml` files), `DEFAULT_APPROVED_TYPES` (the default CI's `validate-commit-range` uses), and `docs/COMMIT_MESSAGE_STANDARD.md`. It is a standard [Conventional Commits](https://www.conventionalcommits.org/) type and was already used once in history; before this the live `commit-checks` job would reject the next `perf(...)` commit.
+- **Commit scopes are free-form** ([#1019](https://github.com/vig-os/devkit/issues/1019))
+  - The `validate-commit-msg` hook no longer pins an allowlist of commit scopes. The previous five-scope list (`agent,ci,setup,image,vigutils`) rejected 594 of the 1206 scoped commits in history (~49%), including the scopes used by our own bots, and contradicted `docs/COMMIT_MESSAGE_STANDARD.md`, which defines a scope as free-form "alphanumeric and hyphens only". The commit **type**, the `Refs:` line and the agent blocklist remain enforced; only the scope vocabulary is open.
 
 ### Deprecated
 
@@ -26,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The release sync step is renamed "Sync Python dependencies" -> "Sync dependencies" and the `ci.yml` job comment "Pytest" -> "Run tests"; both run language-neutral `just` recipes, so the Python-shaped labels were misleading on a Node/TS consumer.
 
 ### Security
+
+- **Scaffolded repos reject AI-authored commits** ([#1031](https://github.com/vig-os/devkit/issues/1031))
+  - `check-agent-identity` now reaches the consumer pre-commit config. It is the only hook of the agent-identity pipeline ([#163](https://github.com/vig-os/devkit/issues/163)) that guards the commit **author/committer** — the one that catches `git commit --author="Claude <...>"`. After [#1026](https://github.com/vig-os/devkit/issues/1026) scaffolded repos rejected an AI-attributed commit *message* while accepting an AI-authored *commit*; the `COMMIT_MESSAGE_STANDARD.md` they ship promised the opposite. It runs at the pre-commit stage, so `prek run --all-files` enforces it in the scaffold's lint job too.
 
 ## [1.1.0](https://github.com/vig-os/devkit/releases/tag/1.1.0) - 2026-07-13
 

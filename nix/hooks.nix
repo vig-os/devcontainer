@@ -593,7 +593,13 @@ let
 
     # ── AI-agent identity + commit-message hooks (stage-gated / git-state
     #    hooks: never run by `--all-files`, runner-only; Refs #163) ────────
+    # Scaffolded: the consumer's `.githooks/prepare-commit-msg` already runs
+    # `prek run --hook-stage prepare-commit-msg`, and this must reach consumers
+    # together with validate-commit-msg — it strips agent trailers *before* the
+    # validator's blocklist gate sees them, so an agent-authored commit is
+    # repaired rather than hard-rejected. Refs #1019.
     prepare-commit-msg-strip-trailers = {
+      scaffold = true;
       yaml = {
         name = "strip agent trailers from commit message";
         entry = "uv run prepare-commit-msg-strip-trailers";
@@ -602,7 +608,17 @@ let
         pass_filenames = true;
       };
     };
+    # Scaffolded: the two commit-msg hooks above guard the commit *message*,
+    # but this is the only #163 hook that guards the *author/committer* —
+    # the one that catches `git commit --author="Claude <...>"`. Without it
+    # in the consumer render, a scaffolded repo rejects an AI-attributed
+    # message while accepting an AI-authored commit, the exact false
+    # guarantee its COMMIT_MESSAGE_STANDARD.md warns against. It is
+    # pre-commit-stage, so `prek run --all-files` also enforces it in the
+    # scaffold's lint job. The blocklist it reads (.github/agent-blocklist.toml)
+    # is already manifest-synced into the scaffold. Refs #1031.
     check-agent-identity = {
+      scaffold = true;
       yaml = {
         name = "check agent identity";
         entry = "uv run check-agent-identity";
@@ -610,7 +626,18 @@ let
         pass_filenames = false;
       };
     };
+    # No `--scopes` allowlist: a scope is free-form "alphanumeric and hyphens
+    # only" per docs/COMMIT_MESSAGE_STANDARD.md, which the validator's subject
+    # regex already enforces. The old five-scope pin rejected ~49% of the
+    # scopes in actual use and would break the bots (Renovate invents a scope
+    # per ecosystem) the moment enforcement went live. Refs #1019.
+    #
+    # Scaffolded: without it the consumer's `.githooks/commit-msg` shim
+    # (`prek run --hook-stage commit-msg`) has no hooks to run, so every
+    # scaffolded repo shipped a COMMIT_MESSAGE_STANDARD.md it could not
+    # enforce. Refs #1019.
     validate-commit-msg = {
+      scaffold = true;
       yaml = {
         name = "validate commit message";
         entry = "uv run validate-commit-msg";
@@ -618,9 +645,7 @@ let
         stages = [ "commit-msg" ];
         args = [
           "--types"
-          "feat,fix,docs,chore,refactor,test,ci,build,revert,style"
-          "--scopes"
-          "agent,ci,setup,image,vigutils"
+          "feat,fix,docs,chore,refactor,perf,test,ci,build,revert,style"
           "--refs-optional-types"
           "chore"
           "--blocked-patterns"
