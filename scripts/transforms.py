@@ -102,7 +102,7 @@ def _strip_banner_block(rest: list[str]) -> list[str]:
     return rest[i:]
 
 
-def strip_banner(text: str, style: str = "html") -> str:
+def strip_banner(text: str, style: str) -> str:
     """Return ``text`` with any provenance banner (either variant) removed.
 
     The inverse of :class:`Banner`: it locates the banner after the same leading
