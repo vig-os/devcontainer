@@ -278,3 +278,159 @@ class TestRemovePrecommitHooks:
         assert "keep-me" in result
         assert "# Section A" not in result
         assert "remove-me" not in result
+
+
+class TestPreserveFilesSource:
+    """PRESERVE_FILES (init-workspace.sh) is the banner-variant SSoT (#1036)."""
+
+    def test_load_preserve_files_reads_the_array(self):
+        sync_manifest = _load_sync_manifest()
+        preserve = sync_manifest.load_preserve_files(
+            project_root / "assets" / "init-workspace.sh"
+        )
+        assert "justfile.project" in preserve
+        assert "renovate.json" in preserve
+        assert ".envrc" in preserve
+        assert ".typos.toml" in preserve
+        # Interleaved comment lines are not mistaken for array entries.
+        assert not any(entry.startswith("#") for entry in preserve)
+
+
+class TestBannerApplication:
+    """apply_banners walks the synced tree and stamps the right variant (#1036)."""
+
+    def test_stamps_managed_and_preserved_variants(self, tmp_path):
+        sync_manifest = _load_sync_manifest()
+        transforms = _load_transforms()
+        (tmp_path / ".github" / "workflows").mkdir(parents=True)
+        managed = tmp_path / ".github" / "workflows" / "ci.yml"
+        managed.write_text("# CI\non: push\n")
+        preserved = tmp_path / "justfile.project"
+        preserved.write_text("# recipes\n")
+
+        sync_manifest.apply_banners(tmp_path, {"justfile.project"})
+
+        assert ("# " + transforms.MANAGED_BANNER[0]) in managed.read_text()
+        assert ("# " + transforms.PRESERVED_BANNER[0]) in preserved.read_text()
+
+    def test_skips_strict_json_and_generated_configs(self, tmp_path):
+        sync_manifest = _load_sync_manifest()
+        renovate = tmp_path / "renovate.json"
+        renovate.write_text('{\n  "x": 1\n}\n')
+        (tmp_path / ".claude").mkdir()
+        worktrees = tmp_path / ".claude" / "worktrees.json"
+        worktrees.write_text('{\n  "y": 2\n}\n')
+        precommit = tmp_path / ".pre-commit-config.yaml"
+        precommit.write_text("repos: []\n")
+        changelog = tmp_path / "CHANGELOG.md"
+        changelog.write_text("# Changelog\n")
+
+        sync_manifest.apply_banners(tmp_path, {"renovate.json"})
+
+        assert renovate.read_text() == '{\n  "x": 1\n}\n'
+        assert worktrees.read_text() == '{\n  "y": 2\n}\n'
+        assert "vigOS devkit" not in precommit.read_text()
+        assert "vigOS devkit" not in changelog.read_text()
+
+    def test_skips_contradictory_justfile_local(self, tmp_path):
+        sync_manifest = _load_sync_manifest()
+        local = tmp_path / "justfile.local"
+        local.write_text("# LOCAL RECIPES\n")
+
+        sync_manifest.apply_banners(tmp_path, set())
+
+        assert "vigOS devkit" not in local.read_text()
+
+    def test_apply_banners_is_idempotent(self, tmp_path):
+        sync_manifest = _load_sync_manifest()
+        (tmp_path / ".github" / "workflows").mkdir(parents=True)
+        wf = tmp_path / ".github" / "workflows" / "ci.yml"
+        wf.write_text("# CI\non: push\n")
+
+        sync_manifest.apply_banners(tmp_path, set())
+        once = wf.read_text()
+        sync_manifest.apply_banners(tmp_path, set())
+        assert wf.read_text() == once
+
+    def test_restores_a_deleted_banner(self, tmp_path):
+        """A missing banner is regenerated exactly, so the hook flags the drift."""
+        sync_manifest = _load_sync_manifest()
+        wf = tmp_path / "scorecard.yml"
+        wf.write_text("# Scorecard\non: push\n")
+        sync_manifest.apply_banners(tmp_path, set())
+        clean = wf.read_text()
+
+        # Consumer deletes the banner block entirely.
+        wf.write_text("# Scorecard\non: push\n")
+        assert wf.read_text() != clean
+
+        sync_manifest.apply_banners(tmp_path, set())
+        assert wf.read_text() == clean
+
+    def test_detects_a_hand_edited_banner(self, tmp_path):
+        """A hand-edited banner re-emerges canonically, so re-sync differs from it."""
+        sync_manifest = _load_sync_manifest()
+        transforms = _load_transforms()
+        wf = tmp_path / "scorecard.yml"
+        wf.write_text("# Scorecard\non: push\n")
+        sync_manifest.apply_banners(tmp_path, set())
+
+        tampered = wf.read_text().replace(transforms.MANAGED_BANNER[0], "hand edited")
+        wf.write_text(tampered)
+
+        sync_manifest.apply_banners(tmp_path, set())
+        result = wf.read_text()
+        # The canonical banner is re-stamped at the top and the drift is visible.
+        assert result != tampered
+        assert result.splitlines()[0] == "# " + transforms.MANAGED_BANNER[0]
+        assert result.splitlines()[1] == "# " + transforms.MANAGED_BANNER[1]
+
+
+class TestSyncBannerIntegration:
+    """The full sync applies banners and converges (#1036)."""
+
+    def test_sync_stamps_banner_on_synced_assets(self, tmp_path):
+        sync_manifest = _load_sync_manifest()
+        transforms = _load_transforms()
+        sync_manifest.sync(project_root, tmp_path)
+
+        # .typos.toml is a preserved file (PRESERVE_FILES) -> preserved variant.
+        typos = (tmp_path / ".typos.toml").read_text()
+        assert ("# " + transforms.PRESERVED_BANNER[0]) in typos
+        # A synced workflow is managed.
+        scorecard = (tmp_path / ".github" / "workflows" / "scorecard.yml").read_text()
+        assert ("# " + transforms.MANAGED_BANNER[0]) in scorecard
+
+    def test_sync_converges_on_second_run(self, tmp_path):
+        sync_manifest = _load_sync_manifest()
+        sync_manifest.sync(project_root, tmp_path)
+        first = {
+            p.relative_to(tmp_path).as_posix(): p.read_text()
+            for p in tmp_path.rglob("*")
+            if p.is_file()
+        }
+        sync_manifest.sync(project_root, tmp_path)
+        second = {
+            p.relative_to(tmp_path).as_posix(): p.read_text()
+            for p in tmp_path.rglob("*")
+            if p.is_file()
+        }
+        assert first == second
+
+
+class TestJustfileDevcBanner:
+    """The stale justfile.devc banner is corrected to point at justfile.project (#1036)."""
+
+    def test_devc_banner_points_at_justfile_project(self):
+        transforms = _load_transforms()
+        devc = (
+            project_root / "assets" / "workspace" / ".devcontainer" / "justfile.devc"
+        ).read_text()
+
+        lines = devc.splitlines()
+        assert lines[0] == "# " + transforms.MANAGED_BANNER[0]
+        assert lines[1] == "# " + transforms.MANAGED_BANNER[1]
+        assert "justfile.project" in lines[1]
+        # The stale, actively-wrong banner is gone.
+        assert "DEVCONTAINER RECIPES - DO NOT EDIT" not in devc
+        assert "Managed by vigOS devcontainer" not in devc
