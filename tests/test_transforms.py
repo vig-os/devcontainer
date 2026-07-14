@@ -323,6 +323,8 @@ class TestPreserveFilesSource:
         assert "renovate.json" in preserve
         assert ".envrc" in preserve
         assert ".typos.toml" in preserve
+        # justfile.local is preserved now (#1054): its header's claim is real.
+        assert "justfile.local" in preserve
         # Interleaved comment lines are not mistaken for array entries.
         assert not any(entry.startswith("#") for entry in preserve)
 
@@ -383,14 +385,19 @@ class TestBannerApplication:
         assert "vigOS devkit" not in precommit.read_text()
         assert "vigOS devkit" not in changelog.read_text()
 
-    def test_skips_contradictory_justfile_local(self, tmp_path):
+    def test_stamps_preserved_banner_on_justfile_local(self, tmp_path):
+        """justfile.local is a PRESERVE_FILE now (#1054): preserved banner, not skipped."""
         sync_manifest = _load_sync_manifest()
+        transforms = _load_transforms()
         local = tmp_path / "justfile.local"
         local.write_text("# LOCAL RECIPES\n")
 
-        sync_manifest.apply_banners(tmp_path, set())
+        sync_manifest.apply_banners(tmp_path, {"justfile.local"})
 
-        assert "vigOS devkit" not in local.read_text()
+        text = local.read_text()
+        assert ("# " + transforms.PRESERVED_BANNER[0]) in text
+        # The managed variant must not leak into this preserved file.
+        assert transforms.MANAGED_BANNER[0] not in text
 
     def test_apply_banners_is_idempotent(self, tmp_path):
         sync_manifest = _load_sync_manifest()

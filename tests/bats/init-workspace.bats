@@ -1333,6 +1333,29 @@ EOF
     assert_failure
 }
 
+# ── justfile.local must be preserved on upgrade (#1054) ───────────────────────
+# The scaffolded justfile.local (personal, gitignored recipes) claims in its
+# header to be preserved on upgrade, but it was absent from PRESERVE_FILES, so a
+# re-scaffold silently overwrote personal recipes. Add it to PRESERVE_FILES so
+# the mechanism matches the promise (same silent-clobber class as #878/#913).
+
+@test "justfile.local is in PRESERVE_FILES (#1054)" {
+    # shellcheck disable=SC2016
+    run grep -E '"justfile\.local"' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+@test "upgrade preserves a customized justfile.local (#1054)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1054-preserve"
+    mkdir -p "$ws"
+    printf '# SENTINEL-1054 personal recipes\nmy-local:\n\t@echo mine\n' \
+        >"$ws/justfile.local"
+    run _upgrade both "$ws"
+    assert_success
+    run grep -q 'SENTINEL-1054' "$ws/justfile.local"
+    assert_success
+}
+
 # ── pre-commit reference scan must cover preserved workflows (#916) ────────────
 # The #881 scan only looked at justfile.project and .githooks/, but a consumer
 # CI workflow that still invokes the retired `pre-commit` binary breaks the same
