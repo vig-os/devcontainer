@@ -111,6 +111,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The helper in `scripts/transforms.py` defaulted `style` to `"html"`, so a future caller stripping a hash-style file that forgot the kwarg would get the wrong header split (no shebang / YAML doc-start handling) and could corrupt the file. The default is removed — omitting `style` now raises `TypeError` — and all callers pass it explicitly.
 - **Friendlier eval error for an invalid `node` module version** ([#1080](https://github.com/vig-os/devkit/issues/1080))
   - The `node` capability module now validates that the `version` option is an integer (`builtins.isInt`) before interpolating it into `pkgs.nodejs_<major>`, so a string, path, derivation or other non-int fails eval with the module-scoped message `node module: invalid Node version of type '…' (the 'version' option must be an integer major, e.g. 22)` instead of Nix's generic "cannot coerce to string" (or, for strings, being silently accepted) — consistent with the module's existing throws for unknown option keys and unavailable majors.
+- **`prepare-release`'s `open-pr` job runs on a bare checkout** ([#1079](https://github.com/vig-os/devkit/issues/1079))
+  - The job's only real work is `gh pr create` (gh is preinstalled on GitHub-hosted runners), yet it stood up the full `setup-env` composite (Nix + `uv sync`) on the release critical path just to reach the `uv run retry` wrapper. It now uses a bare shallow checkout and sources the canonical bash `retry()` helper (`.github/scripts/retry.sh`) instead, keeping the same retry semantics while shaving minutes off every prepare run.
 
 ### Fixed
 
