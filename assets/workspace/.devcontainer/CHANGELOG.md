@@ -107,6 +107,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `perf` joins the approved commit-type allowlist in `nix/hooks.nix` (both rendered `.pre-commit-config.yaml` files), `DEFAULT_APPROVED_TYPES` (the default CI's `validate-commit-range` uses), and `docs/COMMIT_MESSAGE_STANDARD.md`. It is a standard [Conventional Commits](https://www.conventionalcommits.org/) type and was already used once in history; before this the live `commit-checks` job would reject the next `perf(...)` commit.
 - **Commit scopes are free-form** ([#1019](https://github.com/vig-os/devkit/issues/1019))
   - The `validate-commit-msg` hook no longer pins an allowlist of commit scopes. The previous five-scope list (`agent,ci,setup,image,vigutils`) rejected 594 of the 1206 scoped commits in history (~49%), including the scopes used by our own bots, and contradicted `docs/COMMIT_MESSAGE_STANDARD.md`, which defines a scope as free-form "alphanumeric and hyphens only". The commit **type**, the `Refs:` line and the agent blocklist remain enforced; only the scope vocabulary is open.
+- **Friendlier eval error for an invalid `node` module version** ([#1080](https://github.com/vig-os/devkit/issues/1080))
+  - The `node` capability module now validates that the `version` option is an integer (`builtins.isInt`) before interpolating it into `pkgs.nodejs_<major>`, so a string, path, derivation or other non-int fails eval with the module-scoped message `node module: invalid Node version of type '…' (the 'version' option must be an integer major, e.g. 22)` instead of Nix's generic "cannot coerce to string" (or, for strings, being silently accepted) — consistent with the module's existing throws for unknown option keys and unavailable majors.
 
 ### Fixed
 
