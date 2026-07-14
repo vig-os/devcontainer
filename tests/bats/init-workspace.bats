@@ -2524,3 +2524,84 @@ _RELEASE_RESOLVERS_991=(
     assert_success
     assert_output --partial "default code-scanning setup"
 }
+
+# ── first-scaffold npm justfile.project recipes for Node consumers (#1027) ─────
+# justfile.project is a PRESERVE_FILE: the stock template ships uv/pyproject
+# recipes, which no-op for a Node repo whose CI still calls `just sync|test`.
+# On the FIRST scaffold of a Node consumer (package.json present, no existing
+# justfile.project) init-workspace.sh seeds npm-mapped recipes instead of the
+# default template, so `just sync` = `npm ci`, plus lint/test/build/bundle. An
+# EXISTING justfile.project is consumer-owned and never touched.
+
+@test "first scaffold of a Node consumer seeds npm justfile.project recipes (#1027)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1027-node-seed"
+    mkdir -p "$ws"
+    printf '{ "name": "probe" }\n' >"$ws/package.json"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/justfile.project"
+    assert_success
+    # sync = npm ci (the CI contract recipe every mode calls).
+    assert_output --partial 'npm ci'
+    # The npm-mapped quality/build recipes are present by name.
+    assert_output --partial 'sync'
+    assert_output --partial 'test'
+    assert_output --partial 'build'
+    assert_output --partial 'bundle'
+    # ncc (bundle) and tsc (build) are the Action-runtime mappings.
+    assert_output --partial 'ncc'
+    # The Python default template must NOT have been used.
+    refute_output --partial 'uv sync'
+}
+
+@test "first scaffold of a Node consumer substitutes the project placeholder (#1027)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1027-node-subst"
+    mkdir -p "$ws"
+    printf '{ "name": "probe" }\n' >"$ws/package.json"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/justfile.project"
+    assert_success
+    # The seed carries the {{SHORT_NAME}} token, resolved by the substitution
+    # pass like every managed file (SHORT_NAME=testproj in the _scaffold helper).
+    assert_output --partial 'testproj'
+    refute_output --partial '{{SHORT_NAME}}'
+}
+
+@test "an existing justfile.project is never replaced by the Node seed (#1027)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1027-node-preserve"
+    mkdir -p "$ws"
+    printf '{ "name": "probe" }\n' >"$ws/package.json"
+    printf '# consumer-owned recipes\nmy-custom-recipe:\n\t@echo mine\n' \
+        >"$ws/justfile.project"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/justfile.project"
+    assert_success
+    # The consumer file is preserved verbatim — the seed must not clobber it.
+    assert_output --partial 'my-custom-recipe'
+    refute_output --partial 'npm ci'
+}
+
+@test "first scaffold of a Python consumer keeps the uv template, not npm (#1027)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1027-py-notseeded"
+    mkdir -p "$ws"
+    printf '[project]\nname = "probe"\n' >"$ws/pyproject.toml"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/justfile.project"
+    assert_success
+    # No package.json marker, so the Node seed must not apply.
+    assert_output --partial 'uv sync'
+    refute_output --partial 'npm ci'
+}
+
+@test "first scaffold of a language-neutral consumer keeps the default template (#1027)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1027-neutral-notseeded"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/justfile.project"
+    assert_success
+    refute_output --partial 'npm ci'
+}
