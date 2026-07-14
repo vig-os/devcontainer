@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`node` capability module with selectable Node version** ([#1027](https://github.com/vig-os/devkit/issues/1027))
+  - `mkProjectShell` gains a `node` capability module: `modules = [ "node" ]`
+    puts `nodejs` (which bundles `npm`) in the dev-shell, replacing the
+    hand-wired `extraPackages = [ pkgs.nodejs ]` every TS-action consumer copied.
+  - Lands the per-module-options mechanism the capability-modules ADR deferred:
+    a `modules` entry may now be an attrset `{ name = "node"; version = 22; }`
+    (selecting `pkgs.nodejs_<major>`) alongside the plain `"node"` string;
+    unknown option keys and unavailable/insecure majors fail at eval time. A
+    pinned version is prepended on PATH so it wins over the `nodejs` the
+    toolchain SSoT already ships. `modules = [ ]` is byte-identical to before.
+  - Node-detected repos get npm-mapped `justfile.project` recipes seeded at
+    their first scaffold (`sync` = `npm ci`, plus `lint`/`test`/`build`/`bundle`)
+    instead of the uv template, so `just sync` / `just test` work under Node; an
+    existing `justfile.project` is never touched. The module ships shell packages
+    only — eslint/prettier hooks and the codeql language stay out of scope.
 - **Commit messages are validated in CI** ([#1019](https://github.com/vig-os/devkit/issues/1019))
   - New `commit-checks` job (devkit and scaffolded repos) runs `validate-commit-range` over every commit a pull request adds, plus the **pull request title** — which becomes the merge commit's subject under `--no-ff`. `validate-commit-msg` is a `commit-msg`-stage hook, so `prek run --all-files` never ran it: until now the standard was enforced only by a local hook, and only on a machine whose `core.hooksPath` was intact.
   - Merge commits and bot-authored commits (`…[bot]`) are exempt. Renovate and Dependabot emit `build(pip): …` / `ci(actions): …` with no `Refs:` line, so without the exemption the new gate would fail every dependency PR. The exemption is keyed on the author — the same message from a human is still rejected.
