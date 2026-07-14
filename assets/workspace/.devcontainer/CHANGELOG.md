@@ -165,6 +165,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     must be disabled). The installer never changes the code-scanning API setting.
 - **`prepare-changelog finalize` names the heading on a tag-prefix mismatch** ([#1073](https://github.com/vig-os/devkit/issues/1073))
   - Re-running `finalize` on a reused release branch with a different `--tag-prefix` than the first run raised the generic "Version section not found" ValueError. It now detects the already-finalized heading, names it and the expected prefix in the error, and states that the tag prefix must be stable across re-runs; the docstring records the invariant (re-run idempotency holds only for an unchanged prefix).
+- **`prepare-release` rolls back on workflow cancellation** ([#1078](https://github.com/vig-os/devkit/issues/1078))
+  - The `rollback` job's guard only matched `needs.<job>.result == 'failure'` for the `prepare`, `extension` and `open-pr` phases, so cancelling a run after the freeze commit landed skipped the rollback and stranded the partial `release/X.Y.Z` branch plus the freeze commit on `dev`. Each phase guard now also matches `result == 'cancelled'` (the job already used `always()`, which keeps it eligible to run after a cancellation), in both the devkit workflow and the scaffolded consumer copy.
 
 ### Security
 

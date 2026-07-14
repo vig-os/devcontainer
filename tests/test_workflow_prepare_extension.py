@@ -200,6 +200,45 @@ def test_extension_failure_is_covered_by_rollback(path: Path) -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "path", CALLER_WORKFLOWS, ids=lambda p: str(p.relative_to(REPO_ROOT))
+)
+def test_rollback_fires_on_phase_cancellation(path: Path) -> None:
+    """Cancelling a run after the freeze commit rolls back like a failure (#1078).
+
+    ``needs.<job>.result == 'failure'`` alone skips the rollback when the run is
+    CANCELLED mid-phase, stranding the partial ``release/X.Y.Z`` branch and the
+    freeze commit on dev. The guard must (a) keep ``always()`` so GitHub even
+    evaluates the job after a cancellation, and (b) match
+    ``result == 'cancelled'`` for every phase job it watches.
+    """
+    doc = _load(path)
+    ext_name, _ = _extension_job(doc)
+    branch_name, _ = _job_with_step_run(doc, "git/refs")
+    pr_name, _ = _job_with_step_run(doc, "gh pr create")
+    assert ext_name and branch_name and pr_name
+
+    rollback_ifs = [
+        str(job.get("if", ""))
+        for job in _jobs(doc).values()
+        if isinstance(job, dict)
+        and ext_name in _needs(job)
+        and "failure" in str(job.get("if", ""))
+    ]
+    assert rollback_ifs, "could not locate the rollback job"
+    cond = rollback_ifs[0]
+    assert "always()" in cond, (
+        "the rollback guard needs always() to be evaluated at all after a "
+        "workflow cancellation"
+    )
+    for phase in (branch_name, ext_name, pr_name):
+        assert f"needs.{phase}.result == 'cancelled'" in cond, (
+            f"the rollback guard must also fire when the `{phase}` job is "
+            "cancelled, or a cancelled run strands the partial release branch "
+            "and the freeze commit on dev (#1078)"
+        )
+
+
 # --------------------------------------------------------------------------- #
 # Devkit dogfooding: the sync_manifest step moves into devkit's own hook
 # --------------------------------------------------------------------------- #
