@@ -2670,3 +2670,22 @@ _RELEASE_RESOLVERS_991=(
     assert_success
     refute_output --partial 'npm ci'
 }
+
+# ── the Node justfile.project seed carries the preserved banner (#1055) ────────
+# The node.justfile.project seed lives outside assets/workspace/, so the #1036
+# banner pass never touched it — a first-scaffold Node justfile.project lacked
+# the preserved banner every other consumer-owned file carries (and that the uv
+# template it replaces does carry). The banner is stamped into the seed by the
+# sync-manifest banner pass, so a first-scaffolded Node justfile.project opens
+# with it.
+
+@test "a first-scaffolded Node justfile.project carries the preserved banner (#1055)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1055-node-banner"
+    mkdir -p "$ws"
+    printf '{ "name": "probe" }\n' >"$ws/package.json"
+    run _scaffold both "$ws"
+    assert_success
+    run head -1 "$ws/justfile.project"
+    assert_success
+    assert_output --partial 'Seeded by vigOS devkit'
+}

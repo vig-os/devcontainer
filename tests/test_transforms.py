@@ -494,6 +494,52 @@ class TestJustfileDevcBanner:
         assert "Managed by vigOS devcontainer" not in devc
 
 
+class TestSeedBanners:
+    """Seed inputs outside assets/workspace/ get banners via an explicit map (#1055).
+
+    ``assets/justfile.d/node.justfile.project`` seeds a consumer's first-scaffold
+    ``justfile.project`` (a PRESERVE_FILE) for Node repos, but lives outside the
+    tree ``apply_banners`` walks. ``apply_seed_banners`` stamps it, deriving the
+    variant from the PRESERVE_FILES target it seeds — never hand-typed.
+    """
+
+    def test_node_seed_carries_the_preserved_banner(self):
+        transforms = _load_transforms()
+        seed = (
+            project_root / "assets" / "justfile.d" / "node.justfile.project"
+        ).read_text()
+        lines = seed.splitlines()
+        assert lines[0] == "# " + transforms.PRESERVED_BANNER[0]
+        assert lines[1] == "# " + transforms.PRESERVED_BANNER[1]
+
+    def test_apply_seed_banners_derives_variant_from_target(self, tmp_path):
+        sync_manifest = _load_sync_manifest()
+        transforms = _load_transforms()
+        seed_dir = tmp_path / "assets" / "justfile.d"
+        seed_dir.mkdir(parents=True)
+        seed = seed_dir / "node.justfile.project"
+        seed.write_text("# recipes\n")
+
+        # justfile.project is preserved -> the seed gets the preserved banner.
+        sync_manifest.apply_seed_banners(tmp_path, {"justfile.project"})
+
+        text = seed.read_text()
+        assert ("# " + transforms.PRESERVED_BANNER[0]) in text
+        assert transforms.MANAGED_BANNER[0] not in text
+
+    def test_apply_seed_banners_is_idempotent(self, tmp_path):
+        sync_manifest = _load_sync_manifest()
+        seed_dir = tmp_path / "assets" / "justfile.d"
+        seed_dir.mkdir(parents=True)
+        seed = seed_dir / "node.justfile.project"
+        seed.write_text("# recipes\n")
+
+        sync_manifest.apply_seed_banners(tmp_path, {"justfile.project"})
+        once = seed.read_text()
+        sync_manifest.apply_seed_banners(tmp_path, {"justfile.project"})
+        assert seed.read_text() == once
+
+
 class TestManifestTransformedFlagCoversBanners:
     """Entries whose dest gets a banner must be flagged transformed (#1036).
 
