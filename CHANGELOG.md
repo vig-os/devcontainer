@@ -27,6 +27,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `.nyc_output/`, and no longer get a blanket `dist/` ignore (a JS Action
     commits its bundled `dist/index.js`). Python consumers keep their existing
     ignore set.
+- **Language-aware scaffold CodeQL matrix** ([#1025](https://github.com/vig-os/devkit/issues/1025))
+  - `init-workspace.sh` now rewrites the managed `codeql.yml` language matrix
+    from the same language detection (#1024): Python → `python`, Node →
+    `javascript-typescript`, Rust omits its leg (no first-class CodeQL Rust
+    analyzer); `actions` is always analyzed. This fixes the hardcoded
+    `['python', 'actions']` matrix failing the `python` leg on repos with no
+    Python.
+  - The scaffolded `codeql.yml` and an install-time note now document that this
+    advanced config conflicts with GitHub's default code-scanning setup (which
+    must be disabled). The installer never changes the code-scanning API setting.
 
 ### Security
 

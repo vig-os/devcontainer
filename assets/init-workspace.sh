@@ -576,6 +576,40 @@ render_gitignore() {
     done
 }
 
+# Rewrite the managed CodeQL language matrix to the detected language(s) (#1025):
+# python -> 'python', node -> 'javascript-typescript', rust -> omitted (CodeQL
+# ships no first-class Rust analyzer). 'actions' is always analyzed, so the
+# matrix is never empty (a marker-less repo analyzes just actions). No-op when
+# the workflow is absent (e.g. it was never scaffolded or was pruned).
+render_codeql_matrix() {
+    local cq="$WORKSPACE_DIR/.github/workflows/codeql.yml"
+    [[ -f "$cq" ]] || return 0
+    local -a langs=()
+    local lang
+    for lang in ${DETECTED_LANGUAGES[@]+"${DETECTED_LANGUAGES[@]}"}; do
+        case "$lang" in
+            python) langs+=("'python'") ;;
+            node) langs+=("'javascript-typescript'") ;;
+            rust) : ;; # CodeQL rust support caveat (#1025): omit the leg
+        esac
+    done
+    langs+=("'actions'")
+    local joined=""
+    for lang in "${langs[@]}"; do
+        joined="${joined:+$joined, }$lang"
+    done
+    sed -i -E "s|^([[:space:]]*language:).*|\1 [${joined}]|" "$cq"
+    echo "Rendered CodeQL language matrix: [${joined}]"
+    # Preflight note (#1025): the advanced CodeQL config the scaffold ships
+    # cannot coexist with GitHub's *default* code-scanning setup — its uploads
+    # are rejected while default setup is enabled. We never flip that API
+    # setting; the consumer disables default setup deliberately.
+    echo "Note: this advanced CodeQL config conflicts with GitHub's default"
+    echo "      code-scanning setup — disable default setup (Settings -> Code"
+    echo "      security -> Code scanning) or the uploads reject (#1025). This"
+    echo "      scaffold does not change your repo's code-scanning API setting."
+}
+
 # Warn if forcing (prompt user) - show which files would be overwritten
 if [[ "$FORCE" == "true" ]]; then
     echo ""
@@ -1021,6 +1055,7 @@ fi
 # upgrade-persistent. These files carry no placeholders, so ordering after the
 # substitution above is incidental.
 render_gitignore
+render_codeql_matrix
 
 # Persist the resolved manifest (#885). The scaffolded .vig-os is a managed
 # file (template-overwritten on upgrade), so the resolved delivery mode and
