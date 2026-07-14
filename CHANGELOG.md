@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Scaffolded security-scan workflows skip on private repos** ([#1039](https://github.com/vig-os/devkit/issues/1039))
+  - `codeql.yml` and `scorecard.yml` now guard their analysis job with
+    `if: ${{ !github.event.repository.private }}`. Neither scan can ever succeed
+    on a private repo — CodeQL needs GitHub Advanced Security (unavailable on
+    Free-plan private repos) and OpenSSF Scorecard is public-only — so a private
+    consumer previously scaffolded two permanently red workflows. Private repos
+    now get a skipped (neutral) run; a repo later flipped public starts scanning
+    automatically with no re-scaffold. Public consumers are unaffected. The guard
+    is valid on every declared trigger (`pull_request`, `push`, `schedule`).
 - **`mkProjectShell` accepts an overridable Python interpreter** ([#1038](https://github.com/vig-os/devkit/issues/1038))
   - New opt-in `python ? pkgs.python314` argument: `UV_PYTHON` and the bare
     `python`/`python3` on PATH now follow the override, so a consumer whose
