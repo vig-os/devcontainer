@@ -2465,3 +2465,62 @@ _RELEASE_RESOLVERS_991=(
     refute_line 'node_modules/'
     refute_line 'dist/'
 }
+
+# ── language-aware codeql matrix (#1025) ──────────────────────────────────────
+# .github/workflows/codeql.yml is a managed/overwritten scaffold file whose
+# matrix was hardcoded to ['python', 'actions']. On a repo with no Python the
+# python leg fails ("no source code seen"). init-workspace.sh now rewrites the
+# matrix from the SAME language detection as the .gitignore (#1024): python →
+# python, node → javascript-typescript, rust → omitted (CodeQL rust caveat);
+# `actions` is always analyzed. The conflict with GitHub's default code-scanning
+# setup is documented in the rendered workflow.
+
+@test "scaffold codeql matrix for a Node consumer is javascript-typescript + actions (#1025)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1025-node-cq"
+    mkdir -p "$ws"
+    printf '{ "name": "probe" }\n' >"$ws/package.json"
+    run _scaffold both "$ws"
+    assert_success
+    run grep -E '^[[:space:]]*language:' "$ws/.github/workflows/codeql.yml"
+    assert_success
+    assert_output --partial "'javascript-typescript'"
+    assert_output --partial "'actions'"
+    refute_output --partial "'python'"
+}
+
+@test "scaffold codeql matrix for a Python consumer is python + actions (#1025)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1025-py-cq"
+    mkdir -p "$ws"
+    printf '[project]\nname = "probe"\n' >"$ws/pyproject.toml"
+    run _scaffold both "$ws"
+    assert_success
+    run grep -E '^[[:space:]]*language:' "$ws/.github/workflows/codeql.yml"
+    assert_success
+    assert_output --partial "'python'"
+    assert_output --partial "'actions'"
+    refute_output --partial "'javascript-typescript'"
+}
+
+@test "scaffold codeql matrix for a Rust consumer omits the language leg, keeps actions (#1025)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1025-rust-cq"
+    mkdir -p "$ws"
+    printf '[package]\nname = "probe"\n' >"$ws/Cargo.toml"
+    run _scaffold both "$ws"
+    assert_success
+    run grep -E '^[[:space:]]*language:' "$ws/.github/workflows/codeql.yml"
+    assert_success
+    assert_output --partial "'actions'"
+    refute_output --partial "'rust'"
+    refute_output --partial "'python'"
+}
+
+@test "scaffold codeql.yml documents the GitHub default code-scanning conflict (#1025)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1025-doc"
+    mkdir -p "$ws"
+    printf '{ "name": "probe" }\n' >"$ws/package.json"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/.github/workflows/codeql.yml"
+    assert_success
+    assert_output --partial "default code-scanning setup"
+}
