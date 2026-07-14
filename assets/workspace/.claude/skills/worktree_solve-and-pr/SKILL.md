@@ -3,6 +3,8 @@ name: worktree_solve-and-pr
 description: State-aware autonomous pipeline — detect phase from issue, run remaining phases through PR.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Solve and PR
 

@@ -1,4 +1,7 @@
 #!/bin/bash
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
+
 set -euo pipefail
 
 # Change to project root directory ({{SHORT_NAME}} is replaced during template initialization)

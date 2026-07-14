@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
 
 # Initialize script - runs on host before container starts
 # This script is called from initializeCommand in devcontainer.json

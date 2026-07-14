@@ -3,6 +3,8 @@ name: pr_solve
 description: Diagnoses all PR failures (CI, reviews, merge state), plans fixes, executes them.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Solve PR Failures
 

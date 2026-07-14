@@ -3,6 +3,8 @@ name: worktree_execute
 description: Autonomous TDD implementation — commits as it goes, no user checkpoints.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Autonomous Execute
 

@@ -1,3 +1,6 @@
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
+
 # Workflow to sync issues and PRs to markdown files
 # Uses:
 # - sync-issues action from this public repository (vig-os/sync-issues-action)

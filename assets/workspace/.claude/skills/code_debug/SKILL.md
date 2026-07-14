@@ -3,6 +3,8 @@ name: code_debug
 description: Diagnoses bugs, test failures, or unexpected behavior. Root cause first, fix second.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Systematic Debugging
 

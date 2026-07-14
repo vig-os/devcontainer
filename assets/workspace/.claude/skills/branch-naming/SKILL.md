@@ -3,6 +3,8 @@ name: branch-naming
 description: Topic branch naming and workflow for starting work on an issue. Use when creating branches, starting work on issues, or checking out branches.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Topic Branch Naming and Workflow
 

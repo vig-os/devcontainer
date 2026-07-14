@@ -1,7 +1,5 @@
-# ===============================================================================
-# DEVCONTAINER RECIPES - DO NOT EDIT
-# Managed by vigOS devcontainer. Customizations go in root justfile.
-# ===============================================================================
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
 
 # Note: `set shell := [...pipefail...]` lives in the root justfile (the SSoT) so
 # it applies in every delivery mode, including direnv/bare which have no

@@ -1,3 +1,6 @@
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
+
 # Devcontainer Reference
 
 This folder contains everything VS Code needs to launch the

@@ -17,6 +17,7 @@ Called by:
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import sys
 import tomllib
@@ -27,6 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from transforms import (
+    Banner,
     RemoveBlock,
     RemoveLines,
     RemovePrecommitHooks,
@@ -106,6 +108,111 @@ _MANIFEST_PATH = Path(__file__).resolve().parent / "manifest.toml"
 MANIFEST: list[Entry] = _load_manifest(_MANIFEST_PATH)
 
 
+# ── Provenance banners (issue #1036) ─────────────────────────────────────────
+#
+# Every comment-capable file under assets/workspace/ carries a two-line banner
+# (transforms.Banner). The managed-vs-preserved variant is derived from the
+# PRESERVE_FILES array in assets/init-workspace.sh — the single source of truth
+# for what an upgrade overwrites — so the classification can never drift from a
+# hand-typed copy. Because this runs on every `sync`, the sync-manifest
+# pre-commit hook regenerates the banners and fails the commit on any
+# hand-edited or missing one.
+
+_INIT_WORKSPACE = Path("assets") / "init-workspace.sh"
+
+# Files deliberately left un-bannered, grouped by reason. Coverage is knowingly
+# partial (issue #1036); this list keeps every exclusion explicit.
+_BANNER_SKIP: frozenset[str] = frozenset(
+    {
+        # Strict JSON — no comment syntax exists.
+        "renovate.json",
+        ".github/renovate-default.json",
+        ".claude/worktrees.json",
+        ".pymarkdown",
+        # JSONC: VS Code / the devcontainer CLI accept `//`, but the repo's own
+        # (and the scaffolded) `check-json` hook uses a strict parser with no
+        # exclude for these paths, so a `//` banner would fail check-json both
+        # upstream and downstream. Excluding them means editing the drift-gated
+        # nix/hooks.nix hook set — out of scope for a comment-only change.
+        ".devcontainer/devcontainer.json",
+        ".vscode/settings.json",
+        ".devcontainer/workspace.code-workspace.example",
+        # Rendered from nix/hooks.nix and drift-gated by tests/test_flake_hooks.py;
+        # a post-sync banner would have to be threaded through the Nix render.
+        ".pre-commit-config.yaml",
+        # Changelogs — a banner would churn every release diff; the .devcontainer
+        # copy is a generated mirror of the root CHANGELOG.md.
+        "CHANGELOG.md",
+        ".devcontainer/CHANGELOG.md",
+        # Version SSoT, rewritten in place by init-workspace.sh on every
+        # (re)scaffold; a banner would be churned or duplicated by that write-back.
+        ".vig-os",
+        # Commit-message template: git strips `#` lines, so a banner would only
+        # clutter the editor above the author's message on every commit.
+        ".gitmessage",
+        # No comment syntax.
+        "LICENSE",
+        # Nix source is outside this issue's enumerated comment-capable set;
+        # flake.nix is consumer-owned/preserved and deferred to avoid nix-format
+        # churn on re-sync.
+        "flake.nix",
+        # Personal, gitignored starter whose own header already claims (wrongly)
+        # to be preserved even though it is absent from PRESERVE_FILES;
+        # reclassifying it is a separate decision, so it is skipped rather than
+        # handed a contradictory managed banner.
+        "justfile.local",
+    }
+)
+
+
+def load_preserve_files(script_path: Path) -> set[str]:
+    """Parse the PRESERVE_FILES array from init-workspace.sh (the variant SSoT)."""
+    text = script_path.read_text()
+    match = re.search(r"^PRESERVE_FILES=\(\n(.*?)^\)", text, re.DOTALL | re.MULTILINE)
+    if match is None:
+        raise ValueError(f"PRESERVE_FILES array not found in {script_path}")
+    files: set[str] = set()
+    for line in match.group(1).splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        quoted = re.match(r'"([^"]+)"', stripped)
+        if quoted:
+            files.add(quoted.group(1))
+    return files
+
+
+def _banner_style(rel_path: str) -> str | None:
+    """Return the comment style ("hash" | "html") for a file, or None to skip."""
+    if rel_path in _BANNER_SKIP:
+        return None
+    name = rel_path.rsplit("/", 1)[-1]
+    if name.endswith(".md"):
+        return "html"
+    if (
+        name.endswith((".yml", ".yaml", ".toml", ".sh"))
+        or name == ".yamllint"
+        or name in {".gitignore", ".envrc", "CODEOWNERS"}
+        or name == "justfile"
+        or name.startswith("justfile.")
+        or rel_path.startswith(".githooks/")
+    ):
+        return "hash"
+    return None
+
+
+def apply_banners(dest_base: Path, preserve_files: set[str]) -> None:
+    """Stamp the provenance banner onto every comment-capable synced file."""
+    for path in sorted(dest_base.rglob("*")):
+        if not path.is_file():
+            continue
+        rel_path = path.relative_to(dest_base).as_posix()
+        style = _banner_style(rel_path)
+        if style is None:
+            continue
+        Banner(preserved=rel_path in preserve_files, style=style).apply(path)
+
+
 # ── Sync logic ───────────────────────────────────────────────────────────────
 
 
@@ -149,6 +256,10 @@ def sync(project_root: Path, dest_base: Path) -> None:
     if failed:
         print("Error: Some files could not be synced", file=sys.stderr)
         sys.exit(1)
+
+    # Stamp provenance banners over the whole tree (manifest-synced and
+    # directly-authored assets alike), variant driven by PRESERVE_FILES (#1036).
+    apply_banners(dest_base, load_preserve_files(project_root / _INIT_WORKSPACE))
 
     print("All manifest entries synced successfully.")
 

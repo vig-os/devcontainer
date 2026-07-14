@@ -3,6 +3,8 @@ name: code_execute
 description: Works through an implementation plan in batches with human checkpoints.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Execute Plan
 

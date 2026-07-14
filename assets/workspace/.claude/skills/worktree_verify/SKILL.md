@@ -3,6 +3,8 @@ name: worktree_verify
 description: Autonomous verification — full test suite + lint + precommit, evidence only, loops on failure.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Autonomous Verify
 

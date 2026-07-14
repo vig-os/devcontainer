@@ -3,6 +3,8 @@ name: worktree_brainstorm
 description: Autonomous design — reads full issue, posts design comment, never blocks for feedback.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Autonomous Brainstorm
 

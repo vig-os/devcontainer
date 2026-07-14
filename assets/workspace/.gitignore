@@ -1,3 +1,6 @@
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
+
 # Language-neutral base .gitignore
 #
 # This is a MANAGED scaffold file: init-workspace.sh overwrites it on every

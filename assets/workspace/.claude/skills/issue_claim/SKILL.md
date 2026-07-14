@@ -3,6 +3,8 @@ name: issue_claim
 description: Sets up the local environment to begin working on a GitHub issue, and ensures the issue is assigned.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Claim and Start Work on an Issue
 

@@ -1,4 +1,6 @@
 #!/bin/bash
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
 
 # Post-attach script - runs each time a tool attaches to the container.
 # This script is called from postAttachCommand in devcontainer.json.

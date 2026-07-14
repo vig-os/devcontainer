@@ -3,6 +3,8 @@ name: worktree_ask
 description: Posts a question to the GitHub issue when the autonomous agent is stuck.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Ask for Help
 

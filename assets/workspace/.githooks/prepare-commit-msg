@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Managed by vigOS devkit — regenerated on upgrade; local edits are lost.
+# Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues
+
 # Strip AI agent trailers from commit message before validation.
 # Refs: #163
 set -euo pipefail

@@ -3,6 +3,8 @@ name: code_verify
 description: Runs verification and provides evidence before claiming work is done.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Verify Before Completion
 

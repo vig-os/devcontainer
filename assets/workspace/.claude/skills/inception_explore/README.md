@@ -1,3 +1,6 @@
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
+
 # Inception Skills
 
 Pre-development product-thinking skills that bridge the gap between "I have an idea" and "I have actionable GitHub issues."

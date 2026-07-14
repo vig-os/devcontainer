@@ -3,6 +3,8 @@ name: subagent-delegation
 description: How to delegate mechanical sub-steps to lightweight subagents when executing skills. Use when running a skill that has data-gathering, formatting, or structured-review sub-steps.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Subagent Delegation
 

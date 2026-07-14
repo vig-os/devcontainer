@@ -2,6 +2,8 @@
 name: issue_triage
 description: Triage open GitHub issues by analyzing them across priority, area, effort, SemVer impact, dependencies, and release readiness. Groups related issues into parent/sub-issue clusters, suggests milestone assignments, and applies approved changes via gh CLI. Use when the user asks to triage issues, groom the backlog, plan a milestone, or organize open issues.
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Issue Triage
 

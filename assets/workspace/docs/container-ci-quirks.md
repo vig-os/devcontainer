@@ -1,3 +1,6 @@
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
+
 # Container CI Notes
 
 Behavioral notes for the workspace CI workflow (`.github/workflows/ci.yml`)

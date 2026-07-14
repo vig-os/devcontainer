@@ -3,6 +3,8 @@ name: ci_check
 description: Checks the CI pipeline status for the current branch or PR.
 disable-model-invocation: true
 ---
+<!-- Managed by vigOS devkit — regenerated on upgrade; local edits are lost. -->
+<!-- Customize in justfile.project. Bugs / missing tools: https://github.com/vig-os/devkit/issues -->
 
 # Check CI Status
 
