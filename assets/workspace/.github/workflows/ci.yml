@@ -19,7 +19,7 @@
 # Jobs:
 #   1. resolve-toolchain — Resolve delivery mode + image from .vig-os
 #   2. lint              — Pre-commit hooks
-#   3. test              — Pytest
+#   3. test              — Run tests
 #   4. summary           — Aggregate results for branch protection
 #
 # Triggers:

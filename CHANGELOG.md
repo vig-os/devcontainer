@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Opt-in release artifact/bundle step for repos that ship a committed build** ([#1029](https://github.com/vig-os/devkit/issues/1029))
+  - `release-core.yml` now detects a `bundle` just recipe via `just --summary` in the finalize job; when present it runs `just bundle` and commits `dist/` alongside `CHANGELOG.md` in the finalization commit, so a JS Action (or any repo shipping a committed `@vercel/ncc` artifact) tags a fresh bundle instead of a stale one. Repos without a `bundle` recipe (e.g. a pure-Python consumer) are unaffected — no new config surface, the recipe's presence is the flag.
+
 ### Changed
 
 ### Deprecated
@@ -19,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`setup-devkit-toolchain` no longer forces Python/uv env on non-Python consumers** ([#1028](https://github.com/vig-os/devkit/issues/1028))
   - The scaffolded CI toolchain composite applied `UV_PROJECT_ENVIRONMENT`, forwarded `UV_PYTHON_DOWNLOADS_JSON_URL`, and filtered the Nix CPython out of `$GITHUB_PATH` unconditionally. These are now gated on the consumer being Python (a `pyproject.toml` at the repo root), so the composite is a no-op for those steps on a Node/TS repo and keeps the Nix python on PATH there.
+- **Neutral release/CI step labels** ([#1029](https://github.com/vig-os/devkit/issues/1029))
+  - The release sync step is renamed "Sync Python dependencies" -> "Sync dependencies" and the `ci.yml` job comment "Pytest" -> "Run tests"; both run language-neutral `just` recipes, so the Python-shaped labels were misleading on a Node/TS consumer.
 
 ### Security
 
