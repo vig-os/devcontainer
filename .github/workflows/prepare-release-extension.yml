@@ -4,14 +4,42 @@
 # Runs on the freshly cut release/X.Y.Z branch, AFTER the changelog freeze and
 # BEFORE the draft PR opens, so its commit is in the PR diff from the start.
 #
-# What it does: regenerates the synced workspace mirror
-# (assets/workspace/.devcontainer/CHANGELOG.md, a verbatim copy of the root
-# CHANGELOG.md) so it matches the frozen root on the release branch, then commits
-# it via the COMMIT_APP token — the same identity/mechanism as the freeze commit.
-# This is the devkit-specific `sync_manifest.py sync` step that used to be
-# hardcoded in prepare-release.yml (#1059); moving it here makes prepare-release.yml
-# scaffold-shaped and keeps the mirror correct on the branch the image is built
-# from (tests/test_image.py::test_manifest_files checksums mirror == root).
+# What it does, in order:
+#
+# 1. Release branch: regenerates the synced workspace mirror
+#    (assets/workspace/.devcontainer/CHANGELOG.md, a verbatim copy of the root
+#    CHANGELOG.md) so it matches the frozen root on the release branch, then
+#    commits it via the COMMIT_APP token — the same identity/mechanism as the
+#    freeze commit. This is the devkit-specific `sync_manifest.py sync` step that
+#    used to be hardcoded in prepare-release.yml (#1059); moving it here makes
+#    prepare-release.yml scaffold-shaped and keeps the mirror correct on the
+#    branch the image is built from (tests/test_image.py::test_manifest_files
+#    checksums mirror == root).
+#
+# 2. Dev reconciliation (LAST, and that ordering is load-bearing): the freeze
+#    commit is scaffold-verbatim (root CHANGELOG.md only), so dev's mirror is
+#    stale after every prepare — the sync-manifest pre-commit hook would go red
+#    on every dev PR during the release window. This job therefore re-syncs the
+#    mirror against dev's current head and commits JUST the mirror to dev
+#    (idempotent: skipped when it already matches).
+#
+# Rollback interplay — why the dev reconciliation MUST be the last step:
+# prepare-release.yml's rollback job restores root CHANGELOG.md on dev only when
+# dev's head still equals the post-freeze SHA (the dev-advanced guard). The
+# reconcile commit always advances dev, so:
+#   * Extension fails BEFORE the reconcile commit lands => dev holds only the
+#     root-only freeze => rollback's guard passes and its root-restore returns
+#     dev to root(pre) == mirror(pre). Consistent.
+#   * The reconcile commit landed => the extension job is already finished
+#     (nothing failable follows), so the only remaining failure domain is
+#     open-pr => rollback's guard sees dev advanced and skips the root-restore,
+#     leaving dev at root(frozen) == mirror(frozen). Also consistent; the freeze
+#     is intentionally NOT auto-reverted on this rare path (restoring root alone
+#     would re-open the inverse drift, and the scaffold-shaped rollback must not
+#     learn devkit-specific mirror paths). Recover by reverting the freeze +
+#     reconcile commits on dev, or re-cutting the release branch manually.
+# Every failure path therefore leaves dev's root+mirror consistent, which is
+# pinned by tests/test_workflow_prepare_extension.py's ordering assertions.
 
 name: Prepare Release Extension
 
@@ -51,7 +79,7 @@ permissions:
 
 jobs:
   sync-manifest:
-    name: Sync Workspace Manifest on Release Branch
+    name: Sync Workspace Manifest (Release Branch + Dev)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     if: ${{ inputs.dry_run != true }}
@@ -98,4 +126,49 @@ jobs:
             Regenerate the synced workspace mirror so
             assets/workspace/.devcontainer/CHANGELOG.md matches the frozen root
             CHANGELOG.md on the release branch.
+          FILE_PATHS: assets/workspace/.devcontainer/CHANGELOG.md
+
+      # ── Dev-side mirror reconciliation ──────────────────────────────────────
+      # Everything below runs against dev's CURRENT head (not the frozen branch
+      # point), so a dev that advanced since the freeze is reconciled against
+      # what it actually contains. The commit step below must stay the LAST step
+      # of this job — see the rollback-interplay analysis in the header.
+
+      - name: Check out dev at its current head
+        run: |
+          set -euo pipefail
+          # The release-branch sync above left local modifications (the API
+          # commit does not clean the working tree); drop them before moving.
+          git reset --hard
+          git fetch origin dev
+          git checkout --detach origin/dev
+          echo "✓ Working tree now at dev head $(git rev-parse HEAD)"
+
+      - name: Sync workspace manifest against dev
+        id: dev-sync
+        run: |
+          set -euo pipefail
+          uv run python scripts/sync_manifest.py sync assets/workspace/
+          if git diff --quiet -- assets/workspace/.devcontainer/CHANGELOG.md; then
+            echo "mirror_dirty=false" >> "$GITHUB_OUTPUT"
+            echo "i dev changelog mirror already matches root; nothing to reconcile"
+          else
+            echo "mirror_dirty=true" >> "$GITHUB_OUTPUT"
+            echo "✓ dev changelog mirror is stale after the freeze; reconciling"
+          fi
+
+      - name: Commit reconciled mirror to dev via API
+        if: ${{ steps.dev-sync.outputs.mirror_dirty == 'true' }}
+        uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
+        env:
+          GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TARGET_BRANCH: refs/heads/dev
+          MAX_ATTEMPTS: "3"
+          COMMIT_MESSAGE: |-
+            chore: reconcile workspace changelog mirror after freeze for ${{ inputs.version }}
+
+            The changelog freeze commits only the root CHANGELOG.md (scaffold-
+            verbatim); regenerate assets/workspace/.devcontainer/CHANGELOG.md on
+            dev so the sync-manifest hook stays green during the release window.
           FILE_PATHS: assets/workspace/.devcontainer/CHANGELOG.md
