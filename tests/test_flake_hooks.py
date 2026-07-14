@@ -187,6 +187,75 @@ class TestPortableRenderFidelity:
             )
 
 
+class TestCommitMsgHookContract:
+    """The commit-message validator's shipped argv (Refs #1019).
+
+    Scope vocabulary is deliberately *not* an allowlist: the standard
+    (``docs/COMMIT_MESSAGE_STANDARD.md``) defines a scope as free-form
+    "alphanumeric and hyphens only", which the validator's subject regex
+    already enforces. Pinning ``--scopes`` here re-introduces the drift that
+    rejected ~49% of the scopes actually in use, and would break the bots the
+    moment Renovate learns a new ecosystem.
+    """
+
+    def test_validate_commit_msg_pins_no_scope_allowlist(
+        self, rendered_portable: dict[str, Any]
+    ) -> None:
+        args = _normalize(rendered_portable["runner"])["hooks"]["validate-commit-msg"][
+            "args"
+        ]
+        assert "--scopes" not in args, (
+            "validate-commit-msg pins a --scopes allowlist; scope is free-form "
+            "per docs/COMMIT_MESSAGE_STANDARD.md (Refs #1019)"
+        )
+
+    def test_validate_commit_msg_still_enforces_types_and_refs(
+        self, rendered_portable: dict[str, Any]
+    ) -> None:
+        """Dropping the scope allowlist must not weaken the rest of the rule."""
+        args = _normalize(rendered_portable["runner"])["hooks"]["validate-commit-msg"][
+            "args"
+        ]
+        assert "--types" in args
+        assert "--refs-optional-types" in args
+        assert "--blocked-patterns" in args
+
+    def test_commit_msg_hooks_are_scaffolded(
+        self, rendered_portable: dict[str, Any]
+    ) -> None:
+        """Consumers get the commit-msg stage they are already wired to run.
+
+        The scaffolded ``.githooks/commit-msg`` shells out to
+        ``prek run --hook-stage commit-msg``; without these hooks in the
+        consumer render that shim is a no-op, and every scaffolded repo ships
+        a COMMIT_MESSAGE_STANDARD.md it cannot enforce. Refs #1019.
+
+        ``prepare-commit-msg-strip-trailers`` is scaffolded alongside it on
+        purpose: it strips agent trailers *before* the validator's blocklist
+        gate sees them. Shipping the validator alone would turn an
+        auto-repaired commit into a hard failure in consumer repos.
+        """
+        scaffold = _normalize(rendered_portable["scaffold"])["hooks"]
+        assert "validate-commit-msg" in scaffold
+        assert "prepare-commit-msg-strip-trailers" in scaffold
+        assert scaffold["validate-commit-msg"]["stages"] == ["commit-msg"]
+
+    def test_agent_identity_hook_is_scaffolded(
+        self, rendered_portable: dict[str, Any]
+    ) -> None:
+        """Consumers guard the commit *author*, not only the message. Refs #1031.
+
+        ``check-agent-identity`` is the only hook of the #163 pipeline that
+        catches ``git commit --author="Claude <...>"``; the two commit-msg
+        hooks scaffolded in #1026 guard the message text alone. Without this
+        hook in the consumer render, a scaffolded repo rejects an
+        AI-attributed *message* while accepting an AI-authored *commit* — the
+        exact false guarantee its COMMIT_MESSAGE_STANDARD.md promises against.
+        """
+        scaffold = _normalize(rendered_portable["scaffold"])["hooks"]
+        assert "check-agent-identity" in scaffold
+
+
 @pytest.fixture(scope="module")
 def consumer_config() -> dict[str, Any]:
     """Build the generated config for a customized consumer shell."""
