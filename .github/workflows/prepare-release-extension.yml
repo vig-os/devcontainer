@@ -1,0 +1,101 @@
+# Prepare Release Extension (devkit dogfooding of #1059)
+#
+# Devkit's implementation of the scaffolded prepare-release-extension.yml hook.
+# Runs on the freshly cut release/X.Y.Z branch, AFTER the changelog freeze and
+# BEFORE the draft PR opens, so its commit is in the PR diff from the start.
+#
+# What it does: regenerates the synced workspace mirror
+# (assets/workspace/.devcontainer/CHANGELOG.md, a verbatim copy of the root
+# CHANGELOG.md) so it matches the frozen root on the release branch, then commits
+# it via the COMMIT_APP token — the same identity/mechanism as the freeze commit.
+# This is the devkit-specific `sync_manifest.py sync` step that used to be
+# hardcoded in prepare-release.yml (#1059); moving it here makes prepare-release.yml
+# scaffold-shaped and keeps the mirror correct on the branch the image is built
+# from (tests/test_image.py::test_manifest_files checksums mirror == root).
+
+name: Prepare Release Extension
+
+on:  # yamllint disable-line rule:truthy
+  workflow_call:
+    inputs:
+      version:
+        description: "Release version being prepared (X.Y.Z)"
+        required: true
+        type: string
+      release_branch:
+        description: "Release branch just created (release/X.Y.Z)"
+        required: true
+        type: string
+      branch_sha:
+        description: "Post-freeze head SHA the release branch was created from"
+        required: true
+        type: string
+      dry_run:
+        description: "Validate without making changes (extensions must honor it)"
+        required: false
+        default: false
+        type: boolean
+      git_user_name:
+        description: "Git user name for commits"
+        required: false
+        default: "vigOS Release Bot"
+        type: string
+      git_user_email:
+        description: "Git user email for commits"
+        required: false
+        default: "release@vig-os.local"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  sync-manifest:
+    name: Sync Workspace Manifest on Release Branch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    if: ${{ inputs.dry_run != true }}
+    permissions:
+      contents: read          # writes go through the COMMIT_APP token, not GITHUB_TOKEN
+
+    steps:
+      - name: Generate Commit App Token
+        id: commit-app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3
+        with:
+          client-id: ${{ secrets.COMMIT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
+
+      - name: Checkout release branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          ref: ${{ inputs.release_branch }}
+          fetch-depth: 0
+
+      - name: Set up environment
+        uses: ./.github/actions/setup-env
+        with:
+          sync-dependencies: 'true'
+          cachix-cache: ${{ vars.CACHIX_CACHE }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Sync workspace manifest after changelog freeze
+        run: |
+          set -euo pipefail
+          uv run python scripts/sync_manifest.py sync assets/workspace/
+          echo "✓ Synced workspace manifest on ${{ inputs.release_branch }}"
+
+      - name: Commit synced manifest to release branch via API
+        uses: vig-os/commit-action@1bc004353d08d9332a0cb54920b148256220c8e0  # v0.2.0
+        env:
+          GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TARGET_BRANCH: refs/heads/${{ inputs.release_branch }}
+          MAX_ATTEMPTS: "3"
+          COMMIT_MESSAGE: |-
+            chore: sync workspace manifest for release ${{ inputs.version }}
+
+            Regenerate the synced workspace mirror so
+            assets/workspace/.devcontainer/CHANGELOG.md matches the frozen root
+            CHANGELOG.md on the release branch.
+          FILE_PATHS: assets/workspace/.devcontainer/CHANGELOG.md

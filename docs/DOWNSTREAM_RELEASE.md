@@ -129,6 +129,96 @@ Extension contract inputs include both `release_kind` and `publish_version`, so 
 
 `release.yml` requires extension success before publish, so extension failures block release publication.
 
+## Prepare-Release Extension Hook
+
+Project-specific **release-branch preparation** belongs in `.github/workflows/prepare-release-extension.yml` — the *mutating* counterpart to the read-only `release-extension.yml`. Default template behavior is no-op.
+
+`prepare-release.yml` calls it as a reusable workflow **after** the `release/X.Y.Z` branch is created (and the changelog-freeze commit pushed) and **before** the draft PR to `main` is opened, so any commits a consumer's extension pushes to the fresh release branch appear in the PR diff from the start. Because a `workflow_call` workflow is a job, the prepare phase is split into jobs (`prepare` creates the branch, `extension` runs the hook, `open-pr` opens the draft PR).
+
+Contract inputs:
+
+- `version` — the release version being prepared (`X.Y.Z`)
+- `release_branch` — the release branch just created (`release/X.Y.Z`)
+- `branch_sha` — the post-freeze head SHA the release branch was created from
+- `dry_run` — validate without making changes (extensions must honor it)
+- `git_user_name`, `git_user_email` — the git identity `prepare-release.yml` carries
+
+`prepare-release.yml` calls the hook with `secrets: inherit`, so an extension can mint the `COMMIT_APP` token to push to the write-protected release branch — the same bypass and identity the changelog-freeze commit already uses.
+
+Semantics:
+
+- **`dry_run: true`** ⇒ the default no-op prints its inputs and a consumer extension must not write. In the shipped `prepare-release.yml`, the whole prepare phase (including the `extension` job) is gated off on a dry run, so the hook only runs for real preparations.
+- **Rollback** ⇒ an extension failure fails the prepare phase, and a single `rollback` job (which lists `extension` in `needs`) deletes the partial `release/X.Y.Z` branch and restores `CHANGELOG.md` on `dev`. No new rollback machinery is required: every commit the extension pushes lives on the release branch the rollback deletes.
+- Anything the extension commits is ordinary release-branch history, re-validated by the rest of the pipeline (CI on the draft PR, RC candidates, finalize).
+
+### Example: rebuild a committed build artifact (`vig-os/commit-action`)
+
+An action-publishing repo must keep its committed `dist/index.js` fresh on every tagged commit. The prepare-time hook rebuilds it on the freshly cut release branch and commits it, so the release PR's `Dist Check` becomes pure verification:
+
+```yaml
+name: Prepare Release Extension
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      release_branch:
+        required: true
+        type: string
+      branch_sha:
+        required: true
+        type: string
+      dry_run:
+        required: false
+        default: false
+        type: boolean
+      git_user_name:
+        required: false
+        type: string
+      git_user_email:
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild-dist:
+    name: Rebuild and Commit dist/
+    runs-on: ubuntu-24.04
+    if: ${{ inputs.dry_run != true }}
+    steps:
+      - name: Generate Commit App Token
+        id: commit_app_token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.COMMIT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.COMMIT_APP_PRIVATE_KEY }}
+
+      - name: Checkout release branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_branch }}
+
+      - name: Build the action bundle
+        run: |
+          just sync
+          just bundle
+
+      - name: Commit dist/ if it changed
+        if: ${{ hashFiles('dist/index.js') != '' }}
+        uses: vig-os/commit-action@v0
+        env:
+          GH_TOKEN: ${{ steps.commit_app_token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TARGET_BRANCH: refs/heads/${{ inputs.release_branch }}
+          COMMIT_MESSAGE: |-
+            chore: rebuild dist for release ${{ inputs.version }}
+          FILE_PATHS: dist/index.js
+```
+
 ## Cross-Repo Validation Gate
 
 Cross-repository validation gate details are documented in `docs/CROSS_REPO_RELEASE_GATE.md`.
