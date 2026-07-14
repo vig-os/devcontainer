@@ -221,3 +221,101 @@ def test_devkit_extension_implements_manifest_sync() -> None:
     assert "sync_manifest.py sync" in DEVKIT_EXTENSION.read_text(encoding="utf-8"), (
         "devkit's hook must run the workspace manifest sync on the release branch"
     )
+
+
+# --------------------------------------------------------------------------- #
+# Devkit dogfooding: dev-side mirror reconciliation (#1059)
+#
+# The freeze commit is scaffold-verbatim (root CHANGELOG.md only), so after
+# every prepare, dev's synced mirror (assets/workspace/.devcontainer/CHANGELOG.md)
+# is stale until reconciled — a red sync-manifest hook on every dev PR during
+# the release window. Devkit's extension closes that drift by committing the
+# reconciled mirror to dev, and its ORDERING is load-bearing for the rollback:
+#
+# * The dev-reconcile commit must be the LAST step of the job. Any extension
+#   failure then implies the reconcile did NOT land, dev holds only the
+#   root-only freeze, and the scaffold-shaped rollback's root-restore returns
+#   dev to root(pre) == mirror(pre).
+# * If the reconcile landed, the only remaining failure domain is open-pr; the
+#   rollback's dev-advanced guard skips the root-restore, leaving dev at
+#   root(frozen) == mirror(frozen) — also consistent.
+#
+# Either way, every failure path leaves dev's root+mirror consistent.
+# --------------------------------------------------------------------------- #
+
+
+def _devkit_extension_job() -> dict:
+    doc = _load(DEVKIT_EXTENSION)
+    jobs = _jobs(doc)
+    assert len(jobs) == 1, "devkit's extension is expected to be a single job"
+    return next(iter(jobs.values()))
+
+
+def _commit_action_steps(job: dict) -> list[tuple[int, dict]]:
+    """(index, step) of every vig-os/commit-action invocation in the job."""
+    return [
+        (i, s)
+        for i, s in enumerate(job.get("steps") or [])
+        if isinstance(s, dict) and "vig-os/commit-action" in str(s.get("uses", ""))
+    ]
+
+
+def test_devkit_extension_reconciles_dev_mirror() -> None:
+    """The hook commits the reconciled changelog mirror back to dev.
+
+    The freeze commit is scaffold-verbatim (root CHANGELOG.md only), so devkit's
+    extension must close the resulting mirror drift on dev: a commit-action step
+    targeting refs/heads/dev whose FILE_PATHS is exactly the mirror. The job
+    must be gated on dry_run (no writes on a dry run).
+    """
+    job = _devkit_extension_job()
+    dev_commits = [
+        (i, s)
+        for i, s in _commit_action_steps(job)
+        if (s.get("env") or {}).get("TARGET_BRANCH") == "refs/heads/dev"
+    ]
+    assert dev_commits, (
+        "devkit's extension must commit the reconciled mirror to refs/heads/dev"
+    )
+    _, step = dev_commits[0]
+    assert (step.get("env") or {}).get("FILE_PATHS") == (
+        "assets/workspace/.devcontainer/CHANGELOG.md"
+    ), "the dev reconciliation commit must touch exactly the changelog mirror"
+    assert "dry_run" in str(job.get("if", "")), (
+        "the job holding the dev reconciliation must be gated on dry_run"
+    )
+
+
+def test_devkit_extension_dev_reconcile_is_last_step() -> None:
+    """Ordering invariant the rollback analysis relies on (#1059).
+
+    The dev reconciliation commit runs AFTER the release-branch commit and is
+    the LAST step of the job: nothing failable follows it, so a rollback with
+    the reconcile landed can only come from open-pr — the one path where
+    skipping the root-restore is exactly what keeps dev consistent.
+    """
+    job = _devkit_extension_job()
+    steps = job.get("steps") or []
+    commits = _commit_action_steps(job)
+
+    release_idx = [
+        i
+        for i, s in commits
+        if "release_branch" in str((s.get("env") or {}).get("TARGET_BRANCH", ""))
+    ]
+    dev_idx = [
+        i
+        for i, s in commits
+        if (s.get("env") or {}).get("TARGET_BRANCH") == "refs/heads/dev"
+    ]
+    assert release_idx and dev_idx, (
+        "expected both a release-branch commit and a dev reconciliation commit"
+    )
+    assert release_idx[0] < dev_idx[0], (
+        "the dev reconciliation must run after the release-branch commit"
+    )
+    assert dev_idx[0] == len(steps) - 1, (
+        "the dev reconciliation commit must be the job's last step — anything "
+        "after it would create a failure window in which the reconcile landed "
+        "but the extension still fails, defeating the rollback analysis"
+    )
