@@ -2355,6 +2355,30 @@ _RELEASE_RESOLVERS_991=(
     done
 }
 
+@test "release/CI workflows carry no stale python-shaped step labels (#1029)" {
+    # The sync/test steps run language-neutral `just` recipes; their labels and
+    # comments must not name Python (misleading on a Node/TS consumer).
+    run grep -q 'Sync Python dependencies' "$TEMPLATE_DIR/.github/workflows/release-core.yml"
+    assert_failure
+    run grep -q 'Pytest' "$TEMPLATE_DIR/.github/workflows/ci.yml"
+    assert_failure
+}
+
+@test "release-core builds+commits an opt-in bundle when a bundle recipe exists (#1029)" {
+    # A repo that ships a committed build artifact (e.g. a JS action's ncc
+    # dist/) defines a `bundle` just recipe; the release finalize flow detects
+    # it via `just --summary`, runs `just bundle`, and commits dist/ as part of
+    # the finalization commit. Language-neutral: no bundle recipe -> no-op.
+    f="$TEMPLATE_DIR/.github/workflows/release-core.yml"
+    run grep -q 'just --summary' "$f"
+    assert_success
+    run grep -q 'just bundle' "$f"
+    assert_success
+    # dist/ joins CHANGELOG.md in the finalization commit's FILE_PATHS.
+    run grep -q 'CHANGELOG.md,dist' "$f"
+    assert_success
+}
+
 @test "resolve-image action is removed from every rendered mode tree (#991)" {
     for mode in devcontainer direnv both bare; do
         ws="$BATS_TEST_TMPDIR/e2e-991-$mode"
