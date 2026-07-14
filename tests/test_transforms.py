@@ -66,7 +66,13 @@ class TestWorkspaceInterpreterPath:
         sync_manifest = _load_sync_manifest()
         sync_manifest.sync(project_root, tmp_path)
 
-        settings = json.loads((tmp_path / ".vscode" / "settings.json").read_text())
+        raw = (tmp_path / ".vscode" / "settings.json").read_text()
+        # settings.json is now JSONC (#1053): it carries a `//` provenance
+        # banner, so strip comment lines before strict JSON parsing.
+        body = "\n".join(
+            line for line in raw.splitlines() if not line.lstrip().startswith("//")
+        )
+        settings = json.loads(body)
         interpreter = settings["python.defaultInterpreterPath"]
 
         assert interpreter == "${workspaceFolder}/.venv/bin/python3"
@@ -221,6 +227,31 @@ class TestBannerTransform:
         assert lines[2] == "# " + transforms.PRESERVED_BANNER[1]
         assert "services:" in lines
 
+    def test_jsonc_inserts_slash_comment_lines_at_top(self, tmp_path):
+        """JSONC files (#1053) get a `//`-comment banner above the root object."""
+        transforms = _load_transforms()
+        f = tmp_path / "settings.json"
+        f.write_text('{\n  "a": 1\n}\n')
+
+        transforms.Banner(preserved=False, style="jsonc").apply(f)
+
+        lines = f.read_text().splitlines()
+        assert lines[0] == "// " + transforms.MANAGED_BANNER[0]
+        assert lines[1] == "// " + transforms.MANAGED_BANNER[1]
+        assert lines[2] == ""
+        assert lines[3] == "{"
+        assert '"a": 1' in f.read_text()
+
+    def test_jsonc_banner_is_idempotent(self, tmp_path):
+        transforms = _load_transforms()
+        f = tmp_path / "devcontainer.json"
+        f.write_text('{\n  "name": "x"\n}\n')
+
+        transforms.Banner(preserved=True, style="jsonc").apply(f)
+        once = f.read_text()
+        transforms.Banner(preserved=True, style="jsonc").apply(f)
+        assert f.read_text() == once
+
     def test_banner_is_idempotent(self, tmp_path):
         transforms = _load_transforms()
         f = tmp_path / "ci.yml"
@@ -312,6 +343,26 @@ class TestBannerApplication:
 
         assert ("# " + transforms.MANAGED_BANNER[0]) in managed.read_text()
         assert ("# " + transforms.PRESERVED_BANNER[0]) in preserved.read_text()
+
+    def test_stamps_jsonc_banner_on_devcontainer_settings_and_workspace(self, tmp_path):
+        """The three JSONC scaffold files get a `//` banner (#1053)."""
+        sync_manifest = _load_sync_manifest()
+        transforms = _load_transforms()
+        (tmp_path / ".devcontainer").mkdir()
+        (tmp_path / ".vscode").mkdir()
+        devc = tmp_path / ".devcontainer" / "devcontainer.json"
+        devc.write_text('{\n  "name": "x"\n}\n')
+        settings = tmp_path / ".vscode" / "settings.json"
+        settings.write_text('{\n  "a": 1\n}\n')
+        workspace = tmp_path / ".devcontainer" / "workspace.code-workspace.example"
+        workspace.write_text('{\n  "folders": []\n}\n')
+
+        sync_manifest.apply_banners(tmp_path, set())
+
+        for f in (devc, settings, workspace):
+            assert f.read_text().startswith("// " + transforms.MANAGED_BANNER[0]), (
+                f"{f.name} missing the JSONC banner"
+            )
 
     def test_skips_strict_json_and_generated_configs(self, tmp_path):
         sync_manifest = _load_sync_manifest()
@@ -477,6 +528,8 @@ class TestManifestTransformedFlagCoversBanners:
         assert by_src["docs/COMMIT_MESSAGE_STANDARD.md"].is_transformed
         # A directory whose files all get banners -> transformed.
         assert by_src[".github/ISSUE_TEMPLATE/"].is_transformed
+        # A JSONC file gets a `//`-comment banner -> transformed (#1053).
+        assert by_src[".vscode/settings.json"].is_transformed
 
     def test_skip_listed_entry_keeps_identity_flag(self):
         """Genuinely untransformed entries must keep the strict identity check."""
@@ -484,5 +537,4 @@ class TestManifestTransformedFlagCoversBanners:
         by_src = {entry.src: entry for entry in sync_manifest.MANIFEST}
         assert not by_src[".claude/worktrees.json"].is_transformed
         assert not by_src[".gitmessage"].is_transformed
-        assert not by_src[".vscode/settings.json"].is_transformed
         assert not by_src["CHANGELOG.md"].is_transformed

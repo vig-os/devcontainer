@@ -187,6 +187,31 @@ class TestPortableRenderFidelity:
             )
 
 
+class TestCheckJsonExcludesJsoncBanners:
+    """check-json skips the `//`-bannered JSONC scaffold files (#1053).
+
+    The three JSONC scaffold files carry a `//` provenance banner (#1053) that
+    VS Code and the devcontainer CLI accept but check-json's strict parser
+    rejects. nix/hooks.nix excludes them from every check-json surface; both
+    committed YAMLs must carry the rendered exclude.
+    """
+
+    def test_runner_and_scaffold_exclude_the_jsonc_paths(self) -> None:
+        for cfg in (ROOT_CONFIG, SCAFFOLD_CONFIG):
+            hooks = _normalize(yaml.safe_load(cfg.read_text()))["hooks"]
+            exclude = hooks["check-json"].get("exclude", "")
+            assert ".devcontainer/devcontainer\\.json" in exclude, cfg
+            assert ".vscode/settings\\.json" in exclude, cfg
+            assert "code-workspace" in exclude, cfg
+
+    def test_strict_json_is_still_checked(self) -> None:
+        """renovate.json and friends stay under strict check-json (no exclude)."""
+        for cfg in (ROOT_CONFIG, SCAFFOLD_CONFIG):
+            hooks = _normalize(yaml.safe_load(cfg.read_text()))["hooks"]
+            exclude = hooks["check-json"].get("exclude", "")
+            assert "renovate" not in exclude, cfg
+
+
 class TestCommitMsgHookContract:
     """The commit-message validator's shipped argv (Refs #1019).
 
