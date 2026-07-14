@@ -123,8 +123,11 @@ EOF
     assert_success
 }
 
-@test "prepare-release workflow defines rollback step on failure" {
-    run bash -lc "grep -Fq -- 'name: Roll back prepare-release side effects on failure' .github/workflows/prepare-release.yml"
+@test "prepare-release workflow defines rollback job on failure" {
+    # #1059 moved the inline `if: failure()` rollback step into a dedicated
+    # `rollback` job so it also covers the extension and open-pr jobs. Same
+    # guard, new shape: the rollback exists and triggers on any phase failure.
+    run bash -lc "grep -Eq -- '^  rollback:' .github/workflows/prepare-release.yml && grep -Fq -- 'name: Roll back prepare-release side effects' .github/workflows/prepare-release.yml && grep -Fq -- \"needs.prepare.result == 'failure'\" .github/workflows/prepare-release.yml && grep -Fq -- \"needs.extension.result == 'failure'\" .github/workflows/prepare-release.yml && grep -Fq -- \"needs.open-pr.result == 'failure'\" .github/workflows/prepare-release.yml"
     assert_success
 }
 
@@ -149,7 +152,9 @@ EOF
 }
 
 @test "prepare-release PR body omits persistent checklist and related sections" {
-    run bash -lc "! awk '/^      - name: Create draft PR to main/{flag=1} /^      - name: Roll back prepare-release side effects on failure/{flag=0} flag {print}' .github/workflows/prepare-release.yml | grep -Fq -- '### Testing Checklist' && ! awk '/^      - name: Create draft PR to main/{flag=1} /^      - name: Roll back prepare-release side effects on failure/{flag=0} flag {print}' .github/workflows/prepare-release.yml | grep -Fq -- '### When Ready to Release' && ! awk '/^      - name: Create draft PR to main/{flag=1} /^      - name: Roll back prepare-release side effects on failure/{flag=0} flag {print}' .github/workflows/prepare-release.yml | grep -Fq -- '### Related'"
+    # #1059: the PR-open step now lives in the `open-pr` job, so the region ends
+    # at the following `rollback:` job instead of the old inline rollback step.
+    run bash -lc "! awk '/^      - name: Create draft PR to main/{flag=1} /^  rollback:/{flag=0} flag {print}' .github/workflows/prepare-release.yml | grep -Fq -- '### Testing Checklist' && ! awk '/^      - name: Create draft PR to main/{flag=1} /^  rollback:/{flag=0} flag {print}' .github/workflows/prepare-release.yml | grep -Fq -- '### When Ready to Release' && ! awk '/^      - name: Create draft PR to main/{flag=1} /^  rollback:/{flag=0} flag {print}' .github/workflows/prepare-release.yml | grep -Fq -- '### Related'"
     assert_success
 }
 
@@ -276,7 +281,9 @@ EOF
 }
 
 @test "prepare-release workflow FILE_PATHS uses comma delimiter for multi-file values" {
-    run bash -lc "[ -r .github/workflows/prepare-release.yml ] && ! grep -E 'FILE_PATHS:.*CHANGELOG\.md[[:space:]]+[^[:space:]]' .github/workflows/prepare-release.yml"
+    # #1059 moved the workspace-mirror commit into prepare-release-extension.yml,
+    # so the guard covers both files where FILE_PATHS values now live.
+    run bash -lc "[ -r .github/workflows/prepare-release.yml ] && [ -r .github/workflows/prepare-release-extension.yml ] && ! grep -E 'FILE_PATHS:.*CHANGELOG\.md[[:space:]]+[^[:space:]]' .github/workflows/prepare-release.yml .github/workflows/prepare-release-extension.yml"
     assert_success
 }
 
