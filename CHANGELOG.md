@@ -89,6 +89,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Post-scaffold dependency sync is mode-aware and no longer aborts a successful upgrade** ([#1118](https://github.com/vig-os/devkit/issues/1118))
+  - In `direnv` and `bare` modes the container-side `just sync` is now skipped
+    entirely: the consumer's host nix/direnv shell owns dependency install, and a
+    container-side `npm ci`/`uv sync` would write wrong-platform, wrong-owner
+    artifacts into the bind-mounted workspace. An informational line notes the skip.
+  - In `devcontainer`/`both` modes the sync still runs but is non-fatal — a failure
+    (e.g. `npm error Exit handler never called!`) now warns and continues instead of
+    aborting init with a misleading "Failed to initialize workspace", since the
+    scaffold itself is already complete.
 - **Preserve a flake-hooks `.pre-commit-config.yaml` store symlink on upgrade** ([#1117](https://github.com/vig-os/devkit/issues/1117))
   - In direnv mode a flake with `hooks = { }` generates `.pre-commit-config.yaml`
     as a symlink into the host `/nix/store`, which is not mounted inside the image
