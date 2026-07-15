@@ -102,6 +102,13 @@ PRESERVE_FILES=(
     # terms. Preserved like .pre-commit-config.yaml; the upgrade prints a diff
     # against the template below. (Legacy `_typos.toml` handled at copy time.)
     ".typos.toml"
+    # The consumer owns its lint-rule exceptions (#1099): repos add repo-specific
+    # yamllint `ignore:` globs / rule disables and pymarkdown rule tweaks that a
+    # template overwrite silently destroyed, so the hook then flagged legitimate
+    # content. Preserved like .typos.toml; the upgrade prints a diff against the
+    # template below so lint-rule evolution stays visible.
+    ".yamllint"
+    ".pymarkdown.config.md"
 )
 
 # Base recipes the shipped .github/workflows/ci.yml depends on (sync, precommit,
@@ -552,6 +559,13 @@ PRECOMMIT_CONFIG_PREEXISTED=false
 # record it so the post-scaffold guard can surface template divergence.
 TYPOS_CONFIG_PREEXISTED=false
 [[ -f "$WORKSPACE_DIR/.typos.toml" ]] && TYPOS_CONFIG_PREEXISTED=true
+
+# Preserved lint configs are the consumer's rule exceptions (#1099); record them
+# so the post-scaffold guard can surface template divergence.
+YAMLLINT_CONFIG_PREEXISTED=false
+[[ -f "$WORKSPACE_DIR/.yamllint" ]] && YAMLLINT_CONFIG_PREEXISTED=true
+PYMARKDOWN_CONFIG_PREEXISTED=false
+[[ -f "$WORKSPACE_DIR/.pymarkdown.config.md" ]] && PYMARKDOWN_CONFIG_PREEXISTED=true
 
 # ── consumer language detection (#1024/#1025) ─────────────────────────────────
 # Managed scaffold statics (.gitignore, .github/workflows/codeql.yml) are
@@ -1204,6 +1218,17 @@ fi
 # can fold in what they need deliberately. Non-fatal, like the #878 guard.
 if [[ "$TYPOS_CONFIG_PREEXISTED" == "true" ]]; then
     print_preserved_template_diff ".typos.toml" || true
+fi
+
+# Preserved lint configs are the consumer's (#1099) — never overwritten, so
+# their yamllint/pymarkdown rule exceptions survive; the cost is that template
+# rule evolution no longer arrives automatically. Print the divergence so
+# consumers can fold in what they need deliberately. Non-fatal, like the #913 guard.
+if [[ "$YAMLLINT_CONFIG_PREEXISTED" == "true" ]]; then
+    print_preserved_template_diff ".yamllint" || true
+fi
+if [[ "$PYMARKDOWN_CONFIG_PREEXISTED" == "true" ]]; then
+    print_preserved_template_diff ".pymarkdown.config.md" || true
 fi
 
 # The retired `pre-commit` binary (#778) exits 127 at first use: a preserved
