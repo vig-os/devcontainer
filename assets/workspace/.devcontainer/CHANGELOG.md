@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Durable committed home for repo-root ignores (`.gitignore.project`)** ([#1092](https://github.com/vig-os/devkit/issues/1092))
+  - New preserved, consumer-owned `.gitignore.project` (mirroring `justfile.project`): the only committed place git honors for repo-ROOT ignores, since git reads root ignores solely from the managed root `.gitignore` that devkit regenerates on every upgrade. `init-workspace.sh` appends its contents to the regenerated `.gitignore` after the per-language fragments, so root-level consumer ignores survive every upgrade. The base `.gitignore` header and the `flake.nix` opt-in note now point here instead of advising an edit the upgrade destroys.
+
 ### Changed
 
 ### Deprecated
@@ -17,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Managed `.gitignore` rewrite no longer drops consumer-required ignores** ([#1092](https://github.com/vig-os/devkit/issues/1092))
+  - When the flake-hooks opt-in installs `.pre-commit-config.yaml` as a `/nix/store` symlink, the ignore for it is now seeded automatically on every (re)scaffold — gated strictly on the store-symlink condition, so a hand-managed consumer that commits a real `.pre-commit-config.yaml` file is never affected.
+  - The Node fragment now ignores the `tsc`/`ncc` declaration byproducts under `dist/src/` (`.d.ts` / `.d.ts.map` files embed absolute `file://` paths regenerated per checkout) while keeping the committed bundle `dist/index.js` and `dist/package.json` tracked — no blanket `dist/` ignore.
 - **Preserve customized lint configs `.pymarkdown` / `.yamllint` on upgrade** ([#1099](https://github.com/vig-os/devkit/issues/1099))
   - Promoted the markdown-lint config `.pymarkdown` (the JSON pymarkdown reads),
     the `.yamllint` config, and the `.pymarkdown.config.md` doc companion to
