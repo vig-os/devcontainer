@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Candidate releases no longer fail the draft/approval gate** ([#1095](https://github.com/vig-os/devkit/issues/1095))
+  - The scaffolded `release-core.yml` "Find and verify PR" step applied the draft + approval gate to every release kind, so a `release_kind=candidate` dispatch failed against a still-draft PR (`ERROR: PR #N is still in draft`). This was template drift: the #902 fix landed in devkit's own `release.yml` but was never mirrored into the scaffolded template consumers receive. The draft + approval checks are now guarded behind `release_kind=final`; candidates gate on CI only, consistent with `RELEASE_CYCLE.md`.
+
 ### Security
 
 ## [1.2.0](https://github.com/vig-os/devkit/releases/tag/1.2.0) - 2026-07-14
