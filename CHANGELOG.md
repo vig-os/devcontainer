@@ -104,6 +104,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     append-only and deduplicated, so it never reorders the consumer's existing
     entries and a second upgrade re-adds nothing (idempotent); it prints the
     count and list of migrated lines.
+
+- **Install project deps before building the release artifact** ([#1130](https://github.com/vig-os/devkit/issues/1130))
+  - The `Build release artifact` step in `release-core.yml` ran `just bundle`
+    without a preceding `just sync`, so a JS-Action consumer's bundler (`ncc`, a
+    devDependency) was absent from PATH — the finalization step exited 127 and
+    the `final` release rolled back. Only surfaced on a real `final` release (the
+    step is gated on `release_kind == 'final'` and a detected `bundle` recipe).
+  - The step now runs `just sync` (language-neutral: `npm ci` / `uv sync`) before
+    `just bundle`, matching every other build job. No-op for consumers without a
+    bundle recipe.
+
 - **Wire `core.hooksPath` for direnv consumers** ([#1112](https://github.com/vig-os/devkit/issues/1112))
   - In direnv / `nix develop` mode the dev-shell never set `core.hooksPath`, so
     commit-time hooks (pre-commit / commit-msg via prek) were silently inactive

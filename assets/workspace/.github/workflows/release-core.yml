@@ -467,6 +467,11 @@ jobs:
         if: ${{ inputs.release_kind == 'final' && steps.bundle.outputs.has_bundle == 'true' }}
         run: |
           set -euo pipefail
+          # Install project deps (npm ci / uv sync) so the bundler (e.g. ncc, a
+          # devDependency) is on PATH. The toolchain preamble provisions the
+          # dev-shell but not the repo's node_modules, so `just bundle` alone
+          # exits 127; every other build job syncs first (#1130).
+          just sync
           # Rebuild the committed artifact from the finalized sources so the tag
           # ships a fresh bundle, not a stale one. Output (dist/) is committed
           # alongside CHANGELOG.md below.
