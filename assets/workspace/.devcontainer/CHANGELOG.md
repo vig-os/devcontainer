@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Durable committed home for repo-root ignores (`.gitignore.project`)** ([#1092](https://github.com/vig-os/devkit/issues/1092))
+  - New preserved, consumer-owned `.gitignore.project` (mirroring `justfile.project`): the only committed place git honors for repo-ROOT ignores, since git reads root ignores solely from the managed root `.gitignore` that devkit regenerates on every upgrade. `init-workspace.sh` appends its contents to the regenerated `.gitignore` after the per-language fragments, so root-level consumer ignores survive every upgrade. The base `.gitignore` header and the `flake.nix` opt-in note now point here instead of advising an edit the upgrade destroys.
 - **Warn on flake pin / `DEVKIT_VERSION` skew** ([#1093](https://github.com/vig-os/devkit/issues/1093))
   - A `--force` direnv/both upgrade that advances the scaffold now warns when the
     consumer's pinned `vigos` flake `ref` lags the `DEVKIT_VERSION` being
@@ -25,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Managed `.gitignore` rewrite no longer drops consumer-required ignores** ([#1092](https://github.com/vig-os/devkit/issues/1092))
+  - When the flake-hooks opt-in installs `.pre-commit-config.yaml` as a `/nix/store` symlink, the ignore for it is now seeded automatically on every (re)scaffold — gated strictly on the store-symlink condition, so a hand-managed consumer that commits a real `.pre-commit-config.yaml` file is never affected.
+  - The Node fragment now ignores the `tsc`/`ncc` declaration byproducts under `dist/src/` (`.d.ts` / `.d.ts.map` files embed absolute `file://` paths regenerated per checkout) while keeping the committed bundle `dist/index.js` and `dist/package.json` tracked — no blanket `dist/` ignore.
 - **Candidate releases no longer fail the draft/approval gate** ([#1095](https://github.com/vig-os/devkit/issues/1095))
   - The scaffolded `release-core.yml` "Find and verify PR" step applied the draft + approval gate to every release kind, so a `release_kind=candidate` dispatch failed against a still-draft PR (`ERROR: PR #N is still in draft`). This was template drift: the #902 fix landed in devkit's own `release.yml` but was never mirrored into the scaffolded template consumers receive. The draft + approval checks are now guarded behind `release_kind=final`; candidates gate on CI only, consistent with `RELEASE_CYCLE.md`.
 
