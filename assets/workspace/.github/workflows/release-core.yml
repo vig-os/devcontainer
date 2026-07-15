@@ -375,8 +375,8 @@ jobs:
     needs: validate
     runs-on: ubuntu-24.04
     permissions:
-      actions: write
-      contents: write
+      actions: read
+      contents: read
       packages: read
     container:
       image: ${{ inputs.toolchain_image }}

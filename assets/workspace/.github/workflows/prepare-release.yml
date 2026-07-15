@@ -155,7 +155,7 @@ jobs:
         shell: bash
     if: ${{ inputs.dry-run != true }}
     permissions:
-      contents: write
+      contents: read
       packages: read
     # Exposed to the extension, open-pr, and rollback jobs. The PR body (changelog)
     # and the rollback anchors (pre-freeze/post-freeze SHAs) were step outputs when
@@ -438,7 +438,7 @@ jobs:
         )
       }}
     permissions:
-      contents: write
+      contents: read
       packages: read
 
     steps:
