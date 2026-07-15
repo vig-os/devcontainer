@@ -28,6 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Post-scaffold dependency sync is mode-aware and no longer aborts a successful upgrade** ([#1118](https://github.com/vig-os/devkit/issues/1118))
+  - In `direnv` and `bare` modes the container-side `just sync` is now skipped
+    entirely: the consumer's host nix/direnv shell owns dependency install, and a
+    container-side `npm ci`/`uv sync` would write wrong-platform, wrong-owner
+    artifacts into the bind-mounted workspace. An informational line notes the skip.
+  - In `devcontainer`/`both` modes the sync still runs but is non-fatal — a failure
+    (e.g. `npm error Exit handler never called!`) now warns and continues instead of
+    aborting init with a misleading "Failed to initialize workspace", since the
+    scaffold itself is already complete.
+
 - **Post-promote sync-main-to-dev no longer conflicts on the workspace changelog mirror** ([#1115](https://github.com/vig-os/devkit/issues/1115))
   - The prepare extension's sibling-commit reconcile left the mirror's merge base
     at pre-freeze content, so `assets/workspace/.devcontainer/CHANGELOG.md`
