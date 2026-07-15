@@ -341,6 +341,8 @@ class TestPreserveFilesSource:
         assert ".typos.toml" in preserve
         # Lint configs are preserved now (#1099): consumers customize them.
         assert ".yamllint" in preserve
+        # .pymarkdown is the strict-JSON config (banner-skipped like renovate.json).
+        assert ".pymarkdown" in preserve
         assert ".pymarkdown.config.md" in preserve
         # justfile.local is preserved now (#1054): its header's claim is real.
         assert "justfile.local" in preserve
