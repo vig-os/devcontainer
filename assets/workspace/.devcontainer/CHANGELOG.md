@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Warn on flake pin / `DEVKIT_VERSION` skew** ([#1093](https://github.com/vig-os/devkit/issues/1093))
+  - A `--force` direnv/both upgrade that advances the scaffold now warns when the
+    consumer's pinned `vigos` flake `ref` lags the `DEVKIT_VERSION` being
+    written — the two ship coupled halves of the same change (e.g. #1053's JSONC
+    banner + its `check-json` exclude) and must move together, else strict hooks
+    reject files the new scaffold wrote.
+  - Non-fatal; a floating (unpinned) input or a matching pin stays silent.
+
 ### Changed
 
 ### Deprecated
