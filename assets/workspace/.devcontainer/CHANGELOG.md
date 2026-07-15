@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Preserve customized `.yamllint` / `.pymarkdown.config.md` on upgrade** ([#1099](https://github.com/vig-os/devkit/issues/1099))
+  - Promoted both lint configs to `PRESERVE_FILES`, so repo-specific `ignore:`
+    globs and rule disables survive `install.sh --force` instead of being
+    silently overwritten (same class as `.pre-commit-config.yaml` #878 and
+    `.typos.toml` #913).
+  - The upgrade now prints a template diff against each preserved file so
+    lint-rule evolution stays visible, and both templates render the preserved
+    provenance banner.
+
 ### Security
 
 ## [1.2.0](https://github.com/vig-os/devkit/releases/tag/1.2.0) - 2026-07-14
