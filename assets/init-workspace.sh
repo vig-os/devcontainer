@@ -1046,6 +1046,34 @@ if [[ -n "${VIG_OS_VERSION:-}" && -f "$WORKSPACE_DIR/.vig-os" ]]; then
     # DEVKIT_VERSION, so a stray legacy DEVCONTAINER_VERSION line is migrated
     # rather than left stale (#781).
     sed -i -E "s/^(DEVKIT_VERSION|DEVCONTAINER_VERSION)=.*/DEVKIT_VERSION=${VIG_OS_VERSION}/" "$WORKSPACE_DIR/.vig-os"
+
+    # Flake pin / DEVKIT_VERSION lockstep skew warning (#1093). For direnv/flake
+    # consumers the scaffold and the pinned `vigos` flake input deliver coupled
+    # halves of the same change (e.g. #1053's JSONC banner is written by the
+    # scaffold, but its compensating check-json exclude lives in nix/hooks.nix,
+    # delivered through the flake input). Bumping only the scaffold while a pinned
+    # `vigos` ref lags behind silently breaks every commit. We cannot fix it for
+    # the consumer — flake.nix is a PRESERVE_FILE they own — but we can warn.
+    # A FLOATING input (no ?ref=) is intentionally unpinned, so it never warns;
+    # only a pin that differs from the target does.
+    if [[ "$FORCE" == "true" && ( "$MODE" == "direnv" || "$MODE" == "both" ) \
+        && -f "$WORKSPACE_DIR/flake.nix" ]]; then
+        # `|| true`: a floating input yields no grep match (exit 1), which would
+        # abort under `set -o pipefail`; an empty pinned_ref is the intended
+        # "unpinned, no warning" signal.
+        pinned_ref="$(grep -oE 'vigos\.url[[:space:]]*=[[:space:]]*"github:vig-os/devkit\?ref=[^"]+"' \
+            "$WORKSPACE_DIR/flake.nix" 2>/dev/null \
+            | sed -E 's/.*\?ref=([^"]+)".*/\1/' | head -n1 || true)"
+        if [[ -n "$pinned_ref" && "$pinned_ref" != "$VIG_OS_VERSION" ]]; then
+            echo "" >&2
+            echo "WARNING: scaffold upgraded to ${VIG_OS_VERSION}, but the pinned vigos flake input is still ${pinned_ref}." >&2
+            echo "         The two must move together — they deliver coupled halves of the same" >&2
+            echo "         change (e.g. #1053's JSONC banner + its check-json exclude). Update your" >&2
+            echo "         flake.nix to 'vigos.url = \"github:vig-os/devkit?ref=${VIG_OS_VERSION}\";' and run" >&2
+            echo "         'nix flake update vigos', else strict hooks may reject files this scaffold wrote." >&2
+            echo "" >&2
+        fi
+    fi
 fi
 
 # Interactive origin resolution (the renovate.json owner/repo prompt) runs here,
