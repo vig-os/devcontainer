@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Renovate: update `actions/setup-node` from `v6.4.0` to `v7.0.0`** ([#1135](https://github.com/vig-os/devkit/pull/1135))
 - **Evict perl from the image (neovim without wl-clipboard)** ([#1108](https://github.com/vig-os/devkit/issues/1108))
   - perl 5.42.0 and its module stack (libwww-perl, XML-Twig, File-MimeInfo,
     X11-Protocol, …) had one remaining anchor after
