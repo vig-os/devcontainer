@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [1.2.1] - TBD
+
+### Added
+
 - **Durable committed home for repo-root ignores (`.gitignore.project`)** ([#1092](https://github.com/vig-os/devkit/issues/1092))
   - New preserved, consumer-owned `.gitignore.project` (mirroring `justfile.project`): the only committed place git honors for repo-ROOT ignores, since git reads root ignores solely from the managed root `.gitignore` that devkit regenerates on every upgrade. `init-workspace.sh` appends its contents to the regenerated `.gitignore` after the per-language fragments, so root-level consumer ignores survive every upgrade. The base `.gitignore` header and the `flake.nix` opt-in note now point here instead of advising an edit the upgrade destroys.
 - **Warn on flake pin / `DEVKIT_VERSION` skew** ([#1093](https://github.com/vig-os/devkit/issues/1093))
@@ -18,12 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     banner + its `check-json` exclude) and must move together, else strict hooks
     reject files the new scaffold wrote.
   - Non-fatal; a floating (unpinned) input or a matching pin stays silent.
-
-### Changed
-
-### Deprecated
-
-### Removed
 
 ### Fixed
 
@@ -42,8 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `.pymarkdown` is strict JSON and stays un-bannered, like `renovate.json`.
 - **Candidate releases no longer fail the draft/approval gate** ([#1095](https://github.com/vig-os/devkit/issues/1095))
   - The scaffolded `release-core.yml` "Find and verify PR" step applied the draft + approval gate to every release kind, so a `release_kind=candidate` dispatch failed against a still-draft PR (`ERROR: PR #N is still in draft`). This was template drift: the #902 fix landed in devkit's own `release.yml` but was never mirrored into the scaffolded template consumers receive. The draft + approval checks are now guarded behind `release_kind=final`; candidates gate on CI only, consistent with `RELEASE_CYCLE.md`.
-
-### Security
 
 ## [1.2.0](https://github.com/vig-os/devkit/releases/tag/1.2.0) - 2026-07-14
 
