@@ -917,6 +917,47 @@ EOF
     refute_output --partial "pinned vigos flake input is still"
 }
 
+# ── skew warning reads the real pin, not the doc-comment (#1110) ──────────────
+# The standard-layout scaffold flake.nix ships a doc-comment EXAMPLE line
+# (`#   vigos.url = "github:vig-os/devkit?ref=<tag>";`) ABOVE the real input
+# line. The #1093 extractor must read the real pin, not the comment: reading the
+# comment reports the literal `<tag>` and false-fires even on an aligned pin.
+
+# Pre-seed $ws/flake.nix carrying the doc-comment example line AND a real $url
+# vigos input (mirroring the real template shape), then --force upgrade the
+# direnv scaffold to $target.
+_upgrade_direnv_with_documented_flake_url() {
+    local ws="$1" target="$2" url="$3"
+    mkdir -p "$ws"
+    cat >"$ws/flake.nix" <<EOF
+{
+  inputs = {
+    # This scaffold deliberately FLOATS on the default branch. Once you depend
+    # on stability, pin a release tag instead and bump deliberately:
+    #   vigos.url = "github:vig-os/devkit?ref=<tag>";
+    vigos.url = "$url";
+    nixpkgs.follows = "vigos/nixpkgs";
+  };
+}
+EOF
+    local verfile="$BATS_TEST_TMPDIR/VERSION-1110-$RANDOM"
+    printf '%s\n' "$target" >"$verfile"
+    _scaffold_with_version_file direnv "$ws" "$verfile"
+}
+
+@test "init-workspace reports the real pin, not the <tag> doc-comment, when it lags (#1110)" {
+    run _upgrade_direnv_with_documented_flake_url "$BATS_TEST_TMPDIR/e2e-1110-skew" 1.2.0 "github:vig-os/devkit?ref=1.1.0"
+    assert_success
+    assert_output --partial "pinned vigos flake input is still 1.1.0"
+    refute_output --partial "pinned vigos flake input is still <tag>"
+}
+
+@test "init-workspace is silent on an aligned pin despite the <tag> doc-comment (#1110)" {
+    run _upgrade_direnv_with_documented_flake_url "$BATS_TEST_TMPDIR/e2e-1110-match" 1.2.0 "github:vig-os/devkit?ref=1.2.0"
+    assert_success
+    refute_output --partial "pinned vigos flake input is still"
+}
+
 @test "template ships .typos.toml alongside the typos hook (#855)" {
     # The scaffold's .pre-commit-config.yaml runs the typos hook; without the
     # exception config, scaffold-shipped content (version-check.sh's Nd

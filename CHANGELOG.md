@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-## [1.2.1] - TBD
+## [1.2.1](https://github.com/vig-os/devkit/releases/tag/1.2.1) - 2026-07-15
 
 ### Added
 
@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     banner + its `check-json` exclude) and must move together, else strict hooks
     reject files the new scaffold wrote.
   - Non-fatal; a floating (unpinned) input or a matching pin stays silent.
+  - The pinned ref is read from the real `vigos.url` input line only, not the
+    `?ref=<tag>` doc-comment example that ships above it in the standard-layout
+    `flake.nix`; previously the extractor matched the comment first, reported the
+    literal `<tag>`, and false-fired even on an aligned pin ([#1110](https://github.com/vig-os/devkit/issues/1110)).
 
 ### Fixed
 

@@ -1117,7 +1117,12 @@ if [[ -n "${VIG_OS_VERSION:-}" && -f "$WORKSPACE_DIR/.vig-os" ]]; then
         # `|| true`: a floating input yields no grep match (exit 1), which would
         # abort under `set -o pipefail`; an empty pinned_ref is the intended
         # "unpinned, no warning" signal.
-        pinned_ref="$(grep -oE 'vigos\.url[[:space:]]*=[[:space:]]*"github:vig-os/devkit\?ref=[^"]+"' \
+        # Anchor on `^[[:space:]]*vigos\.url` so we read the REAL input line only:
+        # the standard-layout flake.nix ships a doc-comment EXAMPLE line
+        # (`#   vigos.url = "github:vig-os/devkit?ref=<tag>";`) above it, and an
+        # unanchored match picked that comment first, reporting the literal
+        # `<tag>` and false-firing even on an aligned pin (#1110).
+        pinned_ref="$(grep -oE '^[[:space:]]*vigos\.url[[:space:]]*=[[:space:]]*"github:vig-os/devkit\?ref=[^"]+"' \
             "$WORKSPACE_DIR/flake.nix" 2>/dev/null \
             | sed -E 's/.*\?ref=([^"]+)".*/\1/' | head -n1 || true)"
         if [[ -n "$pinned_ref" && "$pinned_ref" != "$VIG_OS_VERSION" ]]; then
