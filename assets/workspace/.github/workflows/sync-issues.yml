@@ -82,10 +82,10 @@ jobs:
       group: sync-issues-${{ github.repository }}
       cancel-in-progress: true
     permissions:
-      contents: write
+      contents: read
       issues: read
       pull-requests: read
-      actions: write  # Required for cache deletion
+      actions: write  # Required for cache deletion (gh api DELETE on github.token)
       packages: read
 
     steps:

@@ -68,7 +68,7 @@ jobs:
     outputs:
       version: ${{ steps.vars.outputs.version }}
     permissions:
-      contents: write
+      contents: read
       pull-requests: read
       packages: read
     defaults:
@@ -112,7 +112,11 @@ jobs:
 
       - name: Verify draft GitHub Release exists
         env:
-          GH_TOKEN: ${{ github.token }}
+          # GitHub only returns draft releases to a token with push (contents:write)
+          # access. The job's GITHUB_TOKEN is read-only (#1136), so use the
+          # RELEASE_APP token this job already mints for its PR-check step; a
+          # read-only github.token would silently hide the draft and fail promote.
+          GH_TOKEN: ${{ steps.release_app_token.outputs.token }}
           VERSION: ${{ steps.vars.outputs.version }}
           TAG_PREFIX: ${{ needs.resolve-toolchain.outputs.tag-prefix }}
         run: |
@@ -294,7 +298,7 @@ jobs:
         password: ${{ secrets.GHCR_PULL_TOKEN || github.token }}
     timeout-minutes: 10
     permissions:
-      contents: write
+      contents: read
       packages: read
     defaults:
       run:
@@ -349,7 +353,7 @@ jobs:
         password: ${{ secrets.GHCR_PULL_TOKEN || github.token }}
     timeout-minutes: 10
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
       packages: read
     defaults:
@@ -481,7 +485,7 @@ jobs:
     if: ${{ needs.merge.result == 'success' }}
     continue-on-error: true
     permissions:
-      contents: write
+      contents: read
       packages: read
     defaults:
       run:
@@ -601,7 +605,7 @@ jobs:
     timeout-minutes: 10
     if: ${{ needs.merge.result == 'success' && needs.resolve-toolchain.outputs.floating-tags != '' }}
     permissions:
-      contents: write
+      contents: read
       packages: read
     defaults:
       run:

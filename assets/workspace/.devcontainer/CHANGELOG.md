@@ -188,6 +188,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Drop vestigial job-level `GITHUB_TOKEN` write grants from workflow templates** ([#1136](https://github.com/vig-os/devkit/issues/1136))
+  - An OpenSSF Scorecard TokenPermissions audit traced every job-level
+    `contents: write` / `actions: write` grant in the rendered release/sync
+    workflows to the token that performs the write: each git push, tag push,
+    `gh release`, `gh pr`, `gh api` mutation and `gh workflow run` rides a
+    COMMIT_APP / RELEASE_APP installation token, not the job's `GITHUB_TOKEN`.
+  - Those grants are now reduced to `read` across `prepare-release.yml` (prepare,
+    rollback), `promote-release.yml` (validate, promote, merge, cleanup,
+    floating-tags), `release.yml` (core + publish caller blocks, rollback),
+    `release-core.yml` (finalize), `release-publish.yml` (publish),
+    `sync-issues.yml` (sync) and `sync-main-to-dev.yml` (sync), shrinking the
+    blast radius of a compromised step to a read-only `GITHUB_TOKEN`.
+  - `promote-release.yml`'s *Verify draft GitHub Release exists* step now reads
+    drafts with the RELEASE_APP token (GitHub only returns drafts to a token with
+    push access), so the `validate` job can drop to `contents: read` without
+    hiding the draft. `sync-issues.yml`'s `sync` job keeps `actions: write` — its
+    cache-deletion step calls `gh api ... -X DELETE` on `github.token`.
 - **Retire the perl 5.42.0 CVE exception batch** ([#1108](https://github.com/vig-os/devkit/issues/1108))
   - With perl gone from the image closure (neovim no longer anchors it via
     wl-clipboard → xdg-utils), the perl 5.42.0 CVE exceptions in `.vulnixignore`
