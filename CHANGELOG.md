@@ -28,6 +28,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Preserve a flake-hooks `.pre-commit-config.yaml` store symlink on upgrade** ([#1117](https://github.com/vig-os/devkit/issues/1117))
+  - In direnv mode a flake with `hooks = { }` generates `.pre-commit-config.yaml`
+    as a symlink into the host `/nix/store`, which is not mounted inside the image
+    where `init-workspace.sh` runs — so the symlink is dangling from the
+    container's view. The preserve/exclude and report gates tested presence with
+    `-e`/`-f`, which follow the link and reported it absent, so `rsync -avL`
+    overwrote the symlink with the ~6 KB template config and the
+    [#1092](https://github.com/vig-os/devkit/issues/1092) ignore auto-seed never
+    fired — leaving a committed, non-ignored template shadowing the generated
+    config (observed on `commit-action` 1.2.0→1.2.1).
+  - A new `path_present` helper treats a symlink of any kind (including a dangling
+    one) as present at all three gates — the rsync exclude builder, the
+    add/preserve report classification (`--preview` now lists it as PRESERVED),
+    and the `PRECOMMIT_CONFIG_PREEXISTED` divergence guard — so the symlink
+    survives untouched and the ignore seed still runs.
 - **Post-promote sync-main-to-dev no longer conflicts on the workspace changelog mirror** ([#1115](https://github.com/vig-os/devkit/issues/1115))
   - The prepare extension's sibling-commit reconcile left the mirror's merge base
     at pre-freeze content, so `assets/workspace/.devcontainer/CHANGELOG.md`

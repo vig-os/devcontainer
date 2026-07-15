@@ -595,8 +595,9 @@ _preview_symlinked_template_venv() {
     # shellcheck disable=SC2016
     run grep -A3 'for preserved in "${PRESERVE_FILES\[@\]}"' "$INIT_WORKSPACE_SH"
     assert_success
+    # path_present (not -e) so a dangling store symlink is still excluded (#1117).
     # shellcheck disable=SC2016
-    assert_output --partial 'if [[ -e "$WORKSPACE_DIR/$preserved" ]]; then'
+    assert_output --partial 'if path_present "$WORKSPACE_DIR/$preserved"; then'
     # shellcheck disable=SC2016
     assert_output --partial 'EXCLUDE_ARGS+=("--exclude=/$preserved")'
 }
