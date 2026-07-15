@@ -588,3 +588,34 @@ to match, then `nix flake update vigos`:
 ```nix
 vigos.url = "github:vig-os/devkit"; # was github:vig-os/devcontainer
 ```
+
+### `DEVKIT_VERSION` and the pinned flake `ref` move in lockstep
+
+If you **pin** the flake input to a release
+(`vigos.url = "github:vig-os/devkit?ref=<tag>"`), the pinned `<tag>` and the
+`DEVKIT_VERSION` written into `.vig-os` by the scaffold must stay on the **same
+version**. They deliver **coupled halves of the same change**: the scaffold
+(keyed to `DEVKIT_VERSION`, delivered by `install.sh --force`) writes files,
+while the pinned flake input (`nix/hooks.nix`) delivers the matching hook
+behavior. For example, the JSONC provenance banner
+([#1053](https://github.com/vig-os/devkit/issues/1053)) is written by the
+scaffold, but its compensating `check-json` exclude lives in the flake input —
+bump only the scaffold and the strict `check-json` hook rejects the banner,
+failing **every** commit
+([#1093](https://github.com/vig-os/devkit/issues/1093)).
+
+Keep them aligned: whenever a `--force` upgrade advances `DEVKIT_VERSION`, bump
+the pinned `ref` to the same version and re-resolve the input:
+
+```nix
+vigos.url = "github:vig-os/devkit?ref=<new-DEVKIT_VERSION>";
+```
+
+```console
+nix flake update vigos
+```
+
+A `--force` upgrade whose scaffold version differs from a pinned `vigos` ref now
+prints a warning to that effect. A **floating** input
+(`vigos.url = "github:vig-os/devkit"`, no `?ref=`) tracks the branch and needs no
+manual bump — it is exempt.

@@ -872,6 +872,92 @@ _scaffold_with_version_file() {
     assert_output "DEVKIT_VERSION=1.2.3"
 }
 
+# ── flake pin / DEVKIT_VERSION lockstep skew warning (#1093) ──────────────────
+# The scaffold (keyed to DEVKIT_VERSION) and the pinned `vigos` flake input ship
+# coupled halves of a change (e.g. #1053's JSONC banner + its check-json exclude).
+# A --force upgrade that advances the scaffold but leaves a stale pinned flake ref
+# behind silently breaks every commit for a direnv/flake consumer. init warns when
+# a pinned vigos ref in the consumer's flake.nix differs from the DEVKIT_VERSION
+# being written. A floating (unpinned) input is intentional and never warns.
+
+# Pre-seed $ws/flake.nix carrying a $url vigos input, then --force upgrade the
+# direnv scaffold to $target (via the image built-tag record).
+_upgrade_direnv_with_flake_url() {
+    local ws="$1" target="$2" url="$3"
+    mkdir -p "$ws"
+    cat >"$ws/flake.nix" <<EOF
+{
+  inputs = {
+    vigos.url = "$url";
+    nixpkgs.follows = "vigos/nixpkgs";
+  };
+}
+EOF
+    local verfile="$BATS_TEST_TMPDIR/VERSION-1093-$RANDOM"
+    printf '%s\n' "$target" >"$verfile"
+    _scaffold_with_version_file direnv "$ws" "$verfile"
+}
+
+@test "init-workspace warns when a pinned vigos flake ref lags the DEVKIT_VERSION target (#1093)" {
+    run _upgrade_direnv_with_flake_url "$BATS_TEST_TMPDIR/e2e-1093-skew" 1.2.0 "github:vig-os/devkit?ref=1.1.0"
+    assert_success
+    assert_output --partial "pinned vigos flake input is still 1.1.0"
+    assert_output --partial "nix flake update vigos"
+}
+
+@test "init-workspace is silent when the pinned vigos flake ref matches the target (#1093)" {
+    run _upgrade_direnv_with_flake_url "$BATS_TEST_TMPDIR/e2e-1093-match" 1.2.0 "github:vig-os/devkit?ref=1.2.0"
+    assert_success
+    refute_output --partial "pinned vigos flake input is still"
+}
+
+@test "init-workspace is silent when the vigos flake input floats unpinned (#1093)" {
+    run _upgrade_direnv_with_flake_url "$BATS_TEST_TMPDIR/e2e-1093-float" 1.2.0 "github:vig-os/devkit"
+    assert_success
+    refute_output --partial "pinned vigos flake input is still"
+}
+
+# ── skew warning reads the real pin, not the doc-comment (#1110) ──────────────
+# The standard-layout scaffold flake.nix ships a doc-comment EXAMPLE line
+# (`#   vigos.url = "github:vig-os/devkit?ref=<tag>";`) ABOVE the real input
+# line. The #1093 extractor must read the real pin, not the comment: reading the
+# comment reports the literal `<tag>` and false-fires even on an aligned pin.
+
+# Pre-seed $ws/flake.nix carrying the doc-comment example line AND a real $url
+# vigos input (mirroring the real template shape), then --force upgrade the
+# direnv scaffold to $target.
+_upgrade_direnv_with_documented_flake_url() {
+    local ws="$1" target="$2" url="$3"
+    mkdir -p "$ws"
+    cat >"$ws/flake.nix" <<EOF
+{
+  inputs = {
+    # This scaffold deliberately FLOATS on the default branch. Once you depend
+    # on stability, pin a release tag instead and bump deliberately:
+    #   vigos.url = "github:vig-os/devkit?ref=<tag>";
+    vigos.url = "$url";
+    nixpkgs.follows = "vigos/nixpkgs";
+  };
+}
+EOF
+    local verfile="$BATS_TEST_TMPDIR/VERSION-1110-$RANDOM"
+    printf '%s\n' "$target" >"$verfile"
+    _scaffold_with_version_file direnv "$ws" "$verfile"
+}
+
+@test "init-workspace reports the real pin, not the <tag> doc-comment, when it lags (#1110)" {
+    run _upgrade_direnv_with_documented_flake_url "$BATS_TEST_TMPDIR/e2e-1110-skew" 1.2.0 "github:vig-os/devkit?ref=1.1.0"
+    assert_success
+    assert_output --partial "pinned vigos flake input is still 1.1.0"
+    refute_output --partial "pinned vigos flake input is still <tag>"
+}
+
+@test "init-workspace is silent on an aligned pin despite the <tag> doc-comment (#1110)" {
+    run _upgrade_direnv_with_documented_flake_url "$BATS_TEST_TMPDIR/e2e-1110-match" 1.2.0 "github:vig-os/devkit?ref=1.2.0"
+    assert_success
+    refute_output --partial "pinned vigos flake input is still"
+}
+
 @test "template ships .typos.toml alongside the typos hook (#855)" {
     # The scaffold's .pre-commit-config.yaml runs the typos hook; without the
     # exception config, scaffold-shipped content (version-check.sh's Nd
@@ -1331,6 +1417,109 @@ EOF
     # template .typos.toml NOT shipped -> single active config
     run test -e "$ws/.typos.toml"
     assert_failure
+}
+
+# ── upgrade must preserve customized lint configs .yamllint / .pymarkdown (#1099) ─
+# Same class as #878/#913: these are fully-managed scaffold files, yet lint
+# CONFIGS a consumer legitimately customizes (repo-specific `ignore:` globs, rule
+# disables). A template overwrite silently destroyed those edits and the hook
+# then flagged legitimate content. Preserve them like .typos.toml (#913) and
+# print the template diff so hook-rule evolution stays visible.
+
+@test ".yamllint is preserved on --force upgrade (#1099)" {
+    # shellcheck disable=SC2016
+    run grep -E '"\.yamllint"' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+@test "upgrade preserves a customized .yamllint (#1099)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1099-yamllint-preserve"
+    mkdir -p "$ws"
+    printf '# SENTINEL-1099 consumer yamllint config\nrules:\n  line-length: enable\n' \
+        >"$ws/.yamllint"
+    run _upgrade both "$ws"
+    assert_success
+    run grep -q 'SENTINEL-1099' "$ws/.yamllint"
+    assert_success
+}
+
+@test "upgrade prints a template diff hint for a preserved .yamllint (#1099)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1099-yamllint-diff"
+    mkdir -p "$ws"
+    # a config lacking the template's rule set
+    printf '# SENTINEL-1099 minimal consumer yamllint config\n' >"$ws/.yamllint"
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial 'command not found'
+    assert_output --partial 'Preserved .yamllint differs from the template'
+    # a template rule the preserved file lacks shows in the diff
+    assert_output --partial 'comments-indentation'
+}
+
+@test ".pymarkdown.config.md is preserved on --force upgrade (#1099)" {
+    # shellcheck disable=SC2016
+    run grep -E '"\.pymarkdown\.config\.md"' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+@test "upgrade preserves a customized .pymarkdown.config.md (#1099)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1099-pymarkdown-preserve"
+    mkdir -p "$ws"
+    printf '# SENTINEL-1099 consumer pymarkdown notes\n\nMy repo-specific rules.\n' \
+        >"$ws/.pymarkdown.config.md"
+    run _upgrade both "$ws"
+    assert_success
+    run grep -q 'SENTINEL-1099' "$ws/.pymarkdown.config.md"
+    assert_success
+}
+
+@test "upgrade prints a template diff hint for a preserved .pymarkdown.config.md (#1099)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1099-pymarkdown-diff"
+    mkdir -p "$ws"
+    # a doc lacking the template's rule descriptions
+    printf '# SENTINEL-1099 minimal consumer pymarkdown notes\n' \
+        >"$ws/.pymarkdown.config.md"
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial 'command not found'
+    assert_output --partial 'Preserved .pymarkdown.config.md differs from the template'
+    # a template rule the preserved file lacks shows in the diff
+    assert_output --partial 'MD013'
+}
+
+# .pymarkdown is the JSON config pymarkdown actually reads (md0xx rule settings)
+# — the file a consumer really customizes. Like renovate.json it is strict JSON
+# and carries no banner (it stays in _BANNER_SKIP), but it is preserved on
+# upgrade all the same, with a template diff on divergence.
+
+@test ".pymarkdown is preserved on --force upgrade (#1099)" {
+    # shellcheck disable=SC2016
+    run grep -E '"\.pymarkdown"' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+@test "upgrade preserves a customized .pymarkdown (#1099)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1099-pymarkdown-json-preserve"
+    mkdir -p "$ws"
+    printf '{ "SENTINEL-1099": true, "plugins": { "md013": { "line_length": 999 } } }\n' \
+        >"$ws/.pymarkdown"
+    run _upgrade both "$ws"
+    assert_success
+    run grep -q 'SENTINEL-1099' "$ws/.pymarkdown"
+    assert_success
+}
+
+@test "upgrade prints a template diff hint for a preserved .pymarkdown (#1099)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1099-pymarkdown-json-diff"
+    mkdir -p "$ws"
+    # a config lacking the template's rule set
+    printf '{ "SENTINEL-1099": true }\n' >"$ws/.pymarkdown"
+    run _upgrade both "$ws"
+    assert_success
+    refute_output --partial 'command not found'
+    assert_output --partial 'Preserved .pymarkdown differs from the template'
+    # a template rule the preserved file lacks shows in the diff
+    assert_output --partial 'siblings_only'
 }
 
 # ── justfile.local must be preserved on upgrade (#1054) ───────────────────────
@@ -2688,4 +2877,107 @@ _RELEASE_RESOLVERS_991=(
     run head -1 "$ws/justfile.project"
     assert_success
     assert_output --partial 'Seeded by vigOS devkit'
+}
+
+# ── consumer-owned durable root ignores: .gitignore.project (#1092) ────────────
+# The managed root .gitignore is overwritten on every upgrade, and git honors a
+# repo-ROOT ignore only from that root .gitignore — so consumers had no durable
+# committed home for root-level ignores. .gitignore.project is a PRESERVE_FILE
+# (mirroring justfile.project) whose contents init-workspace.sh appends to the
+# regenerated .gitignore after the per-language fragments, so root-level consumer
+# ignores survive every regeneration.
+
+@test ".gitignore.project is in PRESERVE_FILES (#1092)" {
+    # shellcheck disable=SC2016
+    run grep -E '"\.gitignore\.project"' "$INIT_WORKSPACE_SH"
+    assert_success
+}
+
+@test "template ships a .gitignore.project (#1092)" {
+    run test -f "$TEMPLATE_DIR/.gitignore.project"
+    assert_success
+}
+
+@test "upgrade preserves a customized .gitignore.project (#1092)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1092-preserve"
+    mkdir -p "$ws"
+    printf '# SENTINEL-1092 consumer root ignores\n/scratch-local/\n' \
+        >"$ws/.gitignore.project"
+    run _upgrade both "$ws"
+    assert_success
+    run grep -q 'SENTINEL-1092' "$ws/.gitignore.project"
+    assert_success
+}
+
+@test "rendered .gitignore appends the consumer .gitignore.project contents (#1092)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1092-append"
+    mkdir -p "$ws"
+    printf '# SENTINEL-1092 consumer root ignores\n/scratch-local/\n' \
+        >"$ws/.gitignore.project"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/.gitignore"
+    assert_success
+    # The consumer's durable root ignore is folded into the regenerated file.
+    assert_line '/scratch-local/'
+}
+
+@test "scaffold .gitignore ignores dist/src/ byproducts but keeps dist/index.js tracked (#1092)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1092-node-dist"
+    mkdir -p "$ws"
+    printf '{ "name": "probe" }\n' >"$ws/package.json"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/.gitignore"
+    assert_success
+    # tsc/ncc declaration output under dist/src/ is ignored ...
+    assert_line 'dist/src/'
+    # ... but no blanket dist/ ignore (the committed bundle must stay tracked).
+    refute_line 'dist/'
+    # Behavioral proof: git honors the ignore for dist/src/ output, not the bundle.
+    git -C "$ws" init -q
+    mkdir -p "$ws/dist/src"
+    printf 'x\n' >"$ws/dist/index.js"
+    printf 'x\n' >"$ws/dist/src/index.d.ts"
+    run git -C "$ws" check-ignore dist/src/index.d.ts
+    assert_success
+    run git -C "$ws" check-ignore dist/index.js
+    assert_failure
+}
+
+# ── flake-hooks opt-in seeds the .pre-commit-config.yaml ignore (#1092) ────────
+# A consumer that opts into flake-generated hooks (hooks = { } in flake.nix) gets
+# .pre-commit-config.yaml installed as a /nix/store symlink, which must be
+# gitignored (committing it pushes a machine-local, broken symlink). The seed is
+# gated STRICTLY on the store-symlink condition, so a hand-managed consumer that
+# commits a real .pre-commit-config.yaml file is never affected.
+
+@test "flake-hooks store-symlink seeds the .pre-commit-config.yaml ignore (#1092)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1092-flakehooks"
+    mkdir -p "$ws"
+    # A real /nix/store-shaped target so the preserve exclude keeps the symlink
+    # (the exclude guard uses -e, which follows the link) and readlink sees the
+    # /nix/store/ path the seed gates on.
+    store="$BATS_TEST_TMPDIR/nix/store/abc123-hooks"
+    mkdir -p "$store"
+    printf 'repos: []\n' >"$store/pre-commit-config.yaml"
+    ln -s "$store/pre-commit-config.yaml" "$ws/.pre-commit-config.yaml"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/.gitignore"
+    assert_success
+    assert_line '.pre-commit-config.yaml'
+}
+
+@test "a hand-managed real .pre-commit-config.yaml is NOT seeded into .gitignore (#1092)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1092-realconfig"
+    mkdir -p "$ws"
+    # A committed regular file (not a store symlink): the consumer owns it and
+    # tracks it, so it must never be auto-ignored.
+    printf 'repos: []\n' >"$ws/.pre-commit-config.yaml"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/.gitignore"
+    assert_success
+    refute_line '.pre-commit-config.yaml'
 }

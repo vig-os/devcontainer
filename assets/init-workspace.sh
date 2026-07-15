@@ -102,6 +102,24 @@ PRESERVE_FILES=(
     # terms. Preserved like .pre-commit-config.yaml; the upgrade prints a diff
     # against the template below. (Legacy `_typos.toml` handled at copy time.)
     ".typos.toml"
+    # The consumer owns its lint-rule exceptions (#1099): repos add repo-specific
+    # yamllint `ignore:` globs / rule disables and pymarkdown rule tweaks that a
+    # template overwrite silently destroyed, so the hook then flagged legitimate
+    # content. Preserved like .typos.toml; the upgrade prints a diff against the
+    # template below so lint-rule evolution stays visible. `.pymarkdown` is the
+    # strict-JSON config pymarkdown actually reads (md0xx rule settings); like
+    # renovate.json it carries no banner but is preserved all the same, while
+    # `.pymarkdown.config.md` is its human-readable doc companion.
+    ".yamllint"
+    ".pymarkdown"
+    ".pymarkdown.config.md"
+    # The consumer owns its repo-ROOT ignores (#1092): the managed root
+    # .gitignore is overwritten on every upgrade, and git honors a repo-root
+    # ignore only from that root .gitignore — so there was no durable committed
+    # home for root-level ignores. .gitignore.project is that home (mirroring
+    # justfile.project): preserved here, and its contents are appended to the
+    # regenerated .gitignore by render_gitignore below so they survive upgrades.
+    ".gitignore.project"
 )
 
 # Base recipes the shipped .github/workflows/ci.yml depends on (sync, precommit,
@@ -553,6 +571,15 @@ PRECOMMIT_CONFIG_PREEXISTED=false
 TYPOS_CONFIG_PREEXISTED=false
 [[ -f "$WORKSPACE_DIR/.typos.toml" ]] && TYPOS_CONFIG_PREEXISTED=true
 
+# Preserved lint configs are the consumer's rule exceptions (#1099); record them
+# so the post-scaffold guard can surface template divergence.
+YAMLLINT_CONFIG_PREEXISTED=false
+[[ -f "$WORKSPACE_DIR/.yamllint" ]] && YAMLLINT_CONFIG_PREEXISTED=true
+PYMARKDOWN_CONFIG_PREEXISTED=false
+[[ -f "$WORKSPACE_DIR/.pymarkdown" ]] && PYMARKDOWN_CONFIG_PREEXISTED=true
+PYMARKDOWN_DOC_PREEXISTED=false
+[[ -f "$WORKSPACE_DIR/.pymarkdown.config.md" ]] && PYMARKDOWN_DOC_PREEXISTED=true
+
 # ── consumer language detection (#1024/#1025) ─────────────────────────────────
 # Managed scaffold statics (.gitignore, .github/workflows/codeql.yml) are
 # Python-shaped by default, which is wrong for Node/Rust consumers and does not
@@ -612,6 +639,35 @@ render_gitignore() {
             cat "$frag" >>"$gi"
         fi
     done
+
+    # Consumer-owned durable root ignores (#1092): .gitignore.project is a
+    # PRESERVE_FILE — the only committed home git honors for repo-ROOT ignores,
+    # since git reads root ignores solely from this regenerated root .gitignore.
+    # Append its contents LAST so consumer entries survive every regeneration.
+    local proj="$WORKSPACE_DIR/.gitignore.project"
+    if [[ -f "$proj" ]]; then
+        printf '\n' >>"$gi"
+        cat "$proj" >>"$gi"
+    fi
+
+    # flake-hooks opt-in seed (#1092): a consumer that opts into flake-generated
+    # hooks (hooks = { } in flake.nix) gets .pre-commit-config.yaml installed as
+    # a /nix/store symlink, which must be ignored — committing it pushes a
+    # machine-local, broken symlink. Seed the ignore automatically, gated
+    # STRICTLY on the store-symlink condition so a hand-managed consumer who
+    # commits a real .pre-commit-config.yaml file is never affected. Idempotent:
+    # skip when the assembled ignore (incl. .gitignore.project) already lists it.
+    local pcc="$WORKSPACE_DIR/.pre-commit-config.yaml"
+    if [[ -L "$pcc" ]] && readlink "$pcc" | grep -q '/nix/store/'; then
+        if ! grep -qxF '.pre-commit-config.yaml' "$gi"; then
+            {
+                printf '\n# flake-hooks opt-in (#1092): the generated'
+                printf ' .pre-commit-config.yaml is a\n'
+                printf '# /nix/store symlink — never commit it.\n'
+                printf '.pre-commit-config.yaml\n'
+            } >>"$gi"
+        fi
+    fi
 }
 
 # Rewrite the managed CodeQL language matrix to the detected language(s) (#1025):
@@ -1046,6 +1102,39 @@ if [[ -n "${VIG_OS_VERSION:-}" && -f "$WORKSPACE_DIR/.vig-os" ]]; then
     # DEVKIT_VERSION, so a stray legacy DEVCONTAINER_VERSION line is migrated
     # rather than left stale (#781).
     sed -i -E "s/^(DEVKIT_VERSION|DEVCONTAINER_VERSION)=.*/DEVKIT_VERSION=${VIG_OS_VERSION}/" "$WORKSPACE_DIR/.vig-os"
+
+    # Flake pin / DEVKIT_VERSION lockstep skew warning (#1093). For direnv/flake
+    # consumers the scaffold and the pinned `vigos` flake input deliver coupled
+    # halves of the same change (e.g. #1053's JSONC banner is written by the
+    # scaffold, but its compensating check-json exclude lives in nix/hooks.nix,
+    # delivered through the flake input). Bumping only the scaffold while a pinned
+    # `vigos` ref lags behind silently breaks every commit. We cannot fix it for
+    # the consumer — flake.nix is a PRESERVE_FILE they own — but we can warn.
+    # A FLOATING input (no ?ref=) is intentionally unpinned, so it never warns;
+    # only a pin that differs from the target does.
+    if [[ "$FORCE" == "true" && ( "$MODE" == "direnv" || "$MODE" == "both" ) \
+        && -f "$WORKSPACE_DIR/flake.nix" ]]; then
+        # `|| true`: a floating input yields no grep match (exit 1), which would
+        # abort under `set -o pipefail`; an empty pinned_ref is the intended
+        # "unpinned, no warning" signal.
+        # Anchor on `^[[:space:]]*vigos\.url` so we read the REAL input line only:
+        # the standard-layout flake.nix ships a doc-comment EXAMPLE line
+        # (`#   vigos.url = "github:vig-os/devkit?ref=<tag>";`) above it, and an
+        # unanchored match picked that comment first, reporting the literal
+        # `<tag>` and false-firing even on an aligned pin (#1110).
+        pinned_ref="$(grep -oE '^[[:space:]]*vigos\.url[[:space:]]*=[[:space:]]*"github:vig-os/devkit\?ref=[^"]+"' \
+            "$WORKSPACE_DIR/flake.nix" 2>/dev/null \
+            | sed -E 's/.*\?ref=([^"]+)".*/\1/' | head -n1 || true)"
+        if [[ -n "$pinned_ref" && "$pinned_ref" != "$VIG_OS_VERSION" ]]; then
+            echo "" >&2
+            echo "WARNING: scaffold upgraded to ${VIG_OS_VERSION}, but the pinned vigos flake input is still ${pinned_ref}." >&2
+            echo "         The two must move together — they deliver coupled halves of the same" >&2
+            echo "         change (e.g. #1053's JSONC banner + its check-json exclude). Update your" >&2
+            echo "         flake.nix to 'vigos.url = \"github:vig-os/devkit?ref=${VIG_OS_VERSION}\";' and run" >&2
+            echo "         'nix flake update vigos', else strict hooks may reject files this scaffold wrote." >&2
+            echo "" >&2
+        fi
+    fi
 fi
 
 # Interactive origin resolution (the renovate.json owner/repo prompt) runs here,
@@ -1204,6 +1293,20 @@ fi
 # can fold in what they need deliberately. Non-fatal, like the #878 guard.
 if [[ "$TYPOS_CONFIG_PREEXISTED" == "true" ]]; then
     print_preserved_template_diff ".typos.toml" || true
+fi
+
+# Preserved lint configs are the consumer's (#1099) — never overwritten, so
+# their yamllint/pymarkdown rule exceptions survive; the cost is that template
+# rule evolution no longer arrives automatically. Print the divergence so
+# consumers can fold in what they need deliberately. Non-fatal, like the #913 guard.
+if [[ "$YAMLLINT_CONFIG_PREEXISTED" == "true" ]]; then
+    print_preserved_template_diff ".yamllint" || true
+fi
+if [[ "$PYMARKDOWN_CONFIG_PREEXISTED" == "true" ]]; then
+    print_preserved_template_diff ".pymarkdown" || true
+fi
+if [[ "$PYMARKDOWN_DOC_PREEXISTED" == "true" ]]; then
+    print_preserved_template_diff ".pymarkdown.config.md" || true
 fi
 
 # The retired `pre-commit` binary (#778) exits 127 at first use: a preserved
