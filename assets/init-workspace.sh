@@ -489,6 +489,18 @@ extract_template_recipe() {
     ' "$TEMPLATE_DIR/justfile.project"
 }
 
+# Helper: a path is "present" in the workspace if it exists as a resolvable
+# target OR is a symlink of any kind — including a DANGLING one (#1117). In
+# direnv mode a flake-hooks consumer's .pre-commit-config.yaml is a symlink into
+# the HOST /nix/store, which is not mounted inside the image where this script
+# runs, so `-e` alone (it follows the link) reports the symlink absent. Every
+# presence gate that decides whether to preserve/classify/track such a file must
+# see the symlink itself, so the rsync copy never clobbers it and the #1092
+# ignore seed (which reads the still-present symlink's target) still fires.
+path_present() {
+    [[ -e "$1" || -L "$1" ]]
+}
+
 # Helper: check if a file is in the preserve list
 is_preserved_file() {
     local file="$1"
@@ -566,7 +578,9 @@ JUSTFILE_PROJECT_PREEXISTED=false
 # A preserved .pre-commit-config.yaml may lag the template hook stack (#878);
 # record it so the post-scaffold guard can surface the divergence.
 PRECOMMIT_CONFIG_PREEXISTED=false
-[[ -f "$WORKSPACE_DIR/.pre-commit-config.yaml" ]] && PRECOMMIT_CONFIG_PREEXISTED=true
+# path_present, not -f: a flake-hooks consumer's config is a dangling store
+# symlink (#1117), which -f (it follows the link) would miss.
+path_present "$WORKSPACE_DIR/.pre-commit-config.yaml" && PRECOMMIT_CONFIG_PREEXISTED=true
 
 # A preserved .typos.toml is the consumer's spell-check exception set (#913);
 # record it so the post-scaffold guard can surface template divergence.
@@ -744,7 +758,9 @@ if [[ "$FORCE" == "true" ]]; then
             continue
         fi
 
-        if [[ -e "$workspace_file" ]]; then
+        # path_present, not -e: a dangling store symlink (#1117) at a preserved
+        # path exists in the tree and must classify as PRESERVED, not ADDED.
+        if path_present "$workspace_file"; then
             if is_preserved_file "$rel_path"; then
                 PRESERVED+=("$rel_path")
             else
@@ -930,9 +946,12 @@ else
     # (.devcontainer/README.md, .claude/skills/*/README.md), which the preview
     # (is_preserved_file, exact rel-path) still promised as ADDED. The anchor
     # matches is_preserved_file's exact-path semantics.
+    # path_present, not -e: a preserved path that is a symlink of any kind —
+    # including a dangling store symlink (#1117) — must be excluded from the
+    # copy, or `rsync -avL` dereferences and writes a real template file over it.
     EXCLUDE_ARGS=()
     for preserved in "${PRESERVE_FILES[@]}"; do
-        if [[ -e "$WORKSPACE_DIR/$preserved" ]]; then
+        if path_present "$WORKSPACE_DIR/$preserved"; then
             EXCLUDE_ARGS+=("--exclude=/$preserved")
         fi
     done
