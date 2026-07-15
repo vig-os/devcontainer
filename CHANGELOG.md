@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [1.3.0] - TBD
+
+### Changed
+
 - **Renovate dependency update** ([#1134](https://github.com/vig-os/devkit/pull/1134))
   - Update `actions/setup-node` from `v6.4.0` to `v6.5.0`
   - Update `cachix/install-nix-action` from `v31.10.7` to `v31.11.0`
@@ -87,10 +99,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Dev-shell behavior is unchanged: `devTools` still ships the full podman
     runtime for daemonless `podman run` on a real host; the swap is scoped to
     the image only.
-
-### Deprecated
-
-### Removed
 
 ### Fixed
 
