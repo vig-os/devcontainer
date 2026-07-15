@@ -17,6 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Post-promote sync-main-to-dev no longer conflicts on the workspace changelog mirror** ([#1115](https://github.com/vig-os/devkit/issues/1115))
+  - The prepare extension's sibling-commit reconcile left the mirror's merge base
+    at pre-freeze content, so `assets/workspace/.devcontainer/CHANGELOG.md`
+    conflicted in the post-promote sync-main-to-dev merge every release cycle
+    ([#1091](https://github.com/vig-os/devkit/issues/1091),
+    [#1114](https://github.com/vig-os/devkit/issues/1114)).
+  - The extension now fast-forwards dev to the release branch's mirror-sync
+    commit (a non-force app ref update, taken only while dev still sits on the
+    freeze commit) so the mirror rewrite is shared ancestry — the same property
+    that keeps the root changelog conflict-free.
+  - A dev-advanced race (or any ref-update failure) falls back to the previous
+    sibling-commit reconcile, exactly the status quo.
+
 ### Security
 
 ## [1.2.1](https://github.com/vig-os/devkit/releases/tag/1.2.1) - 2026-07-15
