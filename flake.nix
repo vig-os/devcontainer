@@ -702,7 +702,6 @@
             # The git-hook runner is `prek` (via devTools); the standalone
             # Python `pre-commit` that used to sit here is dropped (#778).
             pythonEnv
-            bandit
 
             # Rust/cargo + just LSP/formatter tools. The Debian image installed
             # these via cargo-binstall; Nix-native from nixpkgs here (#666).

@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     (`allLocales = false; locales = [ "en_US.UTF-8/UTF-8" ]`), so exactly one
     small (~3 MiB) locale path lands in the closure — a ~220 MiB uncompressed
     reduction with zero functional change.
+- **Drop vestigial baked bandit from the image** ([#1105](https://github.com/vig-os/devkit/issues/1105))
+  - Hooks already run the venv bandit via `uv run` (pinned `bandit[toml]==1.9.4`); the baked copy was unused.
+  - Removes ~74 MiB from the image closure — a stray CPython 3.13 package stack (nixpkgs builds `bandit` on 3.13 while the image toolchain is 3.14) plus a duplicate `git-minimal` pulled in via gitpython.
 
 ### Deprecated
 
