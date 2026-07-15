@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Preserve tag-scheme keys across `--force` upgrades** ([#1116](https://github.com/vig-os/devkit/issues/1116))
+  - `init-workspace.sh` read back `DEVKIT_MODE`/identity/`DEVKIT_MODULES` before
+    the managed-template overwrite of `.vig-os`, but not `DEVKIT_TAG_PREFIX` or
+    `DEVKIT_FLOATING_TAGS`, so an upgrade silently reset a consumer's release
+    tag scheme to the empty template defaults (observed cutting bare tags and
+    stalling floating tags on the commit-action 1.2.0 → 1.2.1 upgrade).
+  - Both keys are now read before the overwrite and written back (bare, matching
+    the template's unquoted form) when the consumer set them.
 - **Post-promote sync-main-to-dev no longer conflicts on the workspace changelog mirror** ([#1115](https://github.com/vig-os/devkit/issues/1115))
   - The prepare extension's sibling-commit reconcile left the mirror's merge base
     at pre-freeze content, so `assets/workspace/.devcontainer/CHANGELOG.md`
