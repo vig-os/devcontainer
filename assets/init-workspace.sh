@@ -106,8 +106,12 @@ PRESERVE_FILES=(
     # yamllint `ignore:` globs / rule disables and pymarkdown rule tweaks that a
     # template overwrite silently destroyed, so the hook then flagged legitimate
     # content. Preserved like .typos.toml; the upgrade prints a diff against the
-    # template below so lint-rule evolution stays visible.
+    # template below so lint-rule evolution stays visible. `.pymarkdown` is the
+    # strict-JSON config pymarkdown actually reads (md0xx rule settings); like
+    # renovate.json it carries no banner but is preserved all the same, while
+    # `.pymarkdown.config.md` is its human-readable doc companion.
     ".yamllint"
+    ".pymarkdown"
     ".pymarkdown.config.md"
 )
 
@@ -565,7 +569,9 @@ TYPOS_CONFIG_PREEXISTED=false
 YAMLLINT_CONFIG_PREEXISTED=false
 [[ -f "$WORKSPACE_DIR/.yamllint" ]] && YAMLLINT_CONFIG_PREEXISTED=true
 PYMARKDOWN_CONFIG_PREEXISTED=false
-[[ -f "$WORKSPACE_DIR/.pymarkdown.config.md" ]] && PYMARKDOWN_CONFIG_PREEXISTED=true
+[[ -f "$WORKSPACE_DIR/.pymarkdown" ]] && PYMARKDOWN_CONFIG_PREEXISTED=true
+PYMARKDOWN_DOC_PREEXISTED=false
+[[ -f "$WORKSPACE_DIR/.pymarkdown.config.md" ]] && PYMARKDOWN_DOC_PREEXISTED=true
 
 # ── consumer language detection (#1024/#1025) ─────────────────────────────────
 # Managed scaffold statics (.gitignore, .github/workflows/codeql.yml) are
@@ -1228,6 +1234,9 @@ if [[ "$YAMLLINT_CONFIG_PREEXISTED" == "true" ]]; then
     print_preserved_template_diff ".yamllint" || true
 fi
 if [[ "$PYMARKDOWN_CONFIG_PREEXISTED" == "true" ]]; then
+    print_preserved_template_diff ".pymarkdown" || true
+fi
+if [[ "$PYMARKDOWN_DOC_PREEXISTED" == "true" ]]; then
     print_preserved_template_diff ".pymarkdown.config.md" || true
 fi
 
