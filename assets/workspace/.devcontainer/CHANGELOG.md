@@ -19,6 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     cleanup), a note that the manual path cannot be resumed by the workflow
     once the draft/PR preconditions are consumed, and a pointer to the
     floating-tag handling. Every subsequent release promotes normally.
+- **Document the first-release floating-tag ruleset bypass** ([#1152](https://github.com/vig-os/devkit/issues/1152))
+  - The imported Tag ruleset bypasses only the Release App (Integration) — right
+    for steady state, where `promote-release.yml` moves `<prefix>X` /
+    `<prefix>X.Y` with the app token — but on a first release the promote
+    workflow is not dispatchable and no human (not even an admin) can move the
+    floating tags (`422 Cannot update this protected ref`), so the release
+    publishes with `<prefix>X` stale and `<prefix>X.Y` missing, silently
+    breaking the `uses: owner/repo@<prefix>X` pin. `docs/MIGRATION.md` gains a
+    "First-release floating tags" subsection: temporarily add a
+    `RepositoryRole: admin` bypass to the Tag ruleset, move the tags to the
+    peeled release commit (the same `move_tag` semantics as
+    `promote-release.yml`), then revert the ruleset.
 
 ### Changed
 

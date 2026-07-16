@@ -623,14 +623,70 @@ Prerequisites (produced by the final `release.yml` run): the git tag
 4. **Move the floating tags** (only if `DEVKIT_FLOATING_TAGS` is set). The Tag
    protection ruleset makes `<prefix>X` / `<prefix>X.Y` moves Release-App
    exclusive, so on a first release neither a human nor the (unregistered)
-   workflow can move them without a one-off ruleset bypass. This step is its own
-   procedure — tracked in
-   [#1152](https://github.com/vig-os/devkit/issues/1152).
+   workflow can move them without a one-off ruleset bypass — see
+   [First-release floating tags](#first-release-floating-tags) below.
 
 After step 2 the merged `main` carries `promote-release.yml`, so this whole
 runbook is needed exactly once per consumer. See
 [`docs/DOWNSTREAM_RELEASE.md`](./DOWNSTREAM_RELEASE.md) for the steady-state
 (fully automated) release and promote flow.
+
+### First-release floating tags
+
+If your repo opts into floating tags (`DEVKIT_FLOATING_TAGS=major,minor` or a
+subset), the imported **Tag ruleset bypasses only the Release App
+(Integration)** — correct for steady state, where `promote-release.yml` moves
+`<prefix>X` / `<prefix>X.Y` with the app token. But on a first release the
+promote workflow is not dispatchable, and no human — **not even a repo/org
+admin** — can create or move the floating tags against the ruleset:
+
+```console
+$ gh api -X PATCH repos/$GH_REPO/git/refs/tags/v0 -f sha=<commit> -F force=true
+HTTP 422: Cannot update this protected ref
+```
+
+Left unmoved, the release publishes but `<prefix>X` still points at the previous
+release and `<prefix>X.Y` is missing — silently breaking the advertised
+`uses: owner/repo@<prefix>X` pin. The one-off bootstrap is to bypass the ruleset,
+move the tags, then revert:
+
+1. **Temporarily grant repository admins a bypass.** In **Settings → Rules →
+   Rulesets → (the Tag ruleset) → Bypass list**, add **Repository admin**
+   (`RepositoryRole`, actor id `5`), then save. Equivalently via the API, append
+   a bypass actor to the ruleset:
+
+   ```bash
+   gh api "repos/$GH_REPO/rulesets/<ruleset-id>" \
+     --jq '.bypass_actors += [{"actor_id":5,"actor_type":"RepositoryRole","bypass_mode":"always"}] | {bypass_actors}' \
+     | gh api -X PUT "repos/$GH_REPO/rulesets/<ruleset-id>" --input -
+   ```
+
+2. **Move the floating tags to the peeled release commit** — the same
+   `move_tag` semantics as `promote-release.yml`. `release-publish.yml` creates
+   an **annotated** tag, so peel it to the underlying commit first:
+
+   ```bash
+   PREFIX=v; VERSION=X.Y.Z            # DEVKIT_TAG_PREFIX and the release version
+   REF=$(gh api "repos/$GH_REPO/git/ref/tags/${PREFIX}${VERSION}")
+   SHA=$(printf '%s' "$REF" | jq -r '.object.sha')
+   [ "$(printf '%s' "$REF" | jq -r '.object.type')" = tag ] && \
+     SHA=$(gh api "repos/$GH_REPO/git/tags/$SHA" --jq '.object.sha')
+   MAJOR=${VERSION%%.*}; MINOR=$(x=${VERSION#*.}; echo "${x%%.*}")
+   # One call per level in DEVKIT_FLOATING_TAGS (major -> vX, minor -> vX.Y):
+   for name in "${PREFIX}${MAJOR}" "${PREFIX}${MAJOR}.${MINOR}"; do
+     gh api -X PATCH "repos/$GH_REPO/git/refs/tags/$name" -f sha="$SHA" -F force=true \
+       || gh api "repos/$GH_REPO/git/refs" -f ref="refs/tags/$name" -f sha="$SHA"
+   done
+   ```
+
+3. **Revert the ruleset** — remove the admin bypass you added in step 1, so the
+   Tag ruleset is Release-App-exclusive again. This is the whole point of the
+   "one-off": steady-state moves go back through `promote-release.yml`.
+
+An alternative to the manual bypass is to ship a small **consumer-owned** dispatch
+workflow that performs only the floating-tag move with the Release App token,
+registered from day one of the migration — but the bypass-and-revert above needs
+no new managed surface and is the recommended one-time path.
 
 ## The retired Debian line (historical)
 
