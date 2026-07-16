@@ -52,6 +52,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Commit only the non-ignored `dist/` on release finalize** ([#1159](https://github.com/vig-os/devkit/issues/1159))
+  - The finalize step passed the whole `dist` directory to `commit-action`
+    (`FILE_PATHS: CHANGELOG.md,dist`). `commit-action` walks a directory path on
+    disk and force-adds **every** file it finds — it never consults
+    `.gitignore` — so the gitignored tsc/ncc byproducts (`dist/src/**`,
+    `*.tsbuildinfo`) were re-committed on every final release, re-tracking them on
+    `main`, on `dev` (via `sync-main-to-dev`), and in the tag tree, and making the
+    sanctioned `git rm --cached` cleanup impossible to persist (it re-bit as a
+    release-PR `Dist Check` failure after an ncc/tsc-affecting dep bump). The
+    build step now computes the tracked-plus-untracked-but-not-ignored set with
+    `git ls-files -co --exclude-standard -- dist` (i.e. `git add`/`.gitignore`
+    semantics) and the finalize commit ships only those explicit files, so the
+    real bundle (`dist/index.js`, `dist/licenses.txt`) is committed without the
+    gitignored emit.
 - **Fail loud with remediation when a first-time floating-tag create is denied** ([#1157](https://github.com/vig-os/devkit/issues/1157))
   - `promote-release.yml` force-**updates** an existing `<prefix>X` /
     `<prefix>X.Y` via `PATCH`, but the first release of a **new** floating level
