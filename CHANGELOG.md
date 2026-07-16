@@ -29,6 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Pin the release finalize sync-issues dispatch to the release branch** ([#1150](https://github.com/vig-os/devkit/issues/1150))
+  - The `finalize` job in `release-core.yml` dispatched `sync-issues.yml` with
+    no `--ref`, so GitHub resolved the workflow on the **default branch** — the
+    pre-devkit workflow until the first devkit release merges — and both
+    `gh run list` polls omitted `--branch`, so a concurrent scheduled run could
+    be mistaken for the dispatched one. On a consumer's first final release this
+    timed out at finalize and triggered the automatic rollback. The dispatch now
+    passes `--ref "release/$VERSION"`, both polls filter `--branch
+    "release/$VERSION"`, and the wait ceiling is raised from 120 s to 600 s
+    (the first release-branch sync has no cutoff cache and self-heals up to
+    14 days of history).
 - **Render CodeQL push `paths:` filter per detected language** ([#1142](https://github.com/vig-os/devkit/issues/1142))
   - The scaffolded `codeql.yml` hardcoded the push-to-main trigger's `paths:`
     filter to `**.py`, so on a Node consumer a push touching only TS/JS never

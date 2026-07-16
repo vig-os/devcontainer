@@ -502,17 +502,30 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
+          # Pin the dispatch to the release branch's ref. Without --ref, GitHub
+          # resolves the workflow definition on the DEFAULT branch — the
+          # pre-devkit sync-issues.yml until the first devkit release merges — so
+          # the sync must run the release branch's own workflow, not whatever
+          # trunk currently carries (#1150).
           retry --retries 2 --backoff 5 --max-backoff 20 -- \
-            gh workflow run sync-issues.yml -f "target-branch=release/$VERSION"
+            gh workflow run sync-issues.yml \
+              --ref "release/$VERSION" \
+              -f "target-branch=release/$VERSION"
 
       - name: Wait for sync-issues completion
         if: ${{ inputs.release_kind == 'final' }}
         id: wait_sync
         env:
           GH_TOKEN: ${{ steps.auth.outputs.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          TIMEOUT=120
+          # 120s was too tight even for the devkit workflow: the first
+          # release-branch run has no cutoff cache and self-heals up to 14 days
+          # of history, which can take minutes. Both polls filter --branch to the
+          # dispatched release-branch run so a concurrent scheduled run is never
+          # mistaken for it (#1150).
+          TIMEOUT=600
           ELAPSED=0
           INTERVAL=10
           RUN_STATUS="unknown"
@@ -522,6 +535,7 @@ jobs:
           while [ $ELAPSED -lt $TIMEOUT ]; do
             RUN_STATUS=$(gh run list \
               --workflow sync-issues.yml \
+              --branch "release/$VERSION" \
               --limit 1 \
               --json status,conclusion \
               --jq '.[0].status' 2>/dev/null || echo "unknown")
@@ -541,6 +555,7 @@ jobs:
 
           RUN_CONCLUSION=$(gh run list \
             --workflow sync-issues.yml \
+            --branch "release/$VERSION" \
             --limit 1 \
             --json conclusion \
             --jq '.[0].conclusion' 2>/dev/null || echo "unknown")
