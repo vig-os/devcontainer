@@ -3126,6 +3126,56 @@ _RELEASE_RESOLVERS_991=(
     assert_failure
 }
 
+# ── never migrate scaffold-committed or template gitignore lines (#1145) ──────
+# Field report: the sync-issues-action 1.3.0 deploy (vig-os/sync-issues-action
+# #106 / PR #108) showed migrate_root_gitignore copying (1) `.envrc` — a
+# scaffold-COMMITTED file (#640) — into .gitignore.project, silently keeping the
+# scaffolded .envrc untracked on every clone, and (2) ~90 lines of stale Python
+# template junk into a Node repo's consumer-owned file, because the managed set
+# only included the DETECTED languages' fragments.
+
+@test "scaffold-committed .envrc is never migrated into .gitignore.project (#1145)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1145-envrc"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    # The old Python-template root .gitignore shipped an `.envrc` entry; in
+    # direnv mode .envrc is a scaffold-committed file, so migrating the entry
+    # would shadow it and break nix-direnv onboarding on every clone.
+    printf '.envrc\nconsumer-only-dir/\n' >>"$ws/.gitignore"
+    run _upgrade both "$ws"
+    assert_success
+    # The scaffold-committed file's entry is NOT migrated ...
+    run grep -qxF '.envrc' "$ws/.gitignore.project"
+    assert_failure
+    # ... while the genuine consumer line IS.
+    run grep -qxF 'consumer-only-dir/' "$ws/.gitignore.project"
+    assert_success
+    # And the scaffolded .envrc is not git-ignored after the upgrade.
+    git init -q "$ws"
+    run git -C "$ws" check-ignore .envrc
+    assert_failure
+}
+
+@test "stale lines from a NON-detected language fragment are never migrated (#1145)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1145-crosslang"
+    mkdir -p "$ws"
+    # Node-only marker: python is NOT among the detected languages.
+    printf '{ "name": "probe" }\n' >"$ws/package.json"
+    run _scaffold both "$ws"
+    assert_success
+    # The repo once used the Python-flavored managed template; its old root
+    # .gitignore still carries Python fragment lines. Those are devkit template
+    # material, not consumer-authored — they must not be migrated.
+    printf '__pycache__/\nconsumer-only-dir/\n' >>"$ws/.gitignore"
+    run _upgrade both "$ws"
+    assert_success
+    run grep -qxF '__pycache__/' "$ws/.gitignore.project"
+    assert_failure
+    run grep -qxF 'consumer-only-dir/' "$ws/.gitignore.project"
+    assert_success
+}
+
 # ── dangling /nix/store symlink is preserved and seeds the ignore (#1117) ──────
 # In direnv mode the flake generates .pre-commit-config.yaml as a symlink into
 # the HOST /nix/store, which is NOT mounted inside the devcontainer image where

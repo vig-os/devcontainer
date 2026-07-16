@@ -17,6 +17,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Never migrate scaffold-committed or template gitignore lines** ([#1145](https://github.com/vig-os/devkit/issues/1145))
+  - The [#1111](https://github.com/vig-os/devkit/issues/1111) gitignore
+    migration copied entries that shadow scaffold-COMMITTED files: the old
+    Python-template `.gitignore` shipped `.envrc`, and migrating that entry
+    into `.gitignore.project` silently kept the scaffolded `.envrc`
+    ([#640](https://github.com/vig-os/devkit/issues/640)) untracked, breaking
+    direnv onboarding on every clone (observed live on the sync-issues-action
+    1.3.0 deploy, vig-os/sync-issues-action#106). Scaffold-committed file
+    names (`.envrc`, `.gitignore.project`, `flake.nix`, `flake.lock`,
+    `justfile`, `justfile.project`, `.vig-os`) now never migrate.
+  - It also treated stale devkit language-template lines as consumer-authored:
+    the managed set was built from the DETECTED languages' fragments only, so
+    a repo that switched language templates (e.g. old Python-flavored managed
+    `.gitignore`, now a Node repo) got ~90 lines of `__pycache__/`-style junk
+    dumped into its consumer-owned file. The managed set is now built from ALL
+    `gitignore.d/` fragments — any line found in any devkit fragment is
+    template material, never migrated.
+
 ### Security
 
 ## [1.3.0](https://github.com/vig-os/devkit/releases/tag/1.3.0) - 2026-07-15
