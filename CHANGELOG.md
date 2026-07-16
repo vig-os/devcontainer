@@ -52,6 +52,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Fail loud with remediation when a first-time floating-tag create is denied** ([#1157](https://github.com/vig-os/devkit/issues/1157))
+  - `promote-release.yml` force-**updates** an existing `<prefix>X` /
+    `<prefix>X.Y` via `PATCH`, but the first release of a **new** floating level
+    must **create** the ref (`POST /git/refs`). When the Tag ruleset restricts
+    tag creation and the Release App is not a bypass actor for its `creation`
+    rule, the create is denied as the opaque `Reference does not exist`
+    (HTTP 422); `retry` then hammered the permanent denial and the job exited 1
+    with no actionable signal — even though publish + merge had already
+    succeeded, leaving the advertised `@<prefix>X.Y` pin silently missing. The
+    move step now guards the create and emits a `::error::` annotation naming the
+    tag, target commit, ruleset root cause, and the one-off remediation
+    (`docs/MIGRATION.md#first-release-floating-tags`, extended to cover a new
+    level introduced in steady state) instead of a bare `gh` error.
 - **Skip trunk-reachable history in release-PR commit validation** ([#1149](https://github.com/vig-os/devkit/issues/1149))
   - On a freshly migrated consumer's first release PR (`release/X.Y.Z` →
     `main`), the `Commit Messages` job validated `merge-base(base, head)..head`,
