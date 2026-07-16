@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Release extension seam gains a documented token ceiling** ([#1144](https://github.com/vig-os/devkit/issues/1144))
+  - The `extension` caller job in the scaffolded `release.yml` now grants the
+    `release-extension.yml` seam a ceiling of `contents: read`, `packages: write`,
+    `id-token: write`, `attestations: write`. A called reusable workflow can only
+    *downgrade* the caller's `GITHUB_TOKEN`, never elevate it, so with no caller
+    grant the seam was capped read-only and write-scoped extensions
+    (`actions/attest-build-provenance`, GHCR publish) were silently denied. This
+    is a ceiling, not a grant: the shipped default no-op stays read-only and a
+    consumer opts a job in by declaring the scopes it needs, up to the ceiling.
+    Scopes beyond it (e.g. `contents: write`) still belong in a consumer-owned
+    tag-push workflow. Documented in `docs/DOWNSTREAM_RELEASE.md`.
+
 ### Deprecated
 
 ### Removed
