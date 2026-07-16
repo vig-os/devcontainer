@@ -650,6 +650,19 @@ release and `<prefix>X.Y` is missing — silently breaking the advertised
 `uses: owner/repo@<prefix>X` pin. The one-off bootstrap is to bypass the ruleset,
 move the tags, then revert:
 
+> **The same one-off recurs when a _new_ floating level first appears in steady
+> state** ([#1157](https://github.com/vig-os/devkit/issues/1157)). Once the
+> workflow is live it force-**updates** existing levels with the app token, but
+> the first release of a new level must **create** the ref (`POST /git/refs`),
+> and if the Tag ruleset does not bypass the Release App for its `creation` rule
+> that create is denied — surfaced as the opaque `Reference does not exist`
+> (HTTP 422). Example: a repo already carrying `<prefix>0` cuts its first
+> `<prefix>0.Y` release. `promote-release.yml` now fails loud with a `::error::`
+> naming the tag, target commit, and this remediation instead of a bare `gh`
+> error. Apply the same bypass-create-revert below (using the **create** call in
+> step 2), or grant the Release App a `creation` bypass so future levels move
+> automatically.
+
 1. **Temporarily grant repository admins a bypass.** In **Settings → Rules →
    Rulesets → (the Tag ruleset) → Bypass list**, add **Repository admin**
    (`RepositoryRole`, actor id `5`), then save. Equivalently via the API, append
