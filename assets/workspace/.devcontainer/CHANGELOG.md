@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Renovate: update `github/codeql-action` from `99df26d` to `7188fc3`** ([#1160](https://github.com/vig-os/devkit/pull/1160))
 - **Release extension seam gains a documented token ceiling** ([#1144](https://github.com/vig-os/devkit/issues/1144))
   - The `extension` caller job in the scaffolded `release.yml` now grants the
     `release-extension.yml` seam a ceiling of `contents: read`, `packages: write`,
