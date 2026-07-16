@@ -2656,16 +2656,23 @@ _RELEASE_RESOLVERS_991=(
 @test "release-core builds+commits an opt-in bundle when a bundle recipe exists (#1029)" {
     # A repo that ships a committed build artifact (e.g. a JS action's ncc
     # dist/) defines a `bundle` just recipe; the release finalize flow detects
-    # it via `just --summary`, runs `just bundle`, and commits dist/ as part of
-    # the finalization commit. Language-neutral: no bundle recipe -> no-op.
+    # it via `just --summary`, runs `just bundle`, and commits the bundle as
+    # part of the finalization commit. Language-neutral: no bundle recipe -> no-op.
     f="$TEMPLATE_DIR/.github/workflows/release-core.yml"
     run grep -q 'just --summary' "$f"
     assert_success
     run grep -q 'just bundle' "$f"
     assert_success
-    # dist/ joins CHANGELOG.md in the finalization commit's FILE_PATHS.
-    run grep -q 'CHANGELOG.md,dist' "$f"
+    # Only the non-ignored dist/ files join CHANGELOG.md in the finalization
+    # commit's FILE_PATHS -- the whole `dist` dir would force-add the gitignored
+    # tsc/ncc emit via commit-action (#1159). The build step computes the set
+    # with git-add/.gitignore semantics and exposes it as a step output.
+    run grep -q 'git ls-files -co --exclude-standard -- dist' "$f"
     assert_success
+    run grep -q 'steps.artifact.outputs.dist_paths' "$f"
+    assert_success
+    run grep -q 'CHANGELOG.md,dist' "$f"
+    assert_failure
 }
 
 @test "resolve-image action is removed from every rendered mode tree (#991)" {
