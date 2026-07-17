@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Nix as a first-class consumer language** ([#1171](https://github.com/vig-os/devkit/issues/1171))
+  - Language detection: a repo is nix-oriented when it carries `*.nix` files
+    **beyond** the scaffold-managed `./flake.nix` (excluding `.git/`,
+    `.direnv/`, `.worktrees/`) — `flake.nix` alone would false-positive on
+    every direnv consumer at re-scaffold time, so the beyond-flake.nix rule is
+    deterministic and re-scaffold-safe.
+  - New `nix` gitignore fragment (`result`, `result-*` build symlinks),
+    appended to the managed root `.gitignore` on detection and feeding the
+    never-migrate managed set like every other fragment.
+  - `statix` and `deadnix` join the **flake-generated consumer hook surface**
+    (`mkProjectShell` hooks) as `language: system` hooks. They are NOT injected
+    into the committed hand-managed `.pre-commit-config.yaml`, so existing
+    container-mode consumers see zero change until they opt into flake hooks.
+    `deadnix` runs with `--no-lambda-arg --no-lambda-pattern-names` so the
+    scaffolded consumer `flake.nix` (idiomatic `{ self, … }` pattern,
+    `extraPackages = pkgs: [ ]` seed) passes out of the box; devkit's own
+    stricter internal `nix flake check` gates are unchanged.
+  - CodeQL is untouched: nix is not a CodeQL language, so the rendered matrix
+    and push paths omit it (same treatment as rust).
 - **Document enabling the dependency graph on new public consumers** ([#1166](https://github.com/vig-os/devkit/issues/1166))
   - The scaffolded `ci.yml` Dependency Review gate reads GitHub's dependency
     graph, which the `vig-os` org leaves **disabled** on new repos

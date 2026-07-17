@@ -464,6 +464,41 @@ let
         files = "\\.nix$";
       };
     };
+    # Nix linters, flake-generated consumer surface ONLY (#1171). No `yaml`
+    # and `scaffold = false`, so neither committed hand-managed YAML (runner
+    # or scaffold) changes — existing container-mode consumers see zero
+    # change until they opt into flake hooks. Devkit's own coverage stays
+    # with the authored-flake-scoped `checks.{statix,deadnix}` gates in
+    # flake.nix (#777), which deliberately keep the STRICT deadnix defaults.
+    statix = {
+      scaffold = false;
+      # statix accepts exactly ONE target, so run it repo-wide from the root
+      # (it respects .gitignore) rather than on the changed filenames.
+      consumer = pkgs: {
+        enable = true;
+        name = "statix";
+        entry = "${pkgs.statix}/bin/statix check .";
+        language = "system";
+        files = "\\.nix$";
+        pass_filenames = false;
+      };
+    };
+    # deadnix relaxes the lambda checks (--no-lambda-arg
+    # --no-lambda-pattern-names): the scaffolded consumer flake.nix ships the
+    # idiomatic `{ self, … }` output pattern and the `extraPackages = pkgs:
+    # [ ]` seed, whose intentionally-unused args strict deadnix flags — a
+    # fresh scaffold must pass out of the box
+    # (tests/test_flake_hooks.py::TestNixLintersConsumerSurface).
+    deadnix = {
+      scaffold = false;
+      consumer = pkgs: {
+        enable = true;
+        name = "deadnix";
+        entry = "${pkgs.deadnix}/bin/deadnix --fail --no-lambda-arg --no-lambda-pattern-names";
+        language = "system";
+        files = "\\.nix$";
+      };
+    };
     typos = {
       scaffold = true;
       yaml = {
