@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [1.4.0] - TBD
+
+### Added
+
 - **`docs` capability module — typst document toolchain** ([#1178](https://github.com/vig-os/devkit/issues/1178))
   - New opt-in `docs` capability module puts `typst` (the document compiler) and
     `typstyle` (its formatter) on the dev-shell PATH, so document-oriented
@@ -109,10 +123,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `flake.nix` or committed config is never rewritten; `container`/`both` keep
     the hand-managed YAML (they run inside the image where `pymarkdown` works);
     `bare` is unaffected (it ships no flake and owns its own toolchain).
-
-### Deprecated
-
-### Removed
 
 ### Fixed
 
