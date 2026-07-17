@@ -905,6 +905,27 @@ render_codeql_matrix() {
     echo "      scaffold does not change your repo's code-scanning API setting."
 }
 
+# Mode- and config-dependent copy excludes (#1196): the single source of truth
+# for template paths the rsync copy skips for reasons OTHER than the preserve
+# list. BOTH the --preview ADDED classification and the real rsync copy below
+# consult this array, so --preview never advertises a file the copy silently
+# skips (exo-pet/vault#31). Entries are exact transfer-root rel-paths; a
+# directory entry (.devcontainer) covers its whole subtree.
+MODE_CONFIG_EXCLUDES=()
+# direnv and bare modes carry no .devcontainer/ (#738) and no in-image CI notes
+# (docs/container-ci-quirks.md, #989); a previously scaffolded copy of either is
+# pruned after the copy (see the DELETIONS block below).
+if [[ "$MODE" == "direnv" || "$MODE" == "bare" ]]; then
+    MODE_CONFIG_EXCLUDES+=(".devcontainer" "docs/container-ci-quirks.md")
+fi
+# Legacy typos config (#913): the `typos` tool reads .typos.toml AND _typos.toml.
+# A consumer still carrying _typos.toml (and no .typos.toml) keeps it as the
+# single config — do not also ship the template .typos.toml, or two active
+# configs collide. (A *preserved* .typos.toml is handled by the preserve list.)
+if [[ -f "$WORKSPACE_DIR/_typos.toml" && ! -f "$WORKSPACE_DIR/.typos.toml" ]]; then
+    MODE_CONFIG_EXCLUDES+=(".typos.toml")
+fi
+
 # Warn if forcing (prompt user) - show which files would be overwritten
 if [[ "$FORCE" == "true" ]]; then
     echo ""
@@ -919,24 +940,26 @@ if [[ "$FORCE" == "true" ]]; then
         rel_path="${template_file#"$TEMPLATE_DIR"/}"
         workspace_file="$WORKSPACE_DIR/$rel_path"
 
-        # Mode filters (#886): skip template paths the chosen delivery mode
-        # never scaffolds. direnv and bare modes exclude .devcontainer/ from
-        # the copy entirely (#738); devcontainer and bare modes prune the
-        # flake.nix/.envrc stubs they would themselves create — unless they
-        # pre-exist (#859), in which case they fall through to the PRESERVED
-        # listing below.
-        if [[ ("$MODE" == "direnv" || "$MODE" == "bare") \
-            && "$rel_path" == .devcontainer/* ]]; then
+        # Mode/config copy excludes (#1196): skip the template paths the real
+        # rsync copy skips for the resolved mode and the consumer's config
+        # (.devcontainer/ #738, docs/container-ci-quirks.md #989, the legacy
+        # .typos.toml #913), so --preview never lists them as ADDED. SSoT:
+        # MODE_CONFIG_EXCLUDES, also consumed by the rsync copy below; a
+        # directory entry (.devcontainer) matches its whole subtree.
+        skip_excluded=false
+        for excl in "${MODE_CONFIG_EXCLUDES[@]}"; do
+            if [[ "$rel_path" == "$excl" || "$rel_path" == "$excl"/* ]]; then
+                skip_excluded=true
+                break
+            fi
+        done
+        if [[ "$skip_excluded" == "true" ]]; then
             continue
         fi
-        # Container-only documentation (#989): in-image CI notes are dead
-        # weight (and misleading) in the container-less modes. Devkit-managed
-        # (not in PRESERVE_FILES), so filtered unconditionally — same class as
-        # the .devcontainer/ skip above.
-        if [[ ("$MODE" == "direnv" || "$MODE" == "bare") \
-            && "$rel_path" == "docs/container-ci-quirks.md" ]]; then
-            continue
-        fi
+        # Devcontainer and bare modes prune the flake.nix/.envrc stubs they would
+        # themselves create — unless they pre-exist (#859), in which case they
+        # fall through to the PRESERVED listing below. This is a post-copy prune,
+        # not an rsync exclude, so it stays separate from MODE_CONFIG_EXCLUDES.
         if [[ "$MODE" == "devcontainer" || "$MODE" == "bare" ]] \
             && [[ "$rel_path" == "flake.nix" || "$rel_path" == ".envrc" ]] \
             && [[ ! -e "$workspace_file" ]]; then
@@ -1141,26 +1164,21 @@ else
         fi
     done
 
-    # direnv and bare modes want no .devcontainer/ at all, so never copy the
-    # template one over a populated consumer .devcontainer/ (#738). Excluding it
-    # from the copy (rather than copying-then-pruning) keeps a real
-    # .devcontainer/ intact.
-    if [[ "$MODE" == "direnv" || "$MODE" == "bare" ]]; then
-        EXCLUDE_ARGS+=("--exclude=.devcontainer")
-        # Container-only documentation stays out of the container-less modes
-        # (#989); a previously scaffolded copy is pruned after the copy below.
-        EXCLUDE_ARGS+=("--exclude=/docs/container-ci-quirks.md")
-    fi
-
-    # Legacy typos config (#913): the `typos` tool reads .typos.toml, typos.toml
-    # AND _typos.toml. A consumer still carrying _typos.toml (and no .typos.toml)
-    # must not also receive the template .typos.toml, or two active configs
-    # collide. Skip shipping the template one; their _typos.toml stands as the
-    # single config (a preserved .typos.toml is already excluded above).
-    if [[ -f "$WORKSPACE_DIR/_typos.toml" && ! -f "$WORKSPACE_DIR/.typos.toml" ]]; then
-        echo "Consumer carries legacy _typos.toml; not shipping template .typos.toml (#913)."
-        EXCLUDE_ARGS+=("--exclude=.typos.toml")
-    fi
+    # Mode/config copy excludes (#1196): the same SSoT the --preview ADDED report
+    # consults (MODE_CONFIG_EXCLUDES) — so preview and copy never disagree —
+    # covering the mode-pruned .devcontainer/ (#738) and container-ci-quirks.md
+    # (#989) plus the legacy .typos.toml (#913). Root-anchored (leading slash) to
+    # match is_preserved_file's exact transfer-root semantics (#953); a directory
+    # entry (.devcontainer) excludes its whole subtree. Excluding these from the
+    # copy (rather than copying-then-pruning) keeps a real .devcontainer/ intact.
+    for excl in "${MODE_CONFIG_EXCLUDES[@]}"; do
+        EXCLUDE_ARGS+=("--exclude=/$excl")
+        # Surface the otherwise-silent legacy-typos skip so the consumer knows
+        # their _typos.toml stands as the single config (#913).
+        if [[ "$excl" == ".typos.toml" ]]; then
+            echo "Consumer carries legacy _typos.toml; not shipping template .typos.toml (#913)."
+        fi
+    done
 
     rsync -avL --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
 
