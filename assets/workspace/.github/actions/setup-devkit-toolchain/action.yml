@@ -164,8 +164,12 @@ runs:
         # GITHUB_ENV. Null-delimited dumps + a random GITHUB_ENV heredoc
         # delimiter keep multi-line and special-character values intact.
         env -0 > "$RUNNER_TEMP/devkit-host-env"
+        # Dump the dev-shell env to a file INSIDE the shell command: capturing
+        # `nix develop` stdout would also capture shellHook output (the
+        # scaffolded flake echoes a banner), gluing it onto the first NUL
+        # record and corrupting GITHUB_ENV (#1189).
         nix develop --profile "$RUNNER_TEMP/devkit-dev-profile" \
-          --command env -0 > "$RUNNER_TEMP/devkit-devshell-env"
+          --command bash -c 'env -0 > "$1"' _ "$RUNNER_TEMP/devkit-devshell-env"
 
         # Denylist: shell session state (must never override the CI shell) and
         # Nix/stdenv build machinery (PATH is already handled via GITHUB_PATH).
@@ -193,6 +197,13 @@ runs:
         while IFS= read -r -d '' devkit_kv; do
           devkit_name="${devkit_kv%%=*}"
           devkit_value="${devkit_kv#*=}"
+          # A name that is not a valid env identifier can only come from a
+          # corrupted dump record; skip it rather than poisoning GITHUB_ENV
+          # (#1189).
+          if [[ ! "$devkit_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+            echo "::warning::Skipping malformed dev-shell env record name."
+            continue
+          fi
           # Skip vars unchanged from the ambient environment (already present in
           # the CI env; forwarding them would needlessly re-emit host secrets).
           if [[ -n "${DEVKIT_HOST_ENV[$devkit_name]+x}" \
