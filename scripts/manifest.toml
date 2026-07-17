@@ -43,6 +43,14 @@ src = ".yamllint"
 [[entries]]
 src = ".typos.toml"
 
+# zizmor GitHub Actions security baseline (#1182). Devkit owns the residual
+# findings in its managed workflows; the root file is the SSoT (devkit's own CI
+# gate reads it) and it scaffolds verbatim into every consumer so their baseline
+# for devkit's output is zero. Scope is per-managed-basename; a repo-authored
+# workflow never inherits an exemption.
+[[entries]]
+src = "zizmor.yml"
+
 [[entries]]
 src = ".pymarkdown"
 
