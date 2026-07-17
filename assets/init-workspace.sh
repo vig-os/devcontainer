@@ -618,6 +618,19 @@ DETECTED_LANGUAGES=()
 [[ -f "$WORKSPACE_DIR/pyproject.toml" ]] && DETECTED_LANGUAGES+=("python")
 [[ -f "$WORKSPACE_DIR/package.json" ]] && DETECTED_LANGUAGES+=("node")
 [[ -f "$WORKSPACE_DIR/Cargo.toml" ]] && DETECTED_LANGUAGES+=("rust")
+# nix (#1171): a repo is nix-oriented when it carries *.nix files BEYOND the
+# scaffold-managed ./flake.nix (excluding .git/, .direnv/, .worktrees/).
+# flake.nix alone cannot be the marker: every direnv scaffold ships one, so
+# naive detection would false-positive on every direnv consumer at re-scaffold
+# time. The beyond-flake.nix rule is deterministic and re-scaffold-safe.
+if find "$WORKSPACE_DIR" \
+    -path "$WORKSPACE_DIR/.git" -prune -o \
+    -path "$WORKSPACE_DIR/.direnv" -prune -o \
+    -path "$WORKSPACE_DIR/.worktrees" -prune -o \
+    -name '*.nix' ! -path "$WORKSPACE_DIR/flake.nix" -print -quit \
+    | grep -q .; then
+    DETECTED_LANGUAGES+=("nix")
+fi
 
 # Seed npm-mapped justfile.project recipes on the FIRST scaffold of a Node
 # consumer (#1027). justfile.project is a PRESERVE_FILE: the stock template
@@ -854,6 +867,7 @@ render_codeql_matrix() {
                 paths+=("'**.ts'" "'**.js'" "'**.mjs'" "'**.cjs'")
                 ;;
             rust) : ;; # CodeQL rust support caveat (#1025): omit the leg
+            nix) : ;; # nix is not a CodeQL language (#1171): omit the leg
         esac
     done
     langs+=("'actions'")
