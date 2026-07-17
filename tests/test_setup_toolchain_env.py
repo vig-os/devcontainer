@@ -386,3 +386,67 @@ def test_install_and_host_paths_carry_identical_settings() -> None:
         key, _, value = line.partition(" = ")
         got[key] = value
     assert got == _NIX_SETTINGS
+
+
+# ── Host Nix version capture in the detect step (#1198) ──────────────────────
+
+DETECT_STEP_NAME = "Detect host Nix"
+
+# A representative multi-user host Nix version banner. exo-fleet's wrapper writes
+# it to stderr, so a plain `$(nix --version)` capture came back empty.
+HOST_NIX_VERSION = "nix (Nix) 2.18.1"
+
+
+def _write_stderr_version_nix_stub(bin_dir: Path) -> None:
+    """A fake `nix` whose `--version` prints ONLY to stderr, mimicking the
+    exo-fleet multi-user host wrapper that produced the empty `()` log (#1198).
+    """
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    stub = bin_dir / "nix"
+    stub.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                'if [ "${1:-}" = "--version" ]; then',
+                f"  echo {_bash_squote(HOST_NIX_VERSION)} >&2",
+                "  exit 0",
+                "fi",
+                "exit 0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+
+
+def test_detect_step_captures_version_from_stderr(tmp_path: Path) -> None:
+    """On a host Nix that writes `--version` to stderr, the detect step must
+    still log the real version, not an empty `()`.
+
+    Refs: #1198
+    """
+    step = _step_by_name(DETECT_STEP_NAME)
+
+    bin_dir = tmp_path / "stub-bin"
+    _write_stderr_version_nix_stub(bin_dir)
+
+    github_output = tmp_path / "github_output"
+    github_output.touch()
+
+    proc = subprocess.run(
+        ["bash", "-c", step["run"]],
+        env={
+            **os.environ,
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "GITHUB_OUTPUT": str(github_output),
+        },
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "Host Nix present:" in proc.stdout
+    assert HOST_NIX_VERSION in proc.stdout, (
+        f"version missing from log line:\n{proc.stdout}"
+    )
+    assert "()" not in proc.stdout, f"empty version parens in log:\n{proc.stdout}"
