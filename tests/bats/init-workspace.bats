@@ -2077,6 +2077,26 @@ _upgrade_no_flags() {
     assert_success
 }
 
+@test "template .vig-os ships the CI runner key empty (#1173)" {
+    run grep -x 'DEVKIT_CI_RUNNER=' "$TEMPLATE_DIR/.vig-os"
+    assert_success
+}
+
+@test "upgrade preserves a persisted DEVKIT_CI_RUNNER value (#1173)" {
+    # .vig-os is a managed file, so a self-hosted consumer's DEVKIT_CI_RUNNER
+    # must be read before the template overwrite and written back — else an
+    # upgrade silently resets ci.yml's jobs onto the hosted default runner.
+    ws="$BATS_TEST_TMPDIR/e2e-1173-cirunner"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    sed -i 's/^DEVKIT_CI_RUNNER=.*/DEVKIT_CI_RUNNER=self-hosted,linux,x64,meatgrinder/' "$ws/.vig-os"
+    run _upgrade_no_flags "$ws"
+    assert_success
+    run grep -x 'DEVKIT_CI_RUNNER=self-hosted,linux,x64,meatgrinder' "$ws/.vig-os"
+    assert_success
+}
+
 # ── legacy mode inference (#885) ──────────────────────────────────────────────
 # Consumers scaffolded before the manifest carry a version-only .vig-os (or
 # none): an upgrade without --mode must infer the delivery mode from the tree
