@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`docs` capability module — typst document toolchain** ([#1178](https://github.com/vig-os/devkit/issues/1178))
+  - New opt-in `docs` capability module puts `typst` (the document compiler) and
+    `typstyle` (its formatter) on the dev-shell PATH, so document-oriented
+    consumers (exo-pet/vault, the future `qms` app, EXOMA presentations/grants)
+    declare `mkProjectShell { modules = [ "docs" ]; }` instead of pinning `typst`
+    via PyPI. It stays out of the base `devTools` and the published image, so
+    non-doc consumers and the slimmed image are unaffected (opt-in only,
+    backward compatible). No version option in v1 — nixpkgs carries a single
+    typst per pin and the module tracks that toolchain pin. Deliberate v1
+    exclusions (documented in `docs/NIX.md`): pandoc/LaTeX (ask-gated), headless
+    drawio/excalidraw export (electron-shaped, repo-owned), and Python
+    doc-processing libraries (`pymupdf4llm`, `openpyxl`) which belong in the
+    consumer's own `pyproject.toml` via uv.
 - **Route scaffolded CI jobs to self-hosted runners via `.vig-os`** ([#1173](https://github.com/vig-os/devkit/issues/1173))
   - New optional `.vig-os` key `DEVKIT_CI_RUNNER` (comma-separated runner label
     list, e.g. `self-hosted,linux,x64,meatgrinder`) lets a self-hosted consumer

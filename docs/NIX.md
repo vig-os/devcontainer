@@ -106,6 +106,28 @@ devShells.default = vigos.lib.mkProjectShell {
   - `node` ([#1027](https://github.com/vig-os/devkit/issues/1027)) — the
     Node/TypeScript capability: `nodejs` (which bundles `npm`) in the shell,
     for consumers who previously hand-wired `extraPackages = [ pkgs.nodejs ]`.
+  - `docs` ([#1178](https://github.com/vig-os/devkit/issues/1178)) — the
+    document-edition capability: `typst` (the document compiler) and `typstyle`
+    (its formatter) in the shell, for document-oriented consumers
+    (exo-pet/vault, the future `qms` app, EXOMA presentations/grants) that
+    previously pinned `typst` via PyPI. Opt in with:
+
+    ```nix
+    devShells.default = vigos.lib.mkProjectShell {
+      inherit pkgs;
+      modules = [ "docs" ];
+    };
+    ```
+
+    **No version option in v1** — nixpkgs carries a single `typst`/`typstyle`
+    per pin, so the module tracks the toolchain nixpkgs pin rather than exposing
+    a selectable version (typst output is not stable across versions, so a
+    consumer regenerates its `generated/` artifacts once under the pinned
+    toolchain — pin-tracking beats a bespoke version overlay). **Deliberate v1
+    exclusions:** pandoc/LaTeX (ask-gated until a consumer needs them), headless
+    drawio/excalidraw export (electron-shaped, stays repo-owned), and Python
+    doc-processing libraries (`pymupdf4llm`, `openpyxl`) which belong in the
+    consumer's own `pyproject.toml` via uv, not in a nix module.
   - **Candidates (ask-gated, not shipped):** `geant4`, `rust`, `fortran`/`f2py`,
     `root`.
 - **Per-module options (the `node` version).** A `modules` entry is either a
