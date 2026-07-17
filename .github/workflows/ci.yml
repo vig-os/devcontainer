@@ -232,6 +232,16 @@ jobs:
       - name: Check downstream flake stub
         run: nix flake check ./assets/workspace --override-input vigos "path:$PWD" --accept-flake-config
 
+      # Audit the devkit-managed workflow set (assets/workspace/.github/workflows/)
+      # against the shipped zizmor baseline (zizmor.yml). Gates regressions: a new
+      # zizmor finding — or a managed workflow that regains a fixed finding — fails
+      # here and must be fixed in the workflow or triaged in zizmor.yml, so
+      # consumers never inherit an unbaselined finding from devkit's output. The
+      # baseline scopes exemptions to managed basenames only, so consumer-authored
+      # workflows are never suppressed. Refs #1182.
+      - name: Audit managed workflows (zizmor)
+        run: uvx zizmor@1.25.2 --offline --config zizmor.yml assets/workspace/.github/workflows/
+
   # Commit-message validation (#1019). `validate-commit-msg` is a commit-msg
   # stage hook, so `prek run --all-files` (the project-checks lane) never runs
   # it — and the only other enforcement path, the local core.hooksPath shim,
