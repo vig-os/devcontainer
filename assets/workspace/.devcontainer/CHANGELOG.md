@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Route scaffolded CI jobs to self-hosted runners via `.vig-os`** ([#1173](https://github.com/vig-os/devkit/issues/1173))
+  - New optional `.vig-os` key `DEVKIT_CI_RUNNER` (comma-separated runner label
+    list, e.g. `self-hosted,linux,x64,meatgrinder`) lets a self-hosted consumer
+    route the scaffold-managed `ci.yml` onto its own runners without hand-editing
+    a managed file (hand-edits are clobbered on upgrade). `resolve-toolchain`
+    reads the key and emits a `runner-json` output — a JSON array of labels,
+    defaulting to `["ubuntu-24.04"]` when the key is absent — which the toolchain
+    jobs (`lint`, `test`, `commit-checks`) and the `summary` gate consume via
+    `runs-on: ${{ fromJSON(needs.resolve-toolchain.outputs.runner-json) }}`. The
+    `resolve-toolchain` job itself stays on the hosted default (it produces the
+    output), and `dependency-review` stays hosted (public-repo-only,
+    toolchain-free). Absent key => unchanged behavior for every existing
+    consumer; the value is persisted across re-scaffolds like the other manifest
+    keys. Documented in `docs/MIGRATION.md`.
+- **Opt-in `gitleaks` secret-scanning hook** ([#1172](https://github.com/vig-os/devkit/issues/1172))
+  - `gitleaks` joins the shared toolchain (`nix/devtools.nix` → dev-shell,
+    image, and `vigos.packages`) and is defined as a `language: system`
+    pre-commit hook resolved from the pinned nixpkgs binary — no upstream
+    pre-commit repo clone, works offline. It is **default-disabled** and lives
+    only on the `mkProjectShell` consumer generation surface: absent from
+    devkit's own committed `.pre-commit-config.yaml`, the scaffold copy, and the
+    sandbox `checks.pre-commit` gate, so no devkit lane runs it. A secret-bearing
+    consumer opts in with `mkProjectShell { hooks = { gitleaks.enable = true; }; }`;
+    the hook runs `gitleaks git --pre-commit --staged --redact --verbose` and a
+    repo-root `.gitleaks.toml` is honored automatically. Off by default because
+    false-positive tuning is repo-specific (`docs/NIX.md`). Backward compatible:
+    zero behavior change for consumers that do not enable it.
 - **Nix as a first-class consumer language** ([#1171](https://github.com/vig-os/devkit/issues/1171))
   - Language detection: a repo is nix-oriented when it carries `*.nix` files
     **beyond** the scaffold-managed `./flake.nix` (excluding `.git/`,
