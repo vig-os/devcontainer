@@ -94,7 +94,9 @@ runs:
         set -euo pipefail
         if command -v nix >/dev/null 2>&1; then
           echo "has-nix=true" >> "$GITHUB_OUTPUT"
-          echo "Host Nix present: $(command -v nix) ($(nix --version))"
+          # Some multi-user host Nix wrappers print --version to stderr (#1198);
+          # fold it into the capture so the log keeps the version, not empty ().
+          echo "Host Nix present: $(command -v nix) ($(nix --version 2>&1))"
         else
           echo "has-nix=false" >> "$GITHUB_OUTPUT"
         fi
