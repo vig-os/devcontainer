@@ -127,6 +127,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     on-`PATH` `cc` wrapper, so a `justfile.project` recipe can run such a tool
     (`just with-native-libs uvx …`) without the wheel failing to import. It
     degrades to a no-op when neither source resolves the library.
+- **direnv CI: forward the flake `shellHook` environment** ([#1180](https://github.com/vig-os/devkit/issues/1180))
+  - The direnv-mode `setup-devkit-toolchain` preamble exported the dev-shell
+    store bin dirs to `GITHUB_PATH` but dropped every environment variable a
+    project's flake `shellHook` exports, so env defaults present in every local
+    `nix develop`/direnv session silently vanished on CI — surfacing as unrelated
+    tool errors (vig-os/org-config#40: a shellHook-seeded `OTTERDOG_TOKEN`
+    placeholder worked locally, failed on CI). The preamble now diffs the ambient
+    environment against the dev-shell environment (the `shellHook` has run inside
+    `nix develop`) and forwards the vars the dev-shell adds or changes to
+    `GITHUB_ENV`, minus a denylist of shell session state (`PATH`, `HOME`,
+    `SHLVL`, `TMPDIR`, …) and Nix/stdenv build machinery (`NIX_*`, `buildInputs`,
+    `stdenv`, `shellHook`, `*Phase`, …). The ambient diff keeps host secrets out
+    of `GITHUB_ENV`; a random heredoc delimiter keeps multi-line values intact.
+    Local-vs-CI parity is now the default in direnv mode, no consumer change.
 
 ### Security
 
