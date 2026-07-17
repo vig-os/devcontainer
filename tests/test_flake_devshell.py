@@ -341,6 +341,22 @@ def test_devshell_provides_precommit_binary_hooks(
     )
 
 
+def test_devshell_provides_pymarkdown(dev_shell_tools: list[str]) -> None:
+    """The flake must provide pymarkdown so its language: system hook runs (#1170).
+
+    ``pymarkdownlnt`` is packaged in the flake (nix/pymarkdown.nix) and added to
+    the ``devTools`` SSoT so the ``pymarkdown`` markdown-lint hook is a
+    ``language: system`` hook resolved from PATH — like ruff/typos/shellcheck —
+    instead of pre-commit's own manylinux-wheel env (whose native ``pyjson5``
+    cannot load on a bare host runner). Its ``meta.mainProgram`` is
+    ``pymarkdown``, so the SSoT tool name is that binary.
+    """
+    assert "pymarkdown" in dev_shell_tools, (
+        "devTools must provide 'pymarkdown' (via nix/pymarkdown.nix) so the "
+        "language: system markdown-lint hook resolves from the flake (#1170)"
+    )
+
+
 def test_devshell_hook_runner_is_prek(dev_shell_tools: list[str]) -> None:
     """The hook runner in the ``devTools`` SSoT must be ``prek``, not ``pre-commit`` (#778).
 
