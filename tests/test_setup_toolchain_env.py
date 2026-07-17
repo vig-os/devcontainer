@@ -292,3 +292,97 @@ def test_shellhook_stdout_banner_never_reaches_github_env(tmp_path: Path) -> Non
     assert BANNER not in raw, "shellHook stdout leaked into GITHUB_ENV"
     # The first env record must survive intact, not be eaten by the banner.
     assert env.get("OTTERDOG_TOKEN") == "placeholder-set-by-shellhook"
+
+
+# ── Self-hosted runners with preinstalled Nix (#1192) ────────────────────────
+
+INSTALL_STEP_NAME = "Install Nix (upstream CppNix)"
+DETECT_STEP_ID = "detect-nix"
+HOST_NIX_STEP_NAME = "Configure host Nix"
+
+# The Nix settings the toolchain needs, identically on both paths (fresh
+# install via install-nix-action's extra_nix_config, preinstalled host Nix via
+# NIX_CONFIG).
+_NIX_SETTINGS = {
+    "experimental-features": "nix-command flakes",
+    "accept-flake-config": "true",
+    "extra-substituters": "https://vig-os.cachix.org",
+    "extra-trusted-public-keys": (
+        "vig-os.cachix.org-1:yoOYRi3bvnM6ThxO0joLt7vtzhTfkq3r6jykeUMg7Bk="
+    ),
+}
+
+
+def _action_steps() -> list[dict]:
+    action = yaml.safe_load(ACTION.read_text(encoding="utf-8"))
+    return action["runs"]["steps"]
+
+
+def _step_by_name(name: str) -> dict:
+    for step in _action_steps():
+        if step.get("name") == name:
+            return step
+    raise AssertionError(f"step {name!r} not found in {ACTION}")
+
+
+def test_install_nix_is_gated_on_missing_host_nix() -> None:
+    """install-nix-action aborts on a Nix-preinstalled self-hosted runner and
+    leaves NIX_CONFIG malformed; it must be skipped when host Nix exists, with
+    a detect step preceding it.
+
+    Refs: #1192
+    """
+    steps = _action_steps()
+    detect_idx = next(
+        (i for i, s in enumerate(steps) if s.get("id") == DETECT_STEP_ID), None
+    )
+    assert detect_idx is not None, f"no step with id {DETECT_STEP_ID!r}"
+    install_idx = next(
+        i for i, s in enumerate(steps) if s.get("name") == INSTALL_STEP_NAME
+    )
+    assert detect_idx < install_idx, "detect step must precede the install step"
+    install_if = _step_by_name(INSTALL_STEP_NAME).get("if", "")
+    assert f"steps.{DETECT_STEP_ID}.outputs.has-nix != 'true'" in install_if
+
+
+def test_host_nix_config_step_writes_wellformed_nix_config(tmp_path: Path) -> None:
+    """On the preinstalled-Nix path, the action must export the same Nix
+    settings via a well-formed multi-line NIX_CONFIG (the malformed one from
+    the aborted installer broke `nix develop` on exo-fleet's runner).
+
+    Refs: #1192
+    """
+    step = _step_by_name(HOST_NIX_STEP_NAME)
+    assert f"steps.{DETECT_STEP_ID}.outputs.has-nix == 'true'" in step.get("if", "")
+
+    github_env = tmp_path / "github_env"
+    github_env.touch()
+    proc = subprocess.run(
+        ["bash", "-c", step["run"]],
+        env={**os.environ, "GITHUB_ENV": str(github_env)},
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    parsed = _parse_github_env(github_env.read_text(encoding="utf-8"))
+    nix_config = parsed.get("NIX_CONFIG")
+    assert nix_config, "NIX_CONFIG not written to GITHUB_ENV"
+    got = {}
+    for line in nix_config.splitlines():
+        assert " = " in line, f"malformed NIX_CONFIG line: {line!r}"
+        key, _, value = line.partition(" = ")
+        got[key] = value
+    assert got == _NIX_SETTINGS
+
+
+def test_install_and_host_paths_carry_identical_settings() -> None:
+    """The fresh-install extra_nix_config and the test's expected host-path
+    settings must stay in lockstep — drift would give the two runner classes
+    different Nix behavior."""
+    install = _step_by_name(INSTALL_STEP_NAME)
+    extra = install["with"]["extra_nix_config"]
+    got = {}
+    for line in extra.strip().splitlines():
+        key, _, value = line.partition(" = ")
+        got[key] = value
+    assert got == _NIX_SETTINGS

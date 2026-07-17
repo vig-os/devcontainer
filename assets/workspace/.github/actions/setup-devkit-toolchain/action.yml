@@ -83,12 +83,29 @@ runs:
         echo "prek present: $(command -v prek)"
 
     # ── direnv — host, provision from the repo's own Nix flake dev-shell ──────
+    # Self-hosted runners (DEVKIT_CI_RUNNER, #1173) usually ship their own Nix;
+    # install-nix-action would abort on them and leave NIX_CONFIG malformed
+    # (#1192), so detect first and take the matching path below.
+    - name: Detect host Nix
+      if: inputs.mode == 'direnv'
+      id: detect-nix
+      shell: bash
+      run: |
+        set -euo pipefail
+        if command -v nix >/dev/null 2>&1; then
+          echo "has-nix=true" >> "$GITHUB_OUTPUT"
+          echo "Host Nix present: $(command -v nix) ($(nix --version))"
+        else
+          echo "has-nix=false" >> "$GITHUB_OUTPUT"
+        fi
+
     # Nix installer SHA-pinned to match the vig-os toolchain. The vig-os public
     # Cachix substituter (pull-only, no token) makes the dev-shell a fast
     # binary-cache pull; accept-flake-config lets the pinned vigos input
-    # contribute its own substituters.
+    # contribute its own substituters. Keep extra_nix_config in lockstep with
+    # the "Configure host Nix" step below (enforced by test).
     - name: Install Nix (upstream CppNix)
-      if: inputs.mode == 'direnv'
+      if: inputs.mode == 'direnv' && steps.detect-nix.outputs.has-nix != 'true'
       uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342  # v31.11.0
       with:
         extra_nix_config: |
@@ -96,6 +113,26 @@ runs:
           accept-flake-config = true
           extra-substituters = https://vig-os.cachix.org
           extra-trusted-public-keys = vig-os.cachix.org-1:yoOYRi3bvnM6ThxO0joLt7vtzhTfkq3r6jykeUMg7Bk=
+
+    # Preinstalled host Nix: export the same settings via a well-formed
+    # multi-line NIX_CONFIG instead of installing. On a multi-user host Nix
+    # the substituter entries may be ignored for non-trusted users — Cachix is
+    # an optimization, correctness does not depend on it. Keep the settings in
+    # lockstep with extra_nix_config above (enforced by test).
+    - name: Configure host Nix
+      if: inputs.mode == 'direnv' && steps.detect-nix.outputs.has-nix == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        {
+          echo 'NIX_CONFIG<<DEVKIT_NIX_CONFIG_EOF'
+          echo 'experimental-features = nix-command flakes'
+          echo 'accept-flake-config = true'
+          echo 'extra-substituters = https://vig-os.cachix.org'
+          echo 'extra-trusted-public-keys = vig-os.cachix.org-1:yoOYRi3bvnM6ThxO0joLt7vtzhTfkq3r6jykeUMg7Bk='
+          echo 'DEVKIT_NIX_CONFIG_EOF'
+        } >> "$GITHUB_ENV"
+        echo "Configured preinstalled host Nix via NIX_CONFIG."
 
     # Optional: push this repo's own closure to a consumer-owned Cachix cache.
     # Skipped unless the repo passes cachix-cache; pulls need no token, so the
