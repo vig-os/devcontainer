@@ -1493,6 +1493,47 @@ EOF
     assert_output --partial 'default_language_version'
 }
 
+# ── preserved diff must survive a foreign/broken .git in the cwd (#1197) ──────
+# When init-workspace.sh runs via a bare `podman run -v <worktree>:/workspace`
+# and the mounted workspace is a git WORKTREE, its `.git` is a FILE pointing at
+# `gitdir: <path outside the mount>`. In-container git discovers that `.git`
+# from the cwd, fails to resolve the gitdir, and `git diff --no-index` aborts
+# with `fatal: not a git repository: (null)` BEFORE diffing — swallowed by
+# `|| true`, so the operator lost the preserved-file divergence and the log
+# gained a `fatal:` line per file. The no-index diff needs no repo, so it must
+# ignore repo discovery entirely.
+
+@test "preserved diff survives a foreign-git worktree cwd (#1197)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1197-worktree"
+    mkdir -p "$ws"
+    # Simulate a worktree whose real gitdir is unreachable (outside the mount).
+    printf 'gitdir: /nonexistent/path/outside\n' >"$ws/.git"
+    _custom_precommit_config "$ws"
+    # Run with cwd INSIDE the workspace so git discovers the broken `.git`.
+    # Stub uv AND just (like _scaffold): the trailing sync step is a fast no-op,
+    # and stubbing just keeps just's own `git rev-parse` (an out-of-scope code
+    # path) from muddying the assertion — the only git call left is the
+    # preserved-template diff under test.
+    local stub="$BATS_TEST_TMPDIR/stub-1197"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/uv"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/uv" "$stub/just"
+    run env -C "$ws" PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=testproj \
+        GITHUB_REPOSITORY=test/repo \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts --mode both
+    assert_success
+    # The broken-repo abort must never surface...
+    refute_output --partial 'fatal:'
+    refute_output --partial 'not a git repository'
+    # ...and the divergence diff is still produced.
+    assert_output --partial 'Preserved .pre-commit-config.yaml differs from the template'
+    assert_output --partial 'default_language_version'
+}
+
 # ── upgrade must preserve a customized .typos.toml, no dual configs (#913) ────
 # The typos hook reads a project's spell-check exceptions; a consumer curates
 # repo-specific extend-words/extend-exclude that a template overwrite silently

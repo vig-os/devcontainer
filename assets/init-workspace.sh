@@ -520,18 +520,27 @@ is_preserved_file() {
 # whose --quiet form gates the block and which exits 1 (the expected "they
 # diverged" signal, not an error) when the files differ. Returns 0 when a diff
 # was printed (files differ), 1 when identical or either file is missing.
+#
+# `git diff --no-index` needs no repository, yet git first DISCOVERS a repo from
+# the cwd. When the workspace is a git worktree (bare `podman run -v` mount), its
+# `.git` is a FILE pointing at a gitdir outside the mount; discovery fails and
+# the diff aborts with `fatal: not a git repository: (null)` before comparing
+# (#1197). `GIT_DIR=/dev/null` pins the git dir explicitly, so git skips
+# discovery entirely and the pure file comparison runs regardless of any
+# broken/foreign `.git` in the cwd.
 print_preserved_template_diff() {
     local rel="$1"
     local preserved="$WORKSPACE_DIR/$rel"
     local template="$TEMPLATE_DIR/$rel"
     [[ -f "$preserved" && -f "$template" ]] || return 1
-    if git diff --no-index --quiet -- "$template" "$preserved" > /dev/null 2>&1; then
+    if GIT_DIR=/dev/null git diff --no-index --quiet -- "$template" "$preserved" \
+        > /dev/null 2>&1; then
         return 1  # identical: nothing to surface
     fi
     echo "Preserved $rel differs from the template (yours was kept)."
     echo "Template changes NOT applied (fold in what you need, see MIGRATION.md):"
     echo "─────────────────────────────────────────────────────────────"
-    git diff --no-index -- "$template" "$preserved" || true
+    GIT_DIR=/dev/null git diff --no-index -- "$template" "$preserved" || true
     echo "─────────────────────────────────────────────────────────────"
     return 0
 }
