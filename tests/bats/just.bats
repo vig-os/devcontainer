@@ -345,12 +345,14 @@ STUB
 }
 
 @test "with-native-libs no-ops cleanly when libstdc++ is not found (#1181)" {
+    # A true no-op: LD_LIBRARY_PATH stays UNSET, not set-to-empty — an empty
+    # value is itself one empty entry, which the dynamic loader treats as the
+    # current working directory.
     _with_native_libs_fixture
     run env -u LD_LIBRARY_PATH PATH="$NL_DIR/notfound:$PATH" \
         just -f "$NL_DIR/justfile" -d "$NL_DIR" with-native-libs env
     assert_success
-    assert_line "LD_LIBRARY_PATH="
-    refute_output --partial "/opt/fake/lib"
+    refute_output --partial "LD_LIBRARY_PATH"
 }
 
 @test "with-native-libs prepends to an existing LD_LIBRARY_PATH (#1181)" {
@@ -359,4 +361,18 @@ STUB
         just -f "$NL_DIR/justfile" -d "$NL_DIR" with-native-libs env
     assert_success
     assert_line "LD_LIBRARY_PATH=/opt/fake/lib:/pre/existing"
+}
+
+@test "with-native-libs leaves an existing LD_LIBRARY_PATH untouched when nothing resolves (#1181)" {
+    # With an empty prefix a naive composition yields ":/pre/existing" — the
+    # leading empty entry means "current working directory" to the dynamic
+    # loader, silently adding cwd to the library search path (a planted
+    # libstdc++.so.6 in an untrusted directory would be loaded). The caller's
+    # value must pass through byte-identical, no leading colon.
+    _with_native_libs_fixture
+    run env LD_LIBRARY_PATH=/pre/existing PATH="$NL_DIR/notfound:$PATH" \
+        just -f "$NL_DIR/justfile" -d "$NL_DIR" with-native-libs env
+    assert_success
+    assert_line "LD_LIBRARY_PATH=/pre/existing"
+    refute_output --partial "LD_LIBRARY_PATH=:"
 }
