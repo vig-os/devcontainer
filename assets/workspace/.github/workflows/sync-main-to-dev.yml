@@ -204,13 +204,14 @@ jobs:
         if: steps.recheck.outputs.up_to_date != 'true'
         env:
           GH_TOKEN: ${{ steps.commit-app-token.outputs.token }}
+          RELEASE_GH_TOKEN: ${{ steps.release-app-token.outputs.token }}
         run: |
           set -euo pipefail
           REFS=$(retry --retries 3 --backoff 5 --max-backoff 30 -- \
             gh api --paginate "repos/${{ github.repository }}/git/matching-refs/heads/chore/sync-main-to-dev-" \
             --jq '.[].ref' | sed 's|refs/heads/||') || true
           for branch in ${REFS}; do
-            HAS_PR=$(GH_TOKEN="${{ steps.release-app-token.outputs.token }}" retry --retries 3 --backoff 5 --max-backoff 30 -- \
+            HAS_PR=$(GH_TOKEN="${RELEASE_GH_TOKEN}" retry --retries 3 --backoff 5 --max-backoff 30 -- \
               gh pr list --base dev --head "${branch}" \
               --state open --json number --jq 'length')
             if [ "${HAS_PR}" = "0" ]; then
