@@ -1451,9 +1451,16 @@ if [[ -f "$VIG_OS_MANIFEST" ]]; then
     fi
 fi
 
-# Restore executable permissions on shell scripts and hooks (must be after sed -i)
+# Restore executable permissions on shell scripts and hooks (must be after sed -i).
+# Scope the +x to the scaffold-delivered script set only: key the sweep on the
+# template's .sh files, not a blanket `find "$WORKSPACE_DIR"`. A consumer's own
+# sourced-only .sh libraries are not template paths, so a blanket sweep wrongly
+# flipped their mode (644 → 755) on every --force re-scaffold (#1195).
 echo "Setting executable permissions on shell scripts and hooks..."
-find "$WORKSPACE_DIR" -type f -name "*.sh" -exec chmod +x {} \;
+while IFS= read -r -d '' template_script; do
+    rel="${template_script#"$TEMPLATE_DIR"/}"
+    [[ -f "$WORKSPACE_DIR/$rel" ]] && chmod +x "$WORKSPACE_DIR/$rel"
+done < <(find -L "$TEMPLATE_DIR" -type f -name "*.sh" -print0)
 find "$WORKSPACE_DIR/.githooks" -type f -exec chmod +x {} \; 2>/dev/null || true
 
 # The root justfile is managed (rsync overwrites it on upgrade), so the
