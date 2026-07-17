@@ -125,6 +125,31 @@ Free-plan private repos; OpenSSF Scorecard is public-only), so private consumers
 get a skipped (neutral) run instead of a permanently red one. A repo later
 flipped public starts scanning automatically, with no re-scaffold.
 
+### Enable the dependency graph on new public consumers
+
+The scaffolded `ci.yml` also ships a **Dependency Review** gate that blocks PRs
+introducing known-vulnerable dependencies
+([#1140](https://github.com/vig-os/devkit/issues/1140)). Like the scans above it
+is guarded to public repos, because the dependency-graph API it reads is
+unavailable on Free-plan private repos.
+
+On a **public** repo the dependency graph is normally on by default — but the
+`vig-os` org creates new repos with it **disabled**
+(`dependency_graph_enabled_for_new_repositories: false`), so a fresh public
+consumer's first Dependency Review run returns `403` until the graph is turned
+on. Enable it once when provisioning a new public consumer (needs repo admin) —
+the same idempotent endpoint the repo's *Settings → Security → Dependency graph*
+toggle calls:
+
+```bash
+gh api -X PUT "repos/<owner>/<repo>/vulnerability-alerts"
+```
+
+This is a one-time, per-repo step run by no scaffold script, so it applies in
+every delivery mode. A private consumer can skip it — the gate is neutral there
+and starts working automatically if the repo is later flipped public
+([#1166](https://github.com/vig-os/devkit/issues/1166)).
+
 ## The `.vig-os` project manifest
 
 Since [#885](https://github.com/vig-os/devkit/issues/885), `.vig-os` is
