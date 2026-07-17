@@ -52,8 +52,8 @@ with pkgs;
   nixfmt # nix file formatter, RFC style (treefmt `nix fmt`, pre-commit hook)
   ruff # python linter/formatter (pre-commit ruff/ruff-format hooks)
   typos # source typo checker (pre-commit typos hook)
-  deadnix # dead-Nix-code linter (flake `checks.deadnix`)
-  statix # nix anti-pattern linter (flake `checks.statix`)
+  deadnix # dead-Nix-code linter (flake `checks.deadnix`, consumer hook #1171)
+  statix # nix anti-pattern linter (flake `checks.statix`, consumer hook #1171)
   actionlint # GitHub Actions workflow linter (pre-commit hook, #995)
   gitleaks # secret scanner (opt-in `language: system` pre-commit hook, #1172)
 
