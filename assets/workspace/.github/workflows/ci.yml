@@ -244,6 +244,11 @@ jobs:
   # API is unavailable on Free-plan private repos, so private repos get a
   # skipped (neutral) run instead of a permanently red one, and a repo later
   # flipped public starts gating automatically with no re-scaffold (#1039).
+  #
+  # First run on a NEW public repo returns 403 if the org disables the dependency
+  # graph for new repos (dependency_graph_enabled_for_new_repositories: false).
+  # Enable it once (repo admin), the same toggle as Settings > Security >
+  # Dependency graph: gh api -X PUT repos/OWNER/REPO/vulnerability-alerts (#1166).
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-24.04

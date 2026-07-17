@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Document enabling the dependency graph on new public consumers** ([#1166](https://github.com/vig-os/devkit/issues/1166))
+  - The scaffolded `ci.yml` Dependency Review gate reads GitHub's dependency
+    graph, which the `vig-os` org leaves **disabled** on new repos
+    (`dependency_graph_enabled_for_new_repositories: false`) — so a fresh public
+    consumer's first run `403`s until it is enabled. `docs/MIGRATION.md` gains an
+    "Enable the dependency graph on new public consumers" step (idempotent
+    `gh api -X PUT repos/<owner>/<repo>/vulnerability-alerts`, one-time per repo,
+    mode-agnostic), and the scaffolded `ci.yml` `dependency-review` job carries a
+    pointer comment at the failure site. Private consumers are unaffected (the
+    gate is neutral there).
+
 ### Changed
 
 ### Deprecated
