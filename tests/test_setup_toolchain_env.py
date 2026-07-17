@@ -44,6 +44,12 @@ ACTION = (
 # The direnv step under test.
 DEVSHELL_STEP_NAME = "Build repo flake dev-shell and export PATH"
 
+# The banner the scaffolded flake's shellHook echoes to stdout on every
+# `nix develop` (assets/workspace/flake.nix). Captured stdout therefore mixes
+# this line into anything the step reads from a `nix develop --command`
+# pipeline (#1189).
+BANNER = "devcontainer dev environment loaded (nix)"
+
 # The simulated dev-shell environment the stub `nix` emits (null-delimited). It
 # mixes shellHook exports (must forward), Nix/stdenv build machinery (must be
 # denied), shell session state (must be denied), and an ambient var unchanged
@@ -83,18 +89,26 @@ def _devshell_step_script() -> str:
     raise AssertionError(f"step {DEVSHELL_STEP_NAME!r} not found in {ACTION}")
 
 
-def _write_nix_stub(bin_dir: Path) -> None:
+def _write_nix_stub(bin_dir: Path, *, banner: bool = False) -> None:
     """A fake `nix` covering every invocation the devshell step makes.
 
     - `nix develop … --command true`                  -> exit 0 (profile build)
     - `nix develop … --command bash -c 'printf … PATH'`-> a fake store PATH
     - `nix develop … --command bash -c '… UV_… '`      -> the uv-download URL
-    - `nix develop … --command env …`                  -> the simulated env dump
+    - `nix develop … --command bash -c 'env -0 > …'`   -> env dump to the file
+    - `nix develop … --command env …`                  -> env dump on stdout
+
+    With ``banner=True`` the stub echoes the shellHook banner to stdout on
+    every invocation, exactly as the real scaffolded flake does (#1189).
     """
     bin_dir.mkdir(parents=True, exist_ok=True)
     lines = [
         "#!/usr/bin/env bash",
         "set -euo pipefail",
+    ]
+    if banner:
+        lines.append(f"echo {_bash_squote(BANNER)}")
+    lines += [
         "# Collect the command after `--command`.",
         "cmd=()",
         "found=0",
@@ -104,6 +118,19 @@ def _write_nix_stub(bin_dir: Path) -> None:
         "done",
         'joined="${cmd[*]:-}"',
         'if [ "${cmd[0]:-}" = "true" ]; then exit 0; fi',
+        "# In-shell file dump: write the records to the target file, keeping",
+        "# stdout (the banner) out of the dump — the shape the action relies on.",
+        'if [[ "$joined" == *"env -0 >"* ]]; then',
+        '  target="${cmd[-1]}"',
+        '  : > "$target"',
+    ]
+    for name, value in _DEVSHELL_ENV:
+        lines.append(
+            f"  printf '%s\\0' {_bash_squote(name + '=' + value)} >> \"$target\""
+        )
+    lines += [
+        "  exit 0",
+        "fi",
         'if [ "${cmd[0]:-}" = "env" ]; then',
     ]
     for name, value in _DEVSHELL_ENV:
@@ -136,10 +163,17 @@ def _run_devshell_step(tmp_path: Path) -> dict[str, str]:
     assert on them; the presence of a heredoc is asserted separately on the raw
     text where it matters.
     """
+    return _exec_devshell_step(tmp_path)[0]
+
+
+def _exec_devshell_step(
+    tmp_path: Path, *, banner: bool = False
+) -> tuple[dict[str, str], str]:
+    """Execute the devshell step; return (parsed GITHUB_ENV map, raw text)."""
     script = _devshell_step_script()
 
     bin_dir = tmp_path / "stub-bin"
-    _write_nix_stub(bin_dir)
+    _write_nix_stub(bin_dir, banner=banner)
 
     github_env = tmp_path / "github_env"
     github_path = tmp_path / "github_path"
@@ -168,7 +202,8 @@ def _run_devshell_step(tmp_path: Path) -> dict[str, str]:
     assert proc.returncode == 0, (
         f"devshell step failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
     )
-    return _parse_github_env(github_env.read_text(encoding="utf-8"))
+    raw = github_env.read_text(encoding="utf-8")
+    return _parse_github_env(raw), raw
 
 
 def _parse_github_env(text: str) -> dict[str, str]:
@@ -243,3 +278,17 @@ def test_unchanged_ambient_var_is_not_reforwarded(tmp_path: Path) -> None:
     """A var identical to the host env is filtered — host secrets never re-leak."""
     env = _run_devshell_step(tmp_path)
     assert "AMBIENT_SHARED" not in env
+
+
+def test_shellhook_stdout_banner_never_reaches_github_env(tmp_path: Path) -> None:
+    """The scaffolded flake shellHook echoes a banner to stdout during every
+    `nix develop`; capturing that stdout as the env dump glued the banner onto
+    the first NUL record and wrote an invalid GITHUB_ENV name, failing every
+    direnv consumer CI job on 1.4.0-rc2.
+
+    Refs: #1189
+    """
+    env, raw = _exec_devshell_step(tmp_path, banner=True)
+    assert BANNER not in raw, "shellHook stdout leaked into GITHUB_ENV"
+    # The first env record must survive intact, not be eaten by the banner.
+    assert env.get("OTTERDOG_TOKEN") == "placeholder-set-by-shellhook"
