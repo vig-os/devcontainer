@@ -48,6 +48,9 @@ VERSION_FLAG_OVERRIDES: dict[str, list[str]] = {
     # argument"); it is a subcommand CLI. `--help` exits 0 and proves the binary
     # is runnable in the dev-shell, which is what this parity check asserts.
     "statix": ["--help"],
+    # pymarkdown is a subcommand CLI: `--version` exits 2 ("unrecognized
+    # arguments"); the version is printed by the `version` subcommand. Refs #1170.
+    "pymarkdown": ["version"],
     # vig-utils is a subcommand CLI (its `main` requires a subcommand, so
     # `--version` exits 2); `--help` exits 0 and proves the binary runs. The
     # release console scripts it ships (prepare-changelog,
