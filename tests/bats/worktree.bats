@@ -190,3 +190,24 @@ setup() {
     assert_output --partial "[ERROR]"
     assert_output --partial "Invalid mode"
 }
+
+# ── _wt_repo backtick tolerates a foreign-git cwd (#1203) ───────────────────────
+# `just` evaluates the top-level `_wt_repo` backtick eagerly on EVERY invocation,
+# so its `git rev-parse --show-toplevel` runs even for unrelated recipes. In a
+# git worktree whose `.git` file points at a gitdir outside a (bind-mounted) tree
+# — the bare-podman scaffold context from #1197 — git can't resolve the repo and
+# leaked `fatal: not a git repository: (null)` to stderr on every `just` call.
+@test "just does not leak a git fatal in a foreign-git worktree cwd (#1203)" {
+    command -v just >/dev/null 2>&1 || skip "just not installed"
+
+    local broken
+    broken="$(mktemp -d)"
+    printf 'gitdir: /nonexistent/path/outside\n' > "$broken/.git"
+
+    run just -d "$broken" -f "$PROJECT_ROOT/justfile.worktree" --evaluate _wt_repo
+    rm -rf "$broken"
+
+    assert_success
+    refute_output --partial "not a git repository"
+    refute_output --partial "fatal:"
+}
