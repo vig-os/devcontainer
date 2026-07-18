@@ -19,16 +19,17 @@ Refs: #1205
 
 from __future__ import annotations
 
-import os
-import shutil
 import subprocess
 from pathlib import Path
 
+from tests.workflow_scaffold import (
+    INIT_WORKSPACE,
+    WORKSPACE,
+    scaffold,
+)
+
 # Repository root (tests/ -> repo root).
 REPO_ROOT = Path(__file__).resolve().parent.parent
-WORKSPACE = REPO_ROOT / "assets" / "workspace"
-WORKFLOWS = WORKSPACE / ".github" / "workflows"
-INIT_WORKSPACE = REPO_ROOT / "assets" / "init-workspace.sh"
 
 # Files the trunk render rewrites that carry NO build-time placeholders, so a
 # gitflow scaffold copies them byte-for-byte from the template (codeql.yml is
@@ -52,38 +53,12 @@ def _scaffold(
 ) -> subprocess.CompletedProcess[str]:
     """Scaffold a workspace by executing the real init-workspace.sh.
 
-    Mirrors tests/bats/init-workspace.bats::_scaffold — a ``just`` stub on PATH,
-    TEMPLATE_DIR/WORKSPACE_DIR/SHORT_NAME/GITHUB_REPOSITORY in the env, and
-    ``--force --no-prompts --mode both``. ``workflow`` appends ``--workflow``;
-    ``seed`` pre-populates the workspace (to exercise the upgrade path). Returns
-    the CompletedProcess so callers can assert on exit code / stderr.
+    Thin wrapper over the shared ``tests.workflow_scaffold.scaffold`` helper
+    (SSoT for the init-workspace invocation, reused by the trunk-parametrized
+    dev-assuming suites, #1210); preserves this suite's ``trunkflow`` default
+    workspace name.
     """
-    dest = tmp_path / name
-    if seed is not None:
-        shutil.copytree(seed, dest)
-    else:
-        dest.mkdir(exist_ok=True)
-
-    stub = tmp_path / "stub-bin"
-    stub.mkdir(exist_ok=True)
-    just_stub = stub / "just"
-    just_stub.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
-    just_stub.chmod(0o755)
-
-    env = {
-        **os.environ,
-        "PATH": f"{stub}{os.pathsep}{os.environ['PATH']}",
-        "TEMPLATE_DIR": str(WORKSPACE),
-        "WORKSPACE_DIR": str(dest),
-        "SHORT_NAME": "testproj",
-        "GITHUB_REPOSITORY": "test/repo",
-    }
-    args = ["bash", str(INIT_WORKSPACE), "--force", "--no-prompts", "--mode", "both"]
-    if workflow is not None:
-        args += ["--workflow", workflow]
-
-    proc = subprocess.run(args, env=env, check=check, capture_output=True, text=True)
-    return proc
+    return scaffold(tmp_path, workflow=workflow, seed=seed, name=name, check=check)
 
 
 def _tree(tmp_path: Path, workflow: str | None = None, **kw) -> Path:
