@@ -1,7 +1,7 @@
 #!/bin/bash
 # Initialize workspace by copying template files
 #
-# Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--preview] [--mode MODE] [--prune-devcontainer]
+# Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--preview] [--mode MODE] [--workflow MODEL] [--prune-devcontainer]
 #
 # Options:
 #   --force       Overwrite existing files (for upgrades)
@@ -23,6 +23,13 @@
 #                               (no .devcontainer/, no flake.nix/.envrc)
 #                 Unset: read DEVKIT_MODE from the workspace .vig-os manifest,
 #                 else prompt interactively / default to "both" with --no-prompts
+#   --workflow MODEL  Workflow model: gitflow | trunk (#1205)
+#                 gitflow  long-lived dev + main with sync-main-to-dev.yml (default)
+#                 trunk    feature/bugfix/chore straight to main; releases fork
+#                          release/X.Y.Z from main and merge back into main; the
+#                          dev branch and sync-main-to-dev.yml disappear
+#                 Unset: read DEVKIT_WORKFLOW from the workspace .vig-os manifest,
+#                 else default to gitflow
 #
 # Environment variables (used with --no-prompts):
 #   SHORT_NAME           - Project short name (required unless the workspace
@@ -58,6 +65,8 @@ PREVIEW=false
 PRUNE_DEVCONTAINER=false
 # Delivery mode: devcontainer | direnv | both | bare. Empty = manifest, prompt, or "both".
 MODE=""
+# Workflow model: gitflow | trunk. Empty = manifest, or the gitflow default (#1205).
+WORKFLOW_MODEL=""
 
 # Files to preserve during --force upgrades (never overwrite if they exist)
 # These are user/project customization files that should survive upgrades
@@ -168,9 +177,17 @@ while [[ $# -gt 0 ]]; do
             MODE="${1#--mode=}"
             shift
             ;;
+        --workflow)
+            WORKFLOW_MODEL="$2"
+            shift 2
+            ;;
+        --workflow=*)
+            WORKFLOW_MODEL="${1#--workflow=}"
+            shift
+            ;;
         *)
             echo "Unknown option: $1" >&2
-            echo "Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--preview] [--mode MODE] [--prune-devcontainer]" >&2
+            echo "Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--preview] [--mode MODE] [--workflow MODEL] [--prune-devcontainer]" >&2
             exit 1
             ;;
     esac
@@ -181,6 +198,15 @@ case "$MODE" in
     ""|devcontainer|direnv|both|bare) ;;
     *)
         echo "Error: Invalid --mode: $MODE (expected: devcontainer | direnv | both | bare)" >&2
+        exit 1
+        ;;
+esac
+
+# Validate the workflow model (empty resolves from manifest/default later, #1205).
+case "$WORKFLOW_MODEL" in
+    ""|gitflow|trunk) ;;
+    *)
+        echo "::error::Invalid --workflow: $WORKFLOW_MODEL (expected: gitflow | trunk)" >&2
         exit 1
         ;;
 esac
