@@ -587,6 +587,38 @@ if [ -z "$MODE" ] && [ -n "$MANIFEST_MODE" ] && [ -z "$SMOKE_TEST" ]; then
     info "Delivery mode from .vig-os manifest: $MODE"
 fi
 
+# Workflow model (#1205): resolve --workflow > persisted DEVKIT_WORKFLOW >
+# gitflow default, mirroring how MODE is handled above. init-workspace.sh is the
+# single source of truth for the render; install.sh only forwards/guards.
+MANIFEST_WORKFLOW="$(read_manifest_value "$PROJECT_PATH/.vig-os" DEVKIT_WORKFLOW || true)"
+
+case "$MANIFEST_WORKFLOW" in
+    ""|gitflow|trunk) ;;
+    *)
+        err "Invalid DEVKIT_WORKFLOW in $PROJECT_PATH/.vig-os: $MANIFEST_WORKFLOW"
+        exit 1
+        ;;
+esac
+
+# Switching the workflow model reshapes the release topology and never happens
+# implicitly (#1205): an explicit --workflow contradicting the persisted
+# DEVKIT_WORKFLOW refuses. --preview (report-only) inspects the switch first.
+if [ -n "$WORKFLOW_MODEL" ] && [ -n "$MANIFEST_WORKFLOW" ] && [ "$WORKFLOW_MODEL" != "$MANIFEST_WORKFLOW" ] \
+    && [ -z "$PREVIEW" ] && [ -z "$SMOKE_TEST" ]; then
+    err "requested --workflow $WORKFLOW_MODEL contradicts the persisted DEVKIT_WORKFLOW=$MANIFEST_WORKFLOW in $PROJECT_PATH/.vig-os"
+    echo "  Switching the workflow model reshapes the release topology and must be deliberate:"
+    echo "  1. Inspect the would-be change first:  install.sh --preview --workflow $WORKFLOW_MODEL $PROJECT_PATH"
+    echo "  2. Keep the persisted model by omitting --workflow, or"
+    echo "  3. Switch deliberately: set DEVKIT_WORKFLOW=$WORKFLOW_MODEL in .vig-os on a dedicated,"
+    echo "     clean upgrade branch and re-run."
+    exit 1
+fi
+
+if [ -z "$WORKFLOW_MODEL" ] && [ -n "$MANIFEST_WORKFLOW" ] && [ -z "$SMOKE_TEST" ]; then
+    WORKFLOW_MODEL="$MANIFEST_WORKFLOW"
+    info "Workflow model from .vig-os manifest: $WORKFLOW_MODEL"
+fi
+
 # Derive project name: --name > persisted DEVKIT_PROJECT > folder name (#885)
 if [ -z "$PROJECT_NAME" ] && [ -n "$MANIFEST_PROJECT" ]; then
     PROJECT_NAME="$MANIFEST_PROJECT"

@@ -321,6 +321,7 @@ MANIFEST_MODULES="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_MODULES || tru
 MANIFEST_TAG_PREFIX="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_TAG_PREFIX || true)"
 MANIFEST_FLOATING_TAGS="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_FLOATING_TAGS || true)"
 MANIFEST_CI_RUNNER="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_CI_RUNNER || true)"
+MANIFEST_WORKFLOW="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_WORKFLOW || true)"
 
 # The OWNER/REPO placeholder (written when no origin was resolvable) must not
 # mask a now-detectable git origin on a later upgrade.
@@ -351,6 +352,33 @@ if [[ -n "$MODE" && -n "$MANIFEST_MODE" && "$MODE" != "$MANIFEST_MODE" \
     echo "  3. Switch deliberately: set DEVKIT_MODE=$MODE in .vig-os on a dedicated," >&2
     echo "     clean upgrade branch (see the upgrade preflight guard in MIGRATION.md)" >&2
     echo "     and re-run the upgrade." >&2
+    exit 1
+fi
+
+# A corrupt persisted workflow model must not silently fall back to gitflow —
+# that would reshape the release topology. Refuse loudly (mirrors DEVKIT_MODE).
+case "$MANIFEST_WORKFLOW" in
+    ""|gitflow|trunk) ;;
+    *)
+        echo "Error: Invalid DEVKIT_WORKFLOW in $VIG_OS_MANIFEST: $MANIFEST_WORKFLOW (expected: gitflow | trunk)" >&2
+        exit 1
+        ;;
+esac
+
+# Switching the workflow model reshapes the release topology (trunk drops the
+# dev branch + sync-main-to-dev.yml) and, like a mode switch, must never happen
+# implicitly. An explicit --workflow that contradicts the persisted
+# DEVKIT_WORKFLOW refuses; --preview inspects the would-be switch first.
+# (--smoke-test redeploys a CI checkout from scratch and is exempt.)
+if [[ -n "$WORKFLOW_MODEL" && -n "$MANIFEST_WORKFLOW" && "$WORKFLOW_MODEL" != "$MANIFEST_WORKFLOW" \
+    && "$PREVIEW" != "true" && "$SMOKE_TEST" != "true" ]]; then
+    echo "Error: requested --workflow $WORKFLOW_MODEL contradicts the persisted DEVKIT_WORKFLOW=$MANIFEST_WORKFLOW in .vig-os." >&2
+    echo "" >&2
+    echo "Switching the workflow model reshapes the release topology and never happens implicitly:" >&2
+    echo "  1. Inspect the would-be change first:  init-workspace --preview --workflow $WORKFLOW_MODEL" >&2
+    echo "  2. Keep the persisted model by omitting --workflow, or" >&2
+    echo "  3. Switch deliberately: set DEVKIT_WORKFLOW=$WORKFLOW_MODEL in .vig-os on a dedicated," >&2
+    echo "     clean upgrade branch and re-run the upgrade." >&2
     exit 1
 fi
 
@@ -500,6 +528,18 @@ if [[ "$PRUNE_DEVCONTAINER" == "true" && "$MODE" != "direnv" && "$MODE" != "bare
     echo "Error: --prune-devcontainer only applies to direnv/bare modes (got: $MODE)" >&2
     exit 1
 fi
+
+# Resolve the workflow model (#1205): explicit --workflow > persisted
+# DEVKIT_WORKFLOW > the gitflow default. Smoke deploys ignore the manifest
+# (they redeploy the full template over a CI checkout), mirroring DEVKIT_MODE.
+# trunk is realized entirely at scaffold time (render_workflow_model + the
+# sync-main-to-dev copy-exclude); gitflow is the unchanged default and a no-op.
+if [[ -z "$WORKFLOW_MODEL" && -n "$MANIFEST_WORKFLOW" && "$SMOKE_TEST" != "true" ]]; then
+    WORKFLOW_MODEL="$MANIFEST_WORKFLOW"
+    echo "Workflow model from .vig-os manifest: $WORKFLOW_MODEL"
+fi
+WORKFLOW_MODEL="${WORKFLOW_MODEL:-gitflow}"
+echo "Workflow model set to: $WORKFLOW_MODEL"
 
 # Print one recipe block from the template justfile.project: the immediately
 # preceding comment/attribute lines, the recipe header, and the indented body.
@@ -1474,6 +1514,13 @@ if [[ -f "$VIG_OS_MANIFEST" ]]; then
     # back — else an upgrade silently resets ci.yml onto the hosted default.
     if [[ -n "$MANIFEST_CI_RUNNER" ]]; then
         write_manifest_value DEVKIT_CI_RUNNER "$MANIFEST_CI_RUNNER"
+    fi
+    # Workflow model (#1205): the template ships DEVKIT_WORKFLOW= (empty =
+    # gitflow default), so only a trunk consumer needs a written-back value — a
+    # gitflow repo's .vig-os stays byte-identical (no new non-empty line), the
+    # same conditional-writeback shape as DEVKIT_TAG_PREFIX above.
+    if [[ "$WORKFLOW_MODEL" == "trunk" ]]; then
+        write_manifest_value DEVKIT_WORKFLOW "$WORKFLOW_MODEL"
     fi
 fi
 
