@@ -19,11 +19,19 @@ invariants. The gitflow (default) render is a provable byte-for-byte no-op.
 | File | What it proves |
 |------|----------------|
 | `simulate_trunk_release.sh` | D1 — trunk release topology (local git sim) |
-| `render_workflow_model.sh` | D2 — `render_workflow_model()` prototype |
-| `verify_render.sh` | D2 — drives the render + all shape/lint assertions |
+| `render_workflow_model.sh` | D2 — `render_workflow_model()` prototype *(removed #1208)* |
+| `verify_render.sh` | D2 — drives the render + all shape/lint assertions *(removed #1208)* |
 | `../../../tests/test_workflow_model.py` | D3 — red/green pytest skeleton |
 
 Run inside the dev shell: `direnv exec . docs/spikes/1206-workflow-model/<script>`.
+
+> **Post-port note (#1208):** `render_workflow_model.sh` and its driver
+> `verify_render.sh` have been removed — the render is now the single source of
+> truth inside `assets/init-workspace.sh` (`render_workflow_model()`, a sibling
+> of `render_codeql_matrix()`), and `tests/test_workflow_model.py` drives the
+> real `init-workspace.sh` end-to-end. `simulate_trunk_release.sh` is kept: it
+> de-risks the release *topology*, which has no production counterpart to
+> supersede it.
 
 ## Deliverable 1 — trunk release topology
 

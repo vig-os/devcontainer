@@ -971,6 +971,94 @@ render_codeql_matrix() {
     echo "      scaffold does not change your repo's code-scanning API setting."
 }
 
+# Rewrite the scaffolded workspace from the gitflow default shape (long-lived
+# `dev` + `main` + sync-main-to-dev.yml) to the trunk shape (`main` only) when
+# the resolved DEVKIT_WORKFLOW is `trunk` (#1205). A pure no-op for gitflow (the
+# default), so a gitflow scaffold is byte-for-byte unchanged. Sibling of
+# render_codeql_matrix: an anchored dev->main retarget applied AFTER the rsync
+# copy. Every `dev` in these files is a plain branch literal (or an inert
+# step-name/comment), so this is an anchored retarget, not a structural rewrite
+# and not a workflow twin. sync-main-to-dev.yml is removed by the copy-exclude
+# (EXCLUDE_ARGS) + upgrade prune below, not here.
+#
+# Anchoring is load-bearing: `heads/dev\b` (word boundary) never touches
+# `development`/`devkit`/`devcontainer`; `ref: dev$` / ` from dev$` are
+# end-anchored. /dev/null device paths and the dev_sha/DEV_SHA variable names
+# are deliberately preserved (behavior is unaffected by their spelling).
+render_workflow_model() {
+    local model="$1"
+    [[ "$model" == "trunk" ]] || return 0
+
+    local wf="$WORKSPACE_DIR/.github/workflows"
+
+    # prepare-release.yml — retarget the release base dev -> main (#590/#617
+    # logic is base-agnostic) and scrub the inert dev step-names/comments so a
+    # trunk repo carries no `dev` cruft (variable names + /dev/null stay intact).
+    local pr="$wf/prepare-release.yml"
+    if [[ -f "$pr" ]]; then
+        # Behavioral branch literals: checkout refs + REST ref reads + targets.
+        sed -i -E 's|^([[:space:]]*ref:) dev$|\1 main|' "$pr"
+        sed -i -E 's|heads/dev\b|heads/main|g' "$pr"
+        sed -i -E 's| from dev$| from main|' "$pr"
+        # Inert step names + comments (no behavior change; the branch literals
+        # above are what drive the retarget).
+        sed -i 's|Checkout dev branch|Checkout main branch|' "$pr"
+        sed -i 's|Capture pre-prepare dev SHA|Capture pre-prepare main SHA|' "$pr"
+        sed -i 's| to dev via API| to main via API|g' "$pr"
+        sed -i 's|Wait for dev to advance|Wait for main to advance|' "$pr"
+        sed -i 's|freeze commit-action updates dev|freeze commit-action updates main|' "$pr"
+        sed -i 's|dev still at pre-freeze SHA|main still at pre-freeze SHA|' "$pr"
+        sed -i 's|ERROR: dev did not advance|ERROR: main did not advance|' "$pr"
+        sed -i 's|CHANGELOG.md on dev|CHANGELOG.md on main|g' "$pr"
+        # The #590 rationale comment describes the gitflow main/dev sync merge,
+        # which does not exist in trunk — reword it (full-line anchored swaps).
+        sed -i 's|dated release, matching$|dated release, so the|' "$pr"
+        sed -i 's|# dev, so the section is stable common context in the eventual main/dev$|# section stays stable and can never be silently dropped (#590) even as|' "$pr"
+        sed -i 's|# sync merge and can never be silently dropped.*Keep a Changelog$|# releases land directly on main. Keep a Changelog|' "$pr"
+    fi
+
+    # ci.yml — drop `- dev` from the PR branch filter; retarget the commit-gate
+    # TRUNK anchor used to exclude already-merged history on release PRs.
+    local ci="$wf/ci.yml"
+    if [[ -f "$ci" ]]; then
+        sed -i '/^      - dev$/d' "$ci"
+        sed -i 's|TRUNK="dev"|TRUNK="main"|' "$ci"
+    fi
+
+    # codeql.yml — drop `- dev` from the PR branch filter (push is main-only).
+    [[ -f "$wf/codeql.yml" ]] && sed -i '/^      - dev$/d' "$wf/codeql.yml"
+
+    # sync-issues.yml — default target branch + `|| 'dev'` fallbacks dev -> main
+    # (the illustrative `e.g., dev, …` description text is left alone).
+    local si="$wf/sync-issues.yml"
+    if [[ -f "$si" ]]; then
+        sed -i -E "s|^([[:space:]]*default:) 'dev'\$|\1 'main'|" "$si"
+        sed -i "s#|| 'dev'#|| 'main'#g" "$si"
+    fi
+
+    # branch-naming SKILL.md — base-branch default dev -> main. (Single-quoted
+    # sed so the Markdown backticks stay literal; the `chore/sync-main-to-dev`
+    # example on another line is a branch NAME, not a base default, and stays.)
+    local skill="$WORKSPACE_DIR/.claude/skills/branch-naming/SKILL.md"
+    if [[ -f "$skill" ]]; then
+        # shellcheck disable=SC2016  # literal Markdown backticks, not command substitution
+        sed -i 's|fall back to `dev`|fall back to `main`|' "$skill"
+        # shellcheck disable=SC2016  # literal Markdown backticks, not command substitution
+        sed -i 's|use `dev` as|use `main` as|' "$skill"
+    fi
+
+    # .pre-commit-config.yaml — drop the `(?!dev$)` protect-clause + its comments
+    # (main stays protected; trunk has no long-lived dev branch to protect).
+    local pc="$WORKSPACE_DIR/.pre-commit-config.yaml"
+    if [[ -f "$pc" ]]; then
+        sed -i 's|# Allows main, dev, and|# Allows main and|' "$pc"
+        sed -i 's|main/dev are not protected|main is not protected|' "$pc"
+        sed -i 's|(?!dev$)||' "$pc"
+    fi
+
+    echo "Rendered workflow model: trunk (anchored dev -> main retarget)"
+}
+
 # Warn if forcing (prompt user) - show which files would be overwritten
 if [[ "$FORCE" == "true" ]]; then
     echo ""
@@ -1001,6 +1089,13 @@ if [[ "$FORCE" == "true" ]]; then
         # the .devcontainer/ skip above.
         if [[ ("$MODE" == "direnv" || "$MODE" == "bare") \
             && "$rel_path" == "docs/container-ci-quirks.md" ]]; then
+            continue
+        fi
+        # trunk workflow model (#1205): sync-main-to-dev.yml is copy-excluded, so
+        # it never lands in a trunk workspace — keep the report truthful (a
+        # leftover copy on a gitflow->trunk upgrade is listed under DELETIONS).
+        if [[ "$WORKFLOW_MODEL" == "trunk" \
+            && "$rel_path" == ".github/workflows/sync-main-to-dev.yml" ]]; then
             continue
         fi
         if [[ "$MODE" == "devcontainer" || "$MODE" == "bare" ]] \
@@ -1051,6 +1146,14 @@ if [[ "$FORCE" == "true" ]]; then
         if [[ -f "$WORKSPACE_DIR/.devcontainer/justfile.base" ]]; then
             DELETIONS+=(".devcontainer/justfile.base")
         fi
+    fi
+
+    # trunk workflow model (#1205): a gitflow->trunk upgrade removes the
+    # now-excluded sync-main-to-dev.yml (mirrors the .devcontainer/ deletion).
+    # Mode-independent, so it sits outside the mode if/else above.
+    if [[ "$WORKFLOW_MODEL" == "trunk" \
+        && -f "$WORKSPACE_DIR/.github/workflows/sync-main-to-dev.yml" ]]; then
+        DELETIONS+=(".github/workflows/sync-main-to-dev.yml")
     fi
 
     # Show preserved files
@@ -1106,6 +1209,14 @@ if [[ "$FORCE" == "true" ]]; then
                 echo "  +  $added"
             done
             echo "─────────────────────────────────────────────────────────────"
+        fi
+        # trunk workflow model (#1205): the copied release workflows are
+        # rendered dev -> main after the copy, so call it out in the preview.
+        if [[ "$WORKFLOW_MODEL" == "trunk" ]]; then
+            echo ""
+            echo "Workflow model: trunk — the release workflows are rendered from the"
+            echo "dev base to main (prepare-release/ci/codeql/sync-issues), along with"
+            echo "the branch-naming skill and the pre-commit branch guard."
         fi
         echo ""
         echo "Preview complete — no files were changed."
@@ -1216,6 +1327,13 @@ else
         # Container-only documentation stays out of the container-less modes
         # (#989); a previously scaffolded copy is pruned after the copy below.
         EXCLUDE_ARGS+=("--exclude=/docs/container-ci-quirks.md")
+    fi
+
+    # trunk workflow model (#1205): the long-lived dev branch and its sync
+    # workflow disappear, so a trunk workspace never receives
+    # sync-main-to-dev.yml (a leftover copy is pruned after the copy below).
+    if [[ "$WORKFLOW_MODEL" == "trunk" ]]; then
+        EXCLUDE_ARGS+=("--exclude=/.github/workflows/sync-main-to-dev.yml")
     fi
 
     # Legacy typos config (#913): the `typos` tool reads .typos.toml, typos.toml
@@ -1332,6 +1450,16 @@ if [[ ("$MODE" == "direnv" || "$MODE" == "bare") \
     && -f "$WORKSPACE_DIR/docs/container-ci-quirks.md" ]]; then
     echo "Pruning container-only docs/container-ci-quirks.md (#989)..."
     rm -f "$WORKSPACE_DIR/docs/container-ci-quirks.md"
+fi
+
+# trunk workflow model (#1205): prune a sync-main-to-dev.yml left by a prior
+# gitflow scaffold on a gitflow->trunk upgrade. The rsync above already excludes
+# the template copy; this removes the upgrade leftover. Devkit-managed (never in
+# PRESERVE_FILES), so no pre-existence guard — mirrors the container-docs prune.
+if [[ "$WORKFLOW_MODEL" == "trunk" \
+    && -f "$WORKSPACE_DIR/.github/workflows/sync-main-to-dev.yml" ]]; then
+    echo "Pruning sync-main-to-dev.yml for the trunk workflow model (#1205)..."
+    rm -f "$WORKSPACE_DIR/.github/workflows/sync-main-to-dev.yml"
 fi
 
 # 0.4.0 retired .devcontainer/justfile.base (recipes relocated to
@@ -1482,6 +1610,9 @@ fi
 migrate_root_gitignore
 render_gitignore
 render_codeql_matrix
+# trunk workflow model (#1205): retarget the copied release workflows dev ->
+# main. A no-op for the gitflow default, so a gitflow scaffold is unchanged.
+render_workflow_model "$WORKFLOW_MODEL"
 
 # Persist the resolved manifest (#885). The scaffolded .vig-os is a managed
 # file (template-overwritten on upgrade), so the resolved delivery mode and
