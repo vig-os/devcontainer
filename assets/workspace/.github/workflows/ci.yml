@@ -19,6 +19,16 @@
 # This collapses the former per-mode ci.yml overlays (container / direnv / bare)
 # into a single managed file (#991).
 #
+# Runner selection (#1173): `resolve-toolchain` also emits `runner-json`, a JSON
+# array of runner labels from the optional `.vig-os` key `DEVKIT_CI_RUNNER`
+# (comma-separated; absent => the hosted default). The toolchain jobs (lint,
+# test, commit-checks) and the summary gate declare
+# `runs-on: ${{ fromJSON(needs.resolve-toolchain.outputs.runner-json) }}`, so a
+# self-hosted consumer routes them onto its own runners without hand-editing this
+# managed file. `resolve-toolchain` itself stays on the hosted default (it
+# produces the output — chicken-and-egg); `dependency-review` stays hosted too
+# (public-repo-only, toolchain-free, and reads GitHub's dependency-graph API).
+#
 # Jobs:
 #   1. resolve-toolchain — Resolve delivery mode + image from .vig-os
 #   2. lint              — Pre-commit hooks
@@ -69,11 +79,13 @@ jobs:
       mode: ${{ steps.resolve.outputs.mode }}
       image: ${{ steps.resolve.outputs.image }}
       image-tag: ${{ steps.resolve.outputs.image-tag }}
+      runner-json: ${{ steps.resolve.outputs.runner-json }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
+          persist-credentials: false
           sparse-checkout: |
             .vig-os
             .github/actions/resolve-toolchain
@@ -90,7 +102,7 @@ jobs:
   lint:
     name: Lint & Format
     needs: [resolve-toolchain]
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(needs.resolve-toolchain.outputs.runner-json) }}
     # Empty image (direnv/bare) => runs on the host; non-empty => in-container.
     # The credentials block is inert on the host (proven by the #992 spike).
     container:
@@ -107,6 +119,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
 
       # Mode-aware preamble: exports the in-image env + prek skew guard in
       # container mode, provisions the Nix dev-shell (direnv) or the uv host
@@ -128,7 +142,7 @@ jobs:
   test:
     name: Tests
     needs: [resolve-toolchain]
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(needs.resolve-toolchain.outputs.runner-json) }}
     container:
       image: ${{ needs.resolve-toolchain.outputs.image }}
       credentials:
@@ -143,6 +157,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Set up devkit toolchain
         uses: ./.github/actions/setup-devkit-toolchain
@@ -166,7 +182,7 @@ jobs:
   commit-checks:
     name: Commit Messages
     needs: [resolve-toolchain]
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(needs.resolve-toolchain.outputs.runner-json) }}
     container:
       image: ${{ needs.resolve-toolchain.outputs.image }}
       credentials:
@@ -244,6 +260,11 @@ jobs:
   # API is unavailable on Free-plan private repos, so private repos get a
   # skipped (neutral) run instead of a permanently red one, and a repo later
   # flipped public starts gating automatically with no re-scaffold (#1039).
+  #
+  # First run on a NEW public repo returns 403 if the org disables the dependency
+  # graph for new repos (dependency_graph_enabled_for_new_repositories: false).
+  # Enable it once (repo admin), the same toggle as Settings > Security >
+  # Dependency graph: gh api -X PUT repos/OWNER/REPO/vulnerability-alerts (#1166).
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-24.04
@@ -256,6 +277,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Review dependencies for vulnerabilities
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294  # v5.0.0
@@ -264,7 +287,7 @@ jobs:
 
   summary:
     name: CI Summary
-    runs-on: ubuntu-24.04
+    runs-on: ${{ fromJSON(needs.resolve-toolchain.outputs.runner-json) }}
     timeout-minutes: 5
     needs: [resolve-toolchain, lint, test, commit-checks, dependency-review]
     if: always()

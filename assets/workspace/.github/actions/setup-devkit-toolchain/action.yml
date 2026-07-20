@@ -83,12 +83,34 @@ runs:
         echo "prek present: $(command -v prek)"
 
     # ── direnv — host, provision from the repo's own Nix flake dev-shell ──────
+    # Self-hosted runners (DEVKIT_CI_RUNNER, #1173) usually ship their own Nix;
+    # install-nix-action would abort on them and leave NIX_CONFIG malformed
+    # (#1192), so detect first and take the matching path below.
+    - name: Detect host Nix
+      if: inputs.mode == 'direnv'
+      id: detect-nix
+      shell: bash
+      run: |
+        set -euo pipefail
+        if command -v nix >/dev/null 2>&1; then
+          echo "has-nix=true" >> "$GITHUB_OUTPUT"
+          # Some multi-user host Nix wrappers print --version to stderr (#1198);
+          # fold it into the capture so the log keeps the version, not empty ().
+          # Scrub the ambient NIX_CONFIG (#1216): a self-hosted runner's service
+          # env may carry a malformed one that makes nix error on the config
+          # before printing the version, defeating the diagnostic.
+          echo "Host Nix present: $(command -v nix) ($(env -u NIX_CONFIG nix --version 2>&1))"
+        else
+          echo "has-nix=false" >> "$GITHUB_OUTPUT"
+        fi
+
     # Nix installer SHA-pinned to match the vig-os toolchain. The vig-os public
     # Cachix substituter (pull-only, no token) makes the dev-shell a fast
     # binary-cache pull; accept-flake-config lets the pinned vigos input
-    # contribute its own substituters.
+    # contribute its own substituters. Keep extra_nix_config in lockstep with
+    # the "Configure host Nix" step below (enforced by test).
     - name: Install Nix (upstream CppNix)
-      if: inputs.mode == 'direnv'
+      if: inputs.mode == 'direnv' && steps.detect-nix.outputs.has-nix != 'true'
       uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342  # v31.11.0
       with:
         extra_nix_config: |
@@ -96,6 +118,26 @@ runs:
           accept-flake-config = true
           extra-substituters = https://vig-os.cachix.org
           extra-trusted-public-keys = vig-os.cachix.org-1:yoOYRi3bvnM6ThxO0joLt7vtzhTfkq3r6jykeUMg7Bk=
+
+    # Preinstalled host Nix: export the same settings via a well-formed
+    # multi-line NIX_CONFIG instead of installing. On a multi-user host Nix
+    # the substituter entries may be ignored for non-trusted users — Cachix is
+    # an optimization, correctness does not depend on it. Keep the settings in
+    # lockstep with extra_nix_config above (enforced by test).
+    - name: Configure host Nix
+      if: inputs.mode == 'direnv' && steps.detect-nix.outputs.has-nix == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        {
+          echo 'NIX_CONFIG<<DEVKIT_NIX_CONFIG_EOF'
+          echo 'experimental-features = nix-command flakes'
+          echo 'accept-flake-config = true'
+          echo 'extra-substituters = https://vig-os.cachix.org'
+          echo 'extra-trusted-public-keys = vig-os.cachix.org-1:yoOYRi3bvnM6ThxO0joLt7vtzhTfkq3r6jykeUMg7Bk='
+          echo 'DEVKIT_NIX_CONFIG_EOF'
+        } >> "$GITHUB_ENV"
+        echo "Configured preinstalled host Nix via NIX_CONFIG."
 
     # Optional: push this repo's own closure to a consumer-owned Cachix cache.
     # Skipped unless the repo passes cachix-cache; pulls need no token, so the
@@ -149,6 +191,83 @@ runs:
             echo "UV_PYTHON_DOWNLOADS_JSON_URL=$UV_DL_JSON_URL" >> "$GITHUB_ENV"
           fi
         fi
+
+        # ── Forward the dev-shell's shellHook environment (#1180) ────────────
+        # GITHUB_PATH carries PATH only, so every env var a project exports from
+        # its flake `shellHook` (tool config, sensible defaults) — present in
+        # every local `nix develop`/direnv session — silently vanished on CI
+        # (vig-os/org-config#40: a shellHook-seeded OTTERDOG_TOKEN placeholder
+        # worked locally, failed on CI). Diff the ambient environment against the
+        # dev-shell environment (the shellHook has run inside `nix develop`) and
+        # forward the vars the dev-shell adds or changes, minus a denylist of
+        # shell session state and Nix/stdenv build machinery that must never leak
+        # into the CI environment. The diff is what keeps ambient host secrets
+        # (already in the runner env, unchanged inside the shell) out of
+        # GITHUB_ENV. Null-delimited dumps + a random GITHUB_ENV heredoc
+        # delimiter keep multi-line and special-character values intact.
+        env -0 > "$RUNNER_TEMP/devkit-host-env"
+        # Dump the dev-shell env to a file INSIDE the shell command: capturing
+        # `nix develop` stdout would also capture shellHook output (the
+        # scaffolded flake echoes a banner), gluing it onto the first NUL
+        # record and corrupting GITHUB_ENV (#1189).
+        nix develop --profile "$RUNNER_TEMP/devkit-dev-profile" \
+          --command bash -c 'env -0 > "$1"' _ "$RUNNER_TEMP/devkit-devshell-env"
+
+        # Denylist: shell session state (must never override the CI shell) and
+        # Nix/stdenv build machinery (PATH is already handled via GITHUB_PATH).
+        devkit_env_denied() {
+          case "$1" in
+            PATH|HOME|USER|LOGNAME|SHELL|TERM|PWD|OLDPWD|SHLVL|IFS|_) return 0 ;;
+            TMPDIR|TMP|TEMP|TEMPDIR) return 0 ;;
+            NIX_*) return 0 ;;
+            out|outputs|src|stdenv|system|builder|name|pname|version|shell|shellHook) return 0 ;;
+            buildInputs|nativeBuildInputs|propagatedBuildInputs|propagatedNativeBuildInputs) return 0 ;;
+            deps*|*Phase|phases|dont*) return 0 ;;
+            configureFlags|cmakeFlags|mesonFlags|makeFlags|patches|strictDeps|enableParallelBuilding) return 0 ;;
+            SOURCE_DATE_EPOCH|HOST_PATH|__structuredAttrs|outputHash*|preferLocalBuild|allowSubstitutes|cmakeDir) return 0 ;;
+            *) return 1 ;;
+          esac
+        }
+
+        # Ambient environment, keyed by name, to detect unchanged vars.
+        declare -A DEVKIT_HOST_ENV=()
+        while IFS= read -r -d '' devkit_kv; do
+          DEVKIT_HOST_ENV["${devkit_kv%%=*}"]="${devkit_kv#*=}"
+        done < "$RUNNER_TEMP/devkit-host-env"
+
+        devkit_env_forwarded=0
+        while IFS= read -r -d '' devkit_kv; do
+          devkit_name="${devkit_kv%%=*}"
+          devkit_value="${devkit_kv#*=}"
+          # A name that is not a valid env identifier can only come from a
+          # corrupted dump record; skip it rather than poisoning GITHUB_ENV
+          # (#1189).
+          if [[ ! "$devkit_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+            echo "::warning::Skipping malformed dev-shell env record name."
+            continue
+          fi
+          # Skip vars unchanged from the ambient environment (already present in
+          # the CI env; forwarding them would needlessly re-emit host secrets).
+          if [[ -n "${DEVKIT_HOST_ENV[$devkit_name]+x}" \
+                && "${DEVKIT_HOST_ENV[$devkit_name]}" == "$devkit_value" ]]; then
+            continue
+          fi
+          if devkit_env_denied "$devkit_name"; then
+            continue
+          fi
+          # Random heredoc delimiter: multi-line and special-character values
+          # survive intact and cannot break GITHUB_ENV parsing (GitHub's own
+          # multiline idiom).
+          devkit_delim="DEVKIT_ENV_EOF_${RANDOM}${RANDOM}${RANDOM}${RANDOM}"
+          {
+            printf '%s<<%s\n' "$devkit_name" "$devkit_delim"
+            printf '%s\n' "$devkit_value"
+            printf '%s\n' "$devkit_delim"
+          } >> "$GITHUB_ENV"
+          devkit_env_forwarded=$((devkit_env_forwarded + 1))
+        done < "$RUNNER_TEMP/devkit-devshell-env"
+        echo "Forwarded $devkit_env_forwarded dev-shell shellHook env var(s) to GITHUB_ENV."
+
         echo "Repo flake dev-shell provisioned; tools added to PATH."
 
     - name: Verify toolchain (prek present in dev-shell)

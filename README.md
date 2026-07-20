@@ -38,6 +38,13 @@ Manual Setup) without `--mode` to be prompted, where the default selection is
 also `both`. `devcontainer` scaffolds `.devcontainer/` only; `direnv` scaffolds
 `flake.nix` + `.envrc` only; `both` scaffolds everything.
 
+**Workflow model.** Independently of the delivery mode, `--workflow gitflow|trunk`
+selects the branching model (persisted as `DEVKIT_WORKFLOW` in `.vig-os`, default
+`gitflow`): `gitflow` keeps a long-lived `dev` branch with `sync-main-to-dev`,
+while `trunk` merges topic branches straight to `main` (releases still fork
+`release/X.Y.Z`, from `main`, and merge back). See
+[`docs/MIGRATION.md`](docs/MIGRATION.md#workflow-models).
+
 **Options:**
 
 ```bash
@@ -199,7 +206,7 @@ For detailed command descriptions, run `just --list --unsorted` or `just --help`
 - **Registry**: `ghcr.io/vig-os/devcontainer`
 - **Architecture**: Multi-platform support (AMD64, ARM64)
 - **License**: Apache
-- **Latest Version**: [1.3.1](https://github.com/vig-os/devkit/releases/tag/1.3.1) - 2026-07-17
+- **Latest Version**: [1.4.0](https://github.com/vig-os/devkit/releases/tag/1.4.0) - 2026-07-20
 - **Image tags**: bare semver (`0.2.1`, `latest`) — git tags use `v` prefix (`v0.2.1`) but image tags do not
 
 ## Features

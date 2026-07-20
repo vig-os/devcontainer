@@ -14,6 +14,7 @@
 #   --org ORG         Override organization name (default: vigOS)
 #   --repo OWNER/REPO GitHub repo for Renovate preset (default: detect from origin or OWNER/REPO)
 #   --mode MODE       Delivery mode: devcontainer | direnv | both | bare (default: .vig-os manifest, prompt, or both)
+#   --workflow MODEL  Workflow model: gitflow | trunk (default: .vig-os manifest, or gitflow)
 #   --smoke-test      Deploy smoke-test-specific assets
 #   --preview         Print the add/overwrite/preserve/delete file report for an
 #                     upgrade and exit without changing anything
@@ -46,6 +47,7 @@ PROJECT_NAME=""
 ORG_NAME=""
 GITHUB_REPO_OVERRIDE=""
 MODE=""
+WORKFLOW_MODEL=""
 SMOKE_TEST=""
 PREVIEW=""
 PRUNE_DEVCONTAINER=""
@@ -86,6 +88,9 @@ OPTIONS:
     --mode MODE       Delivery mode: devcontainer | direnv | both | bare
                       (default: DEVKIT_MODE from the target's .vig-os manifest,
                       else prompt interactively / "both" non-interactively)
+    --workflow MODEL  Workflow model: gitflow | trunk
+                      (default: DEVKIT_WORKFLOW from the target's .vig-os
+                      manifest, else the gitflow default)
     --smoke-test      Deploy smoke-test-specific assets
     --preview         Preview an upgrade: print the add/overwrite/preserve/delete
                       file report and exit without changing any files
@@ -441,6 +446,14 @@ while [ $# -gt 0 ]; do
             MODE="${1#--mode=}"
             shift
             ;;
+        --workflow)
+            WORKFLOW_MODEL="$2"
+            shift 2
+            ;;
+        --workflow=*)
+            WORKFLOW_MODEL="${1#--workflow=}"
+            shift
+            ;;
         --dry-run)
             DRY_RUN=true
             shift
@@ -486,6 +499,16 @@ case "$MODE" in
     ""|devcontainer|direnv|both|bare) ;;
     *)
         err "Invalid --mode: $MODE (expected: devcontainer | direnv | both | bare)"
+        usage
+        exit 1
+        ;;
+esac
+
+# Validate the workflow model (empty = .vig-os manifest, else gitflow default; #1205)
+case "$WORKFLOW_MODEL" in
+    ""|gitflow|trunk) ;;
+    *)
+        err "Invalid --workflow: $WORKFLOW_MODEL (expected: gitflow | trunk)"
         usage
         exit 1
         ;;
@@ -562,6 +585,38 @@ fi
 if [ -z "$MODE" ] && [ -n "$MANIFEST_MODE" ] && [ -z "$SMOKE_TEST" ]; then
     MODE="$MANIFEST_MODE"
     info "Delivery mode from .vig-os manifest: $MODE"
+fi
+
+# Workflow model (#1205): resolve --workflow > persisted DEVKIT_WORKFLOW >
+# gitflow default, mirroring how MODE is handled above. init-workspace.sh is the
+# single source of truth for the render; install.sh only forwards/guards.
+MANIFEST_WORKFLOW="$(read_manifest_value "$PROJECT_PATH/.vig-os" DEVKIT_WORKFLOW || true)"
+
+case "$MANIFEST_WORKFLOW" in
+    ""|gitflow|trunk) ;;
+    *)
+        err "Invalid DEVKIT_WORKFLOW in $PROJECT_PATH/.vig-os: $MANIFEST_WORKFLOW"
+        exit 1
+        ;;
+esac
+
+# Switching the workflow model reshapes the release topology and never happens
+# implicitly (#1205): an explicit --workflow contradicting the persisted
+# DEVKIT_WORKFLOW refuses. --preview (report-only) inspects the switch first.
+if [ -n "$WORKFLOW_MODEL" ] && [ -n "$MANIFEST_WORKFLOW" ] && [ "$WORKFLOW_MODEL" != "$MANIFEST_WORKFLOW" ] \
+    && [ -z "$PREVIEW" ] && [ -z "$SMOKE_TEST" ]; then
+    err "requested --workflow $WORKFLOW_MODEL contradicts the persisted DEVKIT_WORKFLOW=$MANIFEST_WORKFLOW in $PROJECT_PATH/.vig-os"
+    echo "  Switching the workflow model reshapes the release topology and must be deliberate:"
+    echo "  1. Inspect the would-be change first:  install.sh --preview --workflow $WORKFLOW_MODEL $PROJECT_PATH"
+    echo "  2. Keep the persisted model by omitting --workflow, or"
+    echo "  3. Switch deliberately: set DEVKIT_WORKFLOW=$WORKFLOW_MODEL in .vig-os on a dedicated,"
+    echo "     clean upgrade branch and re-run."
+    exit 1
+fi
+
+if [ -z "$WORKFLOW_MODEL" ] && [ -n "$MANIFEST_WORKFLOW" ] && [ -z "$SMOKE_TEST" ]; then
+    WORKFLOW_MODEL="$MANIFEST_WORKFLOW"
+    info "Workflow model from .vig-os manifest: $WORKFLOW_MODEL"
 fi
 
 # Derive project name: --name > persisted DEVKIT_PROJECT > folder name (#885)
@@ -714,6 +769,10 @@ if [ -n "$MODE" ]; then
     CMD+=(--mode "$MODE")
 fi
 
+if [ -n "$WORKFLOW_MODEL" ]; then
+    CMD+=(--workflow "$WORKFLOW_MODEL")
+fi
+
 if [ -n "$PRUNE_DEVCONTAINER" ]; then
     CMD+=(--prune-devcontainer)
 fi
@@ -845,10 +904,13 @@ setup_git_repo() {
         fi
     fi
 
-    # Verify or create branches
+    # Verify or create branches. The gitflow default carries a long-lived 'dev'
+    # branch; the trunk workflow model (#1205) works straight on 'main', so its
+    # dev creation/warning/push-hint are skipped ('git init -b main' is common).
     if [ "$created_repo" = true ]; then
-        # New repo: create dev branch from main
-        if ! git rev-parse --verify dev >/dev/null 2>&1; then
+        # New repo: create dev branch from main (gitflow only).
+        if [ "$WORKFLOW_MODEL" != "trunk" ] \
+            && ! git rev-parse --verify dev >/dev/null 2>&1; then
             echo "Creating 'dev' branch..."
             git branch dev
             echo "'dev' branch created"
@@ -859,7 +921,8 @@ setup_git_repo() {
             echo "Warning: Branch 'main' not found in existing repository"
             echo "  The project workflow expects a 'main' branch."
         fi
-        if ! git rev-parse --verify dev >/dev/null 2>&1; then
+        if [ "$WORKFLOW_MODEL" != "trunk" ] \
+            && ! git rev-parse --verify dev >/dev/null 2>&1; then
             echo "Warning: Branch 'dev' not found in existing repository"
             echo "  The project workflow expects a 'dev' branch."
             echo "  Create it with: git branch dev"
@@ -871,8 +934,13 @@ setup_git_repo() {
     echo ""
     echo "You can set a remote origin with:"
     echo "  git remote add origin <your-repo-url>"
-    echo "Then push your branches with:"
-    echo "  git push -u origin main dev"
+    if [ "$WORKFLOW_MODEL" = "trunk" ]; then
+        echo "Then push your branch with:"
+        echo "  git push -u origin main"
+    else
+        echo "Then push your branches with:"
+        echo "  git push -u origin main dev"
+    fi
     echo ""
 }
 

@@ -342,6 +342,77 @@ _scaffold() {
     assert_success
 }
 
+# ── direnv defaults to flake-generated pre-commit hooks (#1167) ────────────────
+# The direnv CI lane runs on the bare host runner (resolve-toolchain emits an
+# empty container image). A fresh direnv scaffold therefore defaults to the
+# shared flake-generated hook set, which is resolved entirely from the Nix store
+# — including pymarkdown, now a flake system hook (#1170) — rather than building
+# the committed YAML's remote pre-commit repo hook envs per runner. Container/both
+# keep the hand-managed YAML; a consumer's own preserved flake.nix/config is
+# never rewritten.
+
+@test "direnv scaffold drops the hand-managed .pre-commit-config.yaml (#1167)" {
+    ws="$BATS_TEST_TMPDIR/e2e-direnv-hooks-drop"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    run test -e "$ws/.pre-commit-config.yaml"
+    assert_failure
+}
+
+@test "direnv scaffold activates flake-generated hooks in flake.nix (#1167)" {
+    ws="$BATS_TEST_TMPDIR/e2e-direnv-hooks-flake"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    run grep -Eq '^[[:space:]]*hooks = \{ \};' "$ws/flake.nix"
+    assert_success
+}
+
+@test "direnv scaffold gitignores the generated .pre-commit-config.yaml (#1167)" {
+    ws="$BATS_TEST_TMPDIR/e2e-direnv-hooks-gitignore"
+    mkdir -p "$ws"
+    run _scaffold direnv "$ws"
+    assert_success
+    run grep -qxF '.pre-commit-config.yaml' "$ws/.gitignore"
+    assert_success
+}
+
+@test "devcontainer scaffold keeps the hand-managed .pre-commit-config.yaml (#1167)" {
+    ws="$BATS_TEST_TMPDIR/e2e-devc-hooks-keep"
+    mkdir -p "$ws"
+    run _scaffold devcontainer "$ws"
+    assert_success
+    run test -f "$ws/.pre-commit-config.yaml"
+    assert_success
+}
+
+@test "both scaffold keeps the YAML and leaves flake hooks opt-in (#1167)" {
+    ws="$BATS_TEST_TMPDIR/e2e-both-hooks-opt-in"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    run test -f "$ws/.pre-commit-config.yaml"
+    assert_success
+    run grep -Eq '^[[:space:]]*hooks = \{ \};' "$ws/flake.nix"
+    assert_failure
+}
+
+@test "direnv --force preserves a consumer's own flake.nix and config (#1167)" {
+    ws="$BATS_TEST_TMPDIR/e2e-direnv-hooks-preserve"
+    mkdir -p "$ws"
+    printf '# SENTINEL-1167 consumer flake\n{ }\n' >"$ws/flake.nix"
+    printf '# SENTINEL-1167 consumer config\nrepos: []\n' >"$ws/.pre-commit-config.yaml"
+    run _scaffold direnv "$ws"
+    assert_success
+    # A preserved consumer flake is never rewritten with the default hooks line...
+    run grep -Eq '^[[:space:]]*hooks = \{ \};' "$ws/flake.nix"
+    assert_failure
+    # ...and their committed config survives.
+    run grep -q 'SENTINEL-1167 consumer config' "$ws/.pre-commit-config.yaml"
+    assert_success
+}
+
 # ── opt-in .devcontainer/ prune on container-less mode upgrade (#990) ──────────
 # The #738 default is non-destructive: a container→direnv/bare re-scaffold keeps
 # a populated pre-existing .devcontainer/. On a real container→direnv migration
@@ -1422,6 +1493,47 @@ EOF
     assert_output --partial 'default_language_version'
 }
 
+# ── preserved diff must survive a foreign/broken .git in the cwd (#1197) ──────
+# When init-workspace.sh runs via a bare `podman run -v <worktree>:/workspace`
+# and the mounted workspace is a git WORKTREE, its `.git` is a FILE pointing at
+# `gitdir: <path outside the mount>`. In-container git discovers that `.git`
+# from the cwd, fails to resolve the gitdir, and `git diff --no-index` aborts
+# with `fatal: not a git repository: (null)` BEFORE diffing — swallowed by
+# `|| true`, so the operator lost the preserved-file divergence and the log
+# gained a `fatal:` line per file. The no-index diff needs no repo, so it must
+# ignore repo discovery entirely.
+
+@test "preserved diff survives a foreign-git worktree cwd (#1197)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1197-worktree"
+    mkdir -p "$ws"
+    # Simulate a worktree whose real gitdir is unreachable (outside the mount).
+    printf 'gitdir: /nonexistent/path/outside\n' >"$ws/.git"
+    _custom_precommit_config "$ws"
+    # Run with cwd INSIDE the workspace so git discovers the broken `.git`.
+    # Stub uv AND just (like _scaffold): the trailing sync step is a fast no-op,
+    # and stubbing just keeps just's own `git rev-parse` (an out-of-scope code
+    # path) from muddying the assertion — the only git call left is the
+    # preserved-template diff under test.
+    local stub="$BATS_TEST_TMPDIR/stub-1197"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/uv"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/uv" "$stub/just"
+    run env -C "$ws" PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=testproj \
+        GITHUB_REPOSITORY=test/repo \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts --mode both
+    assert_success
+    # The broken-repo abort must never surface...
+    refute_output --partial 'fatal:'
+    refute_output --partial 'not a git repository'
+    # ...and the divergence diff is still produced.
+    assert_output --partial 'Preserved .pre-commit-config.yaml differs from the template'
+    assert_output --partial 'default_language_version'
+}
+
 # ── upgrade must preserve a customized .typos.toml, no dual configs (#913) ────
 # The typos hook reads a project's spell-check exceptions; a consumer curates
 # repo-specific extend-words/extend-exclude that a template overwrite silently
@@ -1475,6 +1587,20 @@ EOF
     # template .typos.toml NOT shipped -> single active config
     run test -e "$ws/.typos.toml"
     assert_failure
+}
+
+@test "--preview does not list template .typos.toml as ADDED under a legacy _typos.toml (#1196)" {
+    # Regression (#1196, exo-pet/vault#31): the real copy rsync-excludes the
+    # template .typos.toml when the consumer carries _typos.toml (and no
+    # .typos.toml), yet --preview reported it as ADDED — advertising a file the
+    # upgrade then silently skips. Preview must mirror the copy's exclude set.
+    ws="$BATS_TEST_TMPDIR/e2e-1196-preview-typos"
+    mkdir -p "$ws"
+    printf '# SENTINEL-1196 legacy typos config\n' >"$ws/_typos.toml"
+    run _preview "$ws" --mode both
+    assert_success
+    # the copy skips template .typos.toml here, so preview must not add it
+    refute_output --partial "+  .typos.toml"
 }
 
 # ── upgrade must preserve customized lint configs .yamllint / .pymarkdown (#1099) ─
@@ -2002,6 +2128,26 @@ _upgrade_no_flags() {
     run grep -x 'DEVKIT_TAG_PREFIX=v' "$ws/.vig-os"
     assert_success
     run grep -x 'DEVKIT_FLOATING_TAGS=major,minor' "$ws/.vig-os"
+    assert_success
+}
+
+@test "template .vig-os ships the CI runner key empty (#1173)" {
+    run grep -x 'DEVKIT_CI_RUNNER=' "$TEMPLATE_DIR/.vig-os"
+    assert_success
+}
+
+@test "upgrade preserves a persisted DEVKIT_CI_RUNNER value (#1173)" {
+    # .vig-os is a managed file, so a self-hosted consumer's DEVKIT_CI_RUNNER
+    # must be read before the template overwrite and written back — else an
+    # upgrade silently resets ci.yml's jobs onto the hosted default runner.
+    ws="$BATS_TEST_TMPDIR/e2e-1173-cirunner"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    sed -i 's/^DEVKIT_CI_RUNNER=.*/DEVKIT_CI_RUNNER=self-hosted,linux,x64,meatgrinder/' "$ws/.vig-os"
+    run _upgrade_no_flags "$ws"
+    assert_success
+    run grep -x 'DEVKIT_CI_RUNNER=self-hosted,linux,x64,meatgrinder' "$ws/.vig-os"
     assert_success
 }
 
@@ -2927,6 +3073,56 @@ _RELEASE_RESOLVERS_991=(
     refute_output --partial "'**.ts'"
 }
 
+# ── nix consumer detection + gitignore fragment (#1171) ───────────────────────
+# A repo is nix-oriented when it carries *.nix files BEYOND the scaffold-managed
+# ./flake.nix (which every direnv scaffold ships — so flake.nix alone cannot be
+# the marker without false-positiving on every direnv consumer at re-scaffold
+# time). The beyond-flake.nix rule is deterministic and re-scaffold-safe. A
+# detected nix repo appends the nix.gitignore fragment (result/result-* build
+# symlinks). nix is NOT a CodeQL language, so the matrix is unchanged (same
+# treatment as rust: the language leg is omitted).
+
+@test "scaffold .gitignore for a nix consumer ignores result symlinks (#1171)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1171-nix-gi"
+    mkdir -p "$ws/nix"
+    # A *.nix file beyond the managed root flake.nix marks the repo as nix.
+    printf '{ }\n' >"$ws/nix/module.nix"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/.gitignore"
+    assert_success
+    assert_line 'result'
+    assert_line 'result-*'
+}
+
+@test "scaffold .gitignore for a flake.nix-only consumer is not nix (#1171)" {
+    # Re-scaffold trap: every direnv consumer ships ./flake.nix. flake.nix alone
+    # must NOT trigger nix detection, or re-scaffold would false-positive on all
+    # of them. Pre-place ONLY the root flake.nix (no other *.nix).
+    ws="$BATS_TEST_TMPDIR/e2e-1171-flake-only"
+    mkdir -p "$ws"
+    printf '{ outputs = _: { }; }\n' >"$ws/flake.nix"
+    run _scaffold both "$ws"
+    assert_success
+    run cat "$ws/.gitignore"
+    assert_success
+    refute_line 'result'
+    refute_line 'result-*'
+}
+
+@test "scaffold codeql matrix for a nix consumer omits the language leg, keeps actions (#1171)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1171-nix-cq"
+    mkdir -p "$ws/nix"
+    printf '{ }\n' >"$ws/nix/module.nix"
+    run _scaffold both "$ws"
+    assert_success
+    run grep -E '^[[:space:]]*language:' "$ws/.github/workflows/codeql.yml"
+    assert_success
+    assert_output --partial "'actions'"
+    refute_output --partial "'nix'"
+    refute_output --partial "'python'"
+}
+
 # ── first-scaffold npm justfile.project recipes for Node consumers (#1027) ─────
 # justfile.project is a PRESERVE_FILE: the stock template ships uv/pyproject
 # recipes, which no-op for a Node repo whose CI still calls `just sync|test`.
@@ -3294,4 +3490,132 @@ _RELEASE_RESOLVERS_991=(
         bash "$INIT_WORKSPACE_SH" --preview --no-prompts --mode both
     assert_success
     assert_line '  ✓  .pre-commit-config.yaml'
+}
+
+# ── scaffold chmod scope for consumer .sh files (#1195) ───────────────────────
+# The post-copy "restore executable permissions" sweep must set +x only on the
+# scaffold-delivered script set (the template's .sh files), never on a
+# consumer's own sourced-only .sh libraries. A blanket `find … -name '*.sh'`
+# re-dirtied preserved consumer libs (mode 644 → 755) on every --force
+# re-scaffold — observed in the field on exo-fleet (#1195).
+
+@test "scaffold chmod +x skips a consumer's pre-existing sourced .sh lib (#1195)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1195-chmod-scope"
+    mkdir -p "$ws/lib"
+    # Consumer-owned, sourced-only library: not a template path, intentionally
+    # non-executable (644). The scaffold must leave its mode untouched.
+    printf '#!/usr/bin/env bash\n# sourced, never executed\n' >"$ws/lib/consumer-lib.sh"
+    chmod 644 "$ws/lib/consumer-lib.sh"
+    run _scaffold both "$ws"
+    assert_success
+    # (a) the consumer's sourced lib keeps its non-executable mode
+    run test -x "$ws/lib/consumer-lib.sh"
+    assert_failure
+    # (b) a template-delivered script IS made executable
+    run test -x "$ws/.devcontainer/scripts/post-create.sh"
+    assert_success
+}
+
+# ── workflow model: trunk scaffold shape (#1205) ──────────────────────────────
+# The DEVKIT_WORKFLOW knob (gitflow default | trunk) is realized entirely at
+# scaffold time: trunk works straight on 'main', so the gitflow 'dev' branch and
+# its sync-main-to-dev.yml bridge disappear. These end-to-end tests run the real
+# init-workspace.sh (via _scaffold_ex / _preview) and assert the trunk shape and
+# its guards. The exhaustive dev->main render is pinned in
+# tests/test_workflow_model.py; here we cover the scaffold-file invariants and
+# the upgrade/guard paths that the bats harness exercises naturally.
+# TEMPLATE_DIR is the gitflow template throughout, so the #991 assertions above
+# (which read TEMPLATE_DIR) are unaffected.
+
+@test "trunk scaffold omits sync-main-to-dev.yml (#1205)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1205-trunk-no-sync"
+    mkdir -p "$ws"
+    run _scaffold_ex both "$ws" --workflow trunk
+    assert_success
+    run test -f "$ws/.github/workflows/sync-main-to-dev.yml"
+    assert_failure
+    # the gitflow bridge is gone, but the rest of the workflow set still ships
+    run test -f "$ws/.github/workflows/prepare-release.yml"
+    assert_success
+}
+
+@test "rendered trunk prepare-release.yml still satisfies the #991 invariants (#1205)" {
+    # The trunk render only retargets dev -> main; it must not disturb the #991
+    # mode-aware toolchain shape: no hardcoded devcontainer image pin, no retired
+    # resolve-image action, and the setup-devkit-toolchain composite is present.
+    ws="$BATS_TEST_TMPDIR/e2e-1205-trunk-991"
+    mkdir -p "$ws"
+    run _scaffold_ex both "$ws" --workflow trunk
+    assert_success
+    wf="$ws/.github/workflows/prepare-release.yml"
+    run grep -q 'ghcr.io/vig-os/devcontainer:' "$wf"
+    assert_failure
+    run grep -q 'resolve-image' "$wf"
+    assert_failure
+    run grep -q 'setup-devkit-toolchain' "$wf"
+    assert_success
+    # and the release base really is main, not dev
+    run grep -q 'ref: main' "$wf"
+    assert_success
+    run grep -q 'heads/dev' "$wf"
+    assert_failure
+}
+
+@test "--preview lists sync-main-to-dev.yml under DELETIONS on a gitflow->trunk upgrade (#1205)" {
+    # Seed a gitflow scaffold (which ships sync-main-to-dev.yml), then preview a
+    # trunk upgrade: the now-excluded bridge is reported as a deletion, and the
+    # preview is side-effect-free (the file stays in place).
+    ws="$BATS_TEST_TMPDIR/e2e-1205-preview-delete"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    run test -f "$ws/.github/workflows/sync-main-to-dev.yml"
+    assert_success
+    run _preview "$ws" --mode both --workflow trunk
+    assert_success
+    assert_output --partial "DELETED"
+    assert_output --partial "sync-main-to-dev.yml"
+    # side-effect-free: the preview left the bridge in place
+    run test -f "$ws/.github/workflows/sync-main-to-dev.yml"
+    assert_success
+}
+
+@test "contradiction guard refuses --workflow trunk against a persisted gitflow .vig-os (#1205)" {
+    # Seed a gitflow scaffold and pin DEVKIT_WORKFLOW=gitflow in its manifest;
+    # an explicit --workflow trunk then contradicts the persisted value and is
+    # refused outside --preview / --smoke-test (the topology switch is deliberate).
+    ws="$BATS_TEST_TMPDIR/e2e-1205-contradict-gitflow"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    sed -i 's/^DEVKIT_WORKFLOW=$/DEVKIT_WORKFLOW=gitflow/' "$ws/.vig-os"
+    run _scaffold_ex both "$ws" --workflow trunk
+    assert_failure
+    assert_output --partial "contradicts the persisted DEVKIT_WORKFLOW"
+}
+
+@test "contradiction guard refuses --workflow gitflow against a persisted trunk .vig-os (#1205)" {
+    # The reverse direction: a trunk scaffold persists DEVKIT_WORKFLOW=trunk, so
+    # a later --workflow gitflow contradicts it and is refused.
+    ws="$BATS_TEST_TMPDIR/e2e-1205-contradict-trunk"
+    mkdir -p "$ws"
+    run _scaffold_ex both "$ws" --workflow trunk
+    assert_success
+    run grep -q '^DEVKIT_WORKFLOW=trunk$' "$ws/.vig-os"
+    assert_success
+    run _scaffold_ex both "$ws" --workflow gitflow
+    assert_failure
+    assert_output --partial "contradicts the persisted DEVKIT_WORKFLOW"
+}
+
+@test "--preview bypasses the workflow contradiction guard (inspect the switch first) (#1205)" {
+    # --preview is the sanctioned way to inspect a would-be topology switch, so
+    # it must not trip the contradiction guard even against a persisted value.
+    ws="$BATS_TEST_TMPDIR/e2e-1205-preview-bypass"
+    mkdir -p "$ws"
+    run _scaffold_ex both "$ws" --workflow trunk
+    assert_success
+    run _preview "$ws" --mode both --workflow gitflow
+    assert_success
+    refute_output --partial "contradicts the persisted DEVKIT_WORKFLOW"
 }

@@ -318,6 +318,49 @@ setup() {
     assert_success
 }
 
+# ── workflow model: trunk skips the dev branch (#1205) ────────────────────────
+# The gitflow default carries a long-lived 'dev' branch; the trunk workflow model
+# works straight on 'main', so its dev creation and the two-branch push hint are
+# gated out. The git setup runs host-side only after the container scaffolds
+# (unreachable under --dry-run), so the branch-skip behavior is asserted
+# structurally here and end-to-end in test_install_script.py; --dry-run proves
+# the --workflow flag is forwarded to the container command.
+
+@test "install.sh gates dev-branch creation on the workflow model (trunk skips it) (#1205)" {
+    # shellcheck disable=SC2016
+    run grep -F '[ "$WORKFLOW_MODEL" != "trunk" ]' "$INSTALL_SH"
+    assert_success
+}
+
+@test "install.sh shows a trunk push hint that omits dev (#1205)" {
+    # The trunk hint pushes only main; the gitflow hint pushes 'main dev'.
+    run grep 'git push -u origin main"' "$INSTALL_SH"
+    assert_success
+}
+
+@test "install.sh --dry-run --workflow trunk forwards --workflow to init-workspace (#1205)" {
+    mkdir -p "$BATS_TEST_TMPDIR/wf-trunk"
+    run bash "$INSTALL_SH" --dry-run --workflow trunk "$BATS_TEST_TMPDIR/wf-trunk" </dev/null
+    assert_success
+    assert_output --partial "Would execute:"
+    assert_output --partial "--workflow trunk"
+}
+
+@test "install.sh --dry-run without --workflow forwards no workflow flag (gitflow default) (#1205)" {
+    mkdir -p "$BATS_TEST_TMPDIR/wf-default"
+    run bash "$INSTALL_SH" --dry-run "$BATS_TEST_TMPDIR/wf-default" </dev/null
+    assert_success
+    assert_output --partial "Would execute:"
+    refute_output --partial "--workflow"
+}
+
+@test "install.sh rejects an invalid --workflow value (#1205)" {
+    mkdir -p "$BATS_TEST_TMPDIR/wf-bogus"
+    run bash "$INSTALL_SH" --dry-run --workflow bogus "$BATS_TEST_TMPDIR/wf-bogus" </dev/null
+    assert_failure
+    assert_output --partial "Invalid --workflow"
+}
+
 # ── user configuration ────────────────────────────────────────────────────────
 
 @test "install.sh includes run_user_conf function" {

@@ -14,6 +14,16 @@ DEVKIT_VERSION={{IMAGE_TAG}}
 # persist a mode this repo did not choose.
 DEVKIT_MODE=
 
+# Workflow model: gitflow (default) | trunk. Empty (= unset) resolves to the
+# gitflow default — long-lived `dev` + `main` with sync-main-to-dev.yml, no
+# change for devkit or existing consumers. `trunk` opts a repo into a
+# trunk-based flow: feature/bugfix/chore branches merge straight to `main`,
+# releases fork release/X.Y.Z from main and merge back into main, and the `dev`
+# branch and sync-main-to-dev.yml disappear. Realized entirely at scaffold time
+# (an anchored dev->main render + a sync-main-to-dev copy-exclude), mirroring
+# DEVKIT_MODE. Written back only for trunk, so a gitflow .vig-os is unchanged (#1205).
+DEVKIT_WORKFLOW=
+
 # Project identity (persisted SHORT_NAME / ORG_NAME / GITHUB_REPOSITORY);
 # written back by init-workspace.sh — edit only to deliberately rename.
 DEVKIT_PROJECT=
@@ -36,3 +46,11 @@ DEVKIT_TAG_PREFIX=
 # `major,minor` moves <prefix>X and <prefix>X.Y so consumers can pin
 # `uses: owner/repo@v0`. Composes with DEVKIT_TAG_PREFIX; final releases only (#1045).
 DEVKIT_FLOATING_TAGS=
+
+# CI runner labels for the scaffolded ci.yml toolchain jobs (lint, test,
+# commit-checks) and the summary gate — comma-separated, e.g.
+# `self-hosted,linux,x64,meatgrinder`. Empty (default) => the hosted `ubuntu-24.04`
+# runner (no change for existing consumers). Routed into `runs-on` via
+# resolve-toolchain's `runner-json` output; the resolve-toolchain and
+# dependency-review jobs always stay on the hosted default (#1173).
+DEVKIT_CI_RUNNER=

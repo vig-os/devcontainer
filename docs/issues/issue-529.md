@@ -2,7 +2,7 @@
 type: issue
 state: open
 created: 2026-04-29T14:40:41Z
-updated: 2026-07-17T06:19:17Z
+updated: 2026-07-20T11:36:03Z
 author: renovate[bot]
 author_url: https://github.com/renovate[bot]
 url: https://github.com/vig-os/devkit/issues/529
@@ -13,7 +13,7 @@ milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-07-17T07:15:34.574Z
+synced: 2026-07-20T14:51:07.153Z
 ---
 
 # [Issue 529]: [Dependency Dashboard](https://github.com/vig-os/devkit/issues/529)
@@ -339,7 +339,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 </details>
 
-<details><summary>assets/workspace/.github/workflows/ci.yml (12)</summary>
+<details><summary>assets/workspace/.github/workflows/ci.yml (8)</summary>
 
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
@@ -347,10 +347,6 @@ The following updates are awaiting their schedule. To get an update now, click o
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `actions/checkout v7.0.0@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0`
  - `actions/dependency-review-action v5.0.0@a1d282b36b6f3519aa1f3fc636f609c47dddb294`
- - `ubuntu 24.04`
- - `ubuntu 24.04`
- - `ubuntu 24.04`
- - `ubuntu 24.04`
  - `ubuntu 24.04`
  - `ubuntu 24.04`
 
@@ -533,7 +529,7 @@ The following updates are awaiting their schedule. To get an update now, click o
 
 <details><summary>pyproject.toml (18)</summary>
 
- - `github-backup ==0.64.0`
+ - `github-backup ==0.64.2`
  - `jinja2 ==3.1.6`
  - `pexpect ==4.9.0`
  - `pytest ==9.1.1`

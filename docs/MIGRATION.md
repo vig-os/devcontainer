@@ -125,6 +125,153 @@ Free-plan private repos; OpenSSF Scorecard is public-only), so private consumers
 get a skipped (neutral) run instead of a permanently red one. A repo later
 flipped public starts scanning automatically, with no re-scaffold.
 
+### direnv mode: `shellHook` environment forwarding
+
+In `direnv` mode the `setup-devkit-toolchain` preamble forwards your flake
+dev-shell's `shellHook` environment to CI **by default**
+([#1180](https://github.com/vig-os/devkit/issues/1180)). Any env var a project
+exports from its `shellHook` (tool configuration, sensible defaults) is present
+in every local `nix develop`/direnv session; before #1180 the preamble exported
+only the dev-shell's `PATH` (via `GITHUB_PATH`), so those vars silently vanished
+on CI — a local-vs-CI divergence that surfaced as unrelated tool errors
+(a `shellHook`-seeded `OTTERDOG_TOKEN` placeholder worked locally and failed on
+CI). The preamble now diffs the ambient runner environment against the dev-shell
+environment (the `shellHook` has run inside `nix develop`) and writes the vars
+the dev-shell **adds or changes** to `GITHUB_ENV`. The ambient diff is what keeps
+host secrets — already in the runner env, unchanged inside the shell — out of
+`GITHUB_ENV`; multi-line values are written with a random `GITHUB_ENV` heredoc
+delimiter so they survive intact.
+
+A denylist keeps shell-session state and Nix/stdenv build machinery from leaking
+into the CI environment. Never forwarded:
+
+- **Session/runtime shell state** — `PATH` (already handled via `GITHUB_PATH`),
+  `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`, `PWD`, `OLDPWD`, `SHLVL`, `IFS`,
+  `TMPDIR`/`TMP`/`TEMP`/`TEMPDIR`.
+- **Nix/stdenv build internals** — everything `NIX_*`; the stdenv scalars/lists
+  `out`, `outputs`, `src`, `stdenv`, `system`, `builder`, `name`, `pname`,
+  `version`, `shell`, `shellHook`, `buildInputs`, `nativeBuildInputs`,
+  `propagatedBuildInputs`, `propagatedNativeBuildInputs`, `SOURCE_DATE_EPOCH`,
+  `HOST_PATH`; and the build-machinery patterns `deps*`, `*Phase`, `phases`,
+  `dont*`, `configureFlags`/`cmakeFlags`/`mesonFlags`/`makeFlags`, `patches`,
+  `strictDeps`, `outputHash*`.
+
+This is why the diff-plus-denylist approach is used instead of forwarding
+`nix print-dev-env` wholesale: that dumps the full build machinery, none of which
+belongs in a CI environment. Recipes should still avoid depending on env a
+`shellHook` sets **only for interactive convenience** — CI parity is best-effort
+for build machinery, but genuine `shellHook` exports are now forwarded.
+
+## Workflow models
+
+`install.sh … --workflow <gitflow|trunk>` selects a consumer's **branching
+model** ([#1205](https://github.com/vig-os/devkit/issues/1205)), independently of
+the delivery mode above. Empty/absent resolves to the `gitflow` default:
+
+- **`gitflow`** (default) — a long-lived `dev` integration branch alongside
+  `main`. `feature`/`bugfix` branches merge to `dev`, `release/X.Y.Z` is cut from
+  `dev`, finalize merges to `main` + tags, and `sync-main-to-dev.yml` back-merges
+  `main` into `dev`. This is the model existing consumers already run; nothing
+  changes for them.
+- **`trunk`** — no `dev` branch and no `sync-main-to-dev.yml`.
+  `feature`/`bugfix`/`chore` branches merge straight to `main`. Releases are
+  unchanged in every other respect: `release/X.Y.Z` is cut **from `main`**, run
+  through the same RC/vulnix-gate/promote train, and **merged back into `main`**
+  and tagged.
+
+The model is realized entirely at scaffold time — an anchored `dev -> main` render
+of the scaffolded workflows (`prepare-release`, `ci`, `codeql`, `sync-issues`),
+the branch-naming skill, and the pre-commit branch guard, plus a
+`sync-main-to-dev.yml` copy-exclude — mirroring how `DEVKIT_MODE` is applied and
+with no runtime workflow logic (see
+[`docs/rfcs/ADR-workflow-model.md`](rfcs/ADR-workflow-model.md) for the design and
+[`docs/RELEASE_CYCLE.md`](RELEASE_CYCLE.md#workflow-models) for the topology). On a
+fresh `trunk` install `init-workspace.sh` also skips creating the `dev` branch.
+
+The chosen model is persisted as `DEVKIT_WORKFLOW` in the `.vig-os` manifest
+(below) — **written back only for `trunk`**, so a `gitflow` `.vig-os` is
+byte-for-byte unchanged — and upgrades never need `--workflow` again.
+
+### Switching the workflow model
+
+Like mode switching, **switching the workflow model never happens implicitly**,
+and it is **destructive** in a way a mode switch is not: the scaffold renders
+files, but it cannot reshape a repository's branch topology. An explicit
+`--workflow` that contradicts the persisted `DEVKIT_WORKFLOW` **refuses** — inspect
+the would-be change with `--preview` first, then, if you really mean it, set
+`DEVKIT_WORKFLOW` in `.vig-os` yourself on a dedicated, clean upgrade branch (the
+[preflight-guard flow](#upgrade-preflight-guard-and-preview)) and re-run the
+upgrade.
+
+- **`gitflow` → `trunk`:** after the re-scaffold drops the `dev`-referencing
+  workflow content and prunes `sync-main-to-dev.yml`, the **remote `dev` branch is
+  orphaned** — the scaffold does not (and must not) delete branches. Once no open
+  work targets it, delete it manually: `git push origin --delete dev` (and
+  `git branch -D dev` locally). Re-point any default-branch or branch-protection
+  settings that named `dev` at `main`.
+- **`trunk` → `gitflow`:** the re-scaffold restores the `dev`-based workflows and
+  `sync-main-to-dev.yml`, but you must (re)create the `dev` branch yourself
+  (`git branch dev main && git push -u origin dev`) for the gitflow release flow
+  to work.
+
+### Enable the dependency graph on new public consumers
+
+The scaffolded `ci.yml` also ships a **Dependency Review** gate that blocks PRs
+introducing known-vulnerable dependencies
+([#1140](https://github.com/vig-os/devkit/issues/1140)). Like the scans above it
+is guarded to public repos, because the dependency-graph API it reads is
+unavailable on Free-plan private repos.
+
+On a **public** repo the dependency graph is normally on by default — but the
+`vig-os` org creates new repos with it **disabled**
+(`dependency_graph_enabled_for_new_repositories: false`), so a fresh public
+consumer's first Dependency Review run returns `403` until the graph is turned
+on. Enable it once when provisioning a new public consumer (needs repo admin) —
+the same idempotent endpoint the repo's *Settings → Security → Dependency graph*
+toggle calls:
+
+```bash
+gh api -X PUT "repos/<owner>/<repo>/vulnerability-alerts"
+```
+
+This is a one-time, per-repo step run by no scaffold script, so it applies in
+every delivery mode. A private consumer can skip it — the gate is neutral there
+and starts working automatically if the repo is later flipped public
+([#1166](https://github.com/vig-os/devkit/issues/1166)).
+
+### Run CI on self-hosted runners
+
+`ci.yml` defaults to GitHub-hosted `ubuntu-24.04` runners. A consumer whose org
+runs its CI on self-hosted runners (e.g. GitHub billing blocks hosted runners
+for heavy jobs) sets the optional `.vig-os` key `DEVKIT_CI_RUNNER` to a
+**comma-separated runner label list** instead of hand-editing the
+scaffold-managed workflow (hand-edits to `runs-on` are clobbered on the next
+upgrade):
+
+```ini
+# .vig-os
+DEVKIT_CI_RUNNER=self-hosted,linux,x64,meatgrinder
+```
+
+`resolve-toolchain` reads the key and emits a `runner-json` output — a JSON array
+of the labels (`["self-hosted","linux","x64","meatgrinder"]`), or
+`["ubuntu-24.04"]` when the key is absent — and the toolchain jobs (`lint`,
+`test`, `commit-checks`) plus the `summary` gate declare
+`runs-on: ${{ fromJSON(needs.resolve-toolchain.outputs.runner-json) }}`. A single
+label still emits a valid one-element array. The key is persisted across
+re-scaffolds like the other manifest keys, so an upgrade preserves it with no
+flags. Absent => unchanged behavior for every existing consumer
+([#1173](https://github.com/vig-os/devkit/issues/1173)).
+
+**Limitation — two jobs always stay hosted.** `resolve-toolchain` runs on the
+hosted default because it *produces* `runner-json` (a job cannot depend on its
+own output — chicken-and-egg); it is a seconds-long sparse checkout.
+`dependency-review` also stays hosted: it is public-repo-only (skipped on private
+repos), needs no toolchain, and reads GitHub's dependency-graph API. A consumer
+whose org **cannot run any hosted job at all** therefore still needs those two
+lanes handled separately (e.g. a repo-specific static render); this v1 keeps the
+managed workflow minimal and does not cover that case.
+
 ## The `.vig-os` project manifest
 
 Since [#885](https://github.com/vig-os/devkit/issues/885), `.vig-os` is
@@ -136,10 +283,12 @@ unknown keys:
 |-----|---------|
 | `DEVCONTAINER_VERSION` | Scaffold/image version pin (managed by release automation; keeps its legacy name until the devkit rename, [#781](https://github.com/vig-os/devkit/issues/781)) |
 | `DEVKIT_MODE` | Delivery mode: `devcontainer` \| `direnv` \| `both` \| `bare` |
+| `DEVKIT_WORKFLOW` | Branching model: `gitflow` (default) \| `trunk`; written back only for `trunk` (see [Workflow models](#workflow-models), [#1205](https://github.com/vig-os/devkit/issues/1205)) |
 | `DEVKIT_PROJECT` | Persisted project short name (`SHORT_NAME`) |
 | `DEVKIT_ORG` | Persisted organization name (`ORG_NAME`) |
 | `DEVKIT_REPO` | Persisted GitHub `owner/repo` (Renovate preset) |
 | `DEVKIT_MODULES` | Reserved: space-separated capability modules mirroring `mkProjectShell`'s `modules = [ … ]` ([#884](https://github.com/vig-os/devkit/issues/884)) |
+| `DEVKIT_CI_RUNNER` | Comma-separated runner label list for the scaffolded `ci.yml` toolchain jobs; empty (default) => the hosted `ubuntu-24.04` runner ([#1173](https://github.com/vig-os/devkit/issues/1173)) |
 
 How it behaves:
 
@@ -362,6 +511,16 @@ hook set is defined once in the vigOS flake, and a consumer can compose it
 from the **preserved** project `flake.nix` instead of hand-editing the
 scaffolded `.pre-commit-config.yaml`:
 
+> **`direnv` scaffolds opt in by default** ([#1167](https://github.com/vig-os/devkit/issues/1167)).
+> A fresh `direnv` scaffold ships `flake.nix` with `hooks = { }` already active
+> and no hand-managed `.pre-commit-config.yaml`, because the direnv CI lane runs
+> on the bare host runner, where the flake-generated set — resolved entirely from
+> the Nix store — is more robust than building the committed YAML's remote
+> pre-commit repo hook envs per runner. Everything in this section still applies
+> — customize via the `hooks`/`hooksExcludes` block; the generated config is a
+> gitignored store symlink. `container`/`both` scaffolds keep the hand-managed
+> YAML with the block commented out, and `bare` ships no flake at all.
+
 ```nix
 devShells.default = vigos.lib.mkProjectShell {
   inherit pkgs;
@@ -406,9 +565,12 @@ The contract:
   `hooks`/`hooksExcludes` block as above, then delete the YAML and gitignore
   it. To opt back out, remove the `hooks` argument and commit a plain YAML
   again.
-- **Residual:** the `pymarkdown` hook is not in nixpkgs, so the generated
-  base set does not include it (the scaffolded YAML runs it from its upstream
-  pre-commit repo). Add it as a custom hook if you need it under generation.
+- **`pymarkdown` is in the base set.** Since
+  [#1170](https://github.com/vig-os/devkit/issues/1170) `pymarkdownlnt` is
+  packaged in the flake and `pymarkdown` is a `language: system` base hook, so
+  the generated set includes it — `direnv`/`bare` consumers gain markdown lint
+  from the shared toolchain like `shellcheck`/`typos`. Toggle it off with
+  `pymarkdown.enable = false` if a repo has no markdown to lint.
 - The planned declarative `.vig-os` manifest
   ([#885](https://github.com/vig-os/devkit/issues/885)) will carry an
   explicit raw-YAML opt-out flag so the choice is recorded per-repo rather

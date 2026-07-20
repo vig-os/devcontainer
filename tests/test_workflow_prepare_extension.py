@@ -29,6 +29,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tests.workflow_scaffold import scaffold_tree
+
 # Repository root (tests/ -> repo root) and the consumer scaffold tree.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKSPACE = REPO_ROOT / "assets" / "workspace"
@@ -96,6 +98,21 @@ def _job_with_step_run(doc: dict, needle: str) -> tuple[str, dict] | tuple[None,
         if isinstance(job, dict) and needle in _job_steps_text(job):
             return name, job
     return None, None
+
+
+def _branch_job_checkout_ref(doc: dict) -> str | None:
+    """The ``with.ref`` the release-branch-creating job checks out.
+
+    The branch-creating job (the one that pushes the release ref via
+    ``git/refs``) forks the release branch from this base: ``dev`` under
+    gitflow, ``main`` under trunk (#1205).
+    """
+    name, job = _job_with_step_run(doc, "git/refs")
+    assert name is not None, "could not locate the release-branch-creating job"
+    for step in job.get("steps") or []:
+        if isinstance(step, dict) and "actions/checkout" in str(step.get("uses", "")):
+            return (step.get("with") or {}).get("ref")
+    raise AssertionError(f"branch-creating job {name!r} has no checkout step")
 
 
 # --------------------------------------------------------------------------- #
@@ -167,6 +184,43 @@ def test_prepare_release_calls_extension_between_branch_and_pr(path: Path) -> No
     )
     assert ext_name in _needs(pr_job), (
         f"the draft PR must open after the extension (needs: {ext_name})"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Workflow model (#1205): the release-branch base tracks gitflow (dev) / trunk
+# (main). The extension hook DAG is model-independent — it must survive the
+# trunk dev -> main render intact.
+# --------------------------------------------------------------------------- #
+
+
+def test_scaffold_prepare_forks_release_branch_from_dev() -> None:
+    """Gitflow (default): the release branch is cut from the long-lived dev."""
+    assert _branch_job_checkout_ref(_load(SCAFFOLD_PREPARE)) == "dev"
+
+
+def test_trunk_prepare_forks_release_branch_from_main(tmp_path: Path) -> None:
+    """Trunk: the release branch is cut from main, and the hook DAG survives.
+
+    The trunk render retargets the branch base dev -> main; the extension hook
+    (branch -> extension -> open-pr ordering) is model-independent and must
+    still hold in the rendered trunk workflow.
+    """
+    rendered = scaffold_tree(tmp_path, "trunk")
+    doc = _load(rendered / ".github" / "workflows" / "prepare-release.yml")
+
+    assert _branch_job_checkout_ref(doc) == "main"
+
+    # The hook DAG is intact under trunk: extension after branch, PR after ext.
+    ext_name, ext_job = _extension_job(doc)
+    assert ext_name is not None, "trunk render dropped the extension job"
+    branch_name, _ = _job_with_step_run(doc, "git/refs")
+    pr_name, pr_job = _job_with_step_run(doc, "gh pr create")
+    assert branch_name in _needs(ext_job), (
+        "the extension must still run after branch creation under trunk"
+    )
+    assert ext_name in _needs(pr_job), (
+        "the draft PR must still open after the extension under trunk"
     )
 
 

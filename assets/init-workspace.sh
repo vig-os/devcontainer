@@ -1,7 +1,7 @@
 #!/bin/bash
 # Initialize workspace by copying template files
 #
-# Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--preview] [--mode MODE] [--prune-devcontainer]
+# Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--preview] [--mode MODE] [--workflow MODEL] [--prune-devcontainer]
 #
 # Options:
 #   --force       Overwrite existing files (for upgrades)
@@ -23,6 +23,13 @@
 #                               (no .devcontainer/, no flake.nix/.envrc)
 #                 Unset: read DEVKIT_MODE from the workspace .vig-os manifest,
 #                 else prompt interactively / default to "both" with --no-prompts
+#   --workflow MODEL  Workflow model: gitflow | trunk (#1205)
+#                 gitflow  long-lived dev + main with sync-main-to-dev.yml (default)
+#                 trunk    feature/bugfix/chore straight to main; releases fork
+#                          release/X.Y.Z from main and merge back into main; the
+#                          dev branch and sync-main-to-dev.yml disappear
+#                 Unset: read DEVKIT_WORKFLOW from the workspace .vig-os manifest,
+#                 else default to gitflow
 #
 # Environment variables (used with --no-prompts):
 #   SHORT_NAME           - Project short name (required unless the workspace
@@ -58,6 +65,8 @@ PREVIEW=false
 PRUNE_DEVCONTAINER=false
 # Delivery mode: devcontainer | direnv | both | bare. Empty = manifest, prompt, or "both".
 MODE=""
+# Workflow model: gitflow | trunk. Empty = manifest, or the gitflow default (#1205).
+WORKFLOW_MODEL=""
 
 # Files to preserve during --force upgrades (never overwrite if they exist)
 # These are user/project customization files that should survive upgrades
@@ -168,9 +177,17 @@ while [[ $# -gt 0 ]]; do
             MODE="${1#--mode=}"
             shift
             ;;
+        --workflow)
+            WORKFLOW_MODEL="$2"
+            shift 2
+            ;;
+        --workflow=*)
+            WORKFLOW_MODEL="${1#--workflow=}"
+            shift
+            ;;
         *)
             echo "Unknown option: $1" >&2
-            echo "Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--preview] [--mode MODE] [--prune-devcontainer]" >&2
+            echo "Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--preview] [--mode MODE] [--workflow MODEL] [--prune-devcontainer]" >&2
             exit 1
             ;;
     esac
@@ -181,6 +198,15 @@ case "$MODE" in
     ""|devcontainer|direnv|both|bare) ;;
     *)
         echo "Error: Invalid --mode: $MODE (expected: devcontainer | direnv | both | bare)" >&2
+        exit 1
+        ;;
+esac
+
+# Validate the workflow model (empty resolves from manifest/default later, #1205).
+case "$WORKFLOW_MODEL" in
+    ""|gitflow|trunk) ;;
+    *)
+        echo "::error::Invalid --workflow: $WORKFLOW_MODEL (expected: gitflow | trunk)" >&2
         exit 1
         ;;
 esac
@@ -294,6 +320,8 @@ MANIFEST_REPO="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_REPO || true)"
 MANIFEST_MODULES="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_MODULES || true)"
 MANIFEST_TAG_PREFIX="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_TAG_PREFIX || true)"
 MANIFEST_FLOATING_TAGS="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_FLOATING_TAGS || true)"
+MANIFEST_CI_RUNNER="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_CI_RUNNER || true)"
+MANIFEST_WORKFLOW="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_WORKFLOW || true)"
 
 # The OWNER/REPO placeholder (written when no origin was resolvable) must not
 # mask a now-detectable git origin on a later upgrade.
@@ -324,6 +352,33 @@ if [[ -n "$MODE" && -n "$MANIFEST_MODE" && "$MODE" != "$MANIFEST_MODE" \
     echo "  3. Switch deliberately: set DEVKIT_MODE=$MODE in .vig-os on a dedicated," >&2
     echo "     clean upgrade branch (see the upgrade preflight guard in MIGRATION.md)" >&2
     echo "     and re-run the upgrade." >&2
+    exit 1
+fi
+
+# A corrupt persisted workflow model must not silently fall back to gitflow —
+# that would reshape the release topology. Refuse loudly (mirrors DEVKIT_MODE).
+case "$MANIFEST_WORKFLOW" in
+    ""|gitflow|trunk) ;;
+    *)
+        echo "Error: Invalid DEVKIT_WORKFLOW in $VIG_OS_MANIFEST: $MANIFEST_WORKFLOW (expected: gitflow | trunk)" >&2
+        exit 1
+        ;;
+esac
+
+# Switching the workflow model reshapes the release topology (trunk drops the
+# dev branch + sync-main-to-dev.yml) and, like a mode switch, must never happen
+# implicitly. An explicit --workflow that contradicts the persisted
+# DEVKIT_WORKFLOW refuses; --preview inspects the would-be switch first.
+# (--smoke-test redeploys a CI checkout from scratch and is exempt.)
+if [[ -n "$WORKFLOW_MODEL" && -n "$MANIFEST_WORKFLOW" && "$WORKFLOW_MODEL" != "$MANIFEST_WORKFLOW" \
+    && "$PREVIEW" != "true" && "$SMOKE_TEST" != "true" ]]; then
+    echo "Error: requested --workflow $WORKFLOW_MODEL contradicts the persisted DEVKIT_WORKFLOW=$MANIFEST_WORKFLOW in .vig-os." >&2
+    echo "" >&2
+    echo "Switching the workflow model reshapes the release topology and never happens implicitly:" >&2
+    echo "  1. Inspect the would-be change first:  init-workspace --preview --workflow $WORKFLOW_MODEL" >&2
+    echo "  2. Keep the persisted model by omitting --workflow, or" >&2
+    echo "  3. Switch deliberately: set DEVKIT_WORKFLOW=$WORKFLOW_MODEL in .vig-os on a dedicated," >&2
+    echo "     clean upgrade branch and re-run the upgrade." >&2
     exit 1
 fi
 
@@ -474,6 +529,18 @@ if [[ "$PRUNE_DEVCONTAINER" == "true" && "$MODE" != "direnv" && "$MODE" != "bare
     exit 1
 fi
 
+# Resolve the workflow model (#1205): explicit --workflow > persisted
+# DEVKIT_WORKFLOW > the gitflow default. Smoke deploys ignore the manifest
+# (they redeploy the full template over a CI checkout), mirroring DEVKIT_MODE.
+# trunk is realized entirely at scaffold time (render_workflow_model + the
+# sync-main-to-dev copy-exclude); gitflow is the unchanged default and a no-op.
+if [[ -z "$WORKFLOW_MODEL" && -n "$MANIFEST_WORKFLOW" && "$SMOKE_TEST" != "true" ]]; then
+    WORKFLOW_MODEL="$MANIFEST_WORKFLOW"
+    echo "Workflow model from .vig-os manifest: $WORKFLOW_MODEL"
+fi
+WORKFLOW_MODEL="${WORKFLOW_MODEL:-gitflow}"
+echo "Workflow model set to: $WORKFLOW_MODEL"
+
 # Print one recipe block from the template justfile.project: the immediately
 # preceding comment/attribute lines, the recipe header, and the indented body.
 # Used to repair a preserved pre-0.4.0 justfile.project that lacks the
@@ -519,18 +586,27 @@ is_preserved_file() {
 # whose --quiet form gates the block and which exits 1 (the expected "they
 # diverged" signal, not an error) when the files differ. Returns 0 when a diff
 # was printed (files differ), 1 when identical or either file is missing.
+#
+# `git diff --no-index` needs no repository, yet git first DISCOVERS a repo from
+# the cwd. When the workspace is a git worktree (bare `podman run -v` mount), its
+# `.git` is a FILE pointing at a gitdir outside the mount; discovery fails and
+# the diff aborts with `fatal: not a git repository: (null)` before comparing
+# (#1197). `GIT_DIR=/dev/null` pins the git dir explicitly, so git skips
+# discovery entirely and the pure file comparison runs regardless of any
+# broken/foreign `.git` in the cwd.
 print_preserved_template_diff() {
     local rel="$1"
     local preserved="$WORKSPACE_DIR/$rel"
     local template="$TEMPLATE_DIR/$rel"
     [[ -f "$preserved" && -f "$template" ]] || return 1
-    if git diff --no-index --quiet -- "$template" "$preserved" > /dev/null 2>&1; then
+    if GIT_DIR=/dev/null git diff --no-index --quiet -- "$template" "$preserved" \
+        > /dev/null 2>&1; then
         return 1  # identical: nothing to surface
     fi
     echo "Preserved $rel differs from the template (yours was kept)."
     echo "Template changes NOT applied (fold in what you need, see MIGRATION.md):"
     echo "─────────────────────────────────────────────────────────────"
-    git diff --no-index -- "$template" "$preserved" || true
+    GIT_DIR=/dev/null git diff --no-index -- "$template" "$preserved" || true
     echo "─────────────────────────────────────────────────────────────"
     return 0
 }
@@ -618,6 +694,19 @@ DETECTED_LANGUAGES=()
 [[ -f "$WORKSPACE_DIR/pyproject.toml" ]] && DETECTED_LANGUAGES+=("python")
 [[ -f "$WORKSPACE_DIR/package.json" ]] && DETECTED_LANGUAGES+=("node")
 [[ -f "$WORKSPACE_DIR/Cargo.toml" ]] && DETECTED_LANGUAGES+=("rust")
+# nix (#1171): a repo is nix-oriented when it carries *.nix files BEYOND the
+# scaffold-managed ./flake.nix (excluding .git/, .direnv/, .worktrees/).
+# flake.nix alone cannot be the marker: every direnv scaffold ships one, so
+# naive detection would false-positive on every direnv consumer at re-scaffold
+# time. The beyond-flake.nix rule is deterministic and re-scaffold-safe.
+if find "$WORKSPACE_DIR" \
+    -path "$WORKSPACE_DIR/.git" -prune -o \
+    -path "$WORKSPACE_DIR/.direnv" -prune -o \
+    -path "$WORKSPACE_DIR/.worktrees" -prune -o \
+    -name '*.nix' ! -path "$WORKSPACE_DIR/flake.nix" -print -quit \
+    | grep -q .; then
+    DETECTED_LANGUAGES+=("nix")
+fi
 
 # Seed npm-mapped justfile.project recipes on the FIRST scaffold of a Node
 # consumer (#1027). justfile.project is a PRESERVE_FILE: the stock template
@@ -680,10 +769,14 @@ render_gitignore() {
     # a /nix/store symlink, which must be ignored — committing it pushes a
     # machine-local, broken symlink. Seed the ignore automatically, gated
     # STRICTLY on the store-symlink condition so a hand-managed consumer who
-    # commits a real .pre-commit-config.yaml file is never affected. Idempotent:
-    # skip when the assembled ignore (incl. .gitignore.project) already lists it.
+    # commits a real .pre-commit-config.yaml file is never affected. A fresh
+    # direnv scaffold defaults to flake-generated hooks (FLAKE_HOOKS_DEFAULT,
+    # #1167) before the store symlink exists, so seed the ignore for it too.
+    # Idempotent: skip when the assembled ignore (incl. .gitignore.project)
+    # already lists it.
     local pcc="$WORKSPACE_DIR/.pre-commit-config.yaml"
-    if [[ -L "$pcc" ]] && readlink "$pcc" | grep -q '/nix/store/'; then
+    if { [[ -L "$pcc" ]] && readlink "$pcc" | grep -q '/nix/store/'; } \
+        || [[ "${FLAKE_HOOKS_DEFAULT:-false}" == "true" ]]; then
         if ! grep -qxF '.pre-commit-config.yaml' "$gi"; then
             {
                 printf '\n# flake-hooks opt-in (#1092): the generated'
@@ -693,6 +786,36 @@ render_gitignore() {
             } >>"$gi"
         fi
     fi
+}
+
+# Turn a freshly-scaffolded direnv flake.nix into a flake-hooks generator (#1167)
+# by activating an empty `hooks = { }` argument to mkProjectShell. The direnv CI
+# lane runs on the bare host runner (resolve-toolchain emits an empty container
+# image), so the shared flake hook set — resolved entirely from the Nix store,
+# including pymarkdown now that it is a flake system hook (#1170) — is more
+# robust there than the committed YAML, which builds its remote pre-commit repo
+# hook envs (pre-commit-hooks, yamllint) per runner. Deterministic single insert
+# after the (unique) extraPackages line — a bats regression guard pins that
+# anchor. Only ever called on a FRESH scaffold (guarded by the caller).
+activate_flake_hooks_default() {
+    local flake="$WORKSPACE_DIR/flake.nix"
+    [[ -f "$flake" ]] || return 0
+    local tmp="${flake}.hooks-default"
+    awk '
+        { print }
+        /^          extraPackages = extraPackages pkgs;$/ && !inserted {
+            print ""
+            print "          # Host-runner hooks (#1167): direnv CI runs on the bare host"
+            print "          # runner, so let the flake GENERATE .pre-commit-config.yaml from"
+            print "          # the shared base hook set, resolved entirely from the Nix store"
+            print "          # (incl. pymarkdown, now a flake system hook, #1170) rather than"
+            print "          # building the committed YAML remote pre-commit repo hook envs"
+            print "          # per runner. Customize like the opt-in block below; the generated"
+            print "          # config is a gitignored /nix/store symlink."
+            print "          hooks = { };"
+            inserted = 1
+        }
+    ' "$flake" >"$tmp" && mv "$tmp" "$flake"
 }
 
 # Migrate consumer-added root ignores into .gitignore.project (#1111). The #1092
@@ -823,6 +946,7 @@ render_codeql_matrix() {
                 paths+=("'**.ts'" "'**.js'" "'**.mjs'" "'**.cjs'")
                 ;;
             rust) : ;; # CodeQL rust support caveat (#1025): omit the leg
+            nix) : ;; # nix is not a CodeQL language (#1171): omit the leg
         esac
     done
     langs+=("'actions'")
@@ -856,6 +980,115 @@ render_codeql_matrix() {
     echo "      scaffold does not change your repo's code-scanning API setting."
 }
 
+# Mode- and config-dependent copy excludes (#1196): the single source of truth
+# for template paths the rsync copy skips for reasons OTHER than the preserve
+# list. BOTH the --preview ADDED classification and the real rsync copy below
+# consult this array, so --preview never advertises a file the copy silently
+# skips (exo-pet/vault#31). Entries are exact transfer-root rel-paths; a
+# directory entry (.devcontainer) covers its whole subtree.
+MODE_CONFIG_EXCLUDES=()
+# direnv and bare modes carry no .devcontainer/ (#738) and no in-image CI notes
+# (docs/container-ci-quirks.md, #989); a previously scaffolded copy of either is
+# pruned after the copy (see the DELETIONS block below).
+if [[ "$MODE" == "direnv" || "$MODE" == "bare" ]]; then
+    MODE_CONFIG_EXCLUDES+=(".devcontainer" "docs/container-ci-quirks.md")
+fi
+# Legacy typos config (#913): the `typos` tool reads .typos.toml AND _typos.toml.
+# A consumer still carrying _typos.toml (and no .typos.toml) keeps it as the
+# single config — do not also ship the template .typos.toml, or two active
+# configs collide. (A *preserved* .typos.toml is handled by the preserve list.)
+if [[ -f "$WORKSPACE_DIR/_typos.toml" && ! -f "$WORKSPACE_DIR/.typos.toml" ]]; then
+    MODE_CONFIG_EXCLUDES+=(".typos.toml")
+fi
+
+# Rewrite the scaffolded workspace from the gitflow default shape (long-lived
+# `dev` + `main` + sync-main-to-dev.yml) to the trunk shape (`main` only) when
+# the resolved DEVKIT_WORKFLOW is `trunk` (#1205). A pure no-op for gitflow (the
+# default), so a gitflow scaffold is byte-for-byte unchanged. Sibling of
+# render_codeql_matrix: an anchored dev->main retarget applied AFTER the rsync
+# copy. Every `dev` in these files is a plain branch literal (or an inert
+# step-name/comment), so this is an anchored retarget, not a structural rewrite
+# and not a workflow twin. sync-main-to-dev.yml is removed by the copy-exclude
+# (EXCLUDE_ARGS) + upgrade prune below, not here.
+#
+# Anchoring is load-bearing: `heads/dev\b` (word boundary) never touches
+# `development`/`devkit`/`devcontainer`; `ref: dev$` / ` from dev$` are
+# end-anchored. /dev/null device paths and the dev_sha/DEV_SHA variable names
+# are deliberately preserved (behavior is unaffected by their spelling).
+render_workflow_model() {
+    local model="$1"
+    [[ "$model" == "trunk" ]] || return 0
+
+    local wf="$WORKSPACE_DIR/.github/workflows"
+
+    # prepare-release.yml — retarget the release base dev -> main (#590/#617
+    # logic is base-agnostic) and scrub the inert dev step-names/comments so a
+    # trunk repo carries no `dev` cruft (variable names + /dev/null stay intact).
+    local pr="$wf/prepare-release.yml"
+    if [[ -f "$pr" ]]; then
+        # Behavioral branch literals: checkout refs + REST ref reads + targets.
+        sed -i -E 's|^([[:space:]]*ref:) dev$|\1 main|' "$pr"
+        sed -i -E 's|heads/dev\b|heads/main|g' "$pr"
+        sed -i -E 's| from dev$| from main|' "$pr"
+        # Inert step names + comments (no behavior change; the branch literals
+        # above are what drive the retarget).
+        sed -i 's|Checkout dev branch|Checkout main branch|' "$pr"
+        sed -i 's|Capture pre-prepare dev SHA|Capture pre-prepare main SHA|' "$pr"
+        sed -i 's| to dev via API| to main via API|g' "$pr"
+        sed -i 's|Wait for dev to advance|Wait for main to advance|' "$pr"
+        sed -i 's|freeze commit-action updates dev|freeze commit-action updates main|' "$pr"
+        sed -i 's|dev still at pre-freeze SHA|main still at pre-freeze SHA|' "$pr"
+        sed -i 's|ERROR: dev did not advance|ERROR: main did not advance|' "$pr"
+        sed -i 's|CHANGELOG.md on dev|CHANGELOG.md on main|g' "$pr"
+        # The #590 rationale comment describes the gitflow main/dev sync merge,
+        # which does not exist in trunk — reword it (full-line anchored swaps).
+        sed -i 's|dated release, matching$|dated release, so the|' "$pr"
+        sed -i 's|# dev, so the section is stable common context in the eventual main/dev$|# section stays stable and can never be silently dropped (#590) even as|' "$pr"
+        sed -i 's|# sync merge and can never be silently dropped.*Keep a Changelog$|# releases land directly on main. Keep a Changelog|' "$pr"
+    fi
+
+    # ci.yml — drop `- dev` from the PR branch filter; retarget the commit-gate
+    # TRUNK anchor used to exclude already-merged history on release PRs.
+    local ci="$wf/ci.yml"
+    if [[ -f "$ci" ]]; then
+        sed -i '/^      - dev$/d' "$ci"
+        sed -i 's|TRUNK="dev"|TRUNK="main"|' "$ci"
+    fi
+
+    # codeql.yml — drop `- dev` from the PR branch filter (push is main-only).
+    [[ -f "$wf/codeql.yml" ]] && sed -i '/^      - dev$/d' "$wf/codeql.yml"
+
+    # sync-issues.yml — default target branch + `|| 'dev'` fallbacks dev -> main
+    # (the illustrative `e.g., dev, …` description text is left alone).
+    local si="$wf/sync-issues.yml"
+    if [[ -f "$si" ]]; then
+        sed -i -E "s|^([[:space:]]*default:) 'dev'\$|\1 'main'|" "$si"
+        sed -i "s#|| 'dev'#|| 'main'#g" "$si"
+    fi
+
+    # branch-naming SKILL.md — base-branch default dev -> main. (Single-quoted
+    # sed so the Markdown backticks stay literal; the `chore/sync-main-to-dev`
+    # example on another line is a branch NAME, not a base default, and stays.)
+    local skill="$WORKSPACE_DIR/.claude/skills/branch-naming/SKILL.md"
+    if [[ -f "$skill" ]]; then
+        # shellcheck disable=SC2016  # literal Markdown backticks, not command substitution
+        sed -i 's|fall back to `dev`|fall back to `main`|' "$skill"
+        # shellcheck disable=SC2016  # literal Markdown backticks, not command substitution
+        sed -i 's|use `dev` as|use `main` as|' "$skill"
+    fi
+
+    # .pre-commit-config.yaml — drop the `(?!dev$)` protect-clause + its comments
+    # (main stays protected; trunk has no long-lived dev branch to protect).
+    local pc="$WORKSPACE_DIR/.pre-commit-config.yaml"
+    if [[ -f "$pc" ]]; then
+        sed -i 's|# Allows main, dev, and|# Allows main and|' "$pc"
+        sed -i 's|main/dev are not protected|main is not protected|' "$pc"
+        sed -i 's|(?!dev$)||' "$pc"
+    fi
+
+    echo "Rendered workflow model: trunk (anchored dev -> main retarget)"
+}
+
 # Warn if forcing (prompt user) - show which files would be overwritten
 if [[ "$FORCE" == "true" ]]; then
     echo ""
@@ -870,24 +1103,33 @@ if [[ "$FORCE" == "true" ]]; then
         rel_path="${template_file#"$TEMPLATE_DIR"/}"
         workspace_file="$WORKSPACE_DIR/$rel_path"
 
-        # Mode filters (#886): skip template paths the chosen delivery mode
-        # never scaffolds. direnv and bare modes exclude .devcontainer/ from
-        # the copy entirely (#738); devcontainer and bare modes prune the
-        # flake.nix/.envrc stubs they would themselves create — unless they
-        # pre-exist (#859), in which case they fall through to the PRESERVED
-        # listing below.
-        if [[ ("$MODE" == "direnv" || "$MODE" == "bare") \
-            && "$rel_path" == .devcontainer/* ]]; then
+        # Mode/config copy excludes (#1196): skip the template paths the real
+        # rsync copy skips for the resolved mode and the consumer's config
+        # (.devcontainer/ #738, docs/container-ci-quirks.md #989, the legacy
+        # .typos.toml #913), so --preview never lists them as ADDED. SSoT:
+        # MODE_CONFIG_EXCLUDES, also consumed by the rsync copy below; a
+        # directory entry (.devcontainer) matches its whole subtree.
+        skip_excluded=false
+        for excl in "${MODE_CONFIG_EXCLUDES[@]}"; do
+            if [[ "$rel_path" == "$excl" || "$rel_path" == "$excl"/* ]]; then
+                skip_excluded=true
+                break
+            fi
+        done
+        if [[ "$skip_excluded" == "true" ]]; then
             continue
         fi
-        # Container-only documentation (#989): in-image CI notes are dead
-        # weight (and misleading) in the container-less modes. Devkit-managed
-        # (not in PRESERVE_FILES), so filtered unconditionally — same class as
-        # the .devcontainer/ skip above.
-        if [[ ("$MODE" == "direnv" || "$MODE" == "bare") \
-            && "$rel_path" == "docs/container-ci-quirks.md" ]]; then
+        # trunk workflow model (#1205): sync-main-to-dev.yml is copy-excluded, so
+        # it never lands in a trunk workspace — keep the report truthful (a
+        # leftover copy on a gitflow->trunk upgrade is listed under DELETIONS).
+        if [[ "$WORKFLOW_MODEL" == "trunk" \
+            && "$rel_path" == ".github/workflows/sync-main-to-dev.yml" ]]; then
             continue
         fi
+        # Devcontainer and bare modes prune the flake.nix/.envrc stubs they would
+        # themselves create — unless they pre-exist (#859), in which case they
+        # fall through to the PRESERVED listing below. This is a post-copy prune,
+        # not an rsync exclude, so it stays separate from MODE_CONFIG_EXCLUDES.
         if [[ "$MODE" == "devcontainer" || "$MODE" == "bare" ]] \
             && [[ "$rel_path" == "flake.nix" || "$rel_path" == ".envrc" ]] \
             && [[ ! -e "$workspace_file" ]]; then
@@ -936,6 +1178,14 @@ if [[ "$FORCE" == "true" ]]; then
         if [[ -f "$WORKSPACE_DIR/.devcontainer/justfile.base" ]]; then
             DELETIONS+=(".devcontainer/justfile.base")
         fi
+    fi
+
+    # trunk workflow model (#1205): a gitflow->trunk upgrade removes the
+    # now-excluded sync-main-to-dev.yml (mirrors the .devcontainer/ deletion).
+    # Mode-independent, so it sits outside the mode if/else above.
+    if [[ "$WORKFLOW_MODEL" == "trunk" \
+        && -f "$WORKSPACE_DIR/.github/workflows/sync-main-to-dev.yml" ]]; then
+        DELETIONS+=(".github/workflows/sync-main-to-dev.yml")
     fi
 
     # Show preserved files
@@ -991,6 +1241,14 @@ if [[ "$FORCE" == "true" ]]; then
                 echo "  +  $added"
             done
             echo "─────────────────────────────────────────────────────────────"
+        fi
+        # trunk workflow model (#1205): the copied release workflows are
+        # rendered dev -> main after the copy, so call it out in the preview.
+        if [[ "$WORKFLOW_MODEL" == "trunk" ]]; then
+            echo ""
+            echo "Workflow model: trunk — the release workflows are rendered from the"
+            echo "dev base to main (prepare-release/ci/codeql/sync-issues), along with"
+            echo "the branch-naming skill and the pre-commit branch guard."
         fi
         echo ""
         echo "Preview complete — no files were changed."
@@ -1092,25 +1350,27 @@ else
         fi
     done
 
-    # direnv and bare modes want no .devcontainer/ at all, so never copy the
-    # template one over a populated consumer .devcontainer/ (#738). Excluding it
-    # from the copy (rather than copying-then-pruning) keeps a real
-    # .devcontainer/ intact.
-    if [[ "$MODE" == "direnv" || "$MODE" == "bare" ]]; then
-        EXCLUDE_ARGS+=("--exclude=.devcontainer")
-        # Container-only documentation stays out of the container-less modes
-        # (#989); a previously scaffolded copy is pruned after the copy below.
-        EXCLUDE_ARGS+=("--exclude=/docs/container-ci-quirks.md")
-    fi
+    # Mode/config copy excludes (#1196): the same SSoT the --preview ADDED report
+    # consults (MODE_CONFIG_EXCLUDES) — so preview and copy never disagree —
+    # covering the mode-pruned .devcontainer/ (#738) and container-ci-quirks.md
+    # (#989) plus the legacy .typos.toml (#913). Root-anchored (leading slash) to
+    # match is_preserved_file's exact transfer-root semantics (#953); a directory
+    # entry (.devcontainer) excludes its whole subtree. Excluding these from the
+    # copy (rather than copying-then-pruning) keeps a real .devcontainer/ intact.
+    for excl in "${MODE_CONFIG_EXCLUDES[@]}"; do
+        EXCLUDE_ARGS+=("--exclude=/$excl")
+        # Surface the otherwise-silent legacy-typos skip so the consumer knows
+        # their _typos.toml stands as the single config (#913).
+        if [[ "$excl" == ".typos.toml" ]]; then
+            echo "Consumer carries legacy _typos.toml; not shipping template .typos.toml (#913)."
+        fi
+    done
 
-    # Legacy typos config (#913): the `typos` tool reads .typos.toml, typos.toml
-    # AND _typos.toml. A consumer still carrying _typos.toml (and no .typos.toml)
-    # must not also receive the template .typos.toml, or two active configs
-    # collide. Skip shipping the template one; their _typos.toml stands as the
-    # single config (a preserved .typos.toml is already excluded above).
-    if [[ -f "$WORKSPACE_DIR/_typos.toml" && ! -f "$WORKSPACE_DIR/.typos.toml" ]]; then
-        echo "Consumer carries legacy _typos.toml; not shipping template .typos.toml (#913)."
-        EXCLUDE_ARGS+=("--exclude=.typos.toml")
+    # trunk workflow model (#1205): the long-lived dev branch and its sync
+    # workflow disappear, so a trunk workspace never receives
+    # sync-main-to-dev.yml (a leftover copy is pruned after the copy below).
+    if [[ "$WORKFLOW_MODEL" == "trunk" ]]; then
+        EXCLUDE_ARGS+=("--exclude=/.github/workflows/sync-main-to-dev.yml")
     fi
 
     rsync -avL --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
@@ -1217,6 +1477,16 @@ if [[ ("$MODE" == "direnv" || "$MODE" == "bare") \
     && -f "$WORKSPACE_DIR/docs/container-ci-quirks.md" ]]; then
     echo "Pruning container-only docs/container-ci-quirks.md (#989)..."
     rm -f "$WORKSPACE_DIR/docs/container-ci-quirks.md"
+fi
+
+# trunk workflow model (#1205): prune a sync-main-to-dev.yml left by a prior
+# gitflow scaffold on a gitflow->trunk upgrade. The rsync above already excludes
+# the template copy; this removes the upgrade leftover. Devkit-managed (never in
+# PRESERVE_FILES), so no pre-existence guard — mirrors the container-docs prune.
+if [[ "$WORKFLOW_MODEL" == "trunk" \
+    && -f "$WORKSPACE_DIR/.github/workflows/sync-main-to-dev.yml" ]]; then
+    echo "Pruning sync-main-to-dev.yml for the trunk workflow model (#1205)..."
+    rm -f "$WORKSPACE_DIR/.github/workflows/sync-main-to-dev.yml"
 fi
 
 # 0.4.0 retired .devcontainer/justfile.base (recipes relocated to
@@ -1340,6 +1610,25 @@ else
     done
 fi
 
+# Host-runner hooks default (#1167): a FRESH direnv scaffold defaults to
+# flake-generated pre-commit hooks. The direnv CI lane runs on the bare host
+# runner (empty container image), where the shared flake hook set — resolved
+# from the Nix store, including pymarkdown now that it is a flake system hook
+# (#1170) — is more robust than the committed YAML's per-runner remote
+# pre-commit repo hook env builds. Runs BEFORE render_gitignore so the generated config is
+# ignored from the first scaffold. Gated on a fresh scaffold: never rewrite a
+# consumer's own flake.nix nor delete a committed .pre-commit-config.yaml (both
+# PRESERVE_FILES). bare mode is out of scope — it prunes flake.nix (no generator)
+# and the consumer owns its own toolchain there.
+FLAKE_HOOKS_DEFAULT=false
+if [[ "$MODE" == "direnv" && "$FLAKE_PREEXISTED" == "false" \
+    && "$PRECOMMIT_CONFIG_PREEXISTED" == "false" ]]; then
+    activate_flake_hooks_default
+    rm -f "$WORKSPACE_DIR/.pre-commit-config.yaml"
+    FLAKE_HOOKS_DEFAULT=true
+    echo "direnv mode: defaulting to flake-generated pre-commit hooks (#1167)"
+fi
+
 # Render the language-aware managed statics (#1024/#1025) from the freshly
 # copied template, keyed on the languages detected before the copy. Runs on
 # every (re)scaffold, so the correct .gitignore / codeql matrix is
@@ -1348,6 +1637,9 @@ fi
 migrate_root_gitignore
 render_gitignore
 render_codeql_matrix
+# trunk workflow model (#1205): retarget the copied release workflows dev ->
+# main. A no-op for the gitflow default, so a gitflow scaffold is unchanged.
+render_workflow_model "$WORKFLOW_MODEL"
 
 # Persist the resolved manifest (#885). The scaffolded .vig-os is a managed
 # file (template-overwritten on upgrade), so the resolved delivery mode and
@@ -1355,8 +1647,9 @@ render_codeql_matrix
 # needs no mode/identity flags at all. A consumer's DEVKIT_MODULES
 # declaration (#884, read before the template overwrite) is restored too, as
 # are the DEVKIT_TAG_PREFIX / DEVKIT_FLOATING_TAGS release tag-scheme keys
-# (#1116, read before the overwrite) — the template ships them empty, so
-# without a write-back an upgrade would silently reset a consumer's tag scheme.
+# (#1116, read before the overwrite) and the DEVKIT_CI_RUNNER runner override
+# (#1173) — the template ships them empty, so without a write-back an upgrade
+# would silently reset a consumer's tag scheme or self-hosted runner selection.
 if [[ -f "$VIG_OS_MANIFEST" ]]; then
     echo "Persisting resolved manifest values in .vig-os..."
     write_manifest_value DEVKIT_MODE "$MODE"
@@ -1374,11 +1667,31 @@ if [[ -f "$VIG_OS_MANIFEST" ]]; then
     if [[ -n "$MANIFEST_FLOATING_TAGS" ]]; then
         write_manifest_value DEVKIT_FLOATING_TAGS "$MANIFEST_FLOATING_TAGS"
     fi
+    # CI runner override (#1173): bare in the template (DEVKIT_CI_RUNNER=), so a
+    # self-hosted consumer's label list is read before the overwrite and written
+    # back — else an upgrade silently resets ci.yml onto the hosted default.
+    if [[ -n "$MANIFEST_CI_RUNNER" ]]; then
+        write_manifest_value DEVKIT_CI_RUNNER "$MANIFEST_CI_RUNNER"
+    fi
+    # Workflow model (#1205): the template ships DEVKIT_WORKFLOW= (empty =
+    # gitflow default), so only a trunk consumer needs a written-back value — a
+    # gitflow repo's .vig-os stays byte-identical (no new non-empty line), the
+    # same conditional-writeback shape as DEVKIT_TAG_PREFIX above.
+    if [[ "$WORKFLOW_MODEL" == "trunk" ]]; then
+        write_manifest_value DEVKIT_WORKFLOW "$WORKFLOW_MODEL"
+    fi
 fi
 
-# Restore executable permissions on shell scripts and hooks (must be after sed -i)
+# Restore executable permissions on shell scripts and hooks (must be after sed -i).
+# Scope the +x to the scaffold-delivered script set only: key the sweep on the
+# template's .sh files, not a blanket `find "$WORKSPACE_DIR"`. A consumer's own
+# sourced-only .sh libraries are not template paths, so a blanket sweep wrongly
+# flipped their mode (644 → 755) on every --force re-scaffold (#1195).
 echo "Setting executable permissions on shell scripts and hooks..."
-find "$WORKSPACE_DIR" -type f -name "*.sh" -exec chmod +x {} \;
+while IFS= read -r -d '' template_script; do
+    rel="${template_script#"$TEMPLATE_DIR"/}"
+    [[ -f "$WORKSPACE_DIR/$rel" ]] && chmod +x "$WORKSPACE_DIR/$rel"
+done < <(find -L "$TEMPLATE_DIR" -type f -name "*.sh" -print0)
 find "$WORKSPACE_DIR/.githooks" -type f -exec chmod +x {} \; 2>/dev/null || true
 
 # The root justfile is managed (rsync overwrites it on upgrade), so the

@@ -328,6 +328,37 @@ def test_node_module_rejects_unknown_option(current_system: str) -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# docs module (#1178) — the document-edition capability. v1 contract (packages
+# only): `typst` and `typstyle` on the dev-shell PATH so a document-oriented
+# consumer (exo-pet/vault, future qms, EXOMA presentations/grants) opts in with
+# `modules = [ "docs" ]` instead of a PyPI typst pin. No version option in v1 —
+# nixpkgs carries a single typst per pin and the module tracks that pin. See
+# docs/rfcs/ADR-capability-modules.md.
+# ---------------------------------------------------------------------------
+
+
+def test_docs_module_provides_typst_and_typstyle(current_system: str) -> None:
+    """The ``docs`` module puts ``typst`` and ``typstyle`` on PATH (#1178).
+
+    The plain-string ``modules = [ "docs" ]`` form (exercised through the
+    registry-generated ``module-docs`` check — which is also the proof the
+    registry resolves the name) contributes the nixpkgs-pinned ``typst`` and
+    ``typstyle``; both must resolve from the shell's own PATH, not the host's.
+    """
+    proc = _develop_module(
+        current_system,
+        "docs",
+        "command -v typst && command -v typstyle "
+        "&& typst --version && typstyle --version",
+    )
+    assert proc.returncode == 0, (
+        "docs-module devshell is missing typst/typstyle: "
+        f"rc={proc.returncode} stdout={proc.stdout.strip()!r} "
+        f"stderr={proc.stderr.strip()[:300]}"
+    )
+
+
 @pytest.mark.parametrize(
     "bad_version",
     ['"22"', "{ }"],

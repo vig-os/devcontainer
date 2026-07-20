@@ -106,6 +106,28 @@ devShells.default = vigos.lib.mkProjectShell {
   - `node` ([#1027](https://github.com/vig-os/devkit/issues/1027)) — the
     Node/TypeScript capability: `nodejs` (which bundles `npm`) in the shell,
     for consumers who previously hand-wired `extraPackages = [ pkgs.nodejs ]`.
+  - `docs` ([#1178](https://github.com/vig-os/devkit/issues/1178)) — the
+    document-edition capability: `typst` (the document compiler) and `typstyle`
+    (its formatter) in the shell, for document-oriented consumers
+    (exo-pet/vault, the future `qms` app, EXOMA presentations/grants) that
+    previously pinned `typst` via PyPI. Opt in with:
+
+    ```nix
+    devShells.default = vigos.lib.mkProjectShell {
+      inherit pkgs;
+      modules = [ "docs" ];
+    };
+    ```
+
+    **No version option in v1** — nixpkgs carries a single `typst`/`typstyle`
+    per pin, so the module tracks the toolchain nixpkgs pin rather than exposing
+    a selectable version (typst output is not stable across versions, so a
+    consumer regenerates its `generated/` artifacts once under the pinned
+    toolchain — pin-tracking beats a bespoke version overlay). **Deliberate v1
+    exclusions:** pandoc/LaTeX (ask-gated until a consumer needs them), headless
+    drawio/excalidraw export (electron-shaped, stays repo-owned), and Python
+    doc-processing libraries (`pymupdf4llm`, `openpyxl`) which belong in the
+    consumer's own `pyproject.toml` via uv, not in a nix module.
   - **Candidates (ask-gated, not shipped):** `geant4`, `rust`, `fortran`/`f2py`,
     `root`.
 - **Per-module options (the `node` version).** A `modules` entry is either a
@@ -392,11 +414,35 @@ These are decided inline in `flake.nix`; summarized here.
      overwritten (#878) and the planned `.vig-os` manifest opt-out flag
      (#885).
 
+### Opt-in `gitleaks` secret scanning (#1172)
+
+`gitleaks` ships in the toolchain (`nix/devtools.nix` → dev-shell, image, and
+`vigos.packages`) and is defined as a `language: system` hook, but it is
+**default-disabled** and lives only on the consumer generation surface — it is
+absent from devkit's own committed `.pre-commit-config.yaml`, the scaffold copy,
+and the sandbox `checks.pre-commit` gate, so no devkit lane runs it. A
+secret-bearing consumer opts in from its project flake:
+
+```nix
+devShells.default = vigos.lib.mkProjectShell {
+  inherit pkgs;
+  hooks = { gitleaks.enable = true; };
+};
+```
+
+The hook runs `gitleaks git --pre-commit --staged --redact --verbose` (the
+v8.19+ invocation) resolved from the pinned nixpkgs binary — no upstream
+pre-commit repo clone, and it works offline. A repo-root `.gitleaks.toml` is
+picked up by gitleaks automatically; no extra plumbing is needed to tune
+allowlists. It is off by default deliberately: false-positive tuning is
+repo-specific, and a red first `just precommit` on every existing consumer would
+be a poor upgrade experience — so devkit ships no `.gitleaks.toml` and never
+enables it for itself.
+
   Hooks that cannot run in the sandbox stay **runner-only** in the committed
   render and carry no gate profile in `nix/hooks.nix`: the generators
-  `generate-docs`/`sync-manifest`, `pip-licenses` (reads `uv.lock`), `pymarkdown`
-  (not in nixpkgs — also the one residual missing from the consumer generation
-  profile), `no-commit-to-branch` and `destroyed-symlinks`
+  `generate-docs`/`sync-manifest`, `pip-licenses` (reads `uv.lock`),
+  `no-commit-to-branch` and `destroyed-symlinks`
   (git-state-dependent), `check-agent-identity` (inspects the commit
   author/committer), and the `commit-msg`/`prepare-commit-msg`-stage hooks (never
   run by `--all-files`). `checks.pre-commit` is thus a Nix-verified guarantee that
@@ -411,25 +457,58 @@ These are decided inline in `flake.nix`; summarized here.
 
 ### `libstdc++` for C-extension pre-commit hooks (#698)
 
-Some pre-commit hooks run from pre-commit's **own** manylinux-wheel Python env
-(not the project venv) and ship a C extension. The `pymarkdown` hook is the case
-in point: its dependency `pyjson5` is a C extension linked against
-`libstdc++.so.6`, which a NixOS host does not put on the loader path outside an
-FHS environment — so the hook aborted with
+Historically some pre-commit hooks ran from pre-commit's **own** manylinux-wheel
+Python env (not the project venv) and shipped a C extension. The `pymarkdown`
+hook was the case in point: its dependency `pyjson5` is a C extension linked
+against `libstdc++.so.6`, which a NixOS host does not put on the loader path
+outside an FHS environment — so the hook aborted with
 `ImportError: libstdc++.so.6: cannot open shared object file` and forced
-`--no-verify`. Unlike the standalone binaries in #697 (`ruff`/`typos`),
-`pymarkdown` is **not** in nixpkgs, so the "add to `devTools` + `language:
-system`" recipe does not apply.
+`--no-verify`. That residual is now retired: `pymarkdownlnt` is packaged in the
+flake (`nix/pymarkdown.nix`) and `pymarkdown` is a `language: system` hook
+resolved from `devTools` like `ruff`/`typos`/`shellcheck` — the exact #697 recipe
+that seemed not to apply while it was missing from nixpkgs (#1170). The gate and
+the consumer generation surface now carry it too, so the hook set has no
+runner-only lint residual left.
 
-`mkProjectShell` therefore **appends** `${pkgs.stdenv.cc.cc.lib}/lib` to
-`LD_LIBRARY_PATH` in the dev-shell, so the wheel resolves the Nix C++ runtime.
-That is the same `libstdc++` the Nix toolchain itself links, so the other
-dev-shell binaries keep working (no version clash), and the existing
-mkShell-injected `LD_LIBRARY_PATH` is appended to rather than clobbered. The fix
-generalises to any future C-extension Python hook. A `nix-ld` host config
-(`programs.nix-ld.enable` + `libraries = [ pkgs.stdenv.cc.cc ]`) would also work
-but is per-contributor system config the repo cannot enforce, so it is at most a
-fallback, not the fix.
+`mkProjectShell` still **appends** `${pkgs.stdenv.cc.cc.lib}/lib` to
+`LD_LIBRARY_PATH` in the dev-shell, so any *runtime-installed* manylinux wheel
+(e.g. a `uvx` tool, or a consumer's own C-extension hook) resolves the Nix C++
+runtime. That is the same `libstdc++` the Nix toolchain itself links, so the
+other dev-shell binaries keep working (no version clash), and the existing
+mkShell-injected `LD_LIBRARY_PATH` is appended to rather than clobbered. It
+remains a general safety net for any future C-extension Python hook. A `nix-ld`
+host config (`programs.nix-ld.enable` + `libraries = [ pkgs.stdenv.cc.cc ]`)
+would also work but is per-contributor system config the repo cannot enforce, so
+it is at most a fallback, not the fix.
+
+That `LD_LIBRARY_PATH` safety net only exists **inside** the dev-shell. In
+`direnv`-mode CI the preamble forwards the dev-shell `PATH` but not its exported
+environment, so a `uvx`-run tool on a non-Python repo (where the manylinux
+exclusion of [#1028](https://github.com/vig-os/devkit/issues/1028) does not
+apply and the Nix CPython stays on `PATH`) loads its native wheel with no
+`libstdc++` on the loader path and aborts with
+`libstdc++.so.6: cannot open shared object file`
+([#1181](https://github.com/vig-os/devkit/issues/1181), otterdog's `rjsonnet` in
+org-config#40). For that case the root `justfile` ships a base
+`with-native-libs` recipe (all delivery modes — it is **not** in the
+devcontainer-only `justfile.devc`) that wraps a single command with a
+command-scoped `LD_LIBRARY_PATH`, sourced from `$VIGOS_STDCPP_LIB` (a dev-shell
+`shellHook` export, when present) or otherwise derived from the on-`PATH` `cc`
+wrapper via `cc -print-file-name=libstdc++.so.6`. A `justfile.project` recipe
+that runs a `uvx` tool with a native extension prefixes it:
+
+```just
+validate:
+    just with-native-libs uvx --from otterdog@1.2.3 otterdog validate --local
+```
+
+Scoping the variable to the one command keeps the Nix `libstdc++` out of every
+other tool's process; when neither `$VIGOS_STDCPP_LIB` nor `cc` resolves the
+library the command runs with the environment untouched — the recipe never
+composes an empty prefix, because an empty `LD_LIBRARY_PATH` entry (a leading
+colon or a bare `""`) means "current working directory" to the dynamic loader.
+Only reach for it on a repo that runs `uvx`/`uv tool` tools with compiled
+extensions under the Nix CPython; pure-Python tools need nothing.
 
 ## Cachix and the `direnv allow` onboarding flow
 

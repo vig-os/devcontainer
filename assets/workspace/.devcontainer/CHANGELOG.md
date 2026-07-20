@@ -19,6 +19,205 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [1.4.0](https://github.com/vig-os/devkit/releases/tag/1.4.0) - 2026-07-20
+
+### Added
+
+- **Per-consumer workflow model: `DEVKIT_WORKFLOW` (gitflow | trunk)** ([#1205](https://github.com/vig-os/devkit/issues/1205))
+  - New optional `.vig-os` key `DEVKIT_WORKFLOW` (and matching `install.sh` /
+    `init-workspace.sh` `--workflow` flag) selects a consumer's branching model.
+    Empty/absent resolves to the unchanged `gitflow` default (long-lived `dev` +
+    `main` with `sync-main-to-dev.yml`); `trunk` opts into a trunk-based flow:
+    feature/bugfix/chore branches merge straight to `main`, releases fork
+    `release/X.Y.Z` from `main` and merge back into `main`, and the `dev` branch
+    and `sync-main-to-dev.yml` disappear ([#1207](https://github.com/vig-os/devkit/issues/1207), [#1208](https://github.com/vig-os/devkit/issues/1208), [#1209](https://github.com/vig-os/devkit/issues/1209)).
+  - Realized entirely at scaffold time (mirroring `DEVKIT_MODE`): an anchored
+    `dev -> main` render of the scaffolded workflows (`prepare-release`, `ci`,
+    `codeql`, `sync-issues`), the branch-naming skill and the pre-commit branch
+    guard, plus a `sync-main-to-dev.yml` copy-exclude and upgrade prune. No
+    resolve-toolchain runtime wiring and no workflow twin. gitflow is a provable
+    byte-for-byte no-op, so existing consumers and their `.vig-os` are unchanged
+    (the key is written back only for `trunk`).
+  - Loud enum and contradiction guards refuse an unknown model or an implicit
+    workflow switch (an explicit `--workflow` that contradicts the persisted
+    value), mirroring the `DEVKIT_MODE` guards; `--preview` shows the would-be
+    switch first.
+- **`docs` capability module — typst document toolchain** ([#1178](https://github.com/vig-os/devkit/issues/1178))
+  - New opt-in `docs` capability module puts `typst` (the document compiler) and
+    `typstyle` (its formatter) on the dev-shell PATH, so document-oriented
+    consumers (exo-pet/vault, the future `qms` app, EXOMA presentations/grants)
+    declare `mkProjectShell { modules = [ "docs" ]; }` instead of pinning `typst`
+    via PyPI. It stays out of the base `devTools` and the published image, so
+    non-doc consumers and the slimmed image are unaffected (opt-in only,
+    backward compatible). No version option in v1 — nixpkgs carries a single
+    typst per pin and the module tracks that toolchain pin. Deliberate v1
+    exclusions (documented in `docs/NIX.md`): pandoc/LaTeX (ask-gated), headless
+    drawio/excalidraw export (electron-shaped, repo-owned), and Python
+    doc-processing libraries (`pymupdf4llm`, `openpyxl`) which belong in the
+    consumer's own `pyproject.toml` via uv.
+- **Route scaffolded CI jobs to self-hosted runners via `.vig-os`** ([#1173](https://github.com/vig-os/devkit/issues/1173))
+  - New optional `.vig-os` key `DEVKIT_CI_RUNNER` (comma-separated runner label
+    list, e.g. `self-hosted,linux,x64,meatgrinder`) lets a self-hosted consumer
+    route the scaffold-managed `ci.yml` onto its own runners without hand-editing
+    a managed file (hand-edits are clobbered on upgrade). `resolve-toolchain`
+    reads the key and emits a `runner-json` output — a JSON array of labels,
+    defaulting to `["ubuntu-24.04"]` when the key is absent — which the toolchain
+    jobs (`lint`, `test`, `commit-checks`) and the `summary` gate consume via
+    `runs-on: ${{ fromJSON(needs.resolve-toolchain.outputs.runner-json) }}`. The
+    `resolve-toolchain` job itself stays on the hosted default (it produces the
+    output), and `dependency-review` stays hosted (public-repo-only,
+    toolchain-free). Absent key => unchanged behavior for every existing
+    consumer; the value is persisted across re-scaffolds like the other manifest
+    keys. Documented in `docs/MIGRATION.md`.
+- **Opt-in `gitleaks` secret-scanning hook** ([#1172](https://github.com/vig-os/devkit/issues/1172))
+  - `gitleaks` joins the shared toolchain (`nix/devtools.nix` → dev-shell,
+    image, and `vigos.packages`) and is defined as a `language: system`
+    pre-commit hook resolved from the pinned nixpkgs binary — no upstream
+    pre-commit repo clone, works offline. It is **default-disabled** and lives
+    only on the `mkProjectShell` consumer generation surface: absent from
+    devkit's own committed `.pre-commit-config.yaml`, the scaffold copy, and the
+    sandbox `checks.pre-commit` gate, so no devkit lane runs it. A secret-bearing
+    consumer opts in with `mkProjectShell { hooks = { gitleaks.enable = true; }; }`;
+    the hook runs `gitleaks git --pre-commit --staged --redact --verbose` and a
+    repo-root `.gitleaks.toml` is honored automatically. Off by default because
+    false-positive tuning is repo-specific (`docs/NIX.md`). Backward compatible:
+    zero behavior change for consumers that do not enable it.
+- **Nix as a first-class consumer language** ([#1171](https://github.com/vig-os/devkit/issues/1171))
+  - Language detection: a repo is nix-oriented when it carries `*.nix` files
+    **beyond** the scaffold-managed `./flake.nix` (excluding `.git/`,
+    `.direnv/`, `.worktrees/`) — `flake.nix` alone would false-positive on
+    every direnv consumer at re-scaffold time, so the beyond-flake.nix rule is
+    deterministic and re-scaffold-safe.
+  - New `nix` gitignore fragment (`result`, `result-*` build symlinks),
+    appended to the managed root `.gitignore` on detection and feeding the
+    never-migrate managed set like every other fragment.
+  - `statix` and `deadnix` join the **flake-generated consumer hook surface**
+    (`mkProjectShell` hooks) as `language: system` hooks. They are NOT injected
+    into the committed hand-managed `.pre-commit-config.yaml`, so existing
+    container-mode consumers see zero change until they opt into flake hooks.
+    `deadnix` runs with `--no-lambda-arg --no-lambda-pattern-names` so the
+    scaffolded consumer `flake.nix` (idiomatic `{ self, … }` pattern,
+    `extraPackages = pkgs: [ ]` seed) passes out of the box; devkit's own
+    stricter internal `nix flake check` gates are unchanged.
+  - CodeQL is untouched: nix is not a CodeQL language, so the rendered matrix
+    and push paths omit it (same treatment as rust).
+- **Package pymarkdown in the flake and promote it to a system hook** ([#1170](https://github.com/vig-os/devkit/issues/1170))
+  - `pymarkdownlnt` is now packaged as a Nix derivation (`nix/pymarkdown.nix`,
+    with its two PyPI-only pure-Python deps `application-properties` and
+    `columnar`; `pyjson5` comes from nixpkgs) and added to the toolchain SSoT
+    (`nix/devtools.nix`), so it ships in the dev-shell, the image, and the
+    `vigos.packages` home module.
+  - The `pymarkdown` hook is promoted from a runner-only remote-repo hook to a
+    `language: system` hook resolved from PATH — like `shellcheck`/`typos` — in
+    **all three** hook artifacts: the committed runner + scaffold YAML, the
+    sandbox `checks.pre-commit` gate, and the consumer generation surface. Same
+    `-c .pymarkdown fix` command and README/CONTRIBUTE/TESTING excludes as before.
+  - This retires the last runner-only residual of the single-SSoT hook system
+    (#883): **every** `direnv`/`bare` consumer regains (or gains) markdown lint
+    from the shared flake hook set, and the container/both lanes converge on the
+    same system hook.
+- **Document enabling the dependency graph on new public consumers** ([#1166](https://github.com/vig-os/devkit/issues/1166))
+  - The scaffolded `ci.yml` Dependency Review gate reads GitHub's dependency
+    graph, which the `vig-os` org leaves **disabled** on new repos
+    (`dependency_graph_enabled_for_new_repositories: false`) — so a fresh public
+    consumer's first run `403`s until it is enabled. `docs/MIGRATION.md` gains an
+    "Enable the dependency graph on new public consumers" step (idempotent
+    `gh api -X PUT repos/<owner>/<repo>/vulnerability-alerts`, one-time per repo,
+    mode-agnostic), and the scaffolded `ci.yml` `dependency-review` job carries a
+    pointer comment at the failure site. Private consumers are unaffected (the
+    gate is neutral there).
+
+### Changed
+
+- **Renovate: update `github-backup` from `==0.64.0` to `==0.64.2`** ([#1213](https://github.com/vig-os/devkit/pull/1213))
+- **direnv scaffolds default to flake-generated pre-commit hooks** ([#1167](https://github.com/vig-os/devkit/issues/1167))
+  - The direnv CI lane runs on the bare host runner (`resolve-toolchain` emits an
+    empty container image), which lacks the devkit image's FHS loader and C++
+    runtime that the hand-managed `.pre-commit-config.yaml`'s `pymarkdown` hook
+    (native `pyjson5`) needs — so it fails with `ImportError: libstdc++.so.6`
+    there, and every direnv consumer had to switch to flake-generated hooks by
+    hand. A fresh `direnv` scaffold now activates an empty `hooks = { }` in
+    `flake.nix` and drops the hand-managed YAML, so the shared flake hook set
+    generates `.pre-commit-config.yaml` (a gitignored `/nix/store` symlink,
+    dropping `pymarkdown`) and runs host-side. A consumer's own preserved
+    `flake.nix` or committed config is never rewritten; `container`/`both` keep
+    the hand-managed YAML (they run inside the image where `pymarkdown` works);
+    `bare` is unaffected (it ships no flake and owns its own toolchain).
+
+### Fixed
+
+- **Detect host Nix probe scrubs the ambient `NIX_CONFIG`** ([#1216](https://github.com/vig-os/devkit/issues/1216))
+  - The direnv-mode "Detect host Nix" step captured `nix --version 2>&1` (#1198)
+    with the runner's ambient `NIX_CONFIG` still in effect. On a self-hosted
+    runner whose service environment carries a malformed `NIX_CONFIG` (observed
+    on exo-fleet's meatgrinder), nix rejects the config before printing the
+    version, so the detect log recorded a `syntax error in configuration` parse
+    error instead of the version string the diagnostic aims to capture. The probe
+    now runs `env -u NIX_CONFIG nix --version 2>&1`, keeping the `2>&1` fold for
+    other failure shapes, so the log shows the real version even when the
+    runner's environment is broken. Non-fatal before the fix (the "Configure host
+    Nix" step rewrites a clean `NIX_CONFIG`), diagnostic-only impact.
+- **uvx tools with native wheels load libstdc++ in direnv-mode CI** ([#1181](https://github.com/vig-os/devkit/issues/1181))
+  - On a non-Python direnv-mode consumer the CI preamble keeps the Nix CPython
+    on `PATH`, whose loader does not search `/usr/lib`, so a `uvx`-run tool's
+    manylinux native wheel (e.g. otterdog's `rjsonnet`) aborted with
+    `libstdc++.so.6: cannot open shared object file` — the same failure class as
+    the dropped `pymarkdown`/`pyjson5` hook. The root `justfile` now ships a base
+    `with-native-libs` recipe that wraps one command with a command-scoped
+    `LD_LIBRARY_PATH` sourced from `$VIGOS_STDCPP_LIB` or derived from the
+    on-`PATH` `cc` wrapper, so a `justfile.project` recipe can run such a tool
+    (`just with-native-libs uvx …`) without the wheel failing to import. It
+    degrades to a no-op when neither source resolves the library.
+- **direnv CI: forward the flake `shellHook` environment** ([#1180](https://github.com/vig-os/devkit/issues/1180))
+  - The direnv-mode `setup-devkit-toolchain` preamble exported the dev-shell
+    store bin dirs to `GITHUB_PATH` but dropped every environment variable a
+    project's flake `shellHook` exports, so env defaults present in every local
+    `nix develop`/direnv session silently vanished on CI — surfacing as unrelated
+    tool errors (vig-os/org-config#40: a shellHook-seeded `OTTERDOG_TOKEN`
+    placeholder worked locally, failed on CI). The preamble now diffs the ambient
+    environment against the dev-shell environment (the `shellHook` has run inside
+    `nix develop`) and forwards the vars the dev-shell adds or changes to
+    `GITHUB_ENV`, minus a denylist of shell session state (`PATH`, `HOME`,
+    `SHLVL`, `TMPDIR`, …) and Nix/stdenv build machinery (`NIX_*`, `buildInputs`,
+    `stdenv`, `shellHook`, `*Phase`, …). The ambient diff keeps host secrets out
+    of `GITHUB_ENV`; a random heredoc delimiter keeps multi-line values intact.
+    Local-vs-CI parity is now the default in direnv mode, no consumer change.
+- **`just` no longer leaks a git `fatal:` in a foreign-git worktree cwd** ([#1203](https://github.com/vig-os/devkit/issues/1203))
+  - The `justfile.worktree` `_wt_repo` variable is a top-level backtick that
+    `just` evaluates eagerly on every invocation, so its `git rev-parse
+    --show-toplevel` ran for any recipe (`just sync`, `just lint`, …). In a git
+    worktree whose `.git` file points at a gitdir outside a bind mount (the
+    bare-`podman` scaffold context), git couldn't resolve the repo and printed
+    `fatal: not a git repository: (null)` to stderr on every `just` call. The
+    substitution now falls back to `pwd` (`git rev-parse --show-toplevel
+    2>/dev/null || pwd`), matching the existing `setup-labels.sh` idiom —
+    cosmetic only, the worktree recipes are unaffected.
+
+### Security
+
+- **Audit and baseline the managed GitHub Actions workflows (zizmor)** ([#1182](https://github.com/vig-os/devkit/issues/1182))
+  - `zizmor` over the 14 devkit-managed workflows previously surfaced 73 findings
+    (40 high / 32 medium) that every consumer had to baseline against code it does
+    not own. Devkit now audits its own output: 8 findings fixed upstream and the
+    intentional remainder shipped as a devkit-owned baseline so consumer baselines
+    shrink to zero.
+  - **Fixed (8):** `persist-credentials: false` on the read-only checkouts that
+    never push or fetch (CI lint/test/resolve-toolchain/dependency-review,
+    `codeql.yml`, and the `renovate-changelog-build`/`sync-issues` toolchain
+    checkouts) — 7 `artipacked` findings; and the `sync-main-to-dev` cleanup step's
+    release-app token moved into `env:` — 1 `template-injection` finding. All
+    behavior-preserving.
+  - **Baseline shipped:** a maintained `zizmor.yml` (scaffolded/managed, registered
+    in `scripts/manifest.toml`) suppresses the 65 residual findings that cannot be
+    fixed without changing release/CI behavior (`unpinned-images` for the
+    runtime-resolved toolchain image, broadly-scoped `github-app` release tokens,
+    `secrets: inherit` release fan-out, the renovate-changelog `dangerous-triggers`,
+    and credential-persisting push checkouts). Every exemption is scoped to a
+    managed-workflow basename, so a consumer-authored workflow never inherits one.
+  - **Gate added:** devkit CI (`ci.yml` `project-checks`) lints the managed set
+    against the shipped baseline, so a regression or a new audit fails devkit CI
+    instead of reaching consumers. Policy documented in `docs/WORKFLOW_SECURITY.md`.
+
 ## [1.3.1](https://github.com/vig-os/devkit/releases/tag/1.3.1) - 2026-07-17
 
 ### Added
