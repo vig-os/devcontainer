@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-07-17T20:27:07Z
-updated: 2026-07-17T20:27:07Z
+updated: 2026-07-20T10:47:11Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devkit/issues/1206
-comments: 0
+comments: 1
 labels: chore, priority:high, area:ci, area:workspace, effort:medium
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-07-18T04:54:21.486Z
+synced: 2026-07-20T14:51:06.300Z
 ---
 
 # [Issue 1206]: [workflow-model spike: prove trunk release cut-from-main + scaffold render](https://github.com/vig-os/devkit/issues/1206)
@@ -28,3 +28,11 @@ Part of #1205. **First step — de-risks the two riskiest assumptions before any
 No production wiring in this issue — just the go/no-go proof + skeleton.
 
 Refs: #1205
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 20, 2026 at 10:47 AM_
+
+Implemented via PR #1212, shipped in 1.4.0 via unfreeze PR #1215.
+
