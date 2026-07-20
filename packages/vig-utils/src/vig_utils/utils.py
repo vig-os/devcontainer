@@ -147,6 +147,37 @@ def find_repo_root(start: Path | None = None) -> Path:
     return cwd
 
 
+def get_devkit_workflow(start: Path | None = None) -> str:
+    """Return the active DEVKIT_WORKFLOW value from workspace `.vig-os`.
+
+    Defaults to "mainline" when unset or file absent.
+    """
+    root = find_repo_root(start)
+    vig_os = root / ".vig-os"
+    if vig_os.is_file():
+        for line in vig_os.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line.startswith("DEVKIT_WORKFLOW"):
+                _, _, val = line.partition("=")
+                return val.strip().strip('"').strip("'")
+    env_val = os.environ.get("DEVKIT_WORKFLOW")
+    if env_val:
+        return env_val.strip()
+    return "mainline"
+
+
+def render_branch_guard_pattern(start: Path | None = None) -> str:
+    """Emit the pre-commit branch-guard regex for the active workflow model.
+
+    Mirrors render_workflow_model() scaffold logic: trunk mode drops the
+    `(?!dev$)` clause since trunk repos have no `dev` branch.
+    """
+    workflow = get_devkit_workflow(start)
+    if workflow == "trunk":
+        return r"^(?!main$)(?!trunk$)(feature|fix|chore|docs|refactor|test|hotfix)/.+$"
+    return r"^(?!main$)(?!dev$)(feature|fix|chore|docs|refactor|test|hotfix)/.+$"
+
+
 def agent_blocklist_path(start: Path | None = None) -> Path:
     """Return path to canonical agent blocklist TOML."""
     return find_repo_root(start) / ".github" / "agent-blocklist.toml"
