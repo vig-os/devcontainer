@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-07-17T20:26:34Z
-updated: 2026-07-17T20:28:12Z
+updated: 2026-07-20T10:47:09Z
 author: c-vigo
 author_url: https://github.com/c-vigo
 url: https://github.com/vig-os/devkit/issues/1205
-comments: 0
+comments: 1
 labels: feature, priority:medium, area:ci, area:workspace, effort:large, semver:minor
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-07-18T04:54:21.714Z
+synced: 2026-07-20T14:51:06.722Z
 ---
 
 # [Issue 1205]: [Per-consumer workflow-model knob (gitflow default / trunk opt-in)](https://github.com/vig-os/devkit/issues/1205)
@@ -52,4 +52,12 @@ Devkit **capability only**. exo-fleet #230 merges as-is on `dev` now; retrofitti
 - [ ] #1211 — docs + ADR + plan doc
 
 Full design plan retained by the maintainer (scaffold-time render; anchored literal render of prepare-release; compose-not-combine mode × model axes).
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 20, 2026 at 10:47 AM_
+
+Implemented via PR #1212, shipped in 1.4.0 via unfreeze PR #1215.
 

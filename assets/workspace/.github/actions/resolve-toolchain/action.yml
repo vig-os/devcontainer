@@ -62,8 +62,8 @@ outputs:
   runner-json:
     description: >-
       JSON array of runner labels from DEVKIT_CI_RUNNER (comma-separated), for
-      `runs-on: ${{ fromJSON(...) }}`. Defaults to ["ubuntu-24.04"] when the key
-      is absent.
+      use with fromJSON() in `runs-on`. Defaults to ["ubuntu-24.04"] when the
+      key is absent.
     value: ${{ steps.resolve.outputs.runner-json }}
 
 runs:
@@ -146,7 +146,7 @@ runs:
         echo "floating-tags=$FLOATING_TAGS" >> "$GITHUB_OUTPUT"
 
         # CI runner labels (#1173): DEVKIT_CI_RUNNER is a comma-separated label
-        # list routed into `runs-on: ${{ fromJSON(...) }}` by the downstream CI
+        # list routed into `runs-on` via fromJSON() by the downstream CI
         # jobs. Absent => the hosted default, so existing consumers are unchanged.
         # Emitted for every mode, ALWAYS a valid JSON array (single label =>
         # ["ubuntu-24.04"]); whitespace around each label is trimmed and empty

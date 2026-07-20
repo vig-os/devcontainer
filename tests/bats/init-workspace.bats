@@ -1493,6 +1493,47 @@ EOF
     assert_output --partial 'default_language_version'
 }
 
+# ── preserved diff must survive a foreign/broken .git in the cwd (#1197) ──────
+# When init-workspace.sh runs via a bare `podman run -v <worktree>:/workspace`
+# and the mounted workspace is a git WORKTREE, its `.git` is a FILE pointing at
+# `gitdir: <path outside the mount>`. In-container git discovers that `.git`
+# from the cwd, fails to resolve the gitdir, and `git diff --no-index` aborts
+# with `fatal: not a git repository: (null)` BEFORE diffing — swallowed by
+# `|| true`, so the operator lost the preserved-file divergence and the log
+# gained a `fatal:` line per file. The no-index diff needs no repo, so it must
+# ignore repo discovery entirely.
+
+@test "preserved diff survives a foreign-git worktree cwd (#1197)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1197-worktree"
+    mkdir -p "$ws"
+    # Simulate a worktree whose real gitdir is unreachable (outside the mount).
+    printf 'gitdir: /nonexistent/path/outside\n' >"$ws/.git"
+    _custom_precommit_config "$ws"
+    # Run with cwd INSIDE the workspace so git discovers the broken `.git`.
+    # Stub uv AND just (like _scaffold): the trailing sync step is a fast no-op,
+    # and stubbing just keeps just's own `git rev-parse` (an out-of-scope code
+    # path) from muddying the assertion — the only git call left is the
+    # preserved-template diff under test.
+    local stub="$BATS_TEST_TMPDIR/stub-1197"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/uv"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$stub/just"
+    chmod +x "$stub/uv" "$stub/just"
+    run env -C "$ws" PATH="$stub:$PATH" \
+        TEMPLATE_DIR="$PROJECT_ROOT/assets/workspace" \
+        WORKSPACE_DIR="$ws" \
+        SHORT_NAME=testproj \
+        GITHUB_REPOSITORY=test/repo \
+        bash "$INIT_WORKSPACE_SH" --force --no-prompts --mode both
+    assert_success
+    # The broken-repo abort must never surface...
+    refute_output --partial 'fatal:'
+    refute_output --partial 'not a git repository'
+    # ...and the divergence diff is still produced.
+    assert_output --partial 'Preserved .pre-commit-config.yaml differs from the template'
+    assert_output --partial 'default_language_version'
+}
+
 # ── upgrade must preserve a customized .typos.toml, no dual configs (#913) ────
 # The typos hook reads a project's spell-check exceptions; a consumer curates
 # repo-specific extend-words/extend-exclude that a template overwrite silently
@@ -1546,6 +1587,20 @@ EOF
     # template .typos.toml NOT shipped -> single active config
     run test -e "$ws/.typos.toml"
     assert_failure
+}
+
+@test "--preview does not list template .typos.toml as ADDED under a legacy _typos.toml (#1196)" {
+    # Regression (#1196, exo-pet/vault#31): the real copy rsync-excludes the
+    # template .typos.toml when the consumer carries _typos.toml (and no
+    # .typos.toml), yet --preview reported it as ADDED — advertising a file the
+    # upgrade then silently skips. Preview must mirror the copy's exclude set.
+    ws="$BATS_TEST_TMPDIR/e2e-1196-preview-typos"
+    mkdir -p "$ws"
+    printf '# SENTINEL-1196 legacy typos config\n' >"$ws/_typos.toml"
+    run _preview "$ws" --mode both
+    assert_success
+    # the copy skips template .typos.toml here, so preview must not add it
+    refute_output --partial "+  .typos.toml"
 }
 
 # ── upgrade must preserve customized lint configs .yamllint / .pymarkdown (#1099) ─
@@ -3435,6 +3490,30 @@ _RELEASE_RESOLVERS_991=(
         bash "$INIT_WORKSPACE_SH" --preview --no-prompts --mode both
     assert_success
     assert_line '  ✓  .pre-commit-config.yaml'
+}
+
+# ── scaffold chmod scope for consumer .sh files (#1195) ───────────────────────
+# The post-copy "restore executable permissions" sweep must set +x only on the
+# scaffold-delivered script set (the template's .sh files), never on a
+# consumer's own sourced-only .sh libraries. A blanket `find … -name '*.sh'`
+# re-dirtied preserved consumer libs (mode 644 → 755) on every --force
+# re-scaffold — observed in the field on exo-fleet (#1195).
+
+@test "scaffold chmod +x skips a consumer's pre-existing sourced .sh lib (#1195)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1195-chmod-scope"
+    mkdir -p "$ws/lib"
+    # Consumer-owned, sourced-only library: not a template path, intentionally
+    # non-executable (644). The scaffold must leave its mode untouched.
+    printf '#!/usr/bin/env bash\n# sourced, never executed\n' >"$ws/lib/consumer-lib.sh"
+    chmod 644 "$ws/lib/consumer-lib.sh"
+    run _scaffold both "$ws"
+    assert_success
+    # (a) the consumer's sourced lib keeps its non-executable mode
+    run test -x "$ws/lib/consumer-lib.sh"
+    assert_failure
+    # (b) a template-delivered script IS made executable
+    run test -x "$ws/.devcontainer/scripts/post-create.sh"
+    assert_success
 }
 
 # ── workflow model: trunk scaffold shape (#1205) ──────────────────────────────

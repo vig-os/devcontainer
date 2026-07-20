@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [1.4.0](https://github.com/vig-os/devkit/releases/tag/1.4.0) - 2026-07-20
+
+### Added
+
 - **Per-consumer workflow model: `DEVKIT_WORKFLOW` (gitflow | trunk)** ([#1205](https://github.com/vig-os/devkit/issues/1205))
   - New optional `.vig-os` key `DEVKIT_WORKFLOW` (and matching `install.sh` /
     `init-workspace.sh` `--workflow` flag) selects a consumer's branching model.
@@ -28,23 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     workflow switch (an explicit `--workflow` that contradicts the persisted
     value), mirroring the `DEVKIT_MODE` guards; `--preview` shows the would-be
     switch first.
-
-### Changed
-
-- **Renovate: update `github-backup` from `==0.64.0` to `==0.64.2`** ([#1213](https://github.com/vig-os/devkit/pull/1213))
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
-
-## [1.4.0] - TBD
-
-### Added
-
 - **`docs` capability module — typst document toolchain** ([#1178](https://github.com/vig-os/devkit/issues/1178))
   - New opt-in `docs` capability module puts `typst` (the document compiler) and
     `typstyle` (its formatter) on the dev-shell PATH, so document-oriented
@@ -132,6 +129,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Renovate: update `github-backup` from `==0.64.0` to `==0.64.2`** ([#1213](https://github.com/vig-os/devkit/pull/1213))
 - **direnv scaffolds default to flake-generated pre-commit hooks** ([#1167](https://github.com/vig-os/devkit/issues/1167))
   - The direnv CI lane runs on the bare host runner (`resolve-toolchain` emits an
     empty container image), which lacks the devkit image's FHS loader and C++
@@ -148,6 +146,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Detect host Nix probe scrubs the ambient `NIX_CONFIG`** ([#1216](https://github.com/vig-os/devkit/issues/1216))
+  - The direnv-mode "Detect host Nix" step captured `nix --version 2>&1` (#1198)
+    with the runner's ambient `NIX_CONFIG` still in effect. On a self-hosted
+    runner whose service environment carries a malformed `NIX_CONFIG` (observed
+    on exo-fleet's meatgrinder), nix rejects the config before printing the
+    version, so the detect log recorded a `syntax error in configuration` parse
+    error instead of the version string the diagnostic aims to capture. The probe
+    now runs `env -u NIX_CONFIG nix --version 2>&1`, keeping the `2>&1` fold for
+    other failure shapes, so the log shows the real version even when the
+    runner's environment is broken. Non-fatal before the fix (the "Configure host
+    Nix" step rewrites a clean `NIX_CONFIG`), diagnostic-only impact.
 - **uvx tools with native wheels load libstdc++ in direnv-mode CI** ([#1181](https://github.com/vig-os/devkit/issues/1181))
   - On a non-Python direnv-mode consumer the CI preamble keeps the Nix CPython
     on `PATH`, whose loader does not search `/usr/lib`, so a `uvx`-run tool's
@@ -173,6 +182,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `stdenv`, `shellHook`, `*Phase`, …). The ambient diff keeps host secrets out
     of `GITHUB_ENV`; a random heredoc delimiter keeps multi-line values intact.
     Local-vs-CI parity is now the default in direnv mode, no consumer change.
+- **`just` no longer leaks a git `fatal:` in a foreign-git worktree cwd** ([#1203](https://github.com/vig-os/devkit/issues/1203))
+  - The `justfile.worktree` `_wt_repo` variable is a top-level backtick that
+    `just` evaluates eagerly on every invocation, so its `git rev-parse
+    --show-toplevel` ran for any recipe (`just sync`, `just lint`, …). In a git
+    worktree whose `.git` file points at a gitdir outside a bind mount (the
+    bare-`podman` scaffold context), git couldn't resolve the repo and printed
+    `fatal: not a git repository: (null)` to stderr on every `just` call. The
+    substitution now falls back to `pwd` (`git rev-parse --show-toplevel
+    2>/dev/null || pwd`), matching the existing `setup-labels.sh` idiom —
+    cosmetic only, the worktree recipes are unaffected.
 
 ### Security
 
