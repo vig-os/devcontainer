@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Per-consumer workflow model: `DEVKIT_WORKFLOW` (gitflow | trunk)** ([#1205](https://github.com/vig-os/devkit/issues/1205))
+  - New optional `.vig-os` key `DEVKIT_WORKFLOW` (and matching `install.sh` /
+    `init-workspace.sh` `--workflow` flag) selects a consumer's branching model.
+    Empty/absent resolves to the unchanged `gitflow` default (long-lived `dev` +
+    `main` with `sync-main-to-dev.yml`); `trunk` opts into a trunk-based flow:
+    feature/bugfix/chore branches merge straight to `main`, releases fork
+    `release/X.Y.Z` from `main` and merge back into `main`, and the `dev` branch
+    and `sync-main-to-dev.yml` disappear ([#1207](https://github.com/vig-os/devkit/issues/1207), [#1208](https://github.com/vig-os/devkit/issues/1208), [#1209](https://github.com/vig-os/devkit/issues/1209)).
+  - Realized entirely at scaffold time (mirroring `DEVKIT_MODE`): an anchored
+    `dev -> main` render of the scaffolded workflows (`prepare-release`, `ci`,
+    `codeql`, `sync-issues`), the branch-naming skill and the pre-commit branch
+    guard, plus a `sync-main-to-dev.yml` copy-exclude and upgrade prune. No
+    resolve-toolchain runtime wiring and no workflow twin. gitflow is a provable
+    byte-for-byte no-op, so existing consumers and their `.vig-os` are unchanged
+    (the key is written back only for `trunk`).
+  - Loud enum and contradiction guards refuse an unknown model or an implicit
+    workflow switch (an explicit `--workflow` that contradicts the persisted
+    value), mirroring the `DEVKIT_MODE` guards; `--preview` shows the would-be
+    switch first.
+
 ### Changed
 
 ### Deprecated

@@ -12,6 +12,12 @@ The fix drops ``ref: dev`` so the workspace is the triggering ``main`` SHA, wher
 the local action is guaranteed to exist. These assertions pin that invariant for
 both copies: the devkit's own workflow and the scaffold shipped to consumers.
 
+The sync-main-to-dev workflow is the gitflow ``main -> dev`` bridge; it exists
+only under the gitflow workflow model. A ``trunk`` scaffold (#1205) works
+straight on ``main`` and has no long-lived ``dev`` branch, so the workflow is
+copy-excluded — this suite is therefore gitflow-scoped, and a trailing test
+positively asserts a trunk scaffold ships no such file.
+
 Refs: #1034
 """
 
@@ -22,9 +28,14 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tests.workflow_scaffold import scaffold_tree
+
 # Repository root (tests/ -> repo root).
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# The gitflow copies: devkit's own workflow and the scaffold shipped to
+# consumers. Both are the gitflow shape (assets/workspace is the gitflow
+# template); trunk is asserted separately below.
 SYNC_WORKFLOWS = [
     REPO_ROOT / ".github" / "workflows" / "sync-main-to-dev.yml",
     REPO_ROOT
@@ -56,7 +67,14 @@ def _uses_local_action(steps: list[dict]) -> bool:
     "path", SYNC_WORKFLOWS, ids=lambda p: str(p.relative_to(REPO_ROOT))
 )
 def test_sync_job_checkout_uses_default_ref(path: Path) -> None:
-    """The sync job runs a local action, so it must check out the default ref."""
+    """The sync job runs a local action, so it must check out the default ref.
+
+    Gitflow-scoped: the sync-main-to-dev bridge exists only under gitflow. Both
+    paths are the gitflow shape (devkit's own workflow + the gitflow template).
+    """
+    assert path.is_file(), (
+        f"{path} must ship under the gitflow model (the sync-main-to-dev bridge)"
+    )
     steps = _steps_of_job(_load(path), "sync")
 
     # Precondition: this test only matters because the job runs a local action,
@@ -73,3 +91,18 @@ def test_sync_job_checkout_uses_default_ref(path: Path) -> None:
             "not a pinned `ref: dev`, because it runs a local composite action "
             "that only exists on the newer tree (#1034)"
         )
+
+
+def test_trunk_scaffold_omits_sync_main_to_dev(tmp_path: Path) -> None:
+    """A trunk scaffold ships no sync-main-to-dev.yml (#1205).
+
+    The whole point of this suite — the ``main -> dev`` sync bridge — has no
+    referent under the trunk workflow model: there is no long-lived ``dev``
+    branch to sync to, so init-workspace copy-excludes the file. Positively
+    assert the absence (rather than skipping) so a regression that reships the
+    gitflow bridge into a trunk repo is caught.
+    """
+    rendered = scaffold_tree(tmp_path, "trunk")
+    assert not (rendered / ".github" / "workflows" / "sync-main-to-dev.yml").exists(), (
+        "trunk scaffold must not ship the gitflow sync-main-to-dev bridge"
+    )
