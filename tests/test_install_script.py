@@ -93,6 +93,60 @@ class TestInstallScriptIntegration:
         yield workspace_path
         cleanup()
 
+    @pytest.fixture(scope="class")
+    @staticmethod
+    def install_workspace_trunk(container_image):
+        """Deploy via install.sh under the trunk workflow model (#1205).
+
+        Same as ``install_workspace`` but with ``--workflow trunk``: the trunk
+        model works straight on ``main``, so install.sh must skip the dev-branch
+        creation that the gitflow default performs.
+        """
+        project_root = Path(__file__).resolve().parents[1]
+        install_script = project_root / "install.sh"
+
+        tests_tmp_dir = project_root / "tests" / "tmp"
+        tests_tmp_dir.mkdir(parents=True, exist_ok=True)
+        workspace_dir = tempfile.mkdtemp(
+            dir=str(tests_tmp_dir), prefix="Install-Test-Trunk-"
+        )
+        workspace_path = Path(workspace_dir)
+
+        def cleanup():
+            if workspace_path.exists():
+                shutil.rmtree(workspace_path, ignore_errors=True)
+
+        atexit.register(cleanup)
+
+        version = container_image.split(":")[-1]
+
+        result = subprocess.run(
+            [
+                str(install_script),
+                "--version",
+                version,
+                "--workflow",
+                "trunk",
+                "--podman",
+                "--skip-pull",
+                str(workspace_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=str(project_root),
+        )
+
+        if result.returncode != 0:
+            cleanup()
+            pytest.fail(
+                f"install.sh --workflow trunk failed:\n"
+                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+            )
+
+        yield workspace_path
+        cleanup()
+
     def test_install_creates_devcontainer_directory(self, install_workspace):
         """Test install.sh creates .devcontainer directory."""
         devcontainer_dir = install_workspace / ".devcontainer"
@@ -361,7 +415,7 @@ class TestInstallScriptIntegration:
         )
 
     def test_install_git_branches(self, install_workspace):
-        """Test git repository has main and dev branches."""
+        """Test git repository has main and dev branches (gitflow default)."""
         result = subprocess.run(
             ["git", "rev-parse", "--verify", "main"],
             cwd=str(install_workspace),
@@ -377,6 +431,30 @@ class TestInstallScriptIntegration:
             text=True,
         )
         assert result.returncode == 0, "dev branch not found"
+
+    def test_install_trunk_creates_main_only(self, install_workspace_trunk):
+        """A trunk install creates main only — no dev branch (#1205).
+
+        The gitflow default carries a long-lived dev branch; the trunk workflow
+        model works straight on main, so install.sh must skip dev creation.
+        """
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", "main"],
+            cwd=str(install_workspace_trunk),
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, "main branch not found in trunk install"
+
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", "dev"],
+            cwd=str(install_workspace_trunk),
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode != 0, (
+            "trunk install must not create a dev branch (#1205)"
+        )
 
     def test_install_git_all_files_committed(self, install_workspace):
         """Test all workspace files are committed (no uncommitted changes)."""

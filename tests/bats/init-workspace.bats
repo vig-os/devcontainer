@@ -3515,3 +3515,107 @@ _RELEASE_RESOLVERS_991=(
     run test -x "$ws/.devcontainer/scripts/post-create.sh"
     assert_success
 }
+
+# ── workflow model: trunk scaffold shape (#1205) ──────────────────────────────
+# The DEVKIT_WORKFLOW knob (gitflow default | trunk) is realized entirely at
+# scaffold time: trunk works straight on 'main', so the gitflow 'dev' branch and
+# its sync-main-to-dev.yml bridge disappear. These end-to-end tests run the real
+# init-workspace.sh (via _scaffold_ex / _preview) and assert the trunk shape and
+# its guards. The exhaustive dev->main render is pinned in
+# tests/test_workflow_model.py; here we cover the scaffold-file invariants and
+# the upgrade/guard paths that the bats harness exercises naturally.
+# TEMPLATE_DIR is the gitflow template throughout, so the #991 assertions above
+# (which read TEMPLATE_DIR) are unaffected.
+
+@test "trunk scaffold omits sync-main-to-dev.yml (#1205)" {
+    ws="$BATS_TEST_TMPDIR/e2e-1205-trunk-no-sync"
+    mkdir -p "$ws"
+    run _scaffold_ex both "$ws" --workflow trunk
+    assert_success
+    run test -f "$ws/.github/workflows/sync-main-to-dev.yml"
+    assert_failure
+    # the gitflow bridge is gone, but the rest of the workflow set still ships
+    run test -f "$ws/.github/workflows/prepare-release.yml"
+    assert_success
+}
+
+@test "rendered trunk prepare-release.yml still satisfies the #991 invariants (#1205)" {
+    # The trunk render only retargets dev -> main; it must not disturb the #991
+    # mode-aware toolchain shape: no hardcoded devcontainer image pin, no retired
+    # resolve-image action, and the setup-devkit-toolchain composite is present.
+    ws="$BATS_TEST_TMPDIR/e2e-1205-trunk-991"
+    mkdir -p "$ws"
+    run _scaffold_ex both "$ws" --workflow trunk
+    assert_success
+    wf="$ws/.github/workflows/prepare-release.yml"
+    run grep -q 'ghcr.io/vig-os/devcontainer:' "$wf"
+    assert_failure
+    run grep -q 'resolve-image' "$wf"
+    assert_failure
+    run grep -q 'setup-devkit-toolchain' "$wf"
+    assert_success
+    # and the release base really is main, not dev
+    run grep -q 'ref: main' "$wf"
+    assert_success
+    run grep -q 'heads/dev' "$wf"
+    assert_failure
+}
+
+@test "--preview lists sync-main-to-dev.yml under DELETIONS on a gitflow->trunk upgrade (#1205)" {
+    # Seed a gitflow scaffold (which ships sync-main-to-dev.yml), then preview a
+    # trunk upgrade: the now-excluded bridge is reported as a deletion, and the
+    # preview is side-effect-free (the file stays in place).
+    ws="$BATS_TEST_TMPDIR/e2e-1205-preview-delete"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    run test -f "$ws/.github/workflows/sync-main-to-dev.yml"
+    assert_success
+    run _preview "$ws" --mode both --workflow trunk
+    assert_success
+    assert_output --partial "DELETED"
+    assert_output --partial "sync-main-to-dev.yml"
+    # side-effect-free: the preview left the bridge in place
+    run test -f "$ws/.github/workflows/sync-main-to-dev.yml"
+    assert_success
+}
+
+@test "contradiction guard refuses --workflow trunk against a persisted gitflow .vig-os (#1205)" {
+    # Seed a gitflow scaffold and pin DEVKIT_WORKFLOW=gitflow in its manifest;
+    # an explicit --workflow trunk then contradicts the persisted value and is
+    # refused outside --preview / --smoke-test (the topology switch is deliberate).
+    ws="$BATS_TEST_TMPDIR/e2e-1205-contradict-gitflow"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    sed -i 's/^DEVKIT_WORKFLOW=$/DEVKIT_WORKFLOW=gitflow/' "$ws/.vig-os"
+    run _scaffold_ex both "$ws" --workflow trunk
+    assert_failure
+    assert_output --partial "contradicts the persisted DEVKIT_WORKFLOW"
+}
+
+@test "contradiction guard refuses --workflow gitflow against a persisted trunk .vig-os (#1205)" {
+    # The reverse direction: a trunk scaffold persists DEVKIT_WORKFLOW=trunk, so
+    # a later --workflow gitflow contradicts it and is refused.
+    ws="$BATS_TEST_TMPDIR/e2e-1205-contradict-trunk"
+    mkdir -p "$ws"
+    run _scaffold_ex both "$ws" --workflow trunk
+    assert_success
+    run grep -q '^DEVKIT_WORKFLOW=trunk$' "$ws/.vig-os"
+    assert_success
+    run _scaffold_ex both "$ws" --workflow gitflow
+    assert_failure
+    assert_output --partial "contradicts the persisted DEVKIT_WORKFLOW"
+}
+
+@test "--preview bypasses the workflow contradiction guard (inspect the switch first) (#1205)" {
+    # --preview is the sanctioned way to inspect a would-be topology switch, so
+    # it must not trip the contradiction guard even against a persisted value.
+    ws="$BATS_TEST_TMPDIR/e2e-1205-preview-bypass"
+    mkdir -p "$ws"
+    run _scaffold_ex both "$ws" --workflow trunk
+    assert_success
+    run _preview "$ws" --mode both --workflow gitflow
+    assert_success
+    refute_output --partial "contradicts the persisted DEVKIT_WORKFLOW"
+}

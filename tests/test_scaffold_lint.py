@@ -277,7 +277,14 @@ def test_no_local_action_on_foreign_ref(path: Path) -> None:
 
 
 def test_rule2_predicate_catches_pre_1034_pattern() -> None:
-    """Regression fixture: the exact pre-#1034 sync-main-to-dev job shape."""
+    """Regression fixture: the exact pre-#1034 sync-main-to-dev job shape.
+
+    Gitflow-scoped by construction: the ``ref: dev`` + local-action shape is the
+    gitflow ``sync-main-to-dev`` bridge, which exists only under the gitflow
+    workflow model. A trunk scaffold (#1205) has no long-lived ``dev`` branch
+    and copy-excludes that workflow, so this foreign-ref pattern cannot arise
+    there — the fixture pins the predicate against the gitflow shape it guards.
+    """
     on = {"push": {"branches": ["main"]}}
     job = {
         "steps": [

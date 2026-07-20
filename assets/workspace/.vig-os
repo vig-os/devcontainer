@@ -14,6 +14,16 @@ DEVKIT_VERSION={{IMAGE_TAG}}
 # persist a mode this repo did not choose.
 DEVKIT_MODE=
 
+# Workflow model: gitflow (default) | trunk. Empty (= unset) resolves to the
+# gitflow default — long-lived `dev` + `main` with sync-main-to-dev.yml, no
+# change for devkit or existing consumers. `trunk` opts a repo into a
+# trunk-based flow: feature/bugfix/chore branches merge straight to `main`,
+# releases fork release/X.Y.Z from main and merge back into main, and the `dev`
+# branch and sync-main-to-dev.yml disappear. Realized entirely at scaffold time
+# (an anchored dev->main render + a sync-main-to-dev copy-exclude), mirroring
+# DEVKIT_MODE. Written back only for trunk, so a gitflow .vig-os is unchanged (#1205).
+DEVKIT_WORKFLOW=
+
 # Project identity (persisted SHORT_NAME / ORG_NAME / GITHUB_REPOSITORY);
 # written back by init-workspace.sh — edit only to deliberately rename.
 DEVKIT_PROJECT=

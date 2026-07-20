@@ -1,7 +1,7 @@
 #!/bin/bash
 # Initialize workspace by copying template files
 #
-# Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--preview] [--mode MODE] [--prune-devcontainer]
+# Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--preview] [--mode MODE] [--workflow MODEL] [--prune-devcontainer]
 #
 # Options:
 #   --force       Overwrite existing files (for upgrades)
@@ -23,6 +23,13 @@
 #                               (no .devcontainer/, no flake.nix/.envrc)
 #                 Unset: read DEVKIT_MODE from the workspace .vig-os manifest,
 #                 else prompt interactively / default to "both" with --no-prompts
+#   --workflow MODEL  Workflow model: gitflow | trunk (#1205)
+#                 gitflow  long-lived dev + main with sync-main-to-dev.yml (default)
+#                 trunk    feature/bugfix/chore straight to main; releases fork
+#                          release/X.Y.Z from main and merge back into main; the
+#                          dev branch and sync-main-to-dev.yml disappear
+#                 Unset: read DEVKIT_WORKFLOW from the workspace .vig-os manifest,
+#                 else default to gitflow
 #
 # Environment variables (used with --no-prompts):
 #   SHORT_NAME           - Project short name (required unless the workspace
@@ -58,6 +65,8 @@ PREVIEW=false
 PRUNE_DEVCONTAINER=false
 # Delivery mode: devcontainer | direnv | both | bare. Empty = manifest, prompt, or "both".
 MODE=""
+# Workflow model: gitflow | trunk. Empty = manifest, or the gitflow default (#1205).
+WORKFLOW_MODEL=""
 
 # Files to preserve during --force upgrades (never overwrite if they exist)
 # These are user/project customization files that should survive upgrades
@@ -168,9 +177,17 @@ while [[ $# -gt 0 ]]; do
             MODE="${1#--mode=}"
             shift
             ;;
+        --workflow)
+            WORKFLOW_MODEL="$2"
+            shift 2
+            ;;
+        --workflow=*)
+            WORKFLOW_MODEL="${1#--workflow=}"
+            shift
+            ;;
         *)
             echo "Unknown option: $1" >&2
-            echo "Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--preview] [--mode MODE] [--prune-devcontainer]" >&2
+            echo "Usage: init-workspace [--force] [--no-prompts] [--smoke-test] [--preview] [--mode MODE] [--workflow MODEL] [--prune-devcontainer]" >&2
             exit 1
             ;;
     esac
@@ -181,6 +198,15 @@ case "$MODE" in
     ""|devcontainer|direnv|both|bare) ;;
     *)
         echo "Error: Invalid --mode: $MODE (expected: devcontainer | direnv | both | bare)" >&2
+        exit 1
+        ;;
+esac
+
+# Validate the workflow model (empty resolves from manifest/default later, #1205).
+case "$WORKFLOW_MODEL" in
+    ""|gitflow|trunk) ;;
+    *)
+        echo "::error::Invalid --workflow: $WORKFLOW_MODEL (expected: gitflow | trunk)" >&2
         exit 1
         ;;
 esac
@@ -295,6 +321,7 @@ MANIFEST_MODULES="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_MODULES || tru
 MANIFEST_TAG_PREFIX="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_TAG_PREFIX || true)"
 MANIFEST_FLOATING_TAGS="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_FLOATING_TAGS || true)"
 MANIFEST_CI_RUNNER="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_CI_RUNNER || true)"
+MANIFEST_WORKFLOW="$(read_manifest_value "$VIG_OS_MANIFEST" DEVKIT_WORKFLOW || true)"
 
 # The OWNER/REPO placeholder (written when no origin was resolvable) must not
 # mask a now-detectable git origin on a later upgrade.
@@ -325,6 +352,33 @@ if [[ -n "$MODE" && -n "$MANIFEST_MODE" && "$MODE" != "$MANIFEST_MODE" \
     echo "  3. Switch deliberately: set DEVKIT_MODE=$MODE in .vig-os on a dedicated," >&2
     echo "     clean upgrade branch (see the upgrade preflight guard in MIGRATION.md)" >&2
     echo "     and re-run the upgrade." >&2
+    exit 1
+fi
+
+# A corrupt persisted workflow model must not silently fall back to gitflow —
+# that would reshape the release topology. Refuse loudly (mirrors DEVKIT_MODE).
+case "$MANIFEST_WORKFLOW" in
+    ""|gitflow|trunk) ;;
+    *)
+        echo "Error: Invalid DEVKIT_WORKFLOW in $VIG_OS_MANIFEST: $MANIFEST_WORKFLOW (expected: gitflow | trunk)" >&2
+        exit 1
+        ;;
+esac
+
+# Switching the workflow model reshapes the release topology (trunk drops the
+# dev branch + sync-main-to-dev.yml) and, like a mode switch, must never happen
+# implicitly. An explicit --workflow that contradicts the persisted
+# DEVKIT_WORKFLOW refuses; --preview inspects the would-be switch first.
+# (--smoke-test redeploys a CI checkout from scratch and is exempt.)
+if [[ -n "$WORKFLOW_MODEL" && -n "$MANIFEST_WORKFLOW" && "$WORKFLOW_MODEL" != "$MANIFEST_WORKFLOW" \
+    && "$PREVIEW" != "true" && "$SMOKE_TEST" != "true" ]]; then
+    echo "Error: requested --workflow $WORKFLOW_MODEL contradicts the persisted DEVKIT_WORKFLOW=$MANIFEST_WORKFLOW in .vig-os." >&2
+    echo "" >&2
+    echo "Switching the workflow model reshapes the release topology and never happens implicitly:" >&2
+    echo "  1. Inspect the would-be change first:  init-workspace --preview --workflow $WORKFLOW_MODEL" >&2
+    echo "  2. Keep the persisted model by omitting --workflow, or" >&2
+    echo "  3. Switch deliberately: set DEVKIT_WORKFLOW=$WORKFLOW_MODEL in .vig-os on a dedicated," >&2
+    echo "     clean upgrade branch and re-run the upgrade." >&2
     exit 1
 fi
 
@@ -474,6 +528,18 @@ if [[ "$PRUNE_DEVCONTAINER" == "true" && "$MODE" != "direnv" && "$MODE" != "bare
     echo "Error: --prune-devcontainer only applies to direnv/bare modes (got: $MODE)" >&2
     exit 1
 fi
+
+# Resolve the workflow model (#1205): explicit --workflow > persisted
+# DEVKIT_WORKFLOW > the gitflow default. Smoke deploys ignore the manifest
+# (they redeploy the full template over a CI checkout), mirroring DEVKIT_MODE.
+# trunk is realized entirely at scaffold time (render_workflow_model + the
+# sync-main-to-dev copy-exclude); gitflow is the unchanged default and a no-op.
+if [[ -z "$WORKFLOW_MODEL" && -n "$MANIFEST_WORKFLOW" && "$SMOKE_TEST" != "true" ]]; then
+    WORKFLOW_MODEL="$MANIFEST_WORKFLOW"
+    echo "Workflow model from .vig-os manifest: $WORKFLOW_MODEL"
+fi
+WORKFLOW_MODEL="${WORKFLOW_MODEL:-gitflow}"
+echo "Workflow model set to: $WORKFLOW_MODEL"
 
 # Print one recipe block from the template justfile.project: the immediately
 # preceding comment/attribute lines, the recipe header, and the indented body.
@@ -935,6 +1001,94 @@ if [[ -f "$WORKSPACE_DIR/_typos.toml" && ! -f "$WORKSPACE_DIR/.typos.toml" ]]; t
     MODE_CONFIG_EXCLUDES+=(".typos.toml")
 fi
 
+# Rewrite the scaffolded workspace from the gitflow default shape (long-lived
+# `dev` + `main` + sync-main-to-dev.yml) to the trunk shape (`main` only) when
+# the resolved DEVKIT_WORKFLOW is `trunk` (#1205). A pure no-op for gitflow (the
+# default), so a gitflow scaffold is byte-for-byte unchanged. Sibling of
+# render_codeql_matrix: an anchored dev->main retarget applied AFTER the rsync
+# copy. Every `dev` in these files is a plain branch literal (or an inert
+# step-name/comment), so this is an anchored retarget, not a structural rewrite
+# and not a workflow twin. sync-main-to-dev.yml is removed by the copy-exclude
+# (EXCLUDE_ARGS) + upgrade prune below, not here.
+#
+# Anchoring is load-bearing: `heads/dev\b` (word boundary) never touches
+# `development`/`devkit`/`devcontainer`; `ref: dev$` / ` from dev$` are
+# end-anchored. /dev/null device paths and the dev_sha/DEV_SHA variable names
+# are deliberately preserved (behavior is unaffected by their spelling).
+render_workflow_model() {
+    local model="$1"
+    [[ "$model" == "trunk" ]] || return 0
+
+    local wf="$WORKSPACE_DIR/.github/workflows"
+
+    # prepare-release.yml — retarget the release base dev -> main (#590/#617
+    # logic is base-agnostic) and scrub the inert dev step-names/comments so a
+    # trunk repo carries no `dev` cruft (variable names + /dev/null stay intact).
+    local pr="$wf/prepare-release.yml"
+    if [[ -f "$pr" ]]; then
+        # Behavioral branch literals: checkout refs + REST ref reads + targets.
+        sed -i -E 's|^([[:space:]]*ref:) dev$|\1 main|' "$pr"
+        sed -i -E 's|heads/dev\b|heads/main|g' "$pr"
+        sed -i -E 's| from dev$| from main|' "$pr"
+        # Inert step names + comments (no behavior change; the branch literals
+        # above are what drive the retarget).
+        sed -i 's|Checkout dev branch|Checkout main branch|' "$pr"
+        sed -i 's|Capture pre-prepare dev SHA|Capture pre-prepare main SHA|' "$pr"
+        sed -i 's| to dev via API| to main via API|g' "$pr"
+        sed -i 's|Wait for dev to advance|Wait for main to advance|' "$pr"
+        sed -i 's|freeze commit-action updates dev|freeze commit-action updates main|' "$pr"
+        sed -i 's|dev still at pre-freeze SHA|main still at pre-freeze SHA|' "$pr"
+        sed -i 's|ERROR: dev did not advance|ERROR: main did not advance|' "$pr"
+        sed -i 's|CHANGELOG.md on dev|CHANGELOG.md on main|g' "$pr"
+        # The #590 rationale comment describes the gitflow main/dev sync merge,
+        # which does not exist in trunk — reword it (full-line anchored swaps).
+        sed -i 's|dated release, matching$|dated release, so the|' "$pr"
+        sed -i 's|# dev, so the section is stable common context in the eventual main/dev$|# section stays stable and can never be silently dropped (#590) even as|' "$pr"
+        sed -i 's|# sync merge and can never be silently dropped.*Keep a Changelog$|# releases land directly on main. Keep a Changelog|' "$pr"
+    fi
+
+    # ci.yml — drop `- dev` from the PR branch filter; retarget the commit-gate
+    # TRUNK anchor used to exclude already-merged history on release PRs.
+    local ci="$wf/ci.yml"
+    if [[ -f "$ci" ]]; then
+        sed -i '/^      - dev$/d' "$ci"
+        sed -i 's|TRUNK="dev"|TRUNK="main"|' "$ci"
+    fi
+
+    # codeql.yml — drop `- dev` from the PR branch filter (push is main-only).
+    [[ -f "$wf/codeql.yml" ]] && sed -i '/^      - dev$/d' "$wf/codeql.yml"
+
+    # sync-issues.yml — default target branch + `|| 'dev'` fallbacks dev -> main
+    # (the illustrative `e.g., dev, …` description text is left alone).
+    local si="$wf/sync-issues.yml"
+    if [[ -f "$si" ]]; then
+        sed -i -E "s|^([[:space:]]*default:) 'dev'\$|\1 'main'|" "$si"
+        sed -i "s#|| 'dev'#|| 'main'#g" "$si"
+    fi
+
+    # branch-naming SKILL.md — base-branch default dev -> main. (Single-quoted
+    # sed so the Markdown backticks stay literal; the `chore/sync-main-to-dev`
+    # example on another line is a branch NAME, not a base default, and stays.)
+    local skill="$WORKSPACE_DIR/.claude/skills/branch-naming/SKILL.md"
+    if [[ -f "$skill" ]]; then
+        # shellcheck disable=SC2016  # literal Markdown backticks, not command substitution
+        sed -i 's|fall back to `dev`|fall back to `main`|' "$skill"
+        # shellcheck disable=SC2016  # literal Markdown backticks, not command substitution
+        sed -i 's|use `dev` as|use `main` as|' "$skill"
+    fi
+
+    # .pre-commit-config.yaml — drop the `(?!dev$)` protect-clause + its comments
+    # (main stays protected; trunk has no long-lived dev branch to protect).
+    local pc="$WORKSPACE_DIR/.pre-commit-config.yaml"
+    if [[ -f "$pc" ]]; then
+        sed -i 's|# Allows main, dev, and|# Allows main and|' "$pc"
+        sed -i 's|main/dev are not protected|main is not protected|' "$pc"
+        sed -i 's|(?!dev$)||' "$pc"
+    fi
+
+    echo "Rendered workflow model: trunk (anchored dev -> main retarget)"
+}
+
 # Warn if forcing (prompt user) - show which files would be overwritten
 if [[ "$FORCE" == "true" ]]; then
     echo ""
@@ -963,6 +1117,13 @@ if [[ "$FORCE" == "true" ]]; then
             fi
         done
         if [[ "$skip_excluded" == "true" ]]; then
+            continue
+        fi
+        # trunk workflow model (#1205): sync-main-to-dev.yml is copy-excluded, so
+        # it never lands in a trunk workspace — keep the report truthful (a
+        # leftover copy on a gitflow->trunk upgrade is listed under DELETIONS).
+        if [[ "$WORKFLOW_MODEL" == "trunk" \
+            && "$rel_path" == ".github/workflows/sync-main-to-dev.yml" ]]; then
             continue
         fi
         # Devcontainer and bare modes prune the flake.nix/.envrc stubs they would
@@ -1019,6 +1180,14 @@ if [[ "$FORCE" == "true" ]]; then
         fi
     fi
 
+    # trunk workflow model (#1205): a gitflow->trunk upgrade removes the
+    # now-excluded sync-main-to-dev.yml (mirrors the .devcontainer/ deletion).
+    # Mode-independent, so it sits outside the mode if/else above.
+    if [[ "$WORKFLOW_MODEL" == "trunk" \
+        && -f "$WORKSPACE_DIR/.github/workflows/sync-main-to-dev.yml" ]]; then
+        DELETIONS+=(".github/workflows/sync-main-to-dev.yml")
+    fi
+
     # Show preserved files
     if [[ ${#PRESERVED[@]} -gt 0 ]]; then
         echo ""
@@ -1072,6 +1241,14 @@ if [[ "$FORCE" == "true" ]]; then
                 echo "  +  $added"
             done
             echo "─────────────────────────────────────────────────────────────"
+        fi
+        # trunk workflow model (#1205): the copied release workflows are
+        # rendered dev -> main after the copy, so call it out in the preview.
+        if [[ "$WORKFLOW_MODEL" == "trunk" ]]; then
+            echo ""
+            echo "Workflow model: trunk — the release workflows are rendered from the"
+            echo "dev base to main (prepare-release/ci/codeql/sync-issues), along with"
+            echo "the branch-naming skill and the pre-commit branch guard."
         fi
         echo ""
         echo "Preview complete — no files were changed."
@@ -1189,6 +1366,13 @@ else
         fi
     done
 
+    # trunk workflow model (#1205): the long-lived dev branch and its sync
+    # workflow disappear, so a trunk workspace never receives
+    # sync-main-to-dev.yml (a leftover copy is pruned after the copy below).
+    if [[ "$WORKFLOW_MODEL" == "trunk" ]]; then
+        EXCLUDE_ARGS+=("--exclude=/.github/workflows/sync-main-to-dev.yml")
+    fi
+
     rsync -avL --exclude='.git' --exclude='.venv' "${EXCLUDE_ARGS[@]}" "$TEMPLATE_DIR/" "$WORKSPACE_DIR/"
 
     # ci.yml is a single mode-aware workflow (#991): it resolves DEVKIT_MODE at
@@ -1293,6 +1477,16 @@ if [[ ("$MODE" == "direnv" || "$MODE" == "bare") \
     && -f "$WORKSPACE_DIR/docs/container-ci-quirks.md" ]]; then
     echo "Pruning container-only docs/container-ci-quirks.md (#989)..."
     rm -f "$WORKSPACE_DIR/docs/container-ci-quirks.md"
+fi
+
+# trunk workflow model (#1205): prune a sync-main-to-dev.yml left by a prior
+# gitflow scaffold on a gitflow->trunk upgrade. The rsync above already excludes
+# the template copy; this removes the upgrade leftover. Devkit-managed (never in
+# PRESERVE_FILES), so no pre-existence guard — mirrors the container-docs prune.
+if [[ "$WORKFLOW_MODEL" == "trunk" \
+    && -f "$WORKSPACE_DIR/.github/workflows/sync-main-to-dev.yml" ]]; then
+    echo "Pruning sync-main-to-dev.yml for the trunk workflow model (#1205)..."
+    rm -f "$WORKSPACE_DIR/.github/workflows/sync-main-to-dev.yml"
 fi
 
 # 0.4.0 retired .devcontainer/justfile.base (recipes relocated to
@@ -1443,6 +1637,9 @@ fi
 migrate_root_gitignore
 render_gitignore
 render_codeql_matrix
+# trunk workflow model (#1205): retarget the copied release workflows dev ->
+# main. A no-op for the gitflow default, so a gitflow scaffold is unchanged.
+render_workflow_model "$WORKFLOW_MODEL"
 
 # Persist the resolved manifest (#885). The scaffolded .vig-os is a managed
 # file (template-overwritten on upgrade), so the resolved delivery mode and
@@ -1475,6 +1672,13 @@ if [[ -f "$VIG_OS_MANIFEST" ]]; then
     # back — else an upgrade silently resets ci.yml onto the hosted default.
     if [[ -n "$MANIFEST_CI_RUNNER" ]]; then
         write_manifest_value DEVKIT_CI_RUNNER "$MANIFEST_CI_RUNNER"
+    fi
+    # Workflow model (#1205): the template ships DEVKIT_WORKFLOW= (empty =
+    # gitflow default), so only a trunk consumer needs a written-back value — a
+    # gitflow repo's .vig-os stays byte-identical (no new non-empty line), the
+    # same conditional-writeback shape as DEVKIT_TAG_PREFIX above.
+    if [[ "$WORKFLOW_MODEL" == "trunk" ]]; then
+        write_manifest_value DEVKIT_WORKFLOW "$WORKFLOW_MODEL"
     fi
 fi
 
