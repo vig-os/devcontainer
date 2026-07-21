@@ -31,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`mkProjectShell`: `extraPackages` Python env no longer silently shadowed** ([#1230](https://github.com/vig-os/devkit/issues/1230))
+  - A `pythonXX.withPackages` env passed through `extraPackages` — the
+    documented way to add Python libraries to a project shell — was shadowed on
+    `PATH` by `vig-utils`'s propagated pinned 3.14 interpreter, so the consumer
+    got the bare interpreter with none of their libraries and only hit a
+    `ModuleNotFoundError` later. The builder now prepends any such env in the
+    shellHook (the same PATH-order mechanism the `python` override uses), so the
+    consumer's interpreter and its `site-packages` own `python3`/`python`.
 - **Trunk render scrubs residual `dev` prose from scaffolded workflows** ([#1226](https://github.com/vig-os/devkit/issues/1226))
   - `render_workflow_model` now retargets the inert `dev` mentions in comments
     and input descriptions as well as the functional literals, so a `trunk`
