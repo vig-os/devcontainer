@@ -54,6 +54,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Extend gawk 5.4.0 CVE exception expiry to 2026-08-18** ([#1240](https://github.com/vig-os/devkit/issues/1240))
+  - The `.vulnixignore` exception for the gawk 5.4.0 CERT-PL batch
+    (`CVE-2026-40467`/`-40468`/`-40469`/`-40553`, from [#1071](https://github.com/vig-os/devkit/issues/1071))
+    is extended from 2026-07-28 to 2026-08-18. The upstream fix (gawk 5.4.1) is
+    still only on nixpkgs `staging` and has not reached the pinned `nixos-26.05`
+    channel, so the planned rev-advance remains unavailable.
+
 ## [1.4.0](https://github.com/vig-os/devkit/releases/tag/1.4.0) - 2026-07-20
 
 ### Added
