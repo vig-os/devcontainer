@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Scheduled security scan now covers `dev` as well as `main`** ([#1237](https://github.com/vig-os/devkit/issues/1237))
+  - `security-scan.yml` gains a `ref` matrix (`main`, `dev`) so the nightly
+    vulnix gate scans the `dev` image closure alongside the default-branch one.
+    A weekly `nixpkgs` bump or an expiring `.vulnixignore` exception on `dev` now
+    surfaces as an ordinary tracking issue days early, instead of first tripping
+    the gate mid-release-train. Each leg reuses the existing machinery unchanged
+    (`check-expirations`, `devkitImageEnv` closure build, vulnix via the
+    nvd-mirror, `vulnix-gate`, deduplicated tracking issue) through its checkout
+    `ref`, files a ref-distinct tracking issue so the lanes never collide on
+    dedup, and runs with `fail-fast: false` so one lane never cancels the other.
 - **`sync-issues` target-branch and schedule knobs** ([#1228](https://github.com/vig-os/devkit/issues/1228))
   - New optional `.vig-os` key `DEVKIT_SYNC_TARGET` overrides the branch the
     scaffolded sync-issues job commits to. Default stays workflow-model-aware
