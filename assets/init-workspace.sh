@@ -324,7 +324,7 @@ is_valid_cron() {
     read -ra fields <<< "$expr"
     [[ ${#fields[@]} -eq 5 ]] || return 1
     for field in "${fields[@]}"; do
-        [[ "$field" =~ ^[0-9A-Za-z*,/?-]+$ ]] || return 1
+        [[ "$field" =~ ^[0-9A-Za-z*,/-]+$ ]] || return 1
     done
     return 0
 }
@@ -400,14 +400,22 @@ if [[ -n "$WORKFLOW_MODEL" && -n "$MANIFEST_WORKFLOW" && "$WORKFLOW_MODEL" != "$
     exit 1
 fi
 
-# sync-issues target branch (#1228): a malformed branch name would render an
-# unusable sync-issues.yml, so validate the ref format loudly at scaffold time
-# using git's own ref-format checker. Pure `.vig-os` key (no CLI flag), so only
-# a format guard — no contradiction guard as for --mode / --workflow.
-if [[ -n "$MANIFEST_SYNC_TARGET" ]] \
-    && ! git check-ref-format "refs/heads/$MANIFEST_SYNC_TARGET" >/dev/null 2>&1; then
-    echo "Error: Invalid DEVKIT_SYNC_TARGET in $VIG_OS_MANIFEST: $MANIFEST_SYNC_TARGET (not a valid git branch name)" >&2
-    exit 1
+# sync-issues target branch (#1228): the value is spliced into single-quoted
+# YAML, sed replacement text, and the bootstrap step's double-quoted shell
+# assignment (executed at sync runtime with the App token in scope) — so the
+# LOAD-BEARING guard is a strict charset allowlist. git check-ref-format alone
+# is NOT enough: it accepts quotes, `$`, backticks, `;`, `|`, `#`, `&` … which
+# would render invalid YAML, crash the render seds, or inject commands. The
+# ref-format check is kept on top to also refuse git-illegal shapes the
+# allowlist admits (e.g. `bad..name`, a trailing `/` or `.lock`). Pure
+# `.vig-os` key (no CLI flag), so only format guards — no contradiction guard
+# as for --mode / --workflow.
+if [[ -n "$MANIFEST_SYNC_TARGET" ]]; then
+    if [[ ! "$MANIFEST_SYNC_TARGET" =~ ^[A-Za-z0-9._/-]+$ ]] \
+        || ! git check-ref-format "refs/heads/$MANIFEST_SYNC_TARGET" >/dev/null 2>&1; then
+        echo "Error: Invalid DEVKIT_SYNC_TARGET in $VIG_OS_MANIFEST: $MANIFEST_SYNC_TARGET (expected a valid git branch name using only [A-Za-z0-9._/-])" >&2
+        exit 1
+    fi
 fi
 
 # sync-issues schedule (#1228): validate the 5-field cron loudly — a bad cron
