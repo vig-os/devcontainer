@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Trunk render scrubs `sync-main-to-dev` prose from `promote-release.yml`** ([#1233](https://github.com/vig-os/devkit/issues/1233))
+  - Follow-up to [#1226](https://github.com/vig-os/devkit/issues/1226) for a file
+    `render_workflow_model` did not touch: the `promote-release.yml` header step
+    list and the Summary echo each named `sync-main-to-dev`, a workflow that is
+    copy-excluded in `trunk`. The trunk render now drops both parentheticals, so
+    a `trunk` consumer no longer ships comments referencing a workflow absent
+    from its repo. Comments only — no functional change; gitflow is unaffected.
 - **Trunk render scrubs residual `dev` prose from scaffolded workflows** ([#1226](https://github.com/vig-os/devkit/issues/1226))
   - `render_workflow_model` now retargets the inert `dev` mentions in comments
     and input descriptions as well as the functional literals, so a `trunk`
