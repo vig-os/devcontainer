@@ -31,6 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`nix-dev` discovery image no longer drifts stale on baked-content pushes** ([#1236](https://github.com/vig-os/devkit/issues/1236))
+  - The `nix-image.yml` `dev` push trigger only watched `flake.nix`,
+    `flake.lock`, and the workflow file, but the image bakes broader repo content
+    at build time (the `assets/` scaffold tree, `docs/MIGRATION.md`, the
+    `packages/vig-utils` console scripts, the `nix/home` environment, `scripts/`).
+    A `dev` push touching only baked content left the mutable `nix-dev` tag stale
+    with no rebuild. Dropped the fragile `paths:` allowlist so every push to
+    `dev` (or the epic branch) rebuilds, tests, and repushes the tag; Cachix/eval
+    caching keeps no-op rebuilds cheap.
 - **Trunk render scrubs residual `dev` prose from scaffolded workflows** ([#1226](https://github.com/vig-os/devkit/issues/1226))
   - `render_workflow_model` now retargets the inert `dev` mentions in comments
     and input descriptions as well as the functional literals, so a `trunk`
