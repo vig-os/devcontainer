@@ -23,6 +23,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from tests.workflow_scaffold import (
     INIT_WORKSPACE,
     WORKSPACE,
@@ -189,6 +191,35 @@ def test_guard_rejects_bad_branch_name(tmp_path: Path) -> None:
     seed = _seed(tmp_path, "bad-branch", "DEVKIT_SYNC_TARGET=bad..name\n")
     proc = scaffold(tmp_path, seed=seed, name="bad-branch", check=False)
     assert proc.returncode != 0
+    assert "Invalid DEVKIT_SYNC_TARGET" in proc.stderr
+
+
+@pytest.mark.parametrize(
+    "hostile",
+    [
+        "foo'bar",  # git-legal, but breaks the single-quoted YAML render
+        "x$(id)y",  # git-legal, but command substitution in the bootstrap step
+        "a`id`b",  # backtick command substitution, same sink
+        "foo|bar",  # sed s#…# replacement crashes / delimiter collision
+        "foo#bar",  # sed s#…# delimiter collision
+        "a;b",  # shell statement separator
+        'q"w',  # double quote — escapes the bootstrap TARGET="…" assignment
+        "a&b",  # sed replacement metacharacter
+        "c{d}",  # expression/brace tokens
+    ],
+)
+def test_guard_rejects_hostile_branch_chars(tmp_path: Path, hostile: str) -> None:
+    """Shell/sed/YAML metacharacters are refused with the clean guard message.
+
+    ``git check-ref-format`` alone accepts quotes, ``$``, backticks, ``;``,
+    ``|``, ``#``, ``&``, ``{`` … — values that would render invalid YAML, crash
+    the render seds with a raw sed error, or (worst) inject commands into the
+    bootstrap step's double-quoted shell assignment at sync runtime with the
+    App token in scope. The guard must be a strict allowlist.
+    """
+    seed = _seed(tmp_path, "hostile", f"DEVKIT_SYNC_TARGET={hostile}\n")
+    proc = scaffold(tmp_path, seed=seed, name="hostile", check=False)
+    assert proc.returncode != 0, f"scaffold accepted hostile target: {hostile!r}"
     assert "Invalid DEVKIT_SYNC_TARGET" in proc.stderr
 
 

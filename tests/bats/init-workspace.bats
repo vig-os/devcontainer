@@ -2206,6 +2206,22 @@ _upgrade_no_flags() {
     assert_output --partial "Invalid DEVKIT_SYNC_TARGET"
 }
 
+@test "a hostile DEVKIT_SYNC_TARGET (shell metacharacters) fails the scaffold loudly (#1228)" {
+    # git check-ref-format alone accepts quotes/$/backticks/;/|/# — values that
+    # would render invalid YAML or inject commands into the bootstrap step's
+    # double-quoted shell assignment at sync runtime (with the App token in
+    # scope). The allowlist guard must refuse them with the clean message.
+    ws="$BATS_TEST_TMPDIR/e2e-1228-hostile-target"
+    mkdir -p "$ws"
+    run _scaffold both "$ws"
+    assert_success
+    # shellcheck disable=SC2016  # literal $(id) is the hostile payload, not an expansion
+    sed -i 's#^DEVKIT_SYNC_TARGET=.*#DEVKIT_SYNC_TARGET=x$(id)y#' "$ws/.vig-os"
+    run _upgrade_no_flags "$ws"
+    assert_failure
+    assert_output --partial "Invalid DEVKIT_SYNC_TARGET"
+}
+
 @test "an invalid DEVKIT_SYNC_SCHEDULE fails the scaffold loudly (#1228)" {
     ws="$BATS_TEST_TMPDIR/e2e-1228-bad-cron"
     mkdir -p "$ws"
