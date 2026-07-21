@@ -186,6 +186,13 @@ def test_trunk_ci_pr_filter_excludes_dev(tmp_path: Path) -> None:
     assert "\n      - dev\n" not in text
     assert 'TRUNK="main"' in text
     assert 'TRUNK="dev"' not in text
+    # #1226: the trigger-header + origin/dev rationale prose retarget to main too
+    # so a trunk repo carries no lying `dev` comments.
+    assert "Pull requests to dev" not in text
+    assert "Pull requests to release/** and main" in text
+    assert "origin/dev" not in text
+    assert "a no-op on a main PR" in text
+    assert "its base IS main" in text
 
 
 def test_trunk_codeql_pr_filter_excludes_dev(tmp_path: Path) -> None:
@@ -193,6 +200,9 @@ def test_trunk_codeql_pr_filter_excludes_dev(tmp_path: Path) -> None:
     text = _wf(_tree(tmp_path, "trunk"), "codeql.yml")
     assert "\n      - dev\n" not in text
     assert "\n      - main\n" in text
+    # #1226: the trigger-header comment retargets to main too.
+    assert "Pull requests to dev" not in text
+    assert "Pull requests to release/** and main" in text
 
 
 def test_trunk_sync_issues_default_main(tmp_path: Path) -> None:
@@ -201,8 +211,10 @@ def test_trunk_sync_issues_default_main(tmp_path: Path) -> None:
     assert "default: 'main'" in text
     assert "|| 'dev'" not in text
     assert "|| 'main'" in text
-    # The illustrative `e.g., dev, release/x.y.z` description text is left alone.
-    assert "e.g., dev" in text
+    # #1226: the illustrative `e.g., dev, …` description retargets dev -> main too
+    # (previously left alone), so no stray `dev` prose survives.
+    assert "e.g., dev" not in text
+    assert "e.g., main, release/x.y.z" in text
 
 
 def test_trunk_skill_base_branch_main(tmp_path: Path) -> None:
