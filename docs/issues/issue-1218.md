@@ -1,19 +1,19 @@
 ---
 type: issue
-state: open
+state: closed
 created: 2026-07-20T14:12:14Z
-updated: 2026-07-20T14:12:14Z
+updated: 2026-07-20T15:23:54Z
 author: github-actions[bot]
 author_url: https://github.com/github-actions[bot]
 url: https://github.com/vig-os/devkit/issues/1218
-comments: 0
+comments: 1
 labels: bug, area:ci
 assignees: none
 milestone: none
 projects: none
 parent: none
 children: none
-synced: 2026-07-20T14:51:02.933Z
+synced: 2026-07-21T05:27:43.139Z
 ---
 
 # [Issue 1218]: [Release 1.4.0 failed -- automatic rollback](https://github.com/vig-os/devkit/issues/1218)
@@ -51,4 +51,12 @@ Release 1.4.0 encountered an error during the automated release workflow.
 4. Publish a new release candidate to validate the fix; re-run the final workflow when ready
 
 For details, check the workflow run linked above.
+
+---
+
+# [Comment #1]() by [c-vigo]()
+
+_Posted on July 20, 2026 at 03:23 PM_
+
+Forgot to approve PR
 
