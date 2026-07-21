@@ -2634,11 +2634,14 @@ _referenced_secrets() {
     assert_success
 }
 
-@test "actionlint passes over the smoke-test workflow template (#995)" {
-    # The smoke-test template ships a single, standalone workflow (no reusable
-    # siblings), so it is linted in-place by explicit path from the repo root.
+@test "actionlint passes over the smoke-test workflow templates (#995)" {
+    # The smoke-test overlay ships standalone workflows (no reusable siblings),
+    # so they are linted in-place by explicit path from the repo root. The repo
+    # actionlint hook is scoped to ^.github/workflows/, so this test is the only
+    # actionlint coverage the overlay workflows get in the devkit (#1194).
     run actionlint \
-        "$PROJECT_ROOT/assets/smoke-test/.github/workflows/repository-dispatch.yml"
+        "$PROJECT_ROOT/assets/smoke-test/.github/workflows/repository-dispatch.yml" \
+        "$PROJECT_ROOT/assets/smoke-test/.github/workflows/direnv-smoke.yml"
     assert_success
 }
 
