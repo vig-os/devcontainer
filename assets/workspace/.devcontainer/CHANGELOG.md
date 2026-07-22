@@ -23,6 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`setup-labels`: repo-local taxonomy extension file** ([#1254](https://github.com/vig-os/devkit/issues/1254))
+  - Optional, non-devkit-managed `.github/label-taxonomy.local.toml` (same
+    `[[labels]]` schema) lets a consuming repo declare repo-specific labels
+    that survive devkit upgrades.
+  - `setup-labels` treats the union of both files as the effective taxonomy:
+    extension labels are created/updated in the normal reconciliation pass, and
+    `--prune` only deletes labels absent from both files.
+  - Local-wins collision policy: an extension entry with the same `name`
+    overrides the canonical color/description.
+
 - **Scheduled security scan now covers `dev` as well as `main`** ([#1237](https://github.com/vig-os/devkit/issues/1237))
   - `security-scan.yml` gains a `ref` matrix (`main`, `dev`) so the nightly
     vulnix gate scans the `dev` image closure alongside the default-branch one.
