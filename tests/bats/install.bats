@@ -869,8 +869,13 @@ _run_install_stubbed() {
 # throwaway container BEFORE the git phase. Rootless podman maps container-root
 # to the invoking user, so it needs no repair. Exercised against a logging stub
 # runtime (records each invocation) so nothing is pulled or actually chowned.
+# The repair keys on the OBSERVED post-scaffold ownership, not the runtime name
+# (#1248): pass owned=foreign to simulate a tree with files not owned by the
+# invoking user (real docker's root-owned output) — an unprivileged test can't
+# create root-owned files, so a stub of install.sh's find(1) ownership probe
+# reporting a hit stands in for them (install.sh runs no other find).
 _run_install_logging_stub() {
-    local dir="$1" runtime="$2" log="$3"
+    local dir="$1" runtime="$2" log="$3" owned="${4:-user}"
     local stub="$BATS_TEST_TMPDIR/stub-$runtime"
     mkdir -p "$stub"
     cat >"$stub/$runtime" <<STUB
@@ -879,6 +884,13 @@ printf '%s\n' "\$*" >> "$log"
 exit 0
 STUB
     chmod +x "$stub/$runtime"
+    if [ "$owned" = "foreign" ]; then
+        cat >"$stub/find" <<'STUB'
+#!/usr/bin/env bash
+echo "/workspace/root-owned-file"
+STUB
+        chmod +x "$stub/find"
+    fi
     _make_repo "$dir"
     run env PATH="$stub:$PATH" bash "$INSTALL_SH" \
         "--$runtime" --skip-pull --mode direnv "$dir" </dev/null
@@ -886,7 +898,7 @@ STUB
 
 @test "docker path chowns scaffold output to the invoking user (#1235)" {
     log="$BATS_TEST_TMPDIR/docker-repair.log"
-    _run_install_logging_stub "$BATS_TEST_TMPDIR/repair-docker" docker "$log"
+    _run_install_logging_stub "$BATS_TEST_TMPDIR/repair-docker" docker "$log" foreign
     assert_success
     run grep -F "chown -R $(id -u):$(id -g) /workspace" "$log"
     assert_success
