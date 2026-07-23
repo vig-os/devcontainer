@@ -59,6 +59,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Upgrade no longer deploys the template `.pre-commit-config.yaml` over flake-generated hooks** ([#1255](https://github.com/vig-os/devkit/issues/1255))
+  - On a flake-hooks consumer ([#1167](https://github.com/vig-os/devkit/issues/1167))
+    the generated config is a gitignored `/nix/store` symlink that only
+    materializes on shell entry, so a fresh checkout/worktree has no file for
+    the preserve list to protect — an `install.sh --force` upgrade then
+    deployed the scaffold template YAML, which silently shadowed the generated
+    config (git-hooks.nix refuses to overwrite an existing file) and dropped
+    the consumer's `hooks`/`hooksExcludes` customizations. Pre-existing since
+    1.4.0; gitignored, so CI and PRs were unaffected.
+  - The upgrade now detects the opt-in from the preserved `flake.nix` itself
+    (an active `hooks`/`hooksExcludes` argument — exactly `mkProjectShell`'s
+    generation trigger), skips the template YAML in both the copy and the
+    `--preview` report, and still seeds the `.pre-commit-config.yaml` gitignore
+    entry so the regenerated root `.gitignore` stays correct.
 - **`mkProjectShell`: `extraPackages` Python env no longer silently shadowed** ([#1230](https://github.com/vig-os/devkit/issues/1230))
   - A `pythonXX.withPackages` env passed through `extraPackages` — the
     documented way to add Python libraries to a project shell — was shadowed on
