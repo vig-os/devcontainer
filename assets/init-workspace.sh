@@ -814,12 +814,17 @@ render_gitignore() {
     # STRICTLY on the store-symlink condition so a hand-managed consumer who
     # commits a real .pre-commit-config.yaml file is never affected. A fresh
     # direnv scaffold defaults to flake-generated hooks (FLAKE_HOOKS_DEFAULT,
-    # #1167) before the store symlink exists, so seed the ignore for it too.
+    # #1167) before the store symlink exists, so seed the ignore for it too —
+    # as does an UPGRADED flake-hooks consumer whose generated config is absent
+    # from a fresh checkout/worktree (FLAKE_HOOKS_CONSUMER, #1255): without the
+    # seed the regenerated root .gitignore would drop the entry and the next
+    # shell entry would leave the store symlink dirtying git status.
     # Idempotent: skip when the assembled ignore (incl. .gitignore.project)
     # already lists it.
     local pcc="$WORKSPACE_DIR/.pre-commit-config.yaml"
     if { [[ -L "$pcc" ]] && readlink "$pcc" | grep -q '/nix/store/'; } \
-        || [[ "${FLAKE_HOOKS_DEFAULT:-false}" == "true" ]]; then
+        || [[ "${FLAKE_HOOKS_DEFAULT:-false}" == "true" ]] \
+        || [[ "${FLAKE_HOOKS_CONSUMER:-false}" == "true" ]]; then
         if ! grep -qxF '.pre-commit-config.yaml' "$gi"; then
             {
                 printf '\n# flake-hooks opt-in (#1092): the generated'
@@ -846,16 +851,16 @@ activate_flake_hooks_default() {
     local tmp="${flake}.hooks-default"
     awk '
         { print }
-        /^          extraPackages = extraPackages pkgs;$/ && !inserted {
+        /^            extraPackages = extraPackages pkgs;$/ && !inserted {
             print ""
-            print "          # Host-runner hooks (#1167): direnv CI runs on the bare host"
-            print "          # runner, so let the flake GENERATE .pre-commit-config.yaml from"
-            print "          # the shared base hook set, resolved entirely from the Nix store"
-            print "          # (incl. pymarkdown, now a flake system hook, #1170) rather than"
-            print "          # building the committed YAML remote pre-commit repo hook envs"
-            print "          # per runner. Customize like the opt-in block below; the generated"
-            print "          # config is a gitignored /nix/store symlink."
-            print "          hooks = { };"
+            print "            # Host-runner hooks (#1167): direnv CI runs on the bare host"
+            print "            # runner, so let the flake GENERATE .pre-commit-config.yaml from"
+            print "            # the shared base hook set, resolved entirely from the Nix store"
+            print "            # (incl. pymarkdown, now a flake system hook, #1170) rather than"
+            print "            # building the committed YAML remote pre-commit repo hook envs"
+            print "            # per runner. Customize like the opt-in block below; the generated"
+            print "            # config is a gitignored /nix/store symlink."
+            print "            hooks = { };"
             inserted = 1
         }
     ' "$flake" >"$tmp" && mv "$tmp" "$flake"
@@ -1042,6 +1047,25 @@ fi
 # configs collide. (A *preserved* .typos.toml is handled by the preserve list.)
 if [[ -f "$WORKSPACE_DIR/_typos.toml" && ! -f "$WORKSPACE_DIR/.typos.toml" ]]; then
     MODE_CONFIG_EXCLUDES+=(".typos.toml")
+fi
+# Flake-hooks consumer with an ABSENT generated config (#1255): the consumer's
+# .pre-commit-config.yaml is flake-GENERATED (#883/#1167) — a gitignored
+# /nix/store symlink that only materializes on shell entry — so in a fresh
+# checkout/worktree the file is absent and the preserve list cannot protect it.
+# Deploying the template YAML then SHADOWS the generated config (git-hooks.nix
+# refuses to overwrite an existing file): the shell silently runs the generic
+# template without the consumer's hooks/hooksExcludes customizations. The
+# opt-in is detectable without the file: an ACTIVE (uncommented)
+# hooks/hooksExcludes argument in the preserved flake.nix — exactly
+# mkProjectShell's generation trigger (hooks != null || hooksExcludes != [ ]);
+# the template's commented opt-in block never matches. Gated on the config
+# being absent: when it IS present the existing paths already handle it (store
+# symlink -> preserved #1117; regular file -> mid-migration, consumer-owned).
+FLAKE_HOOKS_CONSUMER=false
+if [[ "$FLAKE_PREEXISTED" == "true" && "$PRECOMMIT_CONFIG_PREEXISTED" == "false" ]] \
+    && grep -Eq '^[[:space:]]*hooks(Excludes)?[[:space:]]*=' "$WORKSPACE_DIR/flake.nix"; then
+    FLAKE_HOOKS_CONSUMER=true
+    MODE_CONFIG_EXCLUDES+=(".pre-commit-config.yaml")
 fi
 
 # Rewrite the scaffolded workspace from the gitflow default shape (long-lived
@@ -1490,6 +1514,11 @@ else
         # their _typos.toml stands as the single config (#913).
         if [[ "$excl" == ".typos.toml" ]]; then
             echo "Consumer carries legacy _typos.toml; not shipping template .typos.toml (#913)."
+        fi
+        # Surface the flake-hooks skip so the upgrade report explains the
+        # missing template YAML (#1255).
+        if [[ "$excl" == ".pre-commit-config.yaml" ]]; then
+            echo "Flake-generated pre-commit hooks consumer; not shipping template .pre-commit-config.yaml (#1255)."
         fi
     done
 
